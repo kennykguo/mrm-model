@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mrm"
+version = "0.1.0"
+description = "A calibrated, control-oriented plant model of Lightmatter-class silicon microring modulators"
+requires-python = ">=3.12"
+dependencies = ["numpy", "scipy", "matplotlib", "pyyaml", "numba"]
+
+[project.optional-dependencies]
+extract = ["femwell", "scikit-fem", "gmsh", "meshio", "shapely", "pyamg", "devsim", "tidy3d"]
+rl = ["gymnasium"]
+dev = ["pytest"]
+
+[project.scripts]
+mrm = "mrm.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mrm*"]
+
+[tool.setuptools.package-data]
+mrm = ["params/presets/*.yaml", "data/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: long-running test (solver or long simulation)"]

@@ -1,0 +1,109 @@
+{
+ "axisym": {
+  "nodes": 3465,
+  "triangles": 6696,
+  "states": 3402,
+  "ring_volume_um3": 3.7699111843077553,
+  "Rth_K_per_mW": 8.188090290753465,
+  "slowest_time_constants_us": [
+   13.715115947150665,
+   10.938864159045766,
+   7.904919804348809,
+   5.5107868391187615
+  ],
+  "full_freq_sweep_s": 3.8,
+  "f_3dB_Hz": 60082.32888988951,
+  "reductions": {
+   "krylov_r2": {
+    "rel_Hinf_err": 0.25923413257077593,
+    "dc_gain": 8.188090290750326,
+    "shifts_per_us": [
+     0.0
+    ],
+    "seconds": 0.07
+   },
+   "krylov_r4": {
+    "rel_Hinf_err": 0.15830094140849224,
+    "dc_gain": 8.188090290750326,
+    "shifts_per_us": [
+     0.0,
+     0.01
+    ],
+    "seconds": 0.14
+   },
+   "krylov_r6": {
+    "rel_Hinf_err": 0.08039697875254401,
+    "dc_gain": 8.188090290750324,
+    "shifts_per_us": [
+     0.0,
+     0.001,
+     0.1
+    ],
+    "seconds": 0.16
+   },
+   "krylov_r8": {
+    "rel_Hinf_err": 0.060689194927459535,
+    "dc_gain": 8.188090290750324,
+    "shifts_per_us": [
+     0.0,
+     0.001,
+     0.1
+    ],
+    "seconds": 0.22
+   },
+   "pymor_BT_r2": {
+    "rel_Hinf_err": 0.15083945768843396,
+    "seconds": 7.8
+   },
+   "pymor_IRKA_r2": {
+    "rel_Hinf_err": 0.41677772420890935,
+    "seconds": 13.0
+   },
+   "pymor_BT_r4": {
+    "rel_Hinf_err": 0.020469657900382576,
+    "seconds": 0.08
+   },
+   "pymor_IRKA_r4": {
+    "rel_Hinf_err": 0.14077663753290873,
+    "seconds": 27.16
+   },
+   "pymor_BT_r6": {
+    "rel_Hinf_err": 0.003898100234425498,
+    "seconds": 0.01
+   },
+   "pymor_IRKA_r6": {
+    "rel_Hinf_err": 0.015970941374881937,
+    "seconds": 6.67
+   },
+   "pymor_BT_r8": {
+    "rel_Hinf_err": 0.0008078147742084359,
+    "seconds": 0.01
+   },
+   "pymor_IRKA_r8": {
+    "rel_Hinf_err": 0.004870078815915402,
+    "seconds": 8.89
+   }
+  }
+ },
+ "pymor_version": "2026.1.1",
+ "control_version": "0.10.2",
+ "control_rom6": {
+  "dc_gain": 8.156172293315768,
+  "poles_time_constants_us": [
+   9.552901397458227,
+   1.3331606874707103,
+   0.2976634546240138,
+   0.07065075633312053,
+   0.01549263344904391,
+   0.0023781520974412544
+  ]
+ },
+ "control_balred_3_dc_gain": 7.73804830369008,
+ "block3d": {
+  "nodes": 22360,
+  "tets": 117936,
+  "Rth_K_per_mW_12um_heater": 31.699681568405186,
+  "seconds": 2.6
+ },
+ "total_seconds": 81.8
+}
