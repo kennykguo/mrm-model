@@ -434,7 +434,7 @@ class Plant:
 
     # ------------------------------------------------------------------------------------------------ reset
     def reset(self, noise_seed: int | None = None, *, k0: int = 0, protocol: str | None = None, heater_code=None,
-              bias_code=None) -> None:
+              bias_code=None, settle: bool = False) -> None:
         """Reset every world to its defined start (07 P0-1 item 6) at tick k0.
 
         protocol: 'laser_ramp' (lines ramp from 0 over pp.timing.reset_ramp_ticks, cold branch), 'branch_low'
@@ -442,7 +442,82 @@ class Plant:
         pp.timing.reset_protocol. heater_code: initial heater registers (default code_min; a warm start passes
         codes). bias_code: initial bias registers (default the scenario's bias at k0, or code 0 when the controller
         owns the bias). noise_seed re-keys the noise streams only (07 P1-13); device draws never change.
+        settle: start from the thermal steady state of these codes and the inputs at k0 instead of cold lags
+        (:meth:`settle`; needs protocol branch_low or branch_high). ``self.settle_info`` reports it (None without).
         """
+        self._reset(noise_seed, k0=k0, protocol=protocol, heater_code=heater_code, bias_code=bias_code)
+        self.settle_info = None
+        if settle:
+            self.settle_info = self.settle(heater_code=heater_code, bias_code=bias_code)
+
+    def settle(self, *, heater_code=None, bias_code=None, max_iter: int = 200, tol_k: float = 2e-3) -> dict:
+        """Settled warm start (07 P0-1 item 6; controllers_a request 3, controllers_c request 3b): replace the cold
+        thermal lags of the state just reset by the steady state of the held inputs at the reset tick.
+
+        Method: the kernel itself runs open loop with the DC coefficients of every lag (a = 0, c0 = 0, c1 = r_m:
+        the exact FOH step of mrm.plant.thermal.foh_coefficients for h -> inf), one tick at a time, until the ring
+        temperatures change by less than ``tol_k`` (K) between iterations. Each DC tick is the plant's own implicit
+        self-heating solve (mrm.plant.selfheat; the first iterate starts from the reset branch, +inf for
+        branch_high and -inf for branch_low, later ones continue from the previous root), heater TCR split, bias,
+        NRZ levels, data-activity heat and scenario inputs at the reset tick, so the result is the engine's own
+        fixed point, not a separate model. The cross-ring optical heat and the heater TCR lag one iteration (a
+        contraction by the small cross gains). Then the plant is reset again (sensors, metrics, records, edges,
+        registers, noise) and only the thermal state is kept: lag states, observer temperatures, held source powers,
+        ring / heater / PD temperatures, absorbed and heater powers; the self-heating root continues from the
+        settled ring temperature. Pass the same heater_code / bias_code as the reset.
+
+        Convergence: the noise draws of every tick (bias DAC noise, laser RIN, binomial ones density) move the DC
+        fixed point by ~0.5 mK in g26 (~0.04 pm), so ``tol_k`` is 2 mK (0.15 pm at 70 pm/K), not a solver
+        tolerance. From branch_high the first iterates walk down from the hottest root (~10 K per iteration under
+        the solver's iteration limit; those solves count as not converged); g26 nominal settles in ~20 iterations.
+
+        Returns {'iterations', 'max_delta_k', 'converged', 'selfheat_not_converged_last' (B,): self-heating solves
+        that did not converge in the last iteration (0 when the fixed point is a regular root)}.
+        """
+        if self.tick != self.k_reset:
+            raise RuntimeError("settle() must follow reset() directly")
+        P0 = self.P
+        if int(P0.reset_protocol) == 0:
+            raise ValueError("settle needs the reset protocol branch_low or branch_high (lasers on at the start); "
+                             "laser_ramp starts dark")
+        k0 = int(self.tick)
+        shape = P0.th_a.shape                                              # (B|1, n_pow, M)
+        res = np.asarray(self.sys.res_k_per_w, np.float64)
+        c1 = np.ascontiguousarray(np.broadcast_to(res[:, None, :], shape), dtype=np.float64).copy()
+        self.P = P0._replace(th_a=np.zeros(shape), th_c0=np.zeros(shape), th_c1=c1,
+                             policy=type(P0.policy)(K.POLICY_FIXED))
+        t_prev = self.S.rf[:, K.RF_T_RING, :].copy()
+        delta = math.inf
+        it = 0
+        nf_last = np.zeros(self.B, np.int64)
+        try:
+            for it in range(1, int(max_iter) + 1):
+                nf0 = self.S.wi[:, K.WI_N_FAIL].copy()
+                self.run(1, mode=K.MODE_OPEN)
+                nf_last = self.S.wi[:, K.WI_N_FAIL] - nf0
+                t_now = self.S.rf[:, K.RF_T_RING, :]
+                delta = float(np.max(np.abs(t_now - t_prev)))
+                t_prev = t_now.copy()
+                if it >= 3 and delta < tol_k:
+                    break
+        finally:
+            self.P = P0
+        S = self.S
+        keep ={name: getattr(S, name).copy() for name in ("th_x", "th_t_obs", "th_g", "th_u0", "th_u1")}
+        rows = [K.RF_P_PREV, K.RF_T_RING, K.RF_T_HEATER, K.RF_T_PD, K.RF_T_NEW, K.RF_P_NEW, K.RF_HE_P, K.RF_P_ABS]
+        keep_rf = S.rf[:, rows, :].copy()
+        self._reset(None, k0=k0, protocol=None, heater_code=heater_code, bias_code=bias_code)
+        S = self.S
+        for name, val in keep.items():
+            getattr(S, name)[...] = val
+        S.rf[:, rows, :] = keep_rf
+        S.rf[:, K.RF_T_BRANCH, :] = S.rf[:, K.RF_T_RING, :]
+        return {"iterations": int(it), "max_delta_k": delta, "converged": bool(delta < tol_k),
+                "selfheat_not_converged_last": nf_last.copy()}
+
+    def _reset(self, noise_seed: int | None = None, *, k0: int = 0, protocol: str | None = None, heater_code=None,
+               bias_code=None) -> None:
+        """The body of :meth:`reset` (no settle)."""
         if noise_seed is not None and int(noise_seed) != self.noise_seed:
             self.noise_seed = int(noise_seed)
             self._rekey_noise()

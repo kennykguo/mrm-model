@@ -15,14 +15,6 @@
    },
    "width_definition": "mid-height of the etched sidewall",
    "lam0_nm": 1310.0,
-   "provenance": {
-    "film_nm": "printed (GF-IMAPS)",
-    "width_nm": "assumed (SMTAI render 400; BU 45CLO 410)",
-    "slab_nm": "assumed",
-    "sidewall_deg": "assumed",
-    "box_um": "printed (GF-IMAPS)",
-    "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
-   },
    "ranges_nm": {
     "width_nm": [
      360.0,
@@ -36,6 +28,20 @@
      40.0,
      100.0
     ]
+   },
+   "provenance_by_field": {
+    "film_nm": "printed (GF-IMAPS)",
+    "width_nm": "assumed (SMTAI render 400; BU 45CLO 410)",
+    "slab_nm": "assumed",
+    "sidewall_deg": "assumed",
+    "box_um": "printed (GF-IMAPS)",
+    "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
+   },
+   "provenance": "assumed",
+   "provenance_note": "one provenance word for the whole cross-section (the weakest of its parts): every hypothesis has at least one unpublished dimension (slab depth, rib width, sidewall angle or cladding), so it is 'assumed'; per-field provenance is in provenance_by_field",
+   "ranges_not_assigned": {
+    "sidewall_deg": "90 deg (assumed); no range assigned and no sensitivity computed; realize has no sidewall dimension",
+    "clad": "SiO2 (beol) above and beside the core, SiO2 (thermal) BOX, indices from mrm.materials: the cladding stack (no liner, no index spread, thickness) is assumed and has no range"
    }
   },
   "r_ref": {
@@ -49,7 +55,8 @@
    "file": "mrm/data/materials.json",
    "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
    "si_index_model": "li1980 temperature shape on the frey level",
-   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT",
+   "provenance": "literature"
   },
   "film_nm": 160.0,
   "settings": {
@@ -126,7 +133,15 @@
   },
   "overlap_grid_dx_um": 0.005,
   "ring_u_grid_um": 0.0025,
-  "dz_um": 0.04
+  "dz_um": 0.04,
+  "memory": {
+   "cap_gb": 3.0,
+   "cap": "tools/memguard.py --limit-gb 3 --heavy (former per-job cap; heavy default now 6 GB)",
+   "peak_rss_gb": 2.03,
+   "fem_mesh": "mesh_scale 1.5 (h_core 15 nm), inherited from the modes setting that the 3 GB cap shaped; FEM convergence at the through gap: K^2 0.10472 / 0.10450 / 0.10443 at 20 / 15 / 10 nm, so the production value is +0.06 % from the 10 nm level (the CMT method itself is validated to 1-3 % against 2-D Meep)",
+   "overlap_grid": "10 / 5 nm interface-aligned levels; a 2.5 nm level was never planned and was not cut by the cap. Estimated peak at 2.5 nm: about 4 GB (sampled-field cache 0.3 -> 1.3 GB, probe matrices +0.3 GB): above 3 GB, inside 6 GB",
+   "rerun_command": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.coupling --xsec rib160 --dx-nm 2.5 --out <dir> (add --mesh-scale 1.0 for the 10 nm FEM mesh)"
+  }
  },
  "validation": {
   "sampling": {
@@ -527,6 +542,14 @@
   {
    "redesign_utc": "2026-10-09T14:08:40Z",
    "note": "design block recomputed from kappa2_vs_gap_lambda0 (log-linear extrapolation beyond the gap table)"
+  },
+  {
+   "sidecar_update_utc": "2026-10-09T18:07:23Z",
+   "note": "resumed run, no solver: inputs.geometry/materials provenance words (junction convention) and mesh.memory from the run logs (docs/handoff/extract_modes.md, 'Memory cap'). Data file unchanged."
+  },
+  {
+   "sidecar_update_utc": "2026-10-09T18:30:44Z",
+   "note": "review (no solver): inputs.geometry.ranges_not_assigned. Data file unchanged."
   }
  ],
  "sha256": "2b4a35bb976044fb6b9f00cc7486177f1fad4595831688ab8306885f48a906bf"

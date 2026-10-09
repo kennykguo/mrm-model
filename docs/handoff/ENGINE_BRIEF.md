@@ -1,5 +1,11 @@
 # ENGINE BRIEF: what the kernel / plant / runner owner needs
 
+> **Superseded by docs/ENGINE.md** (engine and controllers stage integration, 2026-10-09): how the engine works and
+> how to use it. This brief is kept for its reference tables (sections 2, 4 and 5: leaf builders, leaf kernel
+> signatures, PlantParams consumers). Known gaps 1 (plant/io.py) and 10 (auto substeps) are closed, gap 7 has the
+> waveform LUT (docs/handoff/waveform.md section 3, not wired); section 3 step 6's slope `2 pi c t_rt / lam^2` is
+> wrong after a heater shift: use `2 pi c t_rt / (lam - shift)^2` (docs/handoff/engine.md section 3 item 6).
+
 For the agent that writes `mrm/sim/kernel.py`, `mrm/sim/kernel_ref.py`, `mrm/plant/plant.py`, `mrm/sim/runner.py`
 (and later metrics, experiment, manifest, gym_env, bridge). Written by the foundation-stage integrator on 2026-10-09.
 Contract: docs/ARCHITECTURE.md (v2) and the normative sections of docs/research/07_design_critique.md ("07"):

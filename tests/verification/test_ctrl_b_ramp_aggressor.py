@@ -22,6 +22,7 @@ import warnings
 import numpy as np
 import pytest
 
+from mrm.control.baselines.bitstat_lock import BitStatLock
 from mrm.control.baselines.ramp_acquire import RampAcquire, ST_LOCK
 from mrm.scenarios import library as lib
 
@@ -101,12 +102,14 @@ def test_a2_full_cycle_engine():
     assert dev < 10.0
 
 
-def test_a1_through_the_cusp_engine():
+@pytest.mark.parametrize("which", ["ramp", "bitstat"])
+def test_a1_through_the_cusp_engine(which):
     """A1 (slide 10: T = 113.6 - 88.5 |sin(pi t / 130.7 ms)| degC at the victim, 2127 degC/s at the cusp), in its
     calibrated periodic form with the phase put 2 ms before the minimum (the acquisition happens where the slope is
     small), then the whole rising half-cycle (the slope grows to 2127 degC/s) and 8 ms past the cusp, where the
     slope reverses in one tick. Ring 0 on line 4 (8.74 nm of headroom), declared through tx.assignment so the
-    engine's Truth refers to that line."""
+    engine's Truth refers to that line. ``bitstat``: the bit-statistics lock (same acquisition and inner loop, its
+    set-point from the eye statistics; review addition)."""
     runner = pytest.importorskip("mrm.sim.runner")
     from mrm.plant.plant import prepare_scenario
     from test_ctrl_b_engine import WithAssignment
@@ -122,7 +125,8 @@ def test_a1_through_the_cusp_engine():
                                                     for c in a.power)) for a in csc.aggressors)
     csc = dataclasses.replace(csc, aggressors=aggs)
     lo, hi = _window(spec, offset_nm=8.74)
-    ctrl = RampAcquire(rings=[0], w_start=max(lo - 0.04, 0.0), w_lo=lo, w_hi=hi)
+    cls = RampAcquire if which == "ramp" else BitStatLock
+    ctrl = cls(rings=[0], w_start=max(lo - 0.04, 0.0), w_lo=lo, w_hi=hi)
     wrapped = WithAssignment(ctrl, [4, 1, 2, 3, 4, 5, 6, 7])
     dur = t_min + period / 2 + 8e-3
     res = _engine(wrapped, cfg, csc, dur, [("detuning_m", 100, "mean"), ("detuning_m", 100, "max"),
@@ -134,7 +138,7 @@ def test_a1_through_the_cusp_engine():
     dev = max(float(np.max(mx[after]) - ref), float(ref - np.min(mn[after])))
     cusp = (t > t_min + period / 2 - 5e-3) & (t < t_min + period / 2 + 5e-3)
     dev_cusp = max(float(np.max(mx[cusp]) - ref), float(ref - np.min(mn[cusp])))
-    print(f"\nA1 engine through the cusp: lock detuning median {ref:.1f} pm, max deviation {dev:.2f} pm (within 5 ms "
+    print(f"\nA1 engine through the cusp ({which}): lock detuning median {ref:.1f} pm, max deviation {dev:.2f} pm (within 5 ms "
           f"of the cusp {dev_cusp:.2f} pm), state {ctrl.fsm.state[0, 0]}, wall {res.wall_s:.0f} s")
     assert ctrl.fsm.state[0, 0] == ST_LOCK
     assert dev < 30.0

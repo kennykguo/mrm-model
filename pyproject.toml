@@ -26,4 +26,5 @@ mrm = ["params/presets/*.yaml", "params/*.yaml", "data/**/*", "validation/target
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: long-running test (solver or long simulation)"]
+markers = ["slow: long-running test (solver or long simulation)",
+           "perf: performance measurement against the 07 P0-9 budget (machine dependent)"]

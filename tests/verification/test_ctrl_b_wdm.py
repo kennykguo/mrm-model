@@ -327,3 +327,29 @@ def test_planner_without_a_feasible_shift_takes_the_least_drive():
     c._plan_assignment(0)
     assert c.shift[0] == 3                          # every ring on its first resonance, line n + 3
     np.testing.assert_array_equal(c.target_line[0], (np.arange(8) + 3) % 8)
+
+
+def test_track_rearms_assigned_rings_in_fail():
+    """In TRACK a ring whose lock was lost and whose re-search FAILed (its line dark for a while) is re-armed after
+    fail_rearm_s, in its own window; a ring that never got a line (assigned -1) stays parked. Before the review a
+    FAIL in TRACK was final."""
+    from mrm.control.baselines.ramp_acquire import ST_FAIL, ST_UP
+    spec = make_spec(load_g26(knowledge=KNOW), 1)
+    c = WdmSupervisor(policy="fixed")
+    c.reset(spec)
+    f = c.fsm
+    c.phase[0] = PH_TRACK
+    f.state[0] = ST_LOCK
+    mask = np.zeros((1, 8), bool)
+    mask[0, [2, 5]] = True
+    f.start(mask, w_from=0.2, w_lo=0.25, w_hi=0.3)           # their last search: from 0.2 in [0.25, 0.3]
+    f._enter_fail(mask)
+    f.w[0, [2, 5]] = 0.25
+    c.assigned[0, 5] = -1
+    f.fail_steps[0, [2, 5]] = f.rearm_steps - 1
+    c._track_step(0)
+    assert f.state[0, 2] == ST_FAIL                           # not yet
+    f.fail_steps[0, [2, 5]] = f.rearm_steps
+    c._track_step(0)
+    assert f.state[0, 2] == ST_UP and f.w[0, 2] == pytest.approx(0.2) and f.w_lo[0, 2] == 0.25
+    assert f.state[0, 5] == ST_FAIL

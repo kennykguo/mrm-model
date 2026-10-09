@@ -308,6 +308,381 @@
    "n_si": 3.5057041190984966,
    "n_sio2": 1.4472375047184667,
    "si_obs_weight_fraction": 0.988770373813972
+  },
+  "assumption_ranges": {
+   "family": "inring_noundercut",
+   "film_nm": 160.0,
+   "params": {
+    "radius_um": {
+     "value": 7.5,
+     "provenance": "printed",
+     "note": "Lightmatter '~15 um diameter' (HC, LM26-S); GF PDK MRM R = 7.5 um (GF-ECIO)",
+     "how": "jacobian",
+     "sigma_1": 0.5,
+     "range_1sigma": [
+      7.0,
+      8.0
+     ],
+     "fd_step": -1.0
+    },
+    "width_nm": {
+     "value": 400.0,
+     "provenance": "assumed",
+     "note": "rib width; BU 45CLO ring 410 nm",
+     "how": "jacobian",
+     "sigma_1": 30.0,
+     "range_1sigma": [
+      370.0,
+      430.0
+     ],
+     "fd_step": 50.0
+    },
+    "slab_nm": {
+     "value": 60.0,
+     "provenance": "assumed",
+     "note": "partial-etch depth not public (01 4.2)",
+     "how": "jacobian",
+     "sigma_1": 20.0,
+     "range_1sigma": [
+      40.0,
+      80.0
+     ],
+     "fd_step": 20.0
+    },
+    "slab_out_um": {
+     "value": 2.0,
+     "provenance": "assumed",
+     "how": "jacobian",
+     "sigma_1": 1.0,
+     "range_1sigma": [
+      1.0,
+      3.0
+     ],
+     "fd_step": 1.0
+    },
+    "slab_in_um": {
+     "value": 2.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      1.0,
+      3.0
+     ],
+     "note": "slab extent inside the rib (in-ring/undercut families extend it to the heater); plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "contact_offset_um": {
+     "value": 1.0,
+     "provenance": "assumed",
+     "how": "jacobian",
+     "sigma_1": 0.5,
+     "range_1sigma": [
+      0.5,
+      1.5
+     ],
+     "fd_step": 0.5
+    },
+    "box_um": {
+     "value": 2.0,
+     "provenance": "printed",
+     "note": "45SPCLO 2 um BOX (GF-IMAPS)",
+     "how": "jacobian",
+     "sigma_1": 0.1,
+     "range_1sigma": [
+      1.9,
+      2.1
+     ],
+     "fd_step": 0.2
+    },
+    "sub_um": {
+     "value": 775.0,
+     "provenance": "assumed",
+     "note": "un-thinned 300 mm wafer",
+     "how": "sweep",
+     "sweep": "substrate",
+     "variants": [
+      100.0,
+      300.0
+     ],
+     "range": [
+      100.0,
+      775.0
+     ]
+    },
+    "die_side_mm": {
+     "value": 5.0,
+     "provenance": "assumed",
+     "note": "5 x 5 mm = 45SPCLO MPW block (Europractice, printed); the G25/G26 die is not printed",
+     "how": "sweep",
+     "sweep": "die",
+     "variants": [
+      3.0,
+      10.0
+     ],
+     "range": [
+      3.0,
+      10.0
+     ]
+    },
+    "bottom_bc": {
+     "value": "robin",
+     "provenance": "assumed",
+     "how": "sweep",
+     "sweep": "bottom",
+     "variants": [
+      "dirichlet",
+      {
+       "h_bottom_w_per_m2_k": 100000.0
+      },
+      {
+       "h_bottom_w_per_m2_k": 5000.0
+      }
+     ],
+     "range": [
+      "robin h 5e3 .. 1e5 W/(m^2 K)",
+      "dirichlet"
+     ]
+    },
+    "h_bottom_w_per_m2_k": {
+     "value": 20000.0,
+     "provenance": "assumed",
+     "note": "die attach + package to a TEC-held plate (R'' = 5e-5 m^2 K/W)",
+     "how": "sweep",
+     "sweep": "bottom",
+     "variants": [
+      100000.0,
+      5000.0
+     ],
+     "range": [
+      5000.0,
+      100000.0
+     ]
+    },
+    "clad_um": {
+     "value": 1.5,
+     "provenance": "assumed",
+     "note": "pre-metal dielectric thickness",
+     "how": "jacobian",
+     "sigma_1": 0.5,
+     "range_1sigma": [
+      1.0,
+      2.0
+     ],
+     "fd_step": 0.5
+    },
+    "beol_lo_um": {
+     "value": 2.5,
+     "provenance": "assumed",
+     "note": "lower (thin-Cu, low-k) BEOL level thickness; 9 levels printed, total not public; plausible range, not explored by any run (sensitivity unknown)",
+     "how": "not swept",
+     "range": [
+      1.5,
+      4.0
+     ]
+    },
+    "beol_hi_um": {
+     "value": 5.0,
+     "provenance": "assumed",
+     "note": "9-level BEOL printed, total thickness not public",
+     "how": "jacobian",
+     "sigma_1": 2.0,
+     "range_1sigma": [
+      3.0,
+      7.0
+     ],
+     "fd_step": 2.0
+    },
+    "pass_um": {
+     "value": 1.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      0.5,
+      2.0
+     ],
+     "note": "passivation thickness; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "fill_lo": {
+     "value": 0.15,
+     "provenance": "assumed",
+     "note": "effective Cu area fraction of the thin levels",
+     "how": "jacobian",
+     "sigma_1": 0.1,
+     "range_1sigma": [
+      0.05,
+      0.25
+     ],
+     "fd_step": 0.1,
+     "sweep": "beol_metal",
+     "variants": [
+      0.0,
+      0.3
+     ]
+    },
+    "fill_hi": {
+     "value": 0.3,
+     "provenance": "assumed",
+     "note": "effective Cu area fraction of the thick levels",
+     "how": "jacobian",
+     "sigma_1": 0.15,
+     "range_1sigma": [
+      0.15,
+      0.45
+     ],
+     "fd_step": 0.1,
+     "sweep": "beol_metal",
+     "variants": [
+      0.0,
+      0.5
+     ]
+    },
+    "via_ratio": {
+     "value": 0.1,
+     "provenance": "assumed",
+     "note": "via area fraction relative to the line fill",
+     "how": "jacobian",
+     "sigma_1": 0.05,
+     "range_1sigma": [
+      0.05,
+      0.15
+     ],
+     "fd_step": 0.1
+    },
+    "keepout_um": {
+     "value": 5.0,
+     "provenance": "assumed",
+     "note": "metal no-fill zone beyond the ring radius (imec: tiling costs up to 60 %)",
+     "how": "jacobian",
+     "sigma_1": 5.0,
+     "range_1sigma": [
+      0.0,
+      10.0
+     ],
+     "fd_step": 5.0
+    },
+    "heater_gap_um": {
+     "value": 2.0,
+     "provenance": "assumed",
+     "note": "in-ring heater placement ('heater and PN inside the ring', LM26-S schematic)",
+     "how": "jacobian",
+     "sigma_1": 0.75,
+     "range_1sigma": [
+      1.25,
+      2.75
+     ],
+     "fd_step": -1.0
+    },
+    "heater_width_um": {
+     "value": 1.0,
+     "provenance": "assumed",
+     "note": "in-ring heater width",
+     "how": "jacobian",
+     "sigma_1": 0.5,
+     "range_1sigma": [
+      0.5,
+      1.5
+     ],
+     "fd_step": 0.5
+    },
+    "heater_doping_factor": {
+     "value": 0.8,
+     "provenance": "assumed",
+     "how": "jacobian",
+     "sigma_1": 0.15,
+     "range_1sigma": [
+      0.65,
+      0.95
+     ],
+     "fd_step": -0.2
+    },
+    "driver_radius_um": {
+     "value": 5.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      2.0,
+      10.0
+     ],
+     "note": "driver heat-source disk radius; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "aggressor_radius_um": {
+     "value": 10.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      5.0,
+      20.0
+     ],
+     "note": "aggressor heat-source disk radius; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "cmos_film_nm": {
+     "value": 88.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      70.0,
+      100.0
+     ],
+     "note": "CMOS SOI film under the driver and aggressor sites; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "pd_radius_um": {
+     "value": 3.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      2.0,
+      5.0
+     ],
+     "note": "monitor-PD observer disk radius; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "sensor_radius_um": {
+     "value": 2.0,
+     "provenance": "assumed",
+     "how": "not swept",
+     "range": [
+      1.0,
+      5.0
+     ],
+     "note": "temperature-sensor observer disk radius; plausible range, not explored by any run (sensitivity unknown)"
+    },
+    "site_offsets_um": {
+     "value": {
+      "monitor_pd": [
+       0.0,
+       25.0
+      ],
+      "temp_sensor": [
+       40.0,
+       0.0
+      ],
+      "driver": [
+       0.0,
+       -30.0
+      ],
+      "aggressor": [
+       60.0,
+       0.0
+      ]
+     },
+     "provenance": "assumed",
+     "note": "PD near the drop port, sensor, monolithic driver, aggressor (G26: heater adjacent to the MRM); self_res holds the sites at these offsets, any other site position uses the radial cross_res table (d >= 20 um)",
+     "how": "table",
+     "range": [
+      20.0,
+      2000.0
+     ]
+    },
+    "pitch_um": {
+     "value": 50.0,
+     "provenance": "assumed",
+     "note": "unpublished; only the summary and the 3-D bank use it (50 um); the runtime uses the radial cross_res table at any distance in this range",
+     "how": "table",
+     "range": [
+      20.0,
+      2000.0
+     ]
+    }
+   },
+   "note": "1-sigma ranges are the assumed sigmas of the geometry Jacobian (stages.uncertainty.jacobian); sweep ranges are the variants of stages.uncertainty.sweeps; 'not swept' ranges are plausible values no run has explored (their sensitivity is unknown); 'printed' values carry the Jacobian sigma of the reading (radius) or of the process (BOX)"
   }
  },
  "tool_versions": {
@@ -643,9 +1018,125 @@
    "production_scale": 1.0,
    "max_rel_err_est": 0.0025071339534293484,
    "worst_metric": "t10_opt_ring_s",
-   "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the last three levels (or the last change when convergence is not monotone)"
+   "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the last three levels (or the last change when convergence is not monotone)",
+   "conservative_bound": {
+    "per_metric": {
+     "z_heater_ring_k_per_mw": {
+      "bound": 0.0004913458038607976,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.00020488418363510063
+     },
+     "z_heater_heater_k_per_mw": {
+      "bound": 0.0005304402612161342,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.00028046687158284506
+     },
+     "z_opt_ring_k_per_mw": {
+      "bound": 0.00012486499307340175,
+      "method": "geometric tail, q = 0.195",
+      "observed_order": 4.7126384021935905,
+      "rel_err_est": 0.00012484940375346367
+     },
+     "z_junction_ring_k_per_mw": {
+      "bound": 0.0005133736759934189,
+      "method": "largest of the last two changes",
+      "observed_order": 7.965436880676777,
+      "rel_err_est": 3.7110064651704484e-05
+     },
+     "z_heater_pd_k_per_mw": {
+      "bound": 0.00012454704715115215,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.00012454704715115215
+     },
+     "xt_frac_at_pitch": {
+      "bound": 0.0005702100961286037,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.0001242250359354254
+     },
+     "t63_heater_ring_s": {
+      "bound": 0.0006520711302074811,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.0006516462105264877
+     },
+     "t63_opt_ring_s": {
+      "bound": 4.5628206571840224e-05,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 4.5628206571840224e-05
+     },
+     "t63_heater_heater_s": {
+      "bound": 0.0016427906589024544,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 0.001640096323981717
+     },
+     "t10_opt_ring_s": {
+      "bound": 0.0034269147861286787,
+      "method": "geometric tail, q = 0.786",
+      "observed_order": 0.6938618222887907,
+      "rel_err_est": 0.0025071339534293484
+     },
+     "t63_xt_at_pitch_s": {
+      "bound": 0.0008230989833604582,
+      "method": "geometric tail, q = 0.815",
+      "observed_order": 0.5916198926384961,
+      "rel_err_est": 0.0005207046398483983
+     },
+     "z_heater_ring_at_50um_k_per_mw": {
+      "bound": 8.06336959546311e-05,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 8.06336959546311e-05
+     },
+     "z_heater_ring_at_300um_k_per_mw": {
+      "bound": 2.8720929907512493e-05,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 3.504023805159177e-06
+     },
+     "z_driver_ring_k_per_mw": {
+      "bound": 0.00012185094154420455,
+      "method": "largest of the last two changes",
+      "observed_order": 11.174349531711865,
+      "rel_err_est": 2.8967591185883064e-06
+     },
+     "z_aggressor_ring_k_per_mw": {
+      "bound": 1.6222526387068785e-05,
+      "method": "largest of the last two changes",
+      "observed_order": null,
+      "rel_err_est": 1.6222263220975627e-05
+     }
+    },
+    "max_bound": 0.0034269147861286787,
+    "worst_metric": "t10_opt_ring_s",
+    "noise_rel": 0.0001,
+    "note": "bound on |f(production) - f(converged)| / |f(production)| from the stored levels: geometric tail of the changes when they shrink monotonically above the re-meshing noise, else the largest of the last two changes; never below rel_err_est. It exceeds rel_err_est where the observed order is < 1 (Richardson clamps the order to >= 1)"
+   }
   },
-  "production_scale": 1.0
+  "production_scale": 1.0,
+  "memory_cap": {
+   "cap_at_run_gb": 3.0,
+   "cap_now_heavy_gb": 6.0,
+   "production_h_core_um": 0.05,
+   "intended_production_h_core_um": 0.035,
+   "reason": "the first default extraction with production at 35 nm was killed by memguard at 3.10 GB (2026-10-09 09:02 UTC, before the Krylov-basis and SuperLU-ordering memory fixes); production moved to 50 nm and 35 nm stayed as the finest convergence level",
+   "max_change_50_to_35nm": 0.0016427906589024932,
+   "max_change_metric": "t63_heater_heater_s",
+   "z_heater_ring_change_50_to_35nm": 0.00020484221470518094,
+   "t63_heater_ring_change_50_to_35nm": 0.0006520711302073767,
+   "conservative_last_change_bound": 0.001640096323981717,
+   "dofs_35nm": [
+    77479,
+    79296
+   ],
+   "fits_6gb": "yes (estimate): the 35 nm models have 1.7x the DOF of production; production jobs at 50 nm peaked at 1.1-2.3 GB after the memory fixes",
+   "consequence": "negligible: the 35 nm level would move every tracked metric by <= the change above, inside the stated mesh error"
+  }
  },
  "rom": {
   "vf_iterations": 21,
@@ -776,7 +1267,8 @@
      "max_cross_d_le_300um": 6.331251330184324
     }
    }
-  ]
+  ],
+  "taus_note": "taus_vf_s are the vector-fitting poles before the variable-projection polish (rom.varpro) and the pole separation; the final shared poles are taus_s in the .npz (strictly increasing)"
  },
  "validation": {
   "pitch_um": 50.0,
@@ -1154,7 +1646,9 @@
   "freq_max_db_err": 0.13605056849551805,
   "freq_max_deg_err": 1.5814037956231735,
   "superposition_rel_err": 0.13888853863606415,
-  "superposition_note": "max step-response error of the 8-ring 3-D bank (inring_noundercut 160, pitch 50 um, leads and bus, Dirichlet comparison variant) against the single-ring axisymmetric ROM over 10 ns-10 ms, relative to the ROM DC; measured on the default family only"
+  "superposition_note": "max over pairs and over t in [10 ns, 10 ms] of |y_bank(t) - y_ax(t)| / y_ax(inf) for the 8-ring 3-D bank (inring_noundercut 160, pitch 50.0 um, dirichlet bottom under 200.0 um substrate, 3-D mesh 0.4 um at the rings); y_ax = the axisymmetric single-ring FEM of the same variant at the exact bank distances, so the Foster-fit error (validation.all_pairs) and the distance-interpolation error of the cross_r_um grid (log-log, max 0.0253 at the bank distances; stages.crosscheck_3d.distance_interpolation of thermal_rom_inring_noundercut_160.json) come on top; measured on the default family only; it mixes 3-D discretization error and multibody effects (decomposition keys max_discretization_dc_rel_all / max_multibody_step_err_frac_all in stages.crosscheck_3d.bank are pending)",
+  "superposition_target": 0.1,
+  "superposition_pass": false
  },
  "validation_per_pair_summary": {
   "n": 440,
@@ -1177,7 +1671,8 @@
    },
    "H_solver": {
     "pm_per_k": 65.07512062636934,
-    "source": "modes_rib160.json at 25 C"
+    "source": "modes_rib160.json at 25 C",
+    "sha256": "deab882d53fa1fb01564f6708435d457442b6cac79565fa6fbe2ec0d625d9b74"
    }
   },
   "efficiency_nm_per_mw": {
@@ -2286,7 +2781,7 @@
        "H86": 1.184642725830391,
        "materials_ceiling": 1.4403751407273686,
        "bench_62p5": 1.6281729623812897,
-       "H_solver_proxy": 1.5075675577604535
+       "H_solver": 1.5637437037280837
       }
      },
      {
@@ -2304,7 +2799,7 @@
        "H86": 1.1358485904597946,
        "materials_ceiling": 1.3810476674996675,
        "bench_62p5": 1.5611103027279418,
-       "H_solver_proxy": 1.4454725025258721
+       "H_solver": 1.4993348146166923
       }
      },
      {
@@ -2322,7 +2817,7 @@
        "H86": 1.1338063985776499,
        "materials_ceiling": 1.3785646214677303,
        "bench_62p5": 1.558303514205122,
-       "H_solver_proxy": 1.442873624264002
+       "H_solver": 1.4966390949470594
       }
      },
      {
@@ -2340,7 +2835,7 @@
        "H86": 1.1341256491743916,
        "materials_ceiling": 1.378952789658175,
        "bench_62p5": 1.558742292225284,
-       "H_solver_proxy": 1.4432799002085963
+       "H_solver": 1.4970605098594891
       }
      },
      {
@@ -2358,7 +2853,7 @@
        "H86": 1.3070147483522583,
        "materials_ceiling": 1.589163982559385,
        "bench_62p5": 1.7963610701353439,
-       "H_solver_proxy": 1.6632972871623555
+       "H_solver": 1.7252763545084324
       }
      },
      {
@@ -2376,7 +2871,7 @@
        "H86": 1.2482920583347354,
        "materials_ceiling": 1.5177646475078912,
        "bench_62p5": 1.7156526049752605,
-       "H_solver_proxy": 1.588567226828945
+       "H_solver": 1.6477616449857704
       }
      },
      {
@@ -2394,7 +2889,7 @@
        "H86": 1.2463983989306548,
        "materials_ceiling": 1.515462198110137,
        "bench_62p5": 1.7130499594902922,
-       "H_solver_proxy": 1.5861573698984188
+       "H_solver": 1.645261990106228
       }
      },
      {
@@ -2412,7 +2907,7 @@
        "H86": 1.2462253674715873,
        "materials_ceiling": 1.5152518138256852,
        "bench_62p5": 1.7128121450529497,
-       "H_solver_proxy": 1.5859371713453239
+       "H_solver": 1.6450335863446852
       }
      },
      {
@@ -2430,7 +2925,7 @@
        "H86": 1.6579440515844517,
        "materials_ceiling": 2.015849457856684,
        "bench_62p5": 2.2786783044976704,
-       "H_solver_proxy": 2.109887318979325
+       "H_solver": 2.1885075687957296
       }
      },
      {
@@ -2448,7 +2943,7 @@
        "H86": 1.5702552780925225,
        "materials_ceiling": 1.90923104311893,
        "bench_62p5": 2.158158854210363,
-       "H_solver_proxy": 1.998295235379966
+       "H_solver": 2.0727572548438804
       }
      },
      {
@@ -2466,7 +2961,7 @@
        "H86": 1.5668845737645298,
        "materials_ceiling": 1.9051326946338376,
        "bench_62p5": 2.15352615818197,
-       "H_solver_proxy": 1.9940057020203428
+       "H_solver": 2.0683078815812936
       }
      },
      {
@@ -2484,10 +2979,30 @@
        "H86": 1.5670810038564733,
        "materials_ceiling": 1.905371528684946,
        "bench_62p5": 2.153796131700337,
-       "H_solver_proxy": 1.9942556775003122
+       "H_solver": 2.068567171840544
       }
      }
-    ]
+    ],
+    "dlambda_dt_hypotheses": {
+     "H86": {
+      "pm_per_k": 85.9,
+      "source": "G26 ~15 GHz/C aside (printed), 07 D2"
+     },
+     "materials_ceiling": {
+      "pm_per_k": 70.6488242343886,
+      "source": "mrm.materials dlambda_dt_ceiling_pm_per_k (n_eff/n_g = 0.6), 298 K"
+     },
+     "bench_62p5": {
+      "pm_per_k": 62.5,
+      "source": "Lightmatter bench equivalence (inferred); imec 62.54"
+     },
+     "H_solver": {
+      "pm_per_k": 65.07512062636934,
+      "source": "modes_rib160.json at 25 C",
+      "sha256": "deab882d53fa1fb01564f6708435d457442b6cac79565fa6fbe2ec0d625d9b74"
+     }
+    },
+    "hypotheses_note": "rom_dc_scale_by_hypothesis re-evaluated by --stage propagate from the stored z_heater_ring_k_per_mw with the hypotheses above (the same set as rom_dc_scale)"
    }
   },
   "crosscheck_analytic": {
@@ -3669,6 +4184,284 @@
       }
      ]
     }
+   },
+   "disagreements_above_1pct": {
+    "threshold_rel": 0.01,
+    "n": 30,
+    "records": [
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 0.0,
+      "rel_err": 0.03436730238006473,
+      "response_of_self_dc": 0.0003626762545386095,
+      "err_of_self_dc": 1.2461280960606097e-05,
+      "fem_mesh_change": 1.391048477341372e-06
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 10.0,
+      "rel_err": 0.03435626632794643,
+      "response_of_self_dc": 0.0003626497687533266,
+      "err_of_self_dc": 1.2456369646110952e-05,
+      "fem_mesh_change": 1.3911749714390895e-06
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 1000.0,
+      "rel_err": 0.027885191922100826,
+      "response_of_self_dc": 0.0002228756220238937,
+      "err_of_self_dc": 6.213471750259425e-06,
+      "fem_mesh_change": 2.3493251266654003e-06
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@100um",
+      "f_hz": 10000.0,
+      "rel_err": 0.012926563542216761,
+      "response_of_self_dc": 0.0006653796645647677,
+      "err_of_self_dc": 8.59905508657607e-06,
+      "fem_mesh_change": 4.4484569239371205e-05
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 10000.0,
+      "rel_err": 1.2635417834878466,
+      "response_of_self_dc": 4.130060682365927e-06,
+      "err_of_self_dc": 5.217280212696855e-06,
+      "fem_mesh_change": 2.603852544100375e-05
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@50um",
+      "f_hz": 100000.0,
+      "rel_err": 0.19188933080046874,
+      "response_of_self_dc": 6.379036605894823e-05,
+      "err_of_self_dc": 1.2237819535734685e-05,
+      "fem_mesh_change": 0.0002387547044887523
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@100um",
+      "f_hz": 100000.0,
+      "rel_err": 1.017169756980292,
+      "response_of_self_dc": 4.851508520025631e-06,
+      "err_of_self_dc": 4.933650257005903e-06,
+      "fem_mesh_change": 0.002347608560569482
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 100000.0,
+      "rel_err": 1.0000001614350964,
+      "response_of_self_dc": 4.663301139213309e-06,
+      "err_of_self_dc": 4.662208089872784e-06,
+      "fem_mesh_change": 0.0002535734151439811
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@20um",
+      "f_hz": 1000000.0,
+      "rel_err": 0.011987985841915981,
+      "response_of_self_dc": 0.000968755831210162,
+      "err_of_self_dc": 1.1610707197017524e-05,
+      "fem_mesh_change": 8.001150116947132e-05
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@50um",
+      "f_hz": 1000000.0,
+      "rel_err": 0.999992164056158,
+      "response_of_self_dc": 2.847363951285975e-06,
+      "err_of_self_dc": 2.846673780437609e-06,
+      "fem_mesh_change": 0.026093432045289595
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@100um",
+      "f_hz": 1000000.0,
+      "rel_err": 1.0000000082286302,
+      "response_of_self_dc": 1.8299657163661323e-06,
+      "err_of_self_dc": 1.8295365032683318e-06,
+      "fem_mesh_change": 0.05684846897214364
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 1000000.0,
+      "rel_err": 1.0,
+      "response_of_self_dc": 2.8171067472240048e-06,
+      "err_of_self_dc": 2.8164459799138015e-06,
+      "fem_mesh_change": 0.0942933499434904
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@20um",
+      "f_hz": 10000000.0,
+      "rel_err": 0.3095819969968443,
+      "response_of_self_dc": 8.90936933825082e-06,
+      "err_of_self_dc": 2.7575334059061463e-06,
+      "fem_mesh_change": 0.0016718517218666461
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@50um",
+      "f_hz": 10000000.0,
+      "rel_err": 0.9999999999999913,
+      "response_of_self_dc": 1.1173289361827857e-06,
+      "err_of_self_dc": 1.1170668607621333e-06,
+      "fem_mesh_change": 1.4202710524624358
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@100um",
+      "f_hz": 10000000.0,
+      "rel_err": 1.0,
+      "response_of_self_dc": 9.550298037624984e-07,
+      "err_of_self_dc": 9.548057964630882e-07,
+      "fem_mesh_change": 0.22241573577924575
+     },
+     {
+      "case": "dirichlet_sub200",
+      "pair": "victim@300um",
+      "f_hz": 10000000.0,
+      "rel_err": 1.0,
+      "response_of_self_dc": 9.131828779606016e-07,
+      "err_of_self_dc": 9.129686860793076e-07,
+      "fem_mesh_change": 0.2397441115377137
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@300um",
+      "f_hz": 1000.0,
+      "rel_err": 0.027149177853925184,
+      "response_of_self_dc": 0.0002357132654275705,
+      "err_of_self_dc": 6.36726917092344e-06,
+      "fem_mesh_change": 0.0001968369258968855
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@100um",
+      "f_hz": 10000.0,
+      "rel_err": 0.012982147353688562,
+      "response_of_self_dc": 0.0006673858265974048,
+      "err_of_self_dc": 8.620570665297275e-06,
+      "fem_mesh_change": 4.6011184471203474e-05
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@300um",
+      "f_hz": 10000.0,
+      "rel_err": 1.2549859705890567,
+      "response_of_self_dc": 4.163518999487104e-06,
+      "err_of_self_dc": 5.198905512990984e-06,
+      "fem_mesh_change": 0.0022563081790845244
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@50um",
+      "f_hz": 100000.0,
+      "rel_err": 0.19189680477726992,
+      "response_of_self_dc": 6.396866342229596e-05,
+      "err_of_self_dc": 1.2213707716181843e-05,
+      "fem_mesh_change": 0.00023376946886783924
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@100um",
+      "f_hz": 100000.0,
+      "rel_err": 1.0172392546062365,
+      "response_of_self_dc": 4.864789170002108e-06,
+      "err_of_self_dc": 4.923791307550243e-06,
+      "fem_mesh_change": 0.002579650606771797
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@300um",
+      "f_hz": 100000.0,
+      "rel_err": 1.0000000052382472,
+      "response_of_self_dc": 4.676084647771475e-06,
+      "err_of_self_dc": 4.6525909255312906e-06,
+      "fem_mesh_change": 0.09608717123320795
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@20um",
+      "f_hz": 1000000.0,
+      "rel_err": 0.011994751138210554,
+      "response_of_self_dc": 0.000971462783570348,
+      "err_of_self_dc": 1.1593909663918465e-05,
+      "fem_mesh_change": 8.878065816268839e-05
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@50um",
+      "f_hz": 1000000.0,
+      "rel_err": 0.9999923730784056,
+      "response_of_self_dc": 2.8552513196488206e-06,
+      "err_of_self_dc": 2.840884199608076e-06,
+      "fem_mesh_change": 0.02676182271844237
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@100um",
+      "f_hz": 1000000.0,
+      "rel_err": 1.0000000082335272,
+      "response_of_self_dc": 1.8350099324131702e-06,
+      "err_of_self_dc": 1.8257904269219072e-06,
+      "fem_mesh_change": 0.059721372524374546
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@300um",
+      "f_hz": 1000000.0,
+      "rel_err": 1.0000000000000002,
+      "response_of_self_dc": 2.824908645504205e-06,
+      "err_of_self_dc": 2.8107156415452117e-06,
+      "fem_mesh_change": 0.24780222744086894
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@20um",
+      "f_hz": 10000000.0,
+      "rel_err": 0.30952922707221603,
+      "response_of_self_dc": 8.934254888817409e-06,
+      "err_of_self_dc": 2.7515189262764822e-06,
+      "fem_mesh_change": 0.0017455608166220423
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@50um",
+      "f_hz": 10000000.0,
+      "rel_err": 0.9999999999999905,
+      "response_of_self_dc": 1.1204487249256599e-06,
+      "err_of_self_dc": 1.114819327594862e-06,
+      "fem_mesh_change": 1.3086515825719667
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@100um",
+      "f_hz": 10000000.0,
+      "rel_err": 1.0,
+      "response_of_self_dc": 9.576837651935066e-07,
+      "err_of_self_dc": 9.528721372166206e-07,
+      "fem_mesh_change": 0.21762767437910108
+     },
+     {
+      "case": "robin_sub775",
+      "pair": "victim@300um",
+      "f_hz": 10000000.0,
+      "rel_err": 1.0,
+      "response_of_self_dc": 9.157173113976872e-07,
+      "err_of_self_dc": 9.111165327329787e-07,
+      "fem_mesh_change": 0.9077797677938492
+     }
+    ],
+    "max_err_of_self_dc": 1.2461280960606097e-05,
+    "note": "every point listed has an absolute error <= 1.25e-05 of the self DC; points whose response is >= 1e-5 of the self DC: [('victim@100um', 10000.0), ('victim@20um', 1000000.0), ('victim@300um', 0.0), ('victim@300um', 10.0), ('victim@300um', 1000.0), ('victim@50um', 100000.0)] (cause, Hankel quadrature or FEM, not separated; the FEM mesh change there is listed and is far smaller than the disagreement)"
    }
   },
   "crosscheck_3d": {
@@ -4010,6 +4803,176 @@
      "margin_um": 400.0
     },
     "note": "the ring observer is the full-ring mode-weighted average; arcs leave the coupler regions free"
+   },
+   "derived_equal_mesh": {
+    "method": "pure arithmetic on the two stored single-ring levels, f(h) = f0 + c h^p with p = 1 and p = 2 (the order is not identifiable from two levels); no solver run",
+    "formulation_gap_extrapolated_vs_axisym": {
+     "z_heater_ring": {
+      "p1": -0.002391703671795531,
+      "p2": -0.01563046088353759
+     },
+     "z_heater_heater": {
+      "p1": 0.007546310664262146,
+      "p2": -0.025722168473443885
+     },
+     "t63_heater_ring_s": {
+      "p1": -0.018266193356730298,
+      "p2": -0.008506333303451297
+     }
+    },
+    "single_no_leads_at_h_0p4_vs_axisym": {
+     "z_heater_ring": {
+      "p1": -0.028112717683180244,
+      "p2": -0.027734467477130487
+     },
+     "z_heater_heater": {
+      "p1": -0.05708959166042393,
+      "p2": -0.05613906368506083
+     }
+    },
+    "lead_effect_equal_mesh": {
+     "z_heater_ring": {
+      "p1": -0.039884649762065516,
+      "p2": -0.040258173060908176
+     },
+     "z_heater_heater": {
+      "p1": -0.047232058782756714,
+      "p2": -0.04819155667838082
+     }
+    },
+    "lead_effect_recorded_note": "the recorded lead_effect_* compares leads at h 0.4 um with no leads at h 0.35 um (unequal meshes, a side effect of the 3 GB coarsening); the equal-mesh values above replace them",
+    "bank_self_split": {
+     "discretization_at_h_0p4": {
+      "p1": -0.028112717683180244,
+      "p2": -0.027734467477130487
+     },
+     "own_leads_equal_mesh": {
+      "p1": -0.039884649762065516,
+      "p2": -0.040258173060908176
+     },
+     "multibody_bank_vs_single_with_leads": [
+      0.0003193066589557425,
+      0.0010236040181672568
+     ],
+     "total_bank_vs_axisym": [
+      -0.06657814887218538,
+      -0.06592095217468741
+     ],
+     "note": "split of the driven ring's Z_heater_ring difference (bank vs axisymmetric ROM, -6.6 %): 3-D vs axisymmetric at 0.4 um without leads (-2.8 %: the 3-D discretization error plus the formulation gap, -0.2 .. -1.6 % by order-1..2 extrapolation; the two are not separable from two levels) x own leads (-4.0 %) x multibody (+0.03 .. +0.10 %); the first two multiply to the stored single-ring-with-leads value by construction, so the information is the split, not a check",
+     "discretization_at_h_0p4_note": "named 'discretization' for brevity: it is the whole 3-D vs axisymmetric difference at h 0.4 um (discretization + formulation)"
+    }
+   },
+   "memory_cap": {
+    "cap_at_run_gb": 3.0,
+    "cap_now_heavy_gb": 6.0,
+    "reductions": [
+     {
+      "what": "single-ring 3-D levels",
+      "intended": [
+       0.35,
+       0.25
+      ],
+      "used": [
+       0.5,
+       0.35
+      ],
+      "when": "2026-10-09 08:51 UTC, before any 3-D run, 'to stay well under the 3 GB limit for the 8-ring bank' (the bank used the finest single level)",
+      "consequence": "two levels only (no third refinement): the 3-D vs axisymmetric gap (-2.5 % Z_heater_ring, -4.9 % Z_heater_heater at 0.35 um) cannot be split into formulation and discretization; extrapolation with p = 1..2 leaves a formulation gap of -0.2 .. -1.6 % (Z_hr) and +0.8 .. -2.6 % (Z_hh)",
+      "fits_6gb": "yes: 0.25 um single ring = 166,716 tets (no leads), 291,178 tets (leads, bus, victim margin)"
+     },
+     {
+      "what": "8-ring bank mesh",
+      "intended": 0.25,
+      "used": 0.4,
+      "consequence": "one bank level, no bank convergence: the 13.9 % superposition error contains an unmeasured 3-D discretization share",
+      "fits_6gb": "estimated yes, with little margin: ~1.51 M tets (extrapolated), peak 4.7-5.4 GB scaled from the recorded 2.28 GB peak of the 0.4 um run (635 k tets); a further level at 0.18 um (~2.8 M tets, ~8-10 GB) does not fit"
+     },
+     {
+      "what": "silicide arcs 3-D",
+      "intended": 0.25,
+      "used": 0.35,
+      "consequence": "arcs vs annuli (+1.03 %) is a same-mesh ratio (insensitive); full 3-D vs axisymmetric (-7.0 %) carries the 3-D discretization error",
+      "fits_6gb": "yes (single ring)"
+     },
+     {
+      "what": "lead effect",
+      "consequence": "computed at unequal meshes (-4.3 %); -4.0 % at equal mesh (derived_equal_mesh)",
+      "fits_6gb": "n/a"
+     }
+    ],
+    "not_reductions": [
+     "3.41 GB kill (quick 3-D run): pyamg operator complexity on mass-dominated shifts -> Jacobi-preconditioned CG for those shifts (CG rtol 1e-11; ROM DC error <= 1.2e-9): no accuracy loss",
+     "3.97 GB kill (3-D stage start): skfem probes locator -> memory-bounded exact tetrahedron locator (reconstruction error 2e-16): no accuracy loss"
+    ],
+    "mesh_counts": {
+     "single_no_leads": {
+      "0.5": [
+       10443,
+       57642
+      ],
+      "0.35": [
+       16780,
+       94964
+      ],
+      "0.25": [
+       28822,
+       166716
+      ]
+     },
+     "single_leads_bus": {
+      "0.4": [
+       20518,
+       112116
+      ],
+      "0.25": [
+       41217,
+       230530
+      ]
+     },
+     "single_leads_bus_victim_margin750": {
+      "0.4": [
+       30473,
+       162362
+      ],
+      "0.25": [
+       53393,
+       291178
+      ]
+     },
+     "bank2_leads_bus": {
+      "0.4": [
+       33447,
+       187391
+      ],
+      "0.25": [
+       72273,
+       413600
+      ]
+     },
+     "bank8_leads_bus": {
+      "0.4": [
+       110832,
+       634996
+      ],
+      "0.25_extrapolated": [
+       258609,
+       1512020
+      ]
+     },
+     "note": "[nodes, tets]; the 8-ring count at 0.25 um is 1 ring + 7 x (2-ring - 1-ring); the same rule predicts the meshed 8-ring count at 0.4 um to +0.6 %; meshing the 8-ring bank at 0.4 um alone peaked at 0.80 GB RSS"
+    }
+   },
+   "pending": {
+    "decomposition": {
+     "status": "not run: the re-run that computes the discretization / multibody split of the 13.9 % (keys max_discretization_dc_rel_all, max_multibody_dc_rel_all, max_multibody_step_err_frac_all, pairs[].dc_3d_single) was interrupted by the session restart of 2026-10-09 16:28 UTC",
+     "command": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.thermal_fem --stage 3d --family inring_noundercut --film 160 && .venv/bin/python -m mrm.extraction.thermal_fem --stage propagate",
+     "command_finer_6gb": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.thermal_fem --stage 3d --family inring_noundercut --film 160 --h3d-levels 0.5 0.35 0.25 --h3d-bank 0.25 && .venv/bin/python -m mrm.extraction.thermal_fem --stage propagate",
+     "expected_peak_gb": {
+      "default_settings": "~2.3-2.6 (as the recorded 2.28 GB run)",
+      "finer_6gb": "4.7-5.4 (estimate)"
+     }
+    },
+    "runtime_fallback": "the radial cross_res table of the axisymmetric ROM is used as is (3-D bank values are 2-14 % lower at 50-350 um); mrm.plant.thermal.load_rom warns that superposition_rel_err 0.139 > 0.10; uncertainty.thermal.crosstalk_scale (g26: loguniform 0.33-1.73) covers the gap"
    }
   }
  },
@@ -4092,5 +5055,5 @@
  "file": "thermal_rom_inring_noundercut_160.npz",
  "sha256": "e421874206efb9eb4a2298a6b17273e287fc34f52c8ce231e8947e2a59009bd2",
  "created_utc": "2026-10-09T12:52:27Z",
- "updated_utc": "2026-10-09T15:10:31Z"
+ "updated_utc": "2026-10-09T19:15:20Z"
 }

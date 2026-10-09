@@ -27,7 +27,15 @@ through the true peak; just blue of the peak it falls off the fold. Hence:
     LOCK        integral loop on the block-mean monitor y at the set-point r = y_bg + alpha (y_pk - y_bg) on the red
                 side (heater up when y > r). Gain Ki = 2 pi f_c T_s / |dy/dcode|, with dy/dcode measured at r on the
                 DOWN scan (it includes the self-heating stiffness 1 + G|P'|, 07 P0-1). Loss of lock (y below
-                y_bg + lost_frac (y_pk - y_bg) for lost_steps steps, or the heater at a rail) restarts the search.
+                y_bg + lost_frac (y_pk - y_bg) for lost_steps steps, or the heater at a rail) restarts the search
+                for the SAME resonance: window, peak and event drives moved by the drift the loop had tracked
+                (w_good - w_lock_in), the window top cut to just above the resonance, and only a resonance at least
+                relock_height_frac as high as the lost one taken (a lower one is passed: another line seen while
+                this one is dark).
+                A loss costs a retry; a lock held for retry_reset_s clears the count;
+    FAIL        after max_retries failed searches: heater parked at the window's low edge. Standalone controllers
+                re-arm after fail_rearm_s (the light may come back: a failover gap, a fibre re-mate), with the full
+                window and no height test; the WDM supervisor re-arms the rings it has assigned.
 
 Two cases need care. Bistable re-approach: the DOWN scan's fall-off can leave the ring on the hot branch of the next
 bluer line, whose red flank must not be taken for this one; REAPPROACH therefore waits for the jump near the drive
@@ -90,7 +98,15 @@ class RampParams:
     lock_bw_hz: crossover of the integral lock (3 kHz: ~70 deg margin over the 3-13 us thermal poles and ~10 us of
         ADC/DAC/period delay; type-1 lag ramp / (2 pi f_c), ~6 pm at 1616 degC/s and 70 pm/K: measured 6.4 pm
         max over a full A2 cycle, tests/verification/test_ctrl_b_ramp_aggressor.py);
-    lost_frac, lost_steps: loss-of-lock test; max_retries: searches before FAIL;
+    lost_frac, lost_steps: loss-of-lock test; max_retries: searches before FAIL (a retry repeats the failed search
+        from the window's low edge);
+    retry_reset_s: a lock held this long clears the retry count (10 ms), so occasional losses over a long run do
+        not use up the retries;
+    relock_height_frac: a lock-loss re-search passes resonances lower than this fraction of the lost peak (0.4,
+        -4 dB: a re-mate or failover power step stays above it, another line seen in a dark gap mostly not);
+    fail_rearm_s: a standalone controller (RampAcquire, BitStatLock) in FAIL restarts its search after this long
+        (5 ms; None: FAIL is final). Without it a ring whose light went away (laser off, fibre re-mate, line
+        failover gap) never re-acquires when the light returns. The WDM supervisor re-arms only rings it has assigned;
     w_start, w_lo, w_hi: start drive and search window (scalar, or one value per ring);
     rings: the rings this controller acquires (None = all); the others keep their applied heater code;
     start_delay_s: wait before the first sweep, counted from the first step after a reset (50 us: the turn-on
@@ -108,6 +124,9 @@ class RampParams:
     lost_frac: float = 0.15
     lost_steps: int = 20
     max_retries: int = 3
+    retry_reset_s: float = 10e-3
+    relock_height_frac: float = 0.4
+    fail_rearm_s: float | None = 5e-3
     w_start: float | list = 0.0
     w_lo: float | list = 0.0
     w_hi: float | list = 1.0
@@ -209,6 +228,17 @@ class RampFSM:
         self.lost = z(0, np.int64)
         self.retries = z(0, np.int64)
         self.steps = z(0, np.int64)
+        self.rail = z(0, np.int64)            # steps of the current UP/REAPPROACH ramp spent at full scale (w = 1)
+        self.fail_steps = z(0, np.int64)      # steps spent in FAIL (a standalone controller re-arms after a while)
+        self.w_lock_in = z(np.nan)            # drive at the lock entry (the window follows the tracked drift)
+        self.w_good = z(np.nan)               # drive of the last locked step with the monitor in range
+        self.w_hi_full = self.w_hi.copy()     # window top of the search (a lock-loss search narrows w_hi)
+        self.relock = z(False, bool)          # the running search follows a loss of lock (height-checked)
+        self.rise_ref = z(np.nan)             # peak height above background of the lock that was lost
+        per = spec.period_s
+        self.retry_reset_steps = max(int(round(prm.retry_reset_s / per)), 1)
+        self.rearm_steps = (None if prm.fail_rearm_s is None
+                            else max(int(round(prm.fail_rearm_s / per)), 1))
         self.clipped = z(False, bool)
         self.locked = z(False, bool)
         self.saturated = z(False, bool)
@@ -257,6 +287,8 @@ class RampFSM:
             self.w_lo = np.where(m, w_lo, self.w_lo)
         if w_hi is not None:
             self.w_hi = np.where(m, w_hi, self.w_hi)
+        self.w_hi_full = np.where(m, self.w_hi, self.w_hi_full)
+        self.relock = np.where(m, False, self.relock)
         self.w = np.where(m, np.maximum(self.w, 0.0), self.w)
         if not getattr(self, "_mapping_call", False):
             self.map_mode = np.where(m, False, self.map_mode)
@@ -321,7 +353,22 @@ class RampFSM:
         self.jumped = np.where(m, False, self.jumped)
         self.locked = np.where(m, False, self.locked)
         self.steps = np.where(m, 0, self.steps)
+        self.rail = np.where(m, 0, self.rail)
         self.sk_n = np.where(m, 0, self.sk_n)
+
+    def rearm(self, mask) -> None:
+        """Restart the search of the rings in ``mask`` (normally rings in FAIL, see ``fail_steps``) with a fresh retry
+        count, from the start drive of their last search and in their last window."""
+        m = np.asarray(mask, dtype=bool) & self.active
+        if not np.any(m):
+            return
+        self.w = np.where(m, self.w_up0, self.w)
+        self.w_hi = np.where(m, self.w_hi_full, self.w_hi)       # undo a lock-loss narrowing
+        self.relock = np.where(m, False, self.relock)            # and its height test: take what is there now
+        self.retries = np.where(m, 0, self.retries)
+        self.fail_steps = np.where(m, 0, self.fail_steps)
+        self._enter_up(m)
+        self._apply_code(m)
 
     def _enter_down(self, m):
         self.state = np.where(m, ST_DOWN, self.state)
@@ -339,6 +386,7 @@ class RampFSM:
     def _enter_reapproach(self, m):
         self._set_peak(m)
         self.state = np.where(m, ST_REAPPROACH, self.state)
+        self.rail = np.where(m, 0, self.rail)
 
     def _set_peak(self, m):
         """The DOWN scan's maximum is the peak: set y_pk, w_pk, the background, the set-point and the slope."""
@@ -396,31 +444,50 @@ class RampFSM:
         self.lost = np.where(m, 0, self.lost)
         self.locked = np.where(m, True, self.locked)
         self.steps = np.where(m, 0, self.steps)
+        self.w_lock_in = np.where(m, w_of_code(self.code, self.code_max, self.q), self.w_lock_in)
+        self.w_good = np.where(m, self.w_lock_in, self.w_good)
+        self.relock = np.where(m, False, self.relock)
+
+    def _enter_fail(self, m):
+        self.state = np.where(m, ST_FAIL, self.state)
+        self.locked = np.where(m, False, self.locked)
+        self.fail_steps = np.where(m, 0, self.fail_steps)
 
     def _retry(self, m):
-        """Search again from the current drive (a lost peak), FAIL after max_retries."""
+        """Search again from a little below the current drive (a lost peak), FAIL after max_retries."""
         retry = m & (self.retries < self.prm.max_retries)
         fail = m & ~retry
         self.retries = np.where(retry, self.retries + 1, self.retries)
         self.w = np.where(retry, np.maximum(self.w - 4.0 * self.dw_up, self.w_lo), self.w)
         self._enter_up(retry)
-        self.state = np.where(fail, ST_FAIL, self.state)
-        self.locked = np.where(fail, False, self.locked)
+        self._enter_fail(fail)
+        self.w = np.where(fail, self.w_lo, self.w)            # FAIL parks at the window's low edge, as below
 
     def _fail_or_retry(self, m):
+        """The search passed its window without a resonance: repeat it from the window's low edge, FAIL after
+        max_retries (parked at w_lo). (A retry from the search's start drive ``w_up0``, further below the window,
+        was tried in review and reverted: after the online PAT-1 rotation each ring drops from its old lock to
+        half a spacing below its new window, and repeating that large drop on every retry repeats the thermal
+        transient that made the first search miss; five of eight rings then FAILed, test_ctrl_b_wdm_slow.py.)"""
         retry = m & (self.retries < self.prm.max_retries)
         fail = m & ~retry
         self.retries = np.where(retry, self.retries + 1, self.retries)
         self.w = np.where(retry, self.w_lo, self.w)
         self._enter_up(retry)
-        self.state = np.where(fail, ST_FAIL, self.state)
-        self.locked = np.where(fail, False, self.locked)
+        self._enter_fail(fail)
         self.w = np.where(fail, self.w_lo, self.w)
+
+    def auto_rearm(self) -> None:
+        """Re-arm the rings that have been in FAIL for ``fail_rearm_s`` (standalone controllers call it before
+        :meth:`step`; a supervisor decides itself which rings to re-arm). No-op when ``fail_rearm_s`` is None."""
+        if self.rearm_steps is not None:
+            self.rearm((self.state == ST_FAIL) & (self.fail_steps >= self.rearm_steps))
 
     # ---- one controller step ----------------------------------------------------------------------------------
     def step(self, y: np.ndarray, valid: np.ndarray, clipped: np.ndarray | None = None) -> np.ndarray:
         """Advance every active ring by one controller period with the block-mean monitor ``y`` (codes)."""
         prm = self.prm
+        self.fail_steps = np.where(self.active & (self.state == ST_FAIL), self.fail_steps + 1, self.fail_steps)
         go = self.active & np.asarray(valid, dtype=bool)
         if clipped is not None:
             self.clipped |= go & np.asarray(clipped, dtype=bool) & (self.state != ST_LOCK)
@@ -501,8 +568,12 @@ class RampFSM:
             self._enter_down(found)
             cont = m & ~found & (self.state == ST_UP)
             self.w = np.where(cont, self.w + self.dw_up, self.w)
-            # a maximum inside the window needs a few more steps for its fall to be confirmed
-            over = cont & (self.w > self.w_hi + np.where(self.map_mode, 0.0, 3.0 * self.dw_up))
+            # a maximum inside the window needs a few more steps for its fall to be confirmed. The drive is clipped
+            # to w = 1 at the end of every step, so a window reaching full scale (the default w_hi = 1) is ended by
+            # the steps spent at the rail: without that count a search that finds nothing (no light, a resonance
+            # out of reach) held the heater at full scale for ever
+            self.rail = np.where(cont & (self.w > 1.0), self.rail + 1, np.where(cont, 0, self.rail))
+            over = cont & ((self.w > self.w_hi + np.where(self.map_mode, 0.0, 3.0 * self.dw_up)) | (self.rail > 3))
             map_over = over & self.map_mode
             self.state = np.where(map_over, ST_HOLD, self.state)
             self.map_done |= map_over
@@ -525,12 +596,32 @@ class RampFSM:
             rise = self.y_max - self.y_bg
             fall = np.maximum(self.drop_min, prm.drop_frac * rise)
             peak = m & (rise >= self.detect) & (y <= self.y_max - fall)
+            # bistable = the UP sweep rose by a jump AND the true peak lies well below the up-sweep's event (a hot
+            # branch spanning more than two up-steps). A sharp resonance without bistability also rises by more
+            # than jump_frac in one up-step (dw_up ~ FWHM/3.5 and a large peak), but its DOWN-scan peak sits within
+            # about one step of the up-sweep's maximum: it is re-approached by the continuous rule (before the
+            # review it was treated as bistable, waited for a jump that never came, and ended in FAIL). Only a long
+            # hot branch can hand the DOWN scan to the hot branch of another line (whose red flank the continuous
+            # rule would take), and a long branch keeps the jump rule. (A test of the size of the final fall was
+            # tried and rejected: the block-mean monitor smears a fold over two steps, and on g26 nominal ring 2
+            # the DOWN scan of line 2 continues onto line 7's hot branch, tests/verification/test_ctrl_b_wdm.py.)
+            long_branch = (self.w_event - self.w_max) > 2.0 * self.dw_up
+            self.bistable = np.where(peak, self.bistable & long_branch, self.bistable)
+            # a lock-loss re-search takes only a resonance at least relock_height_frac as high as the one it lost; a
+            # lower one is another line seen while this one is dark (a laser failover gap: the other lines leak into
+            # the drop port), or an occupied line: pass it and search on above it (no retry is spent)
+            weak = peak & self.relock & ((self.y_max - self.y_bg) < prm.relock_height_frac * self.rise_ref)
+            if np.any(weak):
+                self.w = np.where(weak, self.w_event + self.dw_up, self.w)
+                self._enter_up(weak)
+                peak = peak & ~weak
             self._enter_reapproach(peak)
-            cont = m & ~peak
+            cont = m & ~peak & (self.state == ST_DOWN)
             # the heater cannot cool: when the red branch reaches w = 0 (or runs longer than dw_down_max) before its
             # peak, the ring is still on the red side; take the highest point seen as a partial peak and lock
             end = cont & ((self.w - self.dw_down < 0.0) | (self.w - self.dw_down < self.w_event - self.dw_down_max))
             rising = end & (y >= self.y_max - self.drop_min) & (self.y_max - self.y_bg >= self.detect)
+            rising &= ~(self.relock & ((self.y_max - self.y_bg) < prm.relock_height_frac * self.rise_ref))
             if np.any(rising):
                 self.partial = np.where(rising, True, self.partial)
                 self._set_peak(rising)
@@ -557,7 +648,8 @@ class RampFSM:
             cont = m & ~red
             self.w = np.where(cont, self.w + self.dw_re, self.w)
             limit = np.where(self.bistable, self.w_jump_ev, self.w_pk) + tol
-            over = cont & (self.w > limit)
+            self.rail = np.where(cont & (self.w > 1.0), self.rail + 1, np.where(cont, 0, self.rail))
+            over = cont & ((self.w > limit) | (self.rail > 3))      # a peak near full scale: the limit is unreachable
             self._retry(over)
 
         # ---- LOCK: integral loop on the red side
@@ -572,15 +664,44 @@ class RampFSM:
             self.w = np.where(m, w_of_code(self.code, self.code_max, self.q), self.w)
             low = m & (y < self.y_bg + prm.lost_frac * (self.y_pk - self.y_bg))
             self.lost = np.where(low, self.lost + 1, np.where(m, 0, self.lost))
+            # drive of the last step in lock (monitor within 0.2 of the peak height of its set-point): the drift
+            # the loop tracked since the lock entry is w_good - w_lock_in. The integrator wanders while the error
+            # is large (a dark line: the monitor drops to the other lines' leakage, often above the loss threshold,
+            # and the loop runs the heater to its rail), so those steps do not count
+            near_r = np.abs(y - self.setpoint) < 0.2 * np.maximum(self.y_pk - self.y_bg, 1.0)
+            self.w_good = np.where(m & near_r, self.w, self.w_good)
+            # a lock held for retry_reset_s clears the retry count: occasional losses over a long run do not add up
+            self.retries = np.where(m & (self.steps >= self.retry_reset_steps), 0, self.retries)
             gone = m & ((self.lost >= prm.lost_steps) | (self.saturated & (self.steps > prm.lost_steps)))
             if np.any(gone):
-                # restart the search a little blue of the peak, in a window around it
+                # restart the search a little blue of the peak, in a window around it, both moved by the drift the
+                # loop tracked (a chip that warmed by a few K moves the resonance by several linewidths: the
+                # acquisition's window and peak drive are stale; the search must meet the SAME resonance)
+                s = np.where(gone & np.isfinite(self.w_good) & np.isfinite(self.w_lock_in),
+                             self.w_good - self.w_lock_in, 0.0)
+                self.w_lo = np.where(gone, np.clip(self.w_lo + s, 0.0, 1.0), self.w_lo)
+                self.w_hi_full = np.where(gone, np.clip(self.w_hi_full + s, 0.0, 1.0), self.w_hi_full)
+                self.w_pk = np.where(gone, self.w_pk + s, self.w_pk)
+                self.w_jump_ev = np.where(gone, self.w_jump_ev + s, self.w_jump_ev)
+                # the immediate re-search covers only this resonance (up to its up-sweep event + 6 steps): a search
+                # that ran while the light was gone (a dropout longer than a few steps) would otherwise climb past
+                # it in the dark and take the next resonance up, a foreign line. A re-arm after FAIL restores the
+                # full window (w_hi_full)
+                top = np.fmax(self.w_pk, self.w_jump_ev) + 6.0 * self.dw_up
+                self.w_hi = np.where(gone, np.minimum(self.w_hi_full, top), self.w_hi)
                 self.locked = np.where(gone, False, self.locked)
+                self.relock = np.where(gone, True, self.relock)
+                self.rise_ref = np.where(gone, self.y_pk - self.y_bg, self.rise_ref)
+                # a loss counts as a retry; past max_retries the ring FAILs (parked at w_lo) instead of cycling for
+                # ever, e.g. a set-point beyond full scale (lock -> rail -> loss -> search -> lock ...)
+                again = gone & (self.retries < prm.max_retries)
                 lo_w = np.maximum(self.w_pk - 6.0 * self.dw_up, 0.0)
-                self.w = np.where(gone, lo_w, self.w)
-                self.state = np.where(gone, ST_UP, self.state)
-                self.retries = np.where(gone, self.retries + 1, self.retries)
-                self._enter_up(gone)
+                self.w = np.where(again, lo_w, self.w)
+                self.retries = np.where(again, self.retries + 1, self.retries)
+                self._enter_up(again)
+                self._enter_fail(gone & ~again)
+                self.w = np.where(gone & ~again, self.w_lo, self.w)
+                self.w_up0 = np.where(gone, lo_w, self.w_up0)          # a re-arm starts from the moved peak too
 
         # ---- PARK: ramp up to the park drive
         m = self.active & (self.state == ST_PARK)
@@ -646,6 +767,7 @@ class RampAcquire(BaseController):
                 return {"tx.heater": f.code.copy()}
             f.start(np.ones((f.B, f.N), bool))
             self.started = True
+        f.auto_rearm()
         return {"tx.heater": f.step(y, valid, clip)}
 
     def telemetry(self) -> dict[str, np.ndarray]:

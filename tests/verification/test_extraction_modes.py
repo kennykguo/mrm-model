@@ -166,6 +166,101 @@ def test_mesh_convergence_recorded(xs):
     assert err["dneff_dt_bent"] < 1e-3 * d["dneff_dt_per_k"]["value"][i25]
 
 
+@pytest.mark.parametrize("xs", XSECS_MODES + ("decea2019",))
+def test_production_mesh_bias(xs):
+    """discretization_error is the error of the FINEST level; the reported values come from the coarser production
+    mesh. The sidecar records their bias f(production) - f0, recomputed here from the stored series, and it must stay
+    small against the geometry uncertainty (< 0.1 nm of resonance, < 1e-3 in n_g)."""
+    from mrm.extraction import modes as MO
+    d, side, _ = _load(f"modes_{xs}")
+    conv = side["validation"]["mesh_convergence"]
+    rec = side["validation"]["production_mesh_bias"]
+    again = MO.production_mesh_bias(conv, side["inputs"]["settings"]["mesh_scale"], d["lambda0_nm"], d["n_g"])
+    assert json.loads(json.dumps(again)) == rec
+    q = rec["quantities"]
+    assert q["n_eff_bent"]["production_value"] == pytest.approx(d["n_eff"], abs=1e-12)
+    assert abs(rec["lambda_res_bias_nm"]) < 0.1
+    assert abs(q["n_eff_bent"]["bias"]) < 3e-4
+    assert abs(q["n_g_bent"]["bias"]) < 1e-3
+    assert abs(q["w_si_pert"]["bias"]) < 1e-3
+    i25 = d["dneff_dt_per_k"]["t_c"].index(25.0)
+    assert abs(q["dneff_dt_bent"]["bias"]) < 1e-3 * d["dneff_dt_per_k"]["value"][i25]
+
+
+@pytest.mark.parametrize("name", [f"modes_{x}" for x in XSECS_MODES + ("decea2019",)]
+                         + [f"coupling_{x}" for x in XSECS_COUPLING] + ["modes_study_bend"])
+def test_sidecar_provenance_words(name):
+    """The runtime loader labels values from these artefacts solver(assumed-geometry, literature-materials) (the
+    junction sidecar convention), so they rank as 'assumed' (07 P1-14)."""
+    from mrm.params.config import PROVENANCE_RANK, provenance_rank, resolve_from
+    _, side, _ = _load(name)
+    assert side["inputs"]["geometry"]["provenance"] == "assumed"
+    assert isinstance(side["inputs"]["geometry"]["provenance_by_field"], dict)
+    assert side["inputs"]["materials"]["provenance"] == "literature"
+    _, info = resolve_from(f"extracted/{name}.json:schema", None, DATA.parent)
+    assert "assumed-geometry" in info["provenance"] and "literature-materials" in info["provenance"]
+    assert provenance_rank(info["provenance"]) == PROVENANCE_RANK.index("assumed")
+
+
+@pytest.mark.parametrize("name", [f"modes_{x}" for x in XSECS_MODES + ("decea2019",)]
+                         + [f"coupling_{x}" for x in XSECS_COUPLING])
+def test_memory_record(name):
+    """mesh.memory records the cap each run used, its peak RSS and a re-run command under the 6 GB heavy cap."""
+    _, side, _ = _load(name)
+    mem = side["mesh"].get("memory")
+    if mem is None:
+        # the extraction code does not write this record (it comes from the 3 GB-era run logs); a re-extracted
+        # artefact has none
+        pytest.skip(f"{name}: no mesh.memory record (re-extracted after the 3 GB-cap runs)")
+    assert mem["cap_gb"] in (3.0, 6.0)
+    assert mem["peak_rss_gb"] is None or 0.0 < mem["peak_rss_gb"] < mem["cap_gb"]
+    assert "--heavy" in mem["rerun_command"] and "--limit-gb" not in mem["rerun_command"]
+    est = mem.get("estimate")
+    if est and name in ("modes_rib160", "modes_rib200"):
+        assert not est["fits_3gb"] and est["fits_6gb"]
+
+
+@pytest.mark.parametrize("xs", XSECS_MODES)
+def test_tidy3d_crosscheck_uncertainty_recorded(xs):
+    """The n_eff cross-check is only as sharp as Tidy3D's own extrapolation: the sidecar records it (recomputed
+    here from the stored crosscheck block), and |delta| lies inside the conservative bound |finest - f0|."""
+    from mrm.extraction import modes as MO
+    d, side, _ = _load(f"modes_{xs}")
+    rec = side["validation"]["crosscheck_tidy3d_uncertainty"]
+    fem_f0 = side["validation"]["mesh_convergence"]["n_eff_bent"]["f0"]
+    again = MO.tidy3d_crosscheck_uncertainty(d["crosscheck"], d["lambda0_nm"], d["n_g"], fem_f0)
+    assert json.loads(json.dumps(again)) == rec
+    assert rec["delta_fitted_order"] == pytest.approx(d["crosscheck"]["delta"], abs=1e-15)
+    assert abs(rec["delta_fitted_order"]) < abs(rec["tidy3d_finest_minus_f0"])
+    assert rec["delta_range"][0] <= rec["delta_first_order"] <= rec["delta_range"][1]
+    assert abs(rec["bend_shift_rel_diff"]) < 0.02
+    # Tidy3D converges at about first order here, so the limit rests on the extrapolation
+    assert 0.9 < rec["tidy3d_order_p"] < 1.3
+
+
+def test_unranged_assumptions_labelled():
+    """Every assumed geometry value either has a range (ranges_nm) or is listed in ranges_not_assigned."""
+    for name in [f"modes_{x}" for x in XSECS_MODES + ("decea2019",)] + [f"coupling_{x}" for x in XSECS_COUPLING]:
+        _, side, _ = _load(name)
+        g = side["inputs"]["geometry"]
+        assert g["ranges_not_assigned"] == C.unranged_assumptions(C.XSECS[g["name"]]), name
+        assert "sidewall_deg" in g["ranges_not_assigned"] and "clad" in g["ranges_not_assigned"], name
+        for k, v in g["provenance_by_field"].items():
+            if k != "note" and str(v).startswith("assumed"):
+                assert k in g["ranges_nm"] or k in g["ranges_not_assigned"], (name, k)
+
+
+def test_cli_rejects_production_scale_outside_convergence_series(tmp_path):
+    """production_mesh_bias needs the production level in the series: the CLI refuses before any solve."""
+    from mrm.extraction import modes as MO
+    with pytest.raises(SystemExit):
+        MO.main(["--quick", "--study", "no", "--xsec", "strip400x200", "--mesh-scale", "1.0", "--out", str(tmp_path)])
+    with pytest.raises(SystemExit):
+        MO.main(["--study", "no", "--xsec", "rib160", "--mesh-scale", "1.0", "--conv-scales", "2.0", "1.5",
+                 "--out", str(tmp_path)])
+    assert not any(tmp_path.iterdir())
+
+
 @pytest.mark.parametrize("xs", XSECS_MODES)
 def test_tidy3d_crosscheck(xs):
     """Tidy3D local solver (converged by Richardson) agrees at the same r_ref; bend shifts agree."""
@@ -249,6 +344,22 @@ def test_bend_study_meep_and_scaling():
             assert len(src["sha256"]) == 64, name
         for x in ("strip400x200", "rib160", "rib200"):
             assert side["inputs"]["sources"][f"modes_{x}"]["sha256"] == C.sha256_file(DATA / f"modes_{x}.json")
+
+
+def test_bend_study_meep_order_sensitivity():
+    """The verdict's +-0.23 nm omits the order uncertainty. Free-order fits of every consecutive triple give the
+    wider range (recomputed here); the exact prediction stays inside it and needs an order inside the observed
+    range, the isotropic one needs an order outside it."""
+    from mrm.extraction import modes as MO
+    d, side, _ = _load("modes_study_bend")
+    m = d["meep_cylindrical"]
+    rec = side["validation"]["meep_order_sensitivity"]
+    again = MO.meep_order_sensitivity(m["series"]["averaging"], m["fem_pred_lambda_um"])
+    assert json.loads(json.dumps(again)) == rec
+    assert rec["half_range_nm"] > m["verdict"]["extrapolation_uncertainty_nm"]
+    assert rec["inside_f0_range"]["exact"] and not rec["inside_f0_range"]["isotropic"]
+    assert rec["order_needed_inside_observed_range"]["exact"]
+    assert not rec["order_needed_inside_observed_range"]["isotropic"]
 
 
 def test_decea_replication_reported():

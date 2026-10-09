@@ -11,11 +11,14 @@ swing loss)). Section 6 lists what the adversarial review changed. Contract: ARC
 ```python
 # mrm.control.baselines.ramp_acquire
 RampParams(alpha=0.5, dw_up=None, dw_down=None, dw_reapproach=None, detect_frac=0.05, drop_frac=0.15, jump_frac=0.08,
-           lock_bw_hz=3000.0, lost_frac=0.15, lost_steps=20, max_retries=3, w_start=0.0, w_lo=0.0, w_hi=1.0,
-           rings=None, start_delay_s=50e-6, law="voltage", side="red")          # dataclass = controller.params
+           lock_bw_hz=3000.0, lost_frac=0.15, lost_steps=20, max_retries=3, retry_reset_s=10e-3,
+           relock_height_frac=0.4, fail_rearm_s=5e-3, w_start=0.0, w_lo=0.0, w_hi=1.0, rings=None,
+           start_delay_s=50e-6, law="voltage", side="red")          # dataclass = controller.params
 RampFSM(spec, prm: RampParams, design: NominalDesign | None = None)          # vectorized (B, N) state machine
     .start(mask, w_from=None, w_lo=None, w_hi=None, skip=0); .start_map(mask, w_from=0.0, w_hi=None, n_events=None)
     .park(mask, w); .park_from_below(mask, w); .step(y, valid, clipped=None) -> codes (B, N) int64
+    .rearm(mask) (repeat the last search, full window, fresh retries); .auto_rearm() (rings in FAIL for
+    fail_rearm_s; RampAcquire and BitStatLock call it every step, the WDM supervisor re-arms assigned rings in TRACK)
     .detuning_est_pm(y); state/y_pk/w_pk/y_bg/setpoint/ki/jumps/bistable/partial/ev_w/ev_y/ev_wfloor/ev_n ...
     .dw_up (B, N) up-sweep step in use (property; ``fsm.dw_up[b] = x`` sets one world), .dw_up0 (configured scalar)
     .sk_w (B, N, E) / .sk_n: drives of the resonances the running UP search passed outside its window
@@ -307,4 +310,115 @@ target.
   in 3 of 8 sampled worlds (ramp test) and on some rings of 5 of 6 (WDM test), and the PGA gains (1, 2, 4, 8) cannot
   attenuate. Monitor-based set-points then use a clipped amplitude.
   Please add headroom (a gain < 1, or a larger full scale) or state that clipping is intended.
+
+## 7. Second adversarial review (2026-10-09, after a restart)
+
+A first pass of this review had left uncommitted, unwired fields in ramp_acquire.py (`rail`, `fail_steps`,
+`w_lock_in`, `rearm`, `retry_reset_s`, `fail_rearm_s`). They are now wired and tested. All of the following are in
+`RampFSM`, so they apply to RampAcquire, BitStatLock and the WDM supervisor.
+
+### 7.1 Bugs fixed
+
+1. **A search with the default window (w_hi = 1) never ended.** The drive is clipped to 1 at the end of every step,
+   so the end-of-window test `w > w_hi + 3 dw_up` could never become true. With no light, or no resonance in reach,
+   RampAcquire held the heater at full scale (code 65535) for ever, in UP. The same happened in REAPPROACH when the
+   peak was near full scale. Now 4 steps at the rail end the search (retry, then FAIL).
+   Tests: `test_ctrl_b_fsm.py::test_dark_search_ends_in_fail_and_parks_the_heater` and
+   `::test_peak_near_full_scale_does_not_hang`.
+2. **FAIL was final.** A ring whose light went away never re-acquired when the light came back. Examples: a laser
+   failover gap, a fibre re-mate, a laser that turns on after the controller starts. Now standalone controllers
+   re-arm after `fail_rearm_s` (5 ms), and the WDM supervisor re-arms the rings it has assigned in TRACK. A FAIL
+   from `_retry` now parks at w_lo, like the FAIL from `_fail_or_retry`; before, it held whatever drive it was at.
+   Tests: `test_ctrl_b_fsm.py::test_standalone_reacquires_after_a_laser_outage_at_start` and
+   `test_ctrl_b_wdm.py::test_track_rearms_assigned_rings_in_fail`.
+3. **Loss-of-lock retries added up for ever, and a lost lock could cycle for ever.**
+   - Every loss cost a retry, and nothing cleared the count. After 3 losses in a long run, the next search that
+     failed ended in FAIL at once. A lock held for `retry_reset_s` (10 ms) now clears the count.
+   - The loss branch never checked `max_retries`. A set-point beyond full scale cycled lock -> rail -> loss ->
+     search -> lock without end, with the heater mostly at full scale. Past `max_retries` the ring now FAILs.
+   Test: `test_ctrl_b_fsm.py::test_retries_clear_after_a_long_lock`.
+4. **The lock-loss re-search could take a foreign resonance.**
+   - The search started at the stale peak drive (w_pk - 6 dw_up) in the stale window. After the loop had tracked
+     a drift of more than about 6 up-steps, it climbed to the next resonance up.
+   - A search that ran while the line was dark climbed past the resonance and took whatever came next.
+   - In a dark gap the drop port still sees the other lines, so the monitor often stays above the loss threshold.
+     The integrator then runs the heater to its rail.
+
+   Now the re-search works like this:
+   - The window, w_pk and w_jump_ev move by the drift the loop tracked: `w_good - w_lock_in`, where `w_good` is the
+     drive of the last step with |y - r| < 0.2 of the peak height.
+   - The window top is cut to `max(w_pk, w_jump_ev) + 6 dw_up`.
+   - Resonances lower than `relock_height_frac` (0.4) of the lost peak are passed.
+   - A re-arm restores the full window and drops the height test.
+
+   Engine results, [B2] `laser_failover(line=7, gap_s=1 ms)`, ring 0 locked on line 7:
+   - Before: relocked 1431 pm from line 7, a foreign resonance.
+   - After this review's first fix: -705 pm, still a foreign resonance.
+   - Now: 142.5 pm on line 7 (147.9 pm before the gap). The relock is about 6 ms after the light returns: FAIL in
+     the dark, then the 5 ms re-arm.
+
+   Tests: `test_ctrl_b_engine.py::test_ramp_lock_recovers_from_a_line_failover_gap` and
+   `test_ctrl_b_fsm.py::test_lock_loss_search_follows_the_tracked_drift`. The toy-plant test fails when the drift
+   shift is removed (checked).
+5. **A sharp resonance without bistability could never be locked.**
+   - With dw_up = FWHM/3.5, a large continuous peak rises by more than `jump_frac` (8 % FS) in one up-step. It was
+     flagged bistable, so REAPPROACH waited for a jump that never came, then retried 3 times and FAILed (toy plant).
+   - Now a resonance is bistable only when it also has a long hot branch: the DOWN-scan peak lies more than 2 dw_up
+     below the up-sweep's event.
+   - A first fix judged the size of the fall at the end of the DOWN scan. It was reverted: in the g26 nominal WDM
+     cold start, the DOWN scan of ring 2's line 2 runs onto line 7's hot branch (peak 59.7 k codes at w 0.285,
+     against the event at 0.346). The fall at the end was then small, and ring 2 locked on line 7. The long-branch
+     rule keeps the jump rule there, and the ring ends on line 2.
+
+6. **The interrupted pass had changed what a failed window does next.** A retry restarted from the search's start
+   drive `w_up0`, further below the window, instead of from w_lo. This broke the online PAT-1 rotation.
+   - After the rotation, every ring drops from its old lock (w ~ 0.43) to half a spacing below its new window
+     (0.25). Each retry repeated that drop and its thermal transient.
+   - In `test_ctrl_b_wdm_slow.py::test_online_barrel_shift_when_the_chip_cools`, 5 of 8 rings FAILed, against 8 of
+     8 relocked when retries start at w_lo. Checked on the engine with only this line changed.
+   - The retry starts at w_lo again, as in the committed code.
+
+### 7.2 Added
+
+- `test_ctrl_b_fsm.py`: a toy plant (a Lorentzian comb in drive units, one period of lag, ADC noise, light on/off,
+  comb drift) for the FSM bookkeeping. 6 tests, about 2 s, and they also pass with NUMBA_DISABLE_JIT=1.
+- `test_ctrl_b_engine.py::test_ramp_lock_recovers_from_a_line_failover_gap` (engine, about 3 s).
+- `test_ctrl_b_wdm.py::test_track_rearms_assigned_rings_in_fail`.
+- `test_ctrl_b_ramp_aggressor.py::test_a1_through_the_cusp_engine` now also runs the bit-statistics lock
+  (parametrized; slow).
+
+### 7.3 Test results after this review
+
+- **Default suite (`-m "not slow"`, 9 files including `test_ctrl_b_fsm`): 53 passed, in 51 s at load ~4.** The 6
+  FSM tests and the WDM and calibration unit tests also pass with NUMBA_DISABLE_JIT=1.
+- **Slow suite (`-m slow`): 19 passed and 1 xfailed (the default-layout A2 PD issue), in 122 s.**
+
+| case | result |
+|---|---|
+| A2 bench | rms 0.86 pm, max 1.76 pm |
+| A2 engine, 110 ms | max deviation 6.17 pm |
+| A1 engine through the cusp, ramp lock | 5.83 pm |
+| A1 engine through the cusp, bit-statistics lock (new) | 87.3 pm lock point, max deviation 9.55 pm at the cusp, stays in LOCK |
+| barrel shift under 0.10 A | shift 6 |
+| online PAT-1 | all 8 rings relocked on lines n + 1 |
+| WDM warm start | as before |
+| sampled worlds, seed 7, B = 6 | 26 of 48 rings on their line, 14 vouched, 0 vouched wrong |
+| engine WDM cold start | 155-181 pm |
+| bitstat, +10 % laser power | +4.7 pm (monitor lock: +19.9 pm) |
+| corner presets | all LOCK red, p-p <= 0.57 pm |
+
+### 7.4 Open issues found, not fixed
+
+- **The DOWN scan can measure another line's peak.** g26 nominal WDM cold start, ring 2: the set-point and the
+  slope of the line-2 lock come from line 7's peak (59.7 k codes). The lock lands on the right line because
+  REAPPROACH waits for line 2's jump, but its set-point is a fraction of the wrong height. Where line 2's own peak
+  is lower than that set-point, the loop would run over the peak and lose the lock. A fix needs the DOWN scan to
+  stop at the first fold. With the block-mean monitor, a fold can look like a fall of less than drop_frac, so this
+  was not attempted here.
+- **In a dark gap the loss detection is slow.** It is the heater rail after lost_steps steps, not the monitor level,
+  because the other lines keep the monitor above `lost_frac`. A per-ring background estimate from a map, or the
+  line-enable state, would detect it faster.
+- **A standalone ring relocks about 6 ms after its light returns.** This is fail_rearm_s plus a search. A shorter
+  `fail_rearm_s` re-sweeps more often in the dark: with no light the search climbs to full scale, a supply-load
+  concern for 8 rings at once.
 

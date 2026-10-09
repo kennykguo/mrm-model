@@ -15,11 +15,6 @@
    },
    "width_definition": "mid-height of the etched sidewall",
    "lam0_nm": 1310.0,
-   "provenance": {
-    "film_nm": "printed (SMTAI render; textbook REF.waveguideLmNm)",
-    "width_nm": "printed",
-    "note": "the textbook's reference strip (06 audit, 05 smoke tests); oxide-clad, vertical walls"
-   },
    "ranges_nm": {
     "width_nm": [
      380.0,
@@ -29,6 +24,17 @@
      190.0,
      210.0
     ]
+   },
+   "provenance_by_field": {
+    "film_nm": "printed (SMTAI render; textbook REF.waveguideLmNm)",
+    "width_nm": "printed",
+    "note": "the textbook's reference strip (06 audit, 05 smoke tests); oxide-clad, vertical walls"
+   },
+   "provenance": "assumed",
+   "provenance_note": "one provenance word for the whole cross-section (the weakest of its parts): every hypothesis has at least one unpublished dimension (slab depth, rib width, sidewall angle or cladding), so it is 'assumed'; per-field provenance is in provenance_by_field",
+   "ranges_not_assigned": {
+    "sidewall_deg": "90 deg (assumed: vertical walls); no range assigned and no sensitivity computed; realize has no sidewall dimension",
+    "clad": "SiO2 (beol) above and beside the core, SiO2 (thermal) BOX, indices from mrm.materials: the cladding stack (no liner, no index spread, thickness) is assumed and has no range"
    }
   },
   "materials": {
@@ -36,12 +42,14 @@
    "file": "mrm/data/materials.json",
    "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
    "si_index_model": "li1980 temperature shape on the frey level",
-   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT",
+   "provenance": "literature"
   },
   "film_nm": 200.0,
   "lambda0_nm": 1310.0,
   "t_ref_c": 25.0,
   "fsr_design_thz": 1.8,
+  "r_ref_rule": "self-consistent with fsr_design_thz: c / (2 pi r_ref n_g,bent(r_ref)) = FSR",
   "settings": {
    "quick": false,
    "mesh_scale": 1.5,
@@ -119,7 +127,74 @@
    "pml_right_um": 0.0,
    "pml_strength": 2.0
   },
-  "elements": "2nd-order Nedelec (transverse) x 2nd-order Lagrange (longitudinal)"
+  "elements": "2nd-order Nedelec (transverse) x 2nd-order Lagrange (longitudinal)",
+  "memory": {
+   "cap_gb": 3.0,
+   "cap": "tools/memguard.py --limit-gb 3 --heavy (the former per-job cap; the heavy default is now 6 GB)",
+   "peak_rss_gb": null,
+   "used": {
+    "mesh_scale": 1.5,
+    "h_core_nm": 15.0,
+    "conv_scales": [
+     3.0,
+     2.0,
+     1.5,
+     1.0
+    ],
+    "conv_h_core_nm": [
+     30.0,
+     20.0,
+     15.0,
+     10.0
+    ]
+   },
+   "first_design": {
+    "mesh_scale": 1.0,
+    "h_core_nm": 10.0,
+    "conv_scales": [
+     2.0,
+     1.4142,
+     1.0,
+     0.7071
+    ],
+    "conv_h_core_nm": [
+     20.0,
+     14.14,
+     10.0,
+     7.07
+    ]
+   },
+   "reduced_because": "the first design was coarsened before the first full run, right after a 5-solve probe at mesh scale 1.0 (rib160, closed and PML windows up to 128k dofs) peaked at 2.61 GB under the 3 GB cap; the transcript does not state the reason, and run time (about 3x per solve) was a second factor. The finest level (7.07 nm, ~2x the elements of 10 nm) could not run under 3 GB.",
+   "accuracy_cost": "the reported values carry the production-mesh bias of validation.production_mesh_bias instead of the ~3x smaller bias of the 10 nm level",
+   "rerun_command": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.modes --study no --xsec strip400x200 --mesh-scale 1.0 --conv-scales 2.0 1.4142 1.0 0.7071 --out <dir>",
+   "peak_rss_gb_note": "written by a multi-cross-section run (strip, rib160, ...) that the cap later killed at 3.04 GB during rib160 (memory accumulated across cross-sections; fixed by one process per cross-section, a 2-problem cache and gc); the strip's own peak is not recorded and was below 3.0 GB. The kill did not change the strip artefact.",
+   "estimate": {
+    "mesh_counts_ntri": {
+     "closed_bent": {
+      "ntri_scale_1.5": 2524,
+      "ntri_scale_1.0": 4968,
+      "ntri_scale_0.7071": 9430
+     },
+     "closed_straight": {
+      "ntri_scale_1.5": 2488,
+      "ntri_scale_1.0": 4784,
+      "ntri_scale_0.7071": 8604
+     },
+     "largest_pml_window": {
+      "ntri_scale_1.5": 3158,
+      "ntri_scale_1.0": 6366,
+      "ntri_scale_0.7071": 11918
+     }
+    },
+    "mesh_counts_method": "gmsh meshes generated without solving (count_meshes.py, 2026-10-09)",
+    "first_design_largest_pair_dofs": 126599,
+    "model": "empirical RSS model of the first run's probes: RSS ~ 0.18 GB + 6.25 kB per dof of every live FEM problem (fit to the per-scale maxrss of a convergence probe, 10-39k dofs per problem, 0.24-1.17 GB; it predicts 2.70 GB for the scale-1.0 probe with four live problems, 403k dofs, measured 2.61 GB). A long production run adds an overhead (allocator growth, Tidy3D at 2.5 nm) taken from its measured peak; uncertainty ~30 %",
+    "first_design_peak_rss_gb_estimate": 2.47,
+    "fits_3gb": true,
+    "fits_6gb": true,
+    "note": "overhead taken as the largest observed (1.5 GB, rib200); the strip meshes alone fit 3 GB"
+   }
+  }
  },
  "validation": {
   "mesh_convergence": {
@@ -284,7 +359,96 @@
   },
   "index_weight_identity_residual": -2.784162269620083e-07,
   "crosscheck_delta_tidy3d": -0.00019229161896028302,
-  "bend_formulation": "exact transform; see modes_study_bend.json"
+  "crosscheck_tidy3d_uncertainty": {
+   "tidy3d_grids_nm": [
+    2.5,
+    5.0,
+    10.0
+   ],
+   "tidy3d_order_p": 1.0699979972060678,
+   "tidy3d_f0": 2.492188819572452,
+   "tidy3d_finest_minus_f0": 0.004263367756265346,
+   "tidy3d_f0_first_order": 2.491764910986208,
+   "delta_fitted_order": -0.00019229161896028302,
+   "delta_first_order": 0.00023161696728379866,
+   "delta_range": [
+    -0.00019229161896028302,
+    0.00023161696728379866
+   ],
+   "order_sensitivity": 0.0004239085862440817,
+   "delta_fem_richardson_f0": -0.00020811495517492062,
+   "lambda_res_equiv_nm": {
+    "delta_fitted_order": -0.057919557338645226,
+    "order_sensitivity": 0.12768417989334915,
+    "tidy3d_finest_minus_f0": 1.2841556722539464
+   },
+   "bend_shift_rel_diff": -0.010176555932141285,
+   "note": "delta = FEM - Tidy3D limit; the FEM matches Tidy3D within the Tidy3D extrapolation uncertainty (order sensitivity; |finest - f0| is the conservative bound in the FEM's discretization_error convention), not to |delta|. The bend shift is the sharper cross-check."
+  },
+  "bend_formulation": "exact transform; see modes_study_bend.json",
+  "production_mesh_bias": {
+   "production_h_core_nm": 15.0,
+   "finest_h_core_nm": 10.0,
+   "quantities": {
+    "n_eff_straight": {
+     "production_value": 2.4914219359874017,
+     "richardson_f0": 2.491404275495275,
+     "order_p": null,
+     "monotone": true,
+     "bias": 1.766049212648113e-05,
+     "finest_level_error": 1.766049212648113e-05,
+     "bias_over_finest_level_error": 1.0
+    },
+    "n_eff_bent": {
+     "production_value": 2.491996527953492,
+     "richardson_f0": 2.4919807046172773,
+     "order_p": null,
+     "monotone": true,
+     "bias": 1.5823336214637607e-05,
+     "finest_level_error": 1.5823336214637607e-05,
+     "bias_over_finest_level_error": 1.0
+    },
+    "n_eff_bent_isotropic": {
+     "production_value": 2.493568736243211,
+     "richardson_f0": 2.4935530809525774,
+     "order_p": null,
+     "monotone": true,
+     "bias": 1.565529063363158e-05,
+     "finest_level_error": 1.565529063363158e-05,
+     "bias_over_finest_level_error": 1.0
+    },
+    "n_g_bent": {
+     "production_value": 4.349170207180433,
+     "richardson_f0": 4.349496212112593,
+     "order_p": 0.46401179773922197,
+     "monotone": true,
+     "bias": -0.00032600493215984017,
+     "finest_level_error": 0.0002700945051534731,
+     "bias_over_finest_level_error": 1.2070032005079023
+    },
+    "dneff_dt_bent": {
+     "production_value": 0.00021207781307479577,
+     "richardson_f0": 0.00021208722014089183,
+     "order_p": 0.9076719598174985,
+     "monotone": true,
+     "bias": -9.407066096060604e-09,
+     "finest_level_error": 6.510601250313145e-09,
+     "bias_over_finest_level_error": 1.4448843869232733
+    },
+    "w_si_pert": {
+     "production_value": 1.0857448985881308,
+     "richardson_f0": 1.0857909157527827,
+     "order_p": 0.9631038715927991,
+     "monotone": true,
+     "bias": -4.601716465191252e-05,
+     "finest_level_error": 3.114050726460427e-05,
+     "bias_over_finest_level_error": 1.4777268803266332
+    }
+   },
+   "lambda_res_bias_nm": 0.0047660976288397645,
+   "r_ref_relative_bias": 7.49579590433631e-05,
+   "note": "bias = f(production mesh) - f0 for the values reported in the data file; discretization_error there is |f(finest) - f0|. lambda_res_bias_nm = lambda0 * bias(n_eff_bent) / n_g at fixed r_ref."
+  }
  },
  "assumptions": {
   "substrate": "omitted: the 2 um BOX makes substrate leakage negligible (decay exp(-2 k0 sqrt(n_eff^2 - n_ox^2) * 2 um) < 1e-14)",
@@ -311,5 +475,15 @@
   "shapely": "2.2.0",
   "tidy3d": "2.12.0",
   "meshio": "5.3.5"
- }
+ },
+ "history": [
+  {
+   "sidecar_update_utc": "2026-10-09T18:07:23Z",
+   "note": "resumed run, no solver: inputs.geometry/materials provenance words (junction convention), validation.production_mesh_bias from the stored convergence series, mesh.memory from the run logs and mesh counts (docs/handoff/extract_modes.md, 'Memory cap'). Data file unchanged."
+  },
+  {
+   "sidecar_update_utc": "2026-10-09T18:30:44Z",
+   "note": "review (no solver): inputs.geometry.ranges_not_assigned, inputs.r_ref_rule and validation.crosscheck_tidy3d_uncertainty from the stored crosscheck block. Data file unchanged."
+  }
+ ]
 }

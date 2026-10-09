@@ -564,7 +564,8 @@ class MetricsSpec:
                   ber_sample_period_s=float(val("metrics.ber_sample_period_s", 2.0)),
                   reloma_definition=str(val("metrics.reloma_definition", "oma_over_pin")),
                   allowed_assignments=str(val("metrics.allowed_assignments", "fixed")),
-                  lock_reference=str(val("metrics.lock_reference", "line")))
+                  lock_reference=str(val("metrics.lock_reference", "line")),
+                  lock_target_pm=val("metrics.lock_target_pm", None))
         kw.update(overrides)
         return cls(**kw)
 

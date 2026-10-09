@@ -555,6 +555,10 @@ _KEYS: list[Key] = [
     S("metrics.lock_threshold_pm", "float", "lock excursion threshold"),
     S("metrics.hysteresis_pm", "float", "excursion hysteresis"),
     S("metrics.allowed_assignments", "enum", "07 P1-12", enum=("fixed", "cyclic", "any"), default="fixed"),
+    S("metrics.lock_reference", "enum", "reference of the lock error: the line (07 literal), the oracle operating "
+      "point, or metrics.lock_target_pm (mrm.sim.metrics; engine handoff 3 item 21)",
+      enum=("line", "oracle", "target"), default="line"),
+    S("metrics.lock_target_pm", "float", "lock-error reference detuning (pm) when metrics.lock_reference is target"),
 
     # ---------------------------------------------------------------------------------------------- experiment
     S("experiment.kind", "enum", "07 P1-17",

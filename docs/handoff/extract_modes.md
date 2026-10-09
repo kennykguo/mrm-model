@@ -1,13 +1,15 @@
 # Handoff: extract_modes (`mrm/extraction/common.py`, `modes.py`, `coupling.py`)
 
-Status (resumed run, 2026-10-09): finished from the results that existed when a session restart stopped the first
-run. All artefacts below are committed (0a9941e, df1f69e) except `modes_study_bend.json`, which the resumed run
-assembled from stored results without any solver run (see "Bend-formulation study"); it, the edits to `modes.py`,
-the test file and this handoff are not committed yet. The resumed run made no new
-solver run (no femwell, Tidy3D, scikit-fem, DEVSIM or Meep) and did not change any committed artefact. Parts of the
-original task that were NOT done are listed in "Not done", each with the command that would produce it and the runtime
-fallback used meanwhile. Fast tests: `pytest tests/verification/test_extraction_modes.py -m "not slow"` gives 60
-passed (also with `-W error`). Every number below was re-read from the committed artefacts.
+Status (second resumed run, 2026-10-09): finished from the results that existed when a session restart stopped the
+first run. The data files are committed (0a9941e, df1f69e; `modes_study_bend.json` in 812fd1c) and are unchanged.
+Neither resumed run started a solver (no femwell, Tidy3D, scikit-fem, DEVSIM or Meep). The second resumed run filled
+sidecar fields from stored data only (see "Memory cap" and "Sidecar fields added"), added CLI flags for the first-design
+meshes, and added tests; none of that is committed yet. A review pass (also no solver) then corrected the stated
+uncertainty of the Tidy3D and Meep cross-checks, labelled the assumed values that have no range, fixed a CLI check and
+made one test robust to re-extraction (see "Review corrections"). Parts of the original task that were NOT done are
+listed in "Not done", each with the command that would produce it and the runtime fallback used meanwhile. Fast tests:
+`pytest tests/verification/test_extraction_modes.py -m "not slow"` gives 85 passed (also with `-W error`). Every
+number below was re-read from the committed artefacts.
 
 ## Files
 
@@ -16,12 +18,15 @@ passed (also with `-W error`). Every number below was re-read from the committed
   (femwell's formulation generalized to diagonal anisotropic eps and mu: exact bend transform, femwell's isotropic map
   for comparison, complex-coordinate PML), the Tidy3D local-solver wrapper `tidy3d_mode`, Richardson extrapolation,
   `write_artefact` (data + `<name>.sidecar.json`).
-- `mrm/extraction/modes.py`: `python -m mrm.extraction.modes [--quick] [--xsec ...] [--study yes|no|only] [--out DIR]`.
+- `mrm/extraction/modes.py`: `python -m mrm.extraction.modes [--quick] [--xsec ...] [--study yes|no|only] [--out DIR]
+  [--mesh-scale S] [--conv-scales S1 S2 ...] [--meep-pred-scale S]` (defaults 1.5; 3.0 2.0 1.5 1.0; 1.0).
+  `production_mesh_bias` (pure arithmetic) writes the bias of the reported production-mesh values into the sidecar.
   Writes `modes_<xsec>.json` (schema `modes/1`) and `modes_study_bend.json` (schema `modes_bend_study/1`).
   `--assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON` writes the study from stored results with no solver run
   (`assemble_bend_study`); `meep_series_verdict` is the pure Richardson analysis of the cylindrical Meep rows that both
   paths use.
-- `mrm/extraction/coupling.py`: `python -m mrm.extraction.coupling [--quick] [--xsec ...] [--out DIR]`. Writes
+- `mrm/extraction/coupling.py`: `python -m mrm.extraction.coupling [--quick] [--xsec ...] [--out DIR] [--mesh-scale S]
+  [--dx-nm D]` (defaults 1.5 and 5 nm; the convergence rows follow the chosen levels). Writes
   `coupling_<xsec>.json` (schema `coupling/1`). Needs `modes_<xsec>.json` for r_ref.
 - `tests/verification/test_extraction_modes.py`: fast artefact tests + `@pytest.mark.slow` re-runs.
 - `--quick` writes to a temporary directory unless `--out` is given; it never overwrites the committed artefacts.
@@ -36,7 +41,14 @@ passed (also with `-W error`). Every number below was re-read from the committed
 3. **dlambda/dT (H_solver)** = (lambda/n_g)(dn_eff/dT + n_eff alpha_L(T)) at lambda0 = 1310 nm (a locked ring sits
    at its line), alpha_L = substrate-clamped Si (Okada & Tokumaru). Table at 0, 25, 50, 75, 105, 125 C.
 4. **Index weights** are dn_eff/dn_i by central differences (the perturbation integral agrees to < 2e-4). The power
-   fraction is NOT the thermo-optic weight; dn_eff/dn_Si > Gamma_power for these guides.
+   fraction is NOT the thermo-optic weight; dn_eff/dn_Si > Gamma_power for these guides. The keys are `si`, `box`
+   and `clad` (plus `air` for de Cea), not the `sio2` of the ARCHITECTURE 5.1 example: the BOX and the cladding have
+   different indices and dn/dT. For a common oxide index change use `box + clad` (0.251 rib160, 0.178 rib200, 0.234
+   strip).
+4a. **n_g and the polynomial.** `n_g` and `dn_g_dlambda_per_nm` are local derivatives at lambda0 (finite differences
+   with a Richardson step); `n_eff_poly_lambda` is a quadratic fit over 1260-1360 nm, so c0 - lambda0 c1 differs from
+   `n_g` by 2.6e-4 (rib160). The runtime (`mrm/plant/phase.py`) builds n_eff(lambda) from n_eff, n_g and dn_g/dlambda,
+   which agrees with c1 and c2 to 0.02 % and 0.3 %.
 5. **coupler_phase_rad** is the ring-side self-coupling phase DELAY relative to the uncoupled bent guide over the same
    arc (-arg t_ring for fields exp(j(wt - beta z))), so it adds to phi (`docs/handoff/plant_optics.md`, psi).
 6. **kappa2** is per pass (power). Q_e = omega T_rt / (-ln(1 - K^2)), T_rt = 1/FSR. Evaluate at each line:
@@ -53,7 +65,8 @@ passed (also with `-W error`). Every number below was re-read from the committed
 | r_ref for 1.8 THz (um) | 6.7270 | 6.6076 | 6.0948 |
 | n_eff (bent) | 2.43993 | 2.62968 | 2.49200 |
 | n_g (bent) | 3.9405 | 4.0116 | 4.3492 |
-| n_g geometry spread (RSS, width +-45, film +-10, slab +-20 nm) | +-0.11 | +-0.04 | +-0.05 |
+| n_g geometry spread (RSS of Jacobian x half-width; width +-45 (strip +-20), film +-10, slab +-20 nm) | +-0.11 | +-0.04 | +-0.05 |
+| same with the slab half-range of `ranges_nm` (rib160 40-100: +-30; rib200 50-120: +-35) | +-0.16 | +-0.05 | - |
 | dn_g/dlambda (1/nm) | -1.05e-3 | -7.1e-4 | +1.4e-4 |
 | dlambda/dT 0/25/50/75/105/125 C (pm/K) | 62.59 / 65.08 / 67.38 / 69.51 / 71.84 / 73.26 | 64.37 / 66.91 / 69.26 / 71.43 / 73.80 / 75.24 | 63.30 / 65.80 / 68.11 / 70.25 / 72.59 / 74.02 |
 | of which expansion (pm/K, 25 C) | 2.1 | 2.2 | 1.9 |
@@ -100,16 +113,39 @@ A slab of 80 nm on the 160 nm film would radiate ~80 dB/cm at r_ref, most of the
 (07 D1), so the slab is bounded at about 70 nm if Q_i is 7000-8400 and the loss is mostly absorption (`P0-2` loss
 budget: `alpha_bend_radiation_db_per_cm`).
 
-Convergence (Richardson over h_core 30/20/15/10 nm, recorded in each sidecar): error of n_eff 1.4e-5 to 2.3e-5, of n_g
-5e-6 to 2.7e-4, of dn_eff/dT 1e-9 (5e-6 relative), of the Si index weight 7e-6 to 3e-5. PML loss spread over four PML
+Convergence (Richardson over h_core 30/20/15/10 nm, recorded in each sidecar): error of the FINEST (10 nm) level, which
+is what `discretization_error` in the data files holds: n_eff 1.4e-5 to 2.3e-5, n_g 5e-6 to 2.7e-4, dn_eff/dT 1e-9
+(5e-6 relative), Si index weight 7e-6 to 3e-5. The reported values come from the 15 nm production mesh, whose bias
+against the Richardson limit is 3-4x larger on the ribs (`validation.production_mesh_bias` in each sidecar):
+
+| bias f(15 nm) - f0 | rib160 | rib200 | strip400x200 | decea2019 |
+|---|---|---|---|---|
+| n_eff (bent) | +7.6e-5 | +5.4e-5 | +1.6e-5 (p not found) | -1.6e-5 (p not found) |
+| lambda_res at fixed r_ref (nm) | +0.025 | +0.018 | +0.005 | -0.008 |
+| n_g (bent) | -3.6e-5 | -2.0e-5 | -3.3e-4 (p 0.46) | -6.3e-5 (p not found) |
+| dn_eff/dT (1/K) | +5.2e-9 | +4.0e-9 | -9.4e-9 | -3.5e-9 |
+| Si index weight | +3.2e-5 | +2.5e-5 | -4.6e-5 | -1.9e-5 |
+
+All are far below the geometry uncertainty (lambda_res moves ~1 nm per nm of slab; n_g spread +-0.04 to +-0.11) and the
+lambda_res bias is absorbed by the calibrated resonance offset. "p not found": the three finest levels are not in the
+asymptotic range, so f0 is the 10 nm value and the bias is the 15-to-10 nm change; that is a lower estimate, because
+the 10 nm value itself carries an error of about the same size (up to ~2x the tabulated bias). PML loss spread over four PML
 and window settings: 0.09 % (rib160), 0.03 % (rib200). Limits of this evidence: the strip's n_g series is not yet
 asymptotic (observed order 0.46; error estimate 2.7e-4, the largest of the set); alpha_rad has PML/window convergence
 but no mesh-refinement series; the Jacobians use one finite-difference step each (no step-size study).
 
 Cross-checks:
-- Tidy3D local solver (interface-aligned grid, 10/5/2.5 nm, Richardson): n_eff delta (FEM - Tidy3D) -1.6e-4
-  (rib160), +2.5e-4 (rib200), -1.9e-4 (strip). Bend shift at r_ref: FEM 0.003032 / 0.003896 / 0.000575 against
-  Tidy3D 0.003020 / 0.003877 / 0.000580 (finest grid). femwell's isotropic map gives 0.006398 / 0.007885 / 0.002147.
+- Tidy3D local solver (interface-aligned grid, 10/5/2.5 nm, Richardson): n_eff delta (FEM - Tidy3D limit) -1.6e-4
+  (rib160), +2.5e-4 (rib200), -1.9e-4 (strip). **These deltas are not the accuracy of the cross-check.** Tidy3D
+  converges at about first order here (fitted order 1.18 / 1.01 / 1.07), so its finest grid (2.5 nm) is still
+  1.9e-3 / 2.2e-3 / 4.3e-3 from its own limit (0.64 / 0.72 / 1.28 nm of lambda_res), and a first-order fit of the two
+  finest grids moves the limit by 5.1e-4 / 1.7e-5 / 4.2e-4 (delta +3.5e-4 / +2.7e-4 / +2.3e-4). So the FEM n_eff
+  agrees with Tidy3D within the Tidy3D extrapolation uncertainty, a few 1e-4 (~0.1-0.2 nm of lambda_res) by the order
+  sensitivity and < 4.3e-3 by the conservative bound; it is not verified at the 2e-4 level by this check
+  (`validation.crosscheck_tidy3d_uncertainty` in each sidecar; the FEM's own Richardson limit gives deltas of
+  -2.4e-4 / +2.0e-4 / -2.1e-4). The sharper check is the bend shift (bent - straight on the same grid, which converges
+  fast): FEM 0.003032 / 0.003896 / 0.000575 against Tidy3D 0.003020 / 0.003877 / 0.000580 (finest grid; +0.4 / +0.5 /
+  -1.0 %). femwell's isotropic map gives 0.006398 / 0.007885 / 0.002147.
 - Bend formulation: see "Bend-formulation study" below. Verdict: the exact transform; femwell's isotropic map
   overestimates the bend shift 3.7x at 7.5 um.
 - PML radiation loss vs the exact complex-frequency (Hankel) solution of a 2-D ring (rib160 effective-index model):
@@ -135,11 +171,19 @@ scratchpad inputs are embedded in the artefact, so the artefact is self-containe
 | rib160 / rib200 at r_ref | 0.003032 / 0.003896 vs 0.003020 / 0.003877 | 0.006398 / 0.007885 |
 | largest exact-vs-Tidy3D difference of the shift (5 rows) | 1.0 % | ratio >= 2.03 |
 | isotropic excess shift, r_ref vs 7.5 um | ratio 1.5139 against 1/R^2 = 1.5143 | |
-| cylindrical Meep, R = 3 um, m = 36 (3-D vectorial, subpixel averaging, observed order 0.97) | 1.30750 um vs Meep 1.30750 +- 0.23 nm | 1.30954 um: 2.04 nm away (9x the uncertainty) |
+| cylindrical Meep, R = 3 um, m = 36 (3-D vectorial, subpixel averaging, observed order 0.86-1.02) | 1.30750 um vs Meep 1.30750 +- 0.23 nm (narrow) / +- 2.1 nm (order spread) | 1.30954 um: 2.04 nm away; needs order 1.19 between the two finest runs, outside the observed 0.86-1.02 |
 
 Meep: the estimate is the mid-range of three Richardson extrapolations of the averaged series (free order on 120/80/60
-px/um: 1.30727; first order on 120/80: 1.30759; first order on 80/60: 1.30772); the uncertainty is their half-range.
-The finest run (120 px/um) is still 10 nm above the estimate, so Meep alone cannot resolve better than ~0.2 nm here.
+px/um: 1.30727; first order on 120/80: 1.30759; first order on 80/60: 1.30772); the +-0.23 nm is their half-range.
+That number does NOT include the order uncertainty (review correction): the finest run (120 px/um) is still 10 nm
+above the estimate, and 0.1 in the order moves the limit by 1.2 nm. Free-order fits of every consecutive triple give
+orders 0.97 / 0.86 / 1.02 and limits 1.30727 / 1.30489 / 1.30918 um, a half-range of 2.1 nm, about the size of the
+2.04 nm exact-isotropic difference (`validation.meep_order_sensitivity` in the study sidecar). The exact prediction
+lies inside that range and needs order 0.99 between the two finest runs; the isotropic one lies 0.36 nm outside and
+needs 1.19. So the Meep check is consistent with the exact transform and disfavours the isotropic map, but it is not
+the "9x the uncertainty" result stated before; the verdict rests on the analytic Bessel benchmark (6.4e-8 vs 3.6e-3)
+and the Tidy3D bend shifts (within 1 % vs a ratio >= 2). A 160 px/um run would narrow the order spread (not run, per
+Kenny).
 Without averaging the series is not monotone (staircasing) and is not used. The FEM predictions of the Meep resonance
 (exact 1.30750, isotropic 1.30954 um) come from the interrupted run (recorded in this handoff; the output file was not
 kept) and were not recomputed. They are consistent with the stored data: the isotropic excess shift at 7.5 um, scaled by
@@ -222,23 +266,96 @@ pipeline is consistent with the paper only under that reading; the thickness is 
 - Couplers: straight bus of the ring's own cross-section, slab continuous through the gap (rib), drop identical to
   the through coupler on the opposite side. A pulley bus or a slab-free gap would change K^2(gap) and its dispersion.
 
-## Not done (state at the end of the resumed run, 2026-10-09)
+## Not done (state at the end of the second resumed run, 2026-10-09)
 
-The resumed run was not allowed to start solver jobs. `MG` below stands for
-`.venv/bin/python tools/memguard.py --limit-gb 3 --heavy --`.
+The resumed runs were not allowed to start solver jobs. `MG` below stands for
+`.venv/bin/python tools/memguard.py --heavy --` (one heavy job at a time, 6 GB default cap; do not add `--limit-gb 3`,
+an explicit limit overrides the default).
 
 | part of the original task | what exists instead | command that would produce it | runtime fallback meanwhile |
 |---|---|---|---|
 | full bend study: strip rows at R = 3 and 5 um with Tidy3D, Bessel at R = 6.5 um and h = 5 nm, PML-Hankel at R = 3 and 5 um, stored FEM predictions of the Meep resonance | `modes_study_bend.json` assembled from stored results (above) | write `meep_cylindrical.rows` of `modes_study_bend.json` to a file F, then `MRM_MEEP_CYL_JSON=F MG .venv/bin/python -m mrm.extraction.modes --study only` (FEM + Tidy3D; Meep rows reused) | none needed: the runtime does not read the study; every `modes_<xsec>.json` already uses the exact transform |
-| more Meep resolution (e.g. 160 px/um) to tighten the first-order extrapolation | 9 stored runs, 30-120 px/um; estimate +-0.23 nm | `MG .venv/bin/python -m mrm.extraction.modes --meep-cyl-only F2` (edit `resolutions` in `meep_cyl_runs` first); not run, per Kenny | Meep is a check only; nothing at runtime |
+| more Meep resolution (e.g. 160 px/um) to tighten the first-order extrapolation | 9 stored runs, 30-120 px/um; estimate +-0.23 nm (narrow), +-2.1 nm with the order spread | `MG .venv/bin/python -m mrm.extraction.modes --meep-cyl-only F2` (edit `resolutions` in `meep_cyl_runs` first); not run, per Kenny | Meep is a check only; nothing at runtime |
 | 2-D full-wave (Meep) check of the rib200 couplers | rib160 check (same slab-gap topology: A/Meep 0.994 and 1.024) and method B in 3-D for rib200 | add `rib200` to the two name filters in `coupling.py` (`extract_coupling`, `--meep2d-only`), then `MG .venv/bin/python -m mrm.extraction.coupling --xsec rib200 --meep2d-only F3` and `MG .venv/bin/python -m mrm.extraction.coupling --xsec rib200 --meep2d-json F3` | the presets use `coupling_rib160` in every world (the 200 nm world keeps the 160 nm couplers) |
-| a third interface-aligned overlap-grid level (2.5 nm) for K^2 | 10 / 5 nm aligned + FEM mesh 20 / 15 / 10 nm | set `CmtSettings.dx_um = 0.0025, du_um = 0.00125` and run `MG .venv/bin/python -m mrm.extraction.coupling --no-meep --out <tmp>` (no CLI flag) | committed K^2 (5 nm grid; 10 -> 5 nm changes it by 0.15 %) |
-| mesh-refinement series for alpha_rad; step-size study of the Jacobians | PML/window spread (0.09 %, 0.03 %); one step per Jacobian; log-derivatives in this handoff | change `Settings.conv_scales` / `jac_steps_nm` and run `MG .venv/bin/python -m mrm.extraction.modes --study no --xsec rib160 rib200 --out <tmp>` (no CLI flag) | secant Jacobian applied as a linear offset by `realize` |
+| a third interface-aligned overlap-grid level (2.5 nm) for K^2 | 10 / 5 nm aligned + FEM mesh 20 / 15 / 10 nm | `MG .venv/bin/python -m mrm.extraction.coupling --xsec rib160 --no-meep --dx-nm 2.5 --out <tmp>` (rows 10 / 7.5 / 5 / 2.5 nm; estimated peak ~4 GB, needs the 6 GB cap) | committed K^2 (5 nm grid; 10 -> 5 nm changes it by 0.15 %) |
+| mesh-refinement series for alpha_rad; step-size study of the Jacobians | PML/window spread (0.09 %, 0.03 %); one step per Jacobian; log-derivatives in this handoff | alpha_rad: run the extraction at three meshes, `MG .venv/bin/python -m mrm.extraction.modes --study no --xsec rib160 --mesh-scale S --conv-scales ... --out <tmp_S>` for S = 2.0, 1.5, 1.0 (one process per cross-section). Jacobian steps: edit `Settings.jac_steps_nm` (no CLI flag) | secant Jacobian applied as a linear offset by `realize` |
+| first-design meshes (production h_core 10 nm, convergence down to 7.07 nm), cut under the former 3 GB cap | 15 nm production, 30 / 20 / 15 / 10 nm series; bias of the reported values in `validation.production_mesh_bias` (see "Memory cap") | `MG .venv/bin/python -m mrm.extraction.modes --study no --xsec rib160 --mesh-scale 1.0 --conv-scales 2.0 1.4142 1.0 0.7071 --out <tmp>` (one process per cross-section; estimated peak 3.1 GB rib160, 3.8 GB rib200), then the couplers with `--mesh-scale 1.0`. Replacing the committed modes files changes their sha256, which `junction_rib160.json` and the coupling sidecars record: re-extract those too | committed 15 nm values (lambda_res bias 0.025 nm, n_g bias 3.6e-5 on rib160) |
 | Tidy3D cross-check of TM0 / TE1 and of the de Cea geometry | FEM only (`mode_families`; `modes_decea2019.json` crosscheck is null) | needs a family selector in `tidy3d_block` (not written) | TM0 / TE1 are not used at runtime (07 P2-3 optional); VAL-7 uses the FEM |
 | sidewall-angle sensitivity | nominal 90 deg; `XSec.sidewall_deg` works in the FEM, not in the Tidy3D wrapper | add `sidewall_deg` to `jac_steps_nm` and re-extract (no CLI flag) | none; `realize` has no sidewall dimension |
 | n_eff(lambda, T) cross term (dlambda/dT per line) | n_eff(lambda) at 25 C and dn_eff/dT(T) at 1310 nm | not written | s(T) at 1310 nm for every line |
 | coupler K^2 versus temperature | K^2 at 25 C | not written | K^2 at 25 C (07 P1-5 excludes a ring-bus mismatch, < 1 %) |
 | VAL-7 replication of de Cea 2019 at the printed thickness | done, but it fails (see VAL-7) | - | `replicas.py` reads `modes_decea2019.json` |
+| the full extraction at R = 7.5 um (TE0 over 1260-1360 nm and 0-125 C, Jacobians, PML spread, Tidy3D) | `alt_radius`: single values at 1310 nm and 25 C (n_eff, n_g, dn_eff/dT, dlambda/dT, FSR, alpha_rad) | not written: `extract_xsec` has no radius override (r_ref is always the 1.8 THz radius); a `--radius-um` flag that skips `find_r_ref` would produce it | R3 derives the radius from the FSR and n_g; at the `pdk_size` FSR (R ~ 7.5 um) the runtime keeps the r_ref values: n_g differs by +1.0e-3 (rib160), dlambda/dT by +0.02 pm/K, alpha_rad 0.022 vs 0.119 dB/cm (negligible against the ~110 dB/cm budget) |
+| a range and a sensitivity for the sidewall angle and the cladding stack | labelled in `inputs.geometry.ranges_not_assigned` of every sidecar (review) | sidewall: as in the sidewall row above; cladding: not written | nominal vertical walls and an all-oxide cladding; the runtime uncertainty omits both |
+
+## Memory cap (former 3 GB per job; now 6 GB for the single heavy job)
+
+Question: did the old 3 GB cap make this task's results less accurate? Evidence: the first run's job logs (memguard
+"killed" and "peak RSS" lines, session scratchpad, not in the repo), its transcript, the code and the sidecars.
+`git log -p` shows no history for these files (the code was committed once, in its final form). The mesh counts below
+come from gmsh meshes generated without solving (peak 0.14 GB). Each sidecar now holds the result in `mesh.memory`.
+
+| # | what was reduced | evidence | accuracy cost (from stored convergence numbers) | does 6 GB allow the intended setting? |
+|---|---|---|---|---|
+| 1 | Modes: production mesh h_core 10 -> 15 nm, and convergence levels 20 / 14.1 / 10 / 7.07 -> 30 / 20 / 15 / 10 nm, for all four modes artefacts. The couplers use the same 15 nm mesh. | Changed before the first full run, right after a 5-solve probe at 10 nm (rib160, windows up to 128k dofs) peaked at 2.61 GB, 87 % of the 3 GB cap. The transcript does not state the reason. Solve time (about 3x per solve) was a second factor. The 7.07 nm level has about 2x the elements of the 10 nm level. | The reported values are the 15 nm values. Their bias is 3-4x the recorded `discretization_error` (the table under "Convergence"): rib160 n_eff +7.6e-5 (lambda_res +0.025 nm), n_g -3.6e-5 (r_ref +9e-6 relative), dn_eff/dT +5.2e-9 (+0.002 pm/K). The strip's n_g series is not asymptotic (p 0.46), and a 7.07 nm level would have tested it. The couplers' K^2 at 15 nm is +0.06 % (rib160), +0.08 % (rib200) and +0.20 % (strip) from the 10 nm value, against a 1-3 % CMT method error. None of this matters at runtime, because the geometry uncertainty and the calibrated resonance offset are 30-100x larger. | Yes. Estimated peaks of the first design: rib160 3.1 GB, rib200 3.8 GB. Basis: the largest pair of live problems at 7.07 nm (23666 + 21038 and 25168 + 22658 triangles, 314k and 336k dofs); an RSS model of 0.18 GB + 6.25 kB per live dof, fitted to the probes; plus the overhead measured in the production runs (1.0 and 1.5 GB). Uncertainty is about 30 %, so the worst case is about 4.9 GB. That exceeds 3 GB and fits in 6 GB. The run time would be about 3-4x (rib160 production took 30 min). The strip (about 2.5 GB) and de Cea (about 2.8 GB, scaled from its 10 nm meshes; not stored in its sidecar) estimates are below 3 GB. |
+| 2 | Bend study: the FEM mesh of `meep_check`'s predictions of the cylindrical-Meep resonance, 7.07 -> 10 nm. | The light job ran under a self-chosen 1.5 GB cap and was killed at 1.52 GB. The rerun at 10 nm peaked at 2.37 GB under 2.5 GB. That was before the gc fix, and the Meep subprocess counts toward the RSS. | About 0.005 nm (the strip's n_eff changes by 1.6e-5 from 15 to 10 nm), against the Meep uncertainty (+-0.23 nm narrow, +-2.1 nm with the order spread). The exact-minus-isotropic difference (2.04 nm) is taken on one mesh, so the bias mostly cancels. The verdict is unchanged. | Yes. The 7.07 nm mesh adds 31k dofs (about 0.2 GB) and fits even the 3 GB light default (`--meep-pred-scale 0.7071`). |
+| 3 | Process structure only, no accuracy effect. A run that extracted several cross-sections in one process was killed twice (3.03 and 3.04 GB) because memory built up across cross-sections. The fix was one process per cross-section, a 2-problem FEM cache, `gc.collect()` every 4 solves, and freeing the eigen matrices. The coupling `--quick` run hit 2.78 GB under a 1.5 GB light cap in skfem's point locator; matplotlib's trapezoid-map finder replaced it and gives the same results. | `modes_full.log`, `modes_full3.log`; transcript | none: same meshes and solves. The strip artefact was written before the kill and was not affected. | n/a |
+
+Not caused by the cap (checked):
+- The Tidy3D grids 10 / 5 / 2.5 nm were the design. The 2.5 nm level adds about 0.8 GB.
+- The coupling overlap grids 10 / 5 nm were the design. A 2.5 nm level was never planned. It would need about 4 GB (the sampled-field cache grows from 0.3 to 1.3 GB and the probe matrices by about 0.3 GB), which fits only in 6 GB (`--dx-nm 2.5`).
+- The coupling dz was changed from 0.02 to 0.04 um to save run time. Halving dz changes K^2 by 5e-5 relative.
+- The Meep runs stayed below 0.85 GB.
+- The 160 px/um Meep run was skipped because Kenny asked for that, not because of memory.
+
+Peak RSS of the committed runs (memguard): modes rib160 2.17 GB, rib200 2.74 GB, decea2019 2.00 GB (the strip's peak
+is not recorded, but it was below 3.0 GB); coupling rib160 2.03 GB, rib200 2.43 GB, strip 1.90 GB; Meep cylindrical
+0.19-0.23 GB; Meep 2-D 0.74-0.85 GB.
+
+**Does 6 GB limit accuracy or any other goal of this task? No.** Every intended setting fits, with the largest estimate
+3.8 GB (about 4.9 GB at the +30 % bound). Running the first design again would refine lambda_res by about 0.02 nm, so
+the runtime model does not need it. The commands are in "Not done" (row "first-design meshes"). Run each cross-section
+as its own heavy job. Do not pass `--limit-gb 3`, because an explicit limit overrides the 6 GB default. The coupler
+re-run with `--mesh-scale 1.0` was not estimated separately: its FEM convergence levels become 20 / 15 / 7.07 nm
+(the 7.07 nm level is the same isolated-mode problem as in the modes first design, 3.1-3.8 GB estimated) plus the
+overlap-grid caches (~0.3 GB at 5 nm); combining it with `--dx-nm 2.5` (~4 GB on its own) could approach the 6 GB
+cap, so run those two refinements as separate jobs. The modes CLI now refuses a `--mesh-scale` that is not one of the
+convergence scales before any solve (previously it failed in `production_mesh_bias` after the convergence solves).
+
+## Sidecar fields added in the second resumed run (data files unchanged, no solver run)
+
+- `validation.production_mesh_bias` (modes): f(production mesh) - f0 for every convergence quantity, the
+  lambda_res-equivalent bias and the r_ref relative bias. `modes.production_mesh_bias` computes it from the stored
+  series, and future extractions write it too.
+- `mesh.memory` (modes, coupling) and `mesh.meep_fem_prediction` (study): the cap that applied, the peak RSS, what was
+  reduced and why, the mesh counts, the 6 GB estimate, and a re-run command.
+- `inputs.geometry.provenance` = "assumed" (the per-field dict moved to `provenance_by_field`) and
+  `inputs.materials.provenance` = "literature", the junction sidecar convention. `mrm.params.config.resolve_from` now
+  labels values from these artefacts `solver(assumed-geometry, literature-materials)`, which ranks as assumed. Before
+  this change it labelled them bare `solver`, which ranked too strong. The presets set explicit provenance on every
+  leaf they load from these files, so the config hash does not change. `common.geometry_input` and
+  `common.materials_input` write the same fields in future runs.
+- `assembly.full_study_command` of the study no longer pins `--limit-gb 3`.
+
+## Review corrections (no solver run; data files unchanged)
+
+- Tidy3D cross-check: the deltas (-1.6e-4 / +2.5e-4 / -1.9e-4) were reported as if they were the agreement; Tidy3D's
+  own extrapolation uncertainty is larger (see "Cross-checks"). New sidecar field
+  `validation.crosscheck_tidy3d_uncertainty` (`modes.tidy3d_crosscheck_uncertainty`, pure arithmetic, written by future
+  extractions too; null for de Cea, which has no Tidy3D run).
+- Cylindrical Meep: the +-0.23 nm left out the order uncertainty (+-2.1 nm with it); the "9x" statement is withdrawn
+  (see the bend study). New sidecar field `validation.meep_order_sensitivity` (`modes.meep_order_sensitivity`), written
+  by both study paths.
+- Assumed values without a range (the sidewall angle of every cross-section, the cladding stack, de Cea's 145 nm BOX)
+  are now listed in `inputs.geometry.ranges_not_assigned` (`common.unranged_assumptions`, also in future sidecars).
+- `inputs.r_ref_rule` (modes): r_ref is the 1.8 THz radius, except de Cea (fixed 9.15 um centreline; its sidecar's
+  `fsr_design_thz` is not used).
+- n_g geometry spread: the label now says which half-widths were used (the strip's width range is +-20 nm, and the
+  rib slab ranges in `ranges_nm` are wider than +-20 nm: +-0.16 / +-0.05 with them).
+- `test_memory_record` skips artefacts without a `mesh.memory` record (the extraction code does not write it, so any
+  re-extraction would have failed the test) and accepts a 3 or 6 GB cap.
+- New fast tests: `test_tidy3d_crosscheck_uncertainty_recorded`, `test_bend_study_meep_order_sensitivity`,
+  `test_unranged_assumptions_labelled`, `test_cli_rejects_production_scale_outside_convergence_series`.
 
 ## Open issues
 
@@ -251,6 +368,16 @@ The resumed run was not allowed to start solver jobs. `MG` below stands for
 5. coupling K^2 is evaluated at 25 C. A ring-bus temperature mismatch is excluded with a reason in 07 P1-5 (< 1 %).
 6. No sidewall-angle sensitivity was computed (nominal 90 deg); `XSec.sidewall_deg` supports it in the FEM, not in
    the Tidy3D wrapper.
+7. Memory cap: the reported mode values come from the 15 nm mesh that the former 3 GB cap shaped. Their bias is
+   3-4x the recorded `discretization_error` (rib160: lambda_res +0.025 nm, n_g -3.6e-5), recorded in
+   `validation.production_mesh_bias`. The first design (10 nm, series to 7.07 nm) fits the 6 GB cap (estimated
+   3.1-3.8 GB) but was not re-run (no solver runs allowed). See "Memory cap".
+8. Cross-check strength (review): the Tidy3D n_eff cross-check is limited by Tidy3D's first-order convergence (a few
+   1e-4 by the order sensitivity, < 4.3e-3 conservatively), and the cylindrical Meep check by its order spread
+   (+-2.1 nm against the 2.04 nm exact-isotropic difference). The bend-formulation verdict stands on the Bessel
+   benchmark and the Tidy3D bend shifts. A finer Tidy3D grid (1.25 nm) or Meep 160 px/um would sharpen both.
+9. The sidewall angle, the cladding stack and de Cea's BOX are assumed without a range
+   (`inputs.geometry.ranges_not_assigned`); the runtime uncertainty does not include them.
 
 ## Handoff requests
 
@@ -284,10 +411,25 @@ The resumed run was not allowed to start solver jobs. `MG` below stands for
 - **coupling (07 P1-5, P1-9):** `dln_kappa2_through_dlambda_per_nm` = 0.0077 /nm (rib160), drop 0.0123 /nm;
   `dln_kappa2_dgap` -0.0135 /nm (so +-5 nm of drop gap is +-7 % of monitor gain, not +-10 %).
 - **plant_optics:** `coupler_phase_rad` follows your psi convention (delay, adds to phi).
-- **realize:** the coupling Jacobian is partial at fixed gap; a correlated width bias needs d/dw - d/dgap.
+- **realize:** the coupling Jacobian is partial at fixed gap; a correlated width bias needs d/dw - d/dgap. When
+  `ln_kappa2_*_per_nm` is wired to Q_t/Q_d with `lnscale, -1`, note that d ln Q_e / d ln K^2 = -K^2 / ((1 - K^2)
+  (-ln(1 - K^2))) = -1.057 at the through K^2 0.1045 (-1.003 for the drop), so the -1 mapping understates the
+  through coupler's geometry sensitivity of Q_t by 5.7 %.
+- **plant_optics / params (phase.py):** the runtime s(T) = s0 (1 + beta (T - T0)) with beta at 25 C overestimates
+  the solver table by 0.5 / 1.25 / 1.9 % at 75 / 105 / 125 C (the integrated shift from 25 C by 0.18 / 0.44 /
+  0.68 %), because s(T) is concave (beta 1.47e-3 at 25 C, 1.02e-3 at 105 C). This is below the Si dn/dT sigma
+  (3.2 pm/K at 105 C); a quadratic term or the `dlambda_dt_pm_per_k` table would remove it.
+- **integrator (ARCHITECTURE 5.1):** `index_weights` holds `si`, `box`, `clad` (not `sio2`); amend the example or
+  note it in docs/CHANGELOG.md (convention 4 above).
 - **validation (VAL-7):** use the table above; VAL-7 as frozen (n_g 2.73 +-3 %, Gamma 0.65 +-0.05) fails at 100 nm.
 - **docs (07 D10, 05 section 5.4):** the femwell-vs-Tidy3D bend disagreement is settled in favour of the exact
-  transform (three independent checks: analytic Bessel, Tidy3D +-R mean, cylindrical Meep); cylindrical Meep with
-  subpixel averaging converges at first order and agrees after Richardson extrapolation (`modes_study_bend.json`).
+  transform (decisive: the analytic Bessel benchmark and the Tidy3D +-R mean bend shifts; supporting: cylindrical
+  Meep, which converges at first order and, after Richardson extrapolation, is consistent with the exact transform
+  but resolves the 2 nm difference only marginally once the order uncertainty is included; `modes_study_bend.json`).
+- **params (docs/PARAMETERS.md):** `tests/verification/test_params_cli.py::test_parameters_md_is_current` fails.
+  `docs/PARAMETERS.md` was last generated before the modes and coupling artefacts existed, so it still shows the
+  fallbacks (n_g 4, n_eff 2.4, bend radiation 1 dB/cm). Regenerate it with `mrm params table g26 --out
+  docs/PARAMETERS.md` after the loss-budget rebalance above. The sidecar provenance change of this run does not move
+  the config hash, because the presets set provenance explicitly.
 - **tools/memguard.py (owner unknown):** the heavy lock has no queue; with 5-6 waiters one agent's sequential jobs
   can starve others for an hour. A FIFO ticket would help.

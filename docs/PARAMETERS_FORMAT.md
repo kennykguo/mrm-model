@@ -970,6 +970,8 @@ is current.
 | `metrics.lock_threshold_pm` | float |  | pm | setting | lock excursion threshold |
 | `metrics.hysteresis_pm` | float |  | pm | setting | excursion hysteresis |
 | `metrics.allowed_assignments` | enum |  |  | setting; enum: fixed, cyclic, any; default fixed | 07 P1-12 |
+| `metrics.lock_reference` | enum |  |  | setting; enum: line, oracle, target; default line | reference of the lock error: the line (07 literal), the oracle operating point, or metrics.lock_target_pm (mrm.sim.metrics; engine handoff 3 item 21) |
+| `metrics.lock_target_pm` | float |  | pm | setting | lock-error reference detuning (pm) when metrics.lock_reference is target |
 | `experiment.kind` | enum |  |  | setting; enum: run, sweep, mc, compare, robust, acceptance, quasi_static; default run | 07 P1-17 |
 | `experiment.duration_s` | float |  | s | setting | simulated duration |
 | `experiment.batch` | int |  |  | setting | batch size B |

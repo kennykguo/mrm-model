@@ -232,6 +232,11 @@ class ReferencePlant:
 
     # ---- controller edge at tick k
     def release(self, k: int):
+        """Release every sensor bank at tick k (a controller edge). Kept as is on purpose (controllers_b handoff 2):
+        the bit-statistics sampler gets threshold 0, not the ``datapath.bitstat_threshold`` actuator (benches that
+        need the actuator, e.g. tests/verification/test_ctrl_b_plant.py, override this), and the caller must call
+        it once per controller period (``pop_period``), or the monitor FIFO overflows and ``latest`` goes stale.
+        The engine (mrm.sim.kernel.release_row) uses the actuator threshold and releases at every edge."""
         rel = self.mon.release(k)
         sensors, new = self.mon.channels(rel)
         s2, n2 = self.temps.release(k)

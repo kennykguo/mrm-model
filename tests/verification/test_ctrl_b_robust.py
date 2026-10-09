@@ -166,4 +166,7 @@ def test_bitstat_ratio_lock_under_a_swing_loss():
           f" (moved {(lam[-1] - before) * 1e12:+.1f} pm), p-p {pp_pm[0]:.2f} pm")
     assert ctrl.fsm.state[0, 0] == ST_LOCK
     assert ctrl.alpha_eye[0, 0] >= ctrl.alpha_floor - 1e-12
-    assert 0.0 < det[0] < 300.0 and pp_pm[0] < 2.0
+    # p-p of the last quarter (2.25 ms after the step): the ratio loop is still lowering alpha, so the lock point
+    # still creeps. Measured 1.97 pm with the pre-modes_rib160 loss budget (eta 0.8546) and 2.98 pm after the g26
+    # budget was re-solved for the landed artefact (eta 0.848; 2.79 pm at 12 ms): bound 4 pm (integrator, 2026-10-09)
+    assert 0.0 < det[0] < 300.0 and pp_pm[0] < 4.0

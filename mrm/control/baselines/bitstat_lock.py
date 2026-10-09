@@ -283,6 +283,7 @@ class BitStatLock(BaseController):
         r_y = r_c + (self.rho - 0.5) * sign * np.nan_to_num(self.eye_last)
         f.setpoint = np.where(settled_eye, r_y, f.setpoint)
 
+        f.auto_rearm()
         code = f.step(y, valid, clip)
 
         # threshold for the next window: alternate the trackers

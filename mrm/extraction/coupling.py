@@ -1,7 +1,7 @@
 """Ring-bus couplers: through and drop (ARCHITECTURE 5.2, 07 P1-5, P1-9, D1, D7).
 
 Run:  python -m mrm.extraction.coupling [--quick] [--xsec rib160 rib200 strip400x200] [--out DIR]
-      (through tools/memguard.py --limit-gb 3 --heavy). --quick writes into a temporary directory unless --out.
+      (through tools/memguard.py --heavy: 6 GB cap). --quick writes into a temporary directory unless --out.
 
 Geometry (ASSUMED, nothing is public): a straight bus of the ring's own cross-section (same rib, the slab continuous
 through the gap) tangent to a ring of radius r_ref (from modes_<xsec>.json); the drop bus is the same coupler at a
@@ -666,8 +666,10 @@ def extract_coupling(xs: C.XSec, st: CmtSettings, out_dir: Path) -> dict:
     # convergence of method A at the through gap: grid (dx, du) and dz
     conv = []
     if not st.quick:
-        for dx, du, dz in ((0.01, 0.005, 0.04), (0.0075, 0.00375, 0.03), (st.dx_um, st.du_um, st.dz_um),
-                           (st.dx_um, st.du_um, st.dz_um / 2)):
+        grid_levels = [(0.01, 0.005, 0.04), (0.0075, 0.00375, 0.03), (0.005, 0.0025, 0.04),
+                       (st.dx_um, st.du_um, st.dz_um), (st.dx_um, st.du_um, st.dz_um / 2)]
+        grid_levels = [lv for i, lv in enumerate(grid_levels) if lv not in grid_levels[:i]]   # default: 4 rows
+        for dx, du, dz in grid_levels:
             st2 = CmtSettings(**{**st.__dict__, "dx_um": dx, "du_um": du, "dz_um": dz})
             cm2 = CouplerModel(xs, R, st2)
             cm2.ex = cm.ex
@@ -675,8 +677,11 @@ def extract_coupling(xs: C.XSec, st: CmtSettings, out_dir: Path) -> dict:
             conv.append({"dx_um": dx, "du_um": du, "dz_um": dz, "kappa2": a["kappa2"],
                          "power_out_over_in": a["power_out_over_in"]})
             C.log(f"  conv {conv[-1]}")
-        # FEM mesh convergence of the coupling (mode fields): scale 2.0 and 1.0
-        for sc in (2.0, 1.0):
+        # FEM mesh convergence of the coupling (mode fields): scale 2.0 and 1.0 around the default production 1.5;
+        # around another production scale (e.g. --mesh-scale 1.0 under the 6 GB cap) the neighbouring levels
+        fem_levels = (2.0, 1.0) if st.mesh_scale == 1.5 else tuple(
+            sc for sc in (2.0, 1.5, 1.0, 0.7071) if sc != st.mesh_scale and sc >= st.mesh_scale / 1.5)
+        for sc in fem_levels:
             st3 = CmtSettings(**{**st.__dict__, "mesh_scale": sc})
             cm3 = CouplerModel(xs, R, st3)
             a = cm3.kappa2(lam0, g_thr)
@@ -811,8 +816,7 @@ def extract_coupling(xs: C.XSec, st: CmtSettings, out_dir: Path) -> dict:
                            "note": "partial derivatives at fixed edge-to-edge gaps and fixed r_ref; a lithographic "
                                    "width bias delta also closes each gap by delta: total = d/dw - d/dgap"}
     side = {"schema": SCHEMA, "xsec": xs.name,
-            "inputs": {"geometry": xs.as_dict(), "r_ref": rsrc,
-                       "materials": __import__("mrm.materials", fromlist=["x"]).materials_provenance(),
+            "inputs": {"geometry": C.geometry_input(xs), "r_ref": rsrc, "materials": C.materials_input(),
                        "film_nm": xs.film_nm, "settings": dict(st.__dict__),
                        "targets": des["targets"]},
             "mesh": {"fem": C.MeshSpec(scale=st.mesh_scale).as_dict(), "overlap_grid_dx_um": st.dx_um,
@@ -842,6 +846,11 @@ def main(argv=None):
                     help="run only the (light) Meep 2-D validation runs and write them to JSON")
     ap.add_argument("--meep2d-json", default=None, help="precomputed Meep 2-D runs (from --meep2d-only)")
     ap.add_argument("--meep-res", nargs="*", type=int, default=None, help="Meep 2-D resolutions (px/um)")
+    ap.add_argument("--mesh-scale", type=float, default=None,
+                    help="FEM mesh scale of the isolated-mode solves (h_core = 10 nm x scale); default 1.5")
+    ap.add_argument("--dx-nm", type=float, default=None,
+                    help="overlap grid step (nm) of the bus and y grids; the ring u grid uses half of it. Default 5; "
+                         "a third interface-aligned level is 2.5 (estimated peak ~4 GB: use the 6 GB heavy cap)")
     ap.add_argument("--redesign", action="store_true",
                     help="recompute only the 'design' block of existing artefacts from their stored kappa2(gap)")
     a = ap.parse_args(argv)
@@ -865,6 +874,10 @@ def main(argv=None):
     st.meep2d_json = a.meep2d_json
     if a.meep_res:
         st.meep_res = tuple(a.meep_res)
+    if a.mesh_scale is not None:
+        st.mesh_scale = a.mesh_scale
+    if a.dx_nm is not None:
+        st.dx_um, st.du_um = a.dx_nm * 1e-3, a.dx_nm * 0.5e-3
     if a.meep2d_only:
         out = {}
         for name in a.xsec:
