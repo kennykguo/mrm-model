@@ -1,7 +1,7 @@
 """Bent-mode extraction for the MRM cross-sections (ARCHITECTURE 5.1, 07 P1-6, D21, P0-3, P1-16, P2-3, VAL-7).
 
 Run:  python -m mrm.extraction.modes [--quick] [--xsec rib160 rib200 strip400x200 decea2019] [--out DIR]
-      (through tools/memguard.py --limit-gb 3 --heavy). --quick uses a coarse mesh and few points and, unless --out
+      (through tools/memguard.py --heavy: 6 GB cap). --quick uses a coarse mesh and few points and, unless --out
       is given, writes into a temporary directory (it never overwrites the committed artefacts).
 
 Writes ``modes_<xsec>.json`` (schema ``modes/1``) + ``modes_<xsec>.sidecar.json`` for every cross-section, and
@@ -57,6 +57,10 @@ class Settings:
     quick: bool = False
     mesh_scale: float = 1.5                 # production mesh: h_core = 10 nm x scale (15 nm), slab 30 nm
     conv_scales: tuple = (3.0, 2.0, 1.5, 1.0)
+    # The first design was mesh_scale 1.0 with conv_scales (2.0, 1.4142, 1.0, 0.7071). It was coarsened to the values
+    # above under the former 3 GB per-job cap (a 5-solve probe at scale 1.0 peaked at 2.61 GB). Under the 6 GB heavy
+    # cap the first design fits (estimate 3.1-3.8 GB): --mesh-scale 1.0 --conv-scales 2.0 1.4142 1.0 0.7071.
+    # docs/handoff/extract_modes.md, "Memory cap", gives the accuracy cost (production bias, e.g. +7.6e-5 in n_eff).
     lam_grid_nm: tuple = LAM_GRID_NM
     t_list_c: tuple = T_LIST_C
     dlam_um: float = 0.002                  # FD step for n_g (with one Richardson step h, h/2)
@@ -68,6 +72,10 @@ class Settings:
     pml: bool = True
     families: bool = True
     alt_radius_um: float = C.R_PDK_UM
+    # FEM mesh of meep_check's predictions of the cylindrical-Meep resonance. The first design used 0.7071 (7.07 nm);
+    # it was set to 1.0 after a light job hit its 1.5 GB cap. The effect is ~0.005 nm against the +-0.23 nm Meep
+    # uncertainty (handoff "Memory cap"); 0.7071 fits the 6 GB heavy cap.
+    meep_pred_scale: float = 1.0
 
     @classmethod
     def quick_settings(cls) -> "Settings":
@@ -260,9 +268,87 @@ def mesh_convergence(ex: Extractor, R: float) -> dict:
         rows.append(row)
         C.log(f"  conv scale {sc}: {row}")
     out = {"rows": rows}
-    for k in ("n_eff_straight", "n_eff_bent", "n_eff_bent_isotropic", "n_g_bent", "dneff_dt_bent", "w_si_pert"):
+    for k in CONV_QUANTITIES:
         out[k] = C.richardson([r["h_core_nm"] for r in rows], [r[k] for r in rows])
     return out
+
+
+CONV_QUANTITIES = ("n_eff_straight", "n_eff_bent", "n_eff_bent_isotropic", "n_g_bent", "dneff_dt_bent", "w_si_pert")
+R_REF_RULE = "self-consistent with fsr_design_thz: c / (2 pi r_ref n_g,bent(r_ref)) = FSR"
+R_REF_RULE_DECEA = ("fixed at the centreline of the printed 10 um outer radius (10 um - width/2 = 9.15 um); "
+                    "fsr_design_thz is not used for this cross-section")
+
+
+def production_mesh_bias(conv: dict, production_scale: float, lam0_nm: float, n_g: float) -> dict:
+    """Bias of the values in ``modes_<xsec>.json`` relative to the Richardson limit of the convergence series:
+    f(production mesh) - f0. Pure arithmetic on the output of :func:`mesh_convergence`.
+
+    The reported values come from the production mesh. ``discretization_error`` in the data file is
+    |f(finest) - f0|, the error estimate of the FINEST level; when the production mesh is coarser than the finest
+    level (default 15 nm vs 10 nm), the reported values carry this larger bias. When the Richardson fit failed
+    (order p null: the series is not yet asymptotic), f0 is the finest value and the bias is the difference to the
+    finest level; the finest level's own error is then only estimated by ``finest_level_error``."""
+    h_prod = 10.0 * production_scale
+    rows = conv["rows"]
+    out: dict = {"production_h_core_nm": h_prod, "finest_h_core_nm": min(r["h_core_nm"] for r in rows),
+                 "quantities": {}}
+    for k in CONV_QUANTITIES:
+        r = conv.get(k)
+        if not r:
+            continue
+        hs = [float(h) for h in r["h"]]
+        i = min(range(len(hs)), key=lambda j: abs(hs[j] - h_prod))
+        if abs(hs[i] - h_prod) > 1e-6:
+            raise ValueError(f"production h_core {h_prod} nm is not a level of the convergence series {hs}")
+        bias = float(r["f"][i] - r["f0"])
+        err = r.get("err")
+        out["quantities"][k] = {"production_value": float(r["f"][i]), "richardson_f0": float(r["f0"]),
+                                "order_p": r.get("p"), "monotone": r.get("monotone"), "bias": bias,
+                                "finest_level_error": err,
+                                "bias_over_finest_level_error": (abs(bias) / err) if err else None}
+    nb = out["quantities"].get("n_eff_bent")
+    if nb is not None:
+        out["lambda_res_bias_nm"] = lam0_nm * nb["bias"] / n_g
+    ng = out["quantities"].get("n_g_bent")
+    if ng is not None:
+        out["r_ref_relative_bias"] = -ng["bias"] / n_g          # r_ref ~ 1/n_g at the fixed design FSR
+    out["note"] = ("bias = f(production mesh) - f0 for the values reported in the data file; discretization_error "
+                   "there is |f(finest) - f0|. lambda_res_bias_nm = lambda0 * bias(n_eff_bent) / n_g at fixed r_ref.")
+    return out
+
+
+def tidy3d_crosscheck_uncertainty(cc: dict, lam0_nm: float, n_g: float, fem_f0: float | None = None) -> dict | None:
+    """Uncertainty of the Tidy3D n_eff cross-check (pure arithmetic on the ``crosscheck`` block of the data file).
+
+    ``crosscheck.delta`` compares the FEM value with Tidy3D's Richardson limit. Tidy3D converges at about first
+    order here (p 1.0-1.2 over 10 / 5 / 2.5 nm), so its finest grid is still 2e-3 to 4e-3 from that limit, and the
+    limit depends on the fitted order. This records, in the convention of the FEM's ``discretization_error``, the
+    distance of Tidy3D's finest grid to its limit, the limit for a first-order fit of the two finest grids, and the
+    resulting range of delta. The bend SHIFT (bent - straight on the same grid) converges much faster and is the
+    sharper check (``femwell_exact_bend_shift`` vs ``tidy3d_bend_shift``)."""
+    be = (cc or {}).get("bent_extrapolated")
+    if not be or cc.get("tidy3d_n_eff") is None or len(be.get("f", [])) < 2:
+        return None
+    h, f = [float(v) for v in be["h"]], [float(v) for v in be["f"]]
+    f0_p1 = f[0] - (f[1] - f[0]) * h[0] / (h[1] - h[0])
+    fem = float(cc["femwell_n_eff"])
+    d_fit, d_p1 = fem - float(be["f0"]), fem - f0_p1
+    spread = abs(float(be["f0"]) - f0_p1)
+    shift_t = (cc.get("tidy3d_bend_shift") or [None])[-1]
+    shift_f = cc.get("femwell_exact_bend_shift")
+    return {"tidy3d_grids_nm": h, "tidy3d_order_p": be.get("p"), "tidy3d_f0": float(be["f0"]),
+            "tidy3d_finest_minus_f0": f[0] - float(be["f0"]), "tidy3d_f0_first_order": f0_p1,
+            "delta_fitted_order": d_fit, "delta_first_order": d_p1,
+            "delta_range": [min(d_fit, d_p1), max(d_fit, d_p1)],
+            "order_sensitivity": spread,
+            "delta_fem_richardson_f0": (float(fem_f0) - float(be["f0"])) if fem_f0 is not None else None,
+            "lambda_res_equiv_nm": {"delta_fitted_order": lam0_nm * d_fit / n_g,
+                                    "order_sensitivity": lam0_nm * spread / n_g,
+                                    "tidy3d_finest_minus_f0": lam0_nm * (f[0] - float(be["f0"])) / n_g},
+            "bend_shift_rel_diff": (shift_f / shift_t - 1.0) if (shift_t and shift_f) else None,
+            "note": "delta = FEM - Tidy3D limit; the FEM matches Tidy3D within the Tidy3D extrapolation uncertainty "
+                    "(order sensitivity; |finest - f0| is the conservative bound in the FEM's discretization_error "
+                    "convention), not to |delta|. The bend shift is the sharper cross-check."}
 
 
 def lambda_sweep(ex: Extractor, R: float) -> dict:
@@ -587,6 +673,7 @@ def extract_xsec(xs: C.XSec, st: Settings, out_dir: Path) -> dict:
     conv = mesh_convergence(ex, R)
     side_valid["mesh_convergence"] = conv
     res["discretization_error"] = {k: conv[k]["err"] for k in ("n_eff_bent", "n_g_bent", "dneff_dt_bent", "w_si_pert")}
+    side_valid["production_mesh_bias"] = production_mesh_bias(conv, st.mesh_scale, lam0_nm, ng_b)
 
     # 5. radiation loss at r_ref (TE0)
     if st.pml:
@@ -638,15 +725,18 @@ def extract_xsec(xs: C.XSec, st: Settings, out_dir: Path) -> dict:
                                 "formulation, scikit-fem)", "nsolves": ex.nsolves,
                      "solve_seconds": round(ex.solve_seconds, 1)}
     sidecar = {"schema": SCHEMA, "xsec": xs.name,
-               "inputs": {"geometry": xs.as_dict(), "materials": __import__("mrm.materials", fromlist=["x"]).materials_provenance(),
+               "inputs": {"geometry": C.geometry_input(xs), "materials": C.materials_input(),
                           "film_nm": xs.film_nm, "lambda0_nm": lam0_nm, "t_ref_c": C.T_REF_C,
-                          "fsr_design_thz": C.FSR_DESIGN_HZ / 1e12, "settings": {k: v for k, v in st.__dict__.items()}},
+                          "fsr_design_thz": C.FSR_DESIGN_HZ / 1e12, "r_ref_rule": R_REF_RULE_DECEA if is_decea
+                          else R_REF_RULE, "settings": {k: v for k, v in st.__dict__.items()}},
                "mesh": {"production": C.MeshSpec(scale=st.mesh_scale).as_dict(),
                         "window_bent": ex.window(bent=True).as_dict(),
                         "elements": "2nd-order Nedelec (transverse) x 2nd-order Lagrange (longitudinal)"},
                "validation": {**side_valid,
                               "index_weight_identity_residual": iw["identity_residual"],
                               "crosscheck_delta_tidy3d": res.get("crosscheck", {}).get("delta"),
+                              "crosscheck_tidy3d_uncertainty": tidy3d_crosscheck_uncertainty(
+                                  res.get("crosscheck"), lam0_nm, ng_b, conv["n_eff_bent"]["f0"]),
                               "bend_formulation": "exact transform; see modes_study_bend.json"},
                "assumptions": {
                    "substrate": "omitted: the 2 um BOX makes substrate leakage negligible (decay "
@@ -820,12 +910,12 @@ def meep_check(st: Settings, *, R: float = MEEP_CYL_R_UM, m_order: int | None = 
     xs = C.XSECS["strip400x200"]
     n = C.indices(xs, lam, C.T_REF_C + K0C)
     nsi, nox = n["si"], n["clad"]
-    ex = Extractor(xs.replace(top_kind="beol", box_kind="beol"), Settings(mesh_scale=1.0))
+    ex = Extractor(xs.replace(top_kind="beol", box_kind="beol"), Settings(mesh_scale=st.meep_pred_scale))
     const = {"si": nsi, "box": nox, "clad": nox, "air": 1.0}
 
     def neff_const(l, form):
         dom = ex.window(bent=True)
-        P = ex.problem(ex.xs, dom, 1.0)
+        P = ex.problem(ex.xs, dom, st.meep_pred_scale)
         ms = P.solve(const, l, radius_um=R, formulation=form, dom=dom, num_modes=3)
         return float(np.real(C.pick_mode(ms, "TE0").n_eff))
     if m_order is None:
@@ -851,7 +941,8 @@ def meep_check(st: Settings, *, R: float = MEEP_CYL_R_UM, m_order: int | None = 
         rows = meep_cyl_runs(R=R, m_order=m_order, nsi=nsi, nox=nox, lam_guess_um=pred["exact"],
                              resolutions=resolutions)
     series, verdict = meep_series_verdict(rows, pred)
-    return {"R_um": R, "m": m_order, "n_si": nsi, "n_ox": nox, "fem_pred_lambda_um": pred, "rows": rows,
+    return {"R_um": R, "m": m_order, "n_si": nsi, "n_ox": nox, "fem_pred_lambda_um": pred,
+            "fem_pred_h_core_nm": 10.0 * st.meep_pred_scale, "rows": rows,
             "precomputed_source": src, "series": series, "verdict": verdict,
             "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3,
             "note": "Meep's cylindrical runs converge slowly (first order) and, without subpixel averaging, "
@@ -898,6 +989,58 @@ def meep_series_verdict(rows: list, pred: dict) -> tuple[dict, dict | None]:
                    "isotropic_inside_extrapolation_range": bool(lo <= pred["isotropic"] <= hi),
                    "finest_minus_estimate_nm": (a["lam_um"][0] - f0) * 1e3}
     return series, verdict
+
+
+def meep_order_sensitivity(series_avg: dict | None, pred: dict) -> dict | None:
+    """How much the cylindrical-Meep extrapolation depends on the convergence order (pure arithmetic).
+
+    The verdict's ``extrapolation_uncertainty_nm`` is the half-range of three extrapolations that share the finest
+    levels, so it does not include the order uncertainty: the finest run is still ~10 nm from the limit, and 0.1 in
+    the order moves the limit by ~1.2 nm. Here every consecutive triple of the averaged series (finest first) gets its
+    own free-order Richardson fit; the spread of their limits is the wider uncertainty. It also gives the order that
+    the two finest levels need to land exactly on each FEM prediction."""
+    if not series_avg or len(series_avg.get("lam_um", [])) < 3:
+        return None
+    res, lam = list(series_avg["res"]), [float(v) for v in series_avg["lam_um"]]
+    h = [1.0 / r for r in res]
+    triples = []
+    for i in range(len(h) - 2):
+        r = C.richardson(h[i:i + 3], lam[i:i + 3])
+        triples.append({"res": res[i:i + 3], "p": r.get("p"), "f0_um": r["f0"]})
+    fit = [t for t in triples if t["p"] is not None]
+    if not fit:
+        return None
+    q, f1, f2 = h[1] / h[0], lam[0], lam[1]
+
+    def f0_at(p):                                    # first two levels, order p; increasing in p (f2 > f1)
+        return f1 - (f2 - f1) / (q ** p - 1.0)
+
+    def p_needed(target):
+        lo, hi = 0.2, 5.0
+        if (f0_at(lo) - target) * (f0_at(hi) - target) > 0:
+            return None
+        for _ in range(200):
+            mid = 0.5 * (lo + hi)
+            if (f0_at(lo) - target) * (f0_at(mid) - target) <= 0:
+                hi = mid
+            else:
+                lo = mid
+        return 0.5 * (lo + hi)
+
+    ps = [t["p"] for t in fit]
+    f0s = [t["f0_um"] for t in fit]
+    p_lo, p_hi, f_lo, f_hi = min(ps), max(ps), min(f0s), max(f0s)
+    need = {k: p_needed(v) for k, v in pred.items()}
+    return {"triples": triples, "order_range": [p_lo, p_hi], "f0_range_um": [f_lo, f_hi],
+            "half_range_nm": 0.5 * (f_hi - f_lo) * 1e3,
+            "dlimit_dorder_nm": (f0_at(1.05) - f0_at(0.95)) / 0.1 * 1e3,
+            "order_needed_two_finest": need,
+            "inside_f0_range": {k: bool(f_lo <= v <= f_hi) for k, v in pred.items()},
+            "order_needed_inside_observed_range": {k: (v is not None and p_lo <= v <= p_hi) for k, v in need.items()},
+            "note": "free-order Richardson on every consecutive triple of the averaged series; the half-range of "
+                    "their limits is comparable to the 2.04 nm exact-isotropic difference, so the Meep check alone "
+                    "only disfavours the isotropic map (it needs an order outside the observed range); the "
+                    "decisive checks are the analytic Bessel benchmark and the Tidy3D bend shifts"}
 
 
 def pml_benchmark_2d(st: Settings) -> dict:
@@ -1019,10 +1162,11 @@ def bend_study(st: Settings, out_dir: Path, *, meep: bool = True) -> dict:
                       "isotropic eps(1+x/R)^2 overestimates the bend shift (x3.7 at R = 7.5 um), because it "
                       "approximates the conformal coordinate ln(r/R) by x/R and drops the mu tensor. modes.py uses "
                       "the exact transform."}
-    side = {"schema": SCHEMA_STUDY, "inputs": {"materials": __import__("mrm.materials", fromlist=["x"]).materials_provenance(),
-                                               "geometry": xs.as_dict()},
+    mc = out.get("meep_cylindrical") or {}
+    side = {"schema": SCHEMA_STUDY, "inputs": {"materials": C.materials_input(), "geometry": C.geometry_input(xs)},
             "mesh": C.MeshSpec(scale=st.mesh_scale).as_dict(),
-            "validation": out["verdict"]}
+            "validation": {**out["verdict"], "meep_order_sensitivity": meep_order_sensitivity(
+                (mc.get("series") or {}).get("averaging"), mc["fem_pred_lambda_um"]) if mc.get("series") else None}}
     C.write_artefact("modes_study_bend", out, side, out_dir=out_dir)
     return out
 
@@ -1050,7 +1194,6 @@ def assemble_bend_study(quick_study_json: str | Path, meep_cyl_json: str | Path,
     FEM and Tidy3D at r_ref, the strip at 7.5 um), the Tidy3D +-R check of 05 (V1) and the recorded FEM predictions of
     the Meep resonance (:data:`MEEP_CYL_FEM_PRED_RECORDED_UM`). Every block names its source; the sidecar lists the
     sha256 of every input and what the full study would add."""
-    import mrm.materials as M
     qpath, mpath = Path(quick_study_json), Path(meep_cyl_json)
     quick = json.loads(qpath.read_text())
     if quick.get("schema") != SCHEMA_STUDY:
@@ -1179,19 +1322,19 @@ def assemble_bend_study(quick_study_json: str | Path, meep_cyl_json: str | Path,
         "FEM predictions of the Meep resonance re-run and stored (recorded values used)",
         "a finer Meep resolution (160 px/um) to tighten the first-order extrapolation (Meep not run, per Kenny)"]
     side = {"schema": SCHEMA_STUDY,
-            "inputs": {"materials": M.materials_provenance(), "geometry": C.XSECS["strip400x200"].as_dict(),
+            "inputs": {"materials": C.materials_input(), "geometry": C.geometry_input(C.XSECS["strip400x200"]),
                        "sources": sources},
             "mesh": {"bessel_2d_h_nm": sorted({r["h_nm"] for r in b}),
                      "pml_hankel_2d": "core h 10 nm, outside 30 nm; four PML/window settings",
                      "strip_rows": "production FEM mesh h_core 15 nm (modes_<xsec>.json); quick row h_core 30 nm",
                      "tidy3d_grids_nm": {"r_ref": [10.0, 5.0, 2.5], "7.5um": [20.0, 10.0, 5.0]},
                      "meep_resolution_px_per_um": sorted({r["res"] for r in mrows})},
-            "validation": verdict,
+            "validation": {**verdict, "meep_order_sensitivity": meep_order_sensitivity(series.get("averaging"), pred)},
             "assembly": {"method": "assemble_bend_study(): no solver run; arithmetic on stored results",
                          "command": "python -m mrm.extraction.modes --assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON",
                          "full_study_command": "MRM_MEEP_CYL_JSON=<meep rows> .venv/bin/python tools/memguard.py "
-                                               "--limit-gb 3 --heavy -- .venv/bin/python -m mrm.extraction.modes "
-                                               "--study only",
+                                               "--heavy -- .venv/bin/python -m mrm.extraction.modes --study only "
+                                               "[--meep-pred-scale 0.7071]",
                          "not_done": not_done}}
     C.write_artefact("modes_study_bend", out, side, out_dir=out_dir)
     return out
@@ -1208,6 +1351,13 @@ def main(argv=None):
     ap.add_argument("--study", choices=["yes", "no", "only"], default="yes")
     ap.add_argument("--no-meep", action="store_true")
     ap.add_argument("--no-tidy3d", action="store_true")
+    ap.add_argument("--mesh-scale", type=float, default=None,
+                    help="production FEM mesh scale (h_core = 10 nm x scale); default 1.5, first design 1.0")
+    ap.add_argument("--conv-scales", type=float, nargs="+", default=None,
+                    help="mesh-convergence scales; default 3.0 2.0 1.5 1.0, first design 2.0 1.4142 1.0 0.7071")
+    ap.add_argument("--meep-pred-scale", type=float, default=None,
+                    help="FEM mesh scale of the bend study's Meep-resonance predictions; default 1.0, first design "
+                         "0.7071")
     ap.add_argument("--meep-cyl-only", default=None, metavar="JSON",
                     help="run only the (light) cylindrical Meep runs of the bend study and write them to JSON")
     ap.add_argument("--assemble-study", nargs=2, default=None, metavar=("QUICK_STUDY_JSON", "MEEP_CYL_JSON"),
@@ -1229,6 +1379,16 @@ def main(argv=None):
     st = Settings.quick_settings() if a.quick else Settings()
     if a.no_tidy3d:
         st.tidy3d = False
+    if a.mesh_scale is not None:
+        st.mesh_scale = a.mesh_scale
+    if a.conv_scales is not None:
+        st.conv_scales = tuple(a.conv_scales)
+    if not any(abs(s - st.mesh_scale) < 1e-9 for s in st.conv_scales):
+        # checked here, not after the convergence solves: production_mesh_bias needs the production level
+        ap.error(f"the convergence scales {list(st.conv_scales)} must include the production mesh scale "
+                 f"{st.mesh_scale} (pass --conv-scales with it)")
+    if a.meep_pred_scale is not None:
+        st.meep_pred_scale = a.meep_pred_scale
     if a.out:
         out_dir = Path(a.out)
     elif a.quick:

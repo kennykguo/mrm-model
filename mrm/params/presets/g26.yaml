@@ -519,35 +519,35 @@ ring:
         range: [15.0, 135.0]
         textbook: "Ch17 eq. 17.7 eta_abs (0.3, assumed)"
         disagrees: "the textbook assumes an absorbed fraction of 0.3 (Ch10, Ch17 eq. 17.7); 07 D1/P0-2 derive eta ~0.85 from this budget"
-        note: "junction free-carrier absorption at 0 V: NSM 2011 gives 1948 /m = 84.6 dB/cm for 2e18/2e18 cm^-3 at full overlap (mrm.materials), 8.7-31 /cm for 1e18-3e18 (03 section 6.2). The junction artefact will report the absolute alpha_FCA (07 P0-2). The eta_* alternatives keep alpha_fca + alpha_scatter = 96 dB/cm, so alpha_i (and Q_i, the notch and the coupling regime) is the same in every eta world"
+        note: "junction free-carrier absorption at 0 V: NSM 2011 gives 1948 /m = 84.6 dB/cm for 2e18/2e18 cm^-3 at full overlap (mrm.materials), 8.7-31 /cm for 1e18-3e18 (03 section 6.2). The junction artefact will report the absolute alpha_FCA (07 P0-2). The eta_* alternatives keep alpha_fca + alpha_scatter = 96.61 dB/cm, so alpha_i (and Q_i, the notch and the coupling regime) is the same in every eta world (budget re-solved 2026-10-09 for the landed modes_rib160 n_g 3.9405 and alpha_rad 0.119 dB/cm; docs/CHANGELOG.md)"
         alternatives:
-          eta_0p5: {value: 41.13, provenance: assumed, source: D07, note: "eta = 0.5 at the same alpha_i 111.74 dB/cm (07 D1 low end)"}
-          eta_0p65: {value: 57.89, provenance: assumed, source: D07, note: "eta = 0.65 at the same alpha_i"}
-          eta_0p75: {value: 69.07, provenance: assumed, source: D07, note: "eta = 0.75 at the same alpha_i"}
-          eta_0p95: {value: 91.41, provenance: assumed, source: D07, note: "eta = 0.95 at the same alpha_i"}
-          eta_0p3: {value: 18.78, provenance: assumed, source: D07, note: "eta = 0.3 stress corner (textbook value, 07 D1)"}
+          eta_0p5: {value: 41.69, provenance: assumed, source: D07, note: "eta = 0.5 at the same alpha_i 110.08 dB/cm (07 D1 low end)"}
+          eta_0p65: {value: 58.20, provenance: assumed, source: D07, note: "eta = 0.65 at the same alpha_i"}
+          eta_0p75: {value: 69.21, provenance: assumed, source: D07, note: "eta = 0.75 at the same alpha_i"}
+          eta_0p95: {value: 91.23, provenance: assumed, source: D07, note: "eta = 0.95 at the same alpha_i"}
+          eta_0p3: {value: 19.68, provenance: assumed, source: D07, note: "eta = 0.3 stress corner (textbook value, 07 D1)"}
       alpha_other_abs_db_per_cm:
-        value: 14.74
+        value: 13.35
         provenance: assumed
         generation: none
         source: D07
         range: [0.0, 30.0]
-        note: "heat-producing loss besides the junction: in-ring heater doping and contacts overlapping the mode, surface states. 14.74 sets alpha_i = 111.74 dB/cm (Q_i 7503 at 1301.9 nm, n_g 4.0) so the exact G25 ring at Q_L 3850 and kappa_d/kappa 0.007 is under-coupled with the CAL-2 27.9 dB notch at 0 V"
+        note: "heat-producing loss besides the junction: in-ring heater doping and contacts overlapping the mode, surface states. 13.35 sets alpha_i = 110.08 dB/cm (Q_i 7503 at 1301.9 nm with the modes_rib160 n_g 3.9405 and alpha_rad 0.119 dB/cm) so the exact G25 ring at Q_L 3850 and kappa_d/kappa 0.007 is under-coupled with the CAL-2 27.9 dB notch at 0 V, and eta = (80 + 13.35)/110.08 = 0.848. Re-solve alpha_i from the notch whenever modes_rib160 n_g or alpha_rad changes (was 14.74 with the n_g 4.0 / 1.0 dB/cm fallbacks)"
         alternatives:
-          over: {value: 5.97, provenance: inferred, source: D07, note: "lowers alpha_i to 102.97 dB/cm (Q_i 8142) so the exact G25 ring is over-coupled with the same 27.9 dB notch at Q_L 3850 (07 P1-5)"}
+          over: {value: 4.71, provenance: inferred, source: D07, note: "lowers alpha_i to 101.44 dB/cm (Q_i ~8140) so the exact G25 ring is over-coupled with the same 27.9 dB notch at Q_L 3850 (07 P1-5)"}
       alpha_scatter_db_per_cm:
-        value: 16.0
+        value: 16.61
         provenance: assumed
         generation: none
         source: D07
         range: [2.0, 80.0]
         note: "non-heating loss: bend-enhanced sidewall scattering (straight rib 0.73 dB/cm, GF-BIAN) plus coupler excess loss (~1 % per pass is ~11 dB/cm equivalent at L ~ 41 um)"
         alternatives:
-          eta_0p5: {value: 54.87, provenance: assumed, source: D07}
-          eta_0p65: {value: 38.11, provenance: assumed, source: D07}
-          eta_0p75: {value: 26.93, provenance: assumed, source: D07}
-          eta_0p95: {value: 4.59, provenance: assumed, source: D07}
-          eta_0p3: {value: 77.22, provenance: assumed, source: D07}
+          eta_0p5: {value: 54.92, provenance: assumed, source: D07}
+          eta_0p65: {value: 38.41, provenance: assumed, source: D07}
+          eta_0p75: {value: 27.40, provenance: assumed, source: D07}
+          eta_0p95: {value: 5.38, provenance: assumed, source: D07}
+          eta_0p3: {value: 76.93, provenance: assumed, source: D07}
       alpha_bend_radiation_db_per_cm:
         value: {from: "extracted/modes_rib160.json:alpha_rad_db_per_cm"}
         provenance: solver(assumed-geometry)
@@ -558,18 +558,18 @@ ring:
           fallback: {value: 1.0, provenance: assumed, generation: none, source: X-MODES, note: "strip bends radiate ~1e-13 dB/cm at r_ref (modes_strip400x200) and 2e-4 dB/cm at 7.5 um (05 t01); the 60 nm slab may leak more"}
           strip400x200: {from: "extracted/modes_strip400x200.json:alpha_rad_db_per_cm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
           strip400x200_q_anchor:
-            value: 10.37
+            value: 11.09
             provenance: inferred
             generation: G25
             source: LM-T
             note: >-
               selected by uncertainty.film_thickness '200'. The measured G25 Q_L and 0 V notch (CAL-1, CAL-2) pin Q_i,
               not alpha_i, and Q_i = 2 pi n_g/(lambda alpha_i): with the strip's n_g 4.349 the budget must total
-              (96 + other + 1) x 4.349/4.0 dB/cm to keep Q_i. The strip's own radiation is ~1e-13 dB/cm, so this term is
-              the strip radiation plus the non-heating loss that keeps Q_i (10.75 dB/cm for under, 9.99 for over; 10.37
+              alpha_i,160 x 4.349/3.9405 dB/cm to keep Q_i. The strip's own radiation is ~1e-13 dB/cm, so this term is
+              the strip radiation plus the non-heating loss that keeps Q_i (11.54 dB/cm for under, 10.64 for over with the modes_rib160 n_g 3.9405; 11.09
               splits the difference: notch 27.9 +- 0.7 dB in both regimes). Which component carries it is unknown; a
               non-heating term lowers eta by 0.92x in the 200 nm worlds. Recompute when n_g of modes_rib160 or
-              modes_rib200 lands: (97 + other) x n_g,200/n_g,160 - 96 - other
+              modes_rib200 changes: alpha_i,160 (n_g,200/n_g,160 - 1) + alpha_rad,160 for each regime, then the mean
     heat_fraction: {value: null, provenance: derived, note: "eta = (fca + other)/alpha_i = 0.848 nominal (07 D1: ~0.85; range 0.5-0.95 by uncertainty.self_heating.eta)"}
     q_intrinsic: {value: null, provenance: derived, note: "R4_loss_budget: Q_i = 2 pi n_g/(lambda alpha_i) ~ 7500 at the G25 line (near-critical, 07 D1)"}
     q_through: {value: null, provenance: derived, note: "R4_q: 1/Q_t = 1/Q_L - 1/Q_i - 1/Q_d; the through-gap Jacobian cannot move it (anchor choice, params_machinery handoff 3)"}

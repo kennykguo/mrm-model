@@ -25,9 +25,15 @@ Public API (stable for the next agents)
   mrm.sim.metrics module docstring).
 - options: ``substep_policy`` ('fixed' | 'auto', default the config's sim.substep_policy), ``uncertainty``
   ('sample' | 'lhs' | 'nominal'), ``variation`` ('sample' | 'off'), ``reset_protocol``, ``heater_code`` (warm
-  start), ``path`` ('auto' | 'compiled' | 'python'), ``n_threads``, ``oracle``, ``histogram``, ``chunk_ticks``
-  (ticks per kernel call on the compiled path, default 1e5), ``controller_params`` (a mapping, passed to
-  mrm.control.registry.create when ``controller`` is a name), ``cfg``, ``auto_max_ticks``, ``oracle_period_ticks``.
+  start: codes (B, N) or ``'quasi_static'``, the oracle lock codes of :func:`quasi_static` at each world's base
+  temperature and bias at the start, without aggressor power), ``settle`` (True: start from the thermal steady
+  state of the warm-start codes and the inputs at the start, mrm.plant.plant.Plant.settle; needs reset_protocol
+  branch_high or branch_low, and defaults it to branch_high), ``factory_table`` (a
+  mrm.control.calibration.FactoryCalTable handed to ``controller.load_factory_cal`` before its reset when the
+  controller has that method: the warm start of 07 P1-1), ``path`` ('auto' | 'compiled' | 'python'), ``n_threads``,
+  ``oracle``, ``histogram``, ``chunk_ticks`` (ticks per kernel call on the compiled path, default 1e5),
+  ``controller_params`` (a mapping, passed to mrm.control.registry.create when ``controller`` is a name), ``cfg``,
+  ``auto_max_ticks``, ``oracle_period_ticks``.
 - Truth-fed controllers (``truth_fed = True``: the oracle of mrm.validation.oracle; the registry refuses them) are
   called as ``step(obs, truth=plant.truth())``; every other controller sees only the released sensor channels.
 
@@ -58,7 +64,7 @@ from mrm.plant.plant import Plant, Truth
 from mrm.sim import kernel as K
 from mrm.sim.metrics import MetricsSpec, RecordSpec
 
-__all__ = ["run", "RunResult", "quasi_static", "QuasiStaticResult", "load_inputs"]
+__all__ = ["run", "RunResult", "quasi_static", "QuasiStaticResult", "load_inputs", "warm_start_codes"]
 
 
 @dataclass
@@ -166,10 +172,20 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
                   metrics=mspec, record=record, record_ticks=n_ticks, substep_policy=options.get("substep_policy"),
                   auto_max_ticks=int(options.get("auto_max_ticks", 64)), fast_kernel=fast is not None,
                   oracle=options.get("oracle", True), histogram=options.get("histogram"))
-    plant.reset(protocol=options.get("reset_protocol"), heater_code=options.get("heater_code"))
+    settle = bool(options.get("settle", False))
+    protocol = options.get("reset_protocol") or ("branch_high" if settle else None)
+    heater_code = options.get("heater_code")
+    if isinstance(heater_code, str):
+        heater_code = warm_start_codes(plant, cfg, mode=heater_code)
+    plant.reset(protocol=protocol, heater_code=heater_code, settle=settle)
     n_threads = options.get("n_threads")
     plant.n_threads = n_threads
     if ctrl is not None:
+        table = options.get("factory_table")
+        if table is not None:
+            if not hasattr(ctrl, "load_factory_cal"):
+                raise TypeError(f"factory_table given but {type(ctrl).__name__} has no load_factory_cal")
+            ctrl.load_factory_cal(table)
         ctrl.reset(spec)
     if ctrl is None:
         _run_open(plant, n_ticks, n_threads)
@@ -203,12 +219,43 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
           "controller_latency_ticks": lat, "spec_fingerprint": spec.fingerprint(),
           "metrics_settings": m.get("settings"), "world": getattr(pp, "world", None),
           "world_choices": getattr(pp, "world_choices", None),
-          "records": [r.key for r in plant.records_state.specs], "diagnostics": diag}
+          "records": [r.key for r in plant.records_state.specs], "diagnostics": diag,
+          "warm_start": {"heater_code": None if heater_code is None else np.asarray(heater_code).tolist(),
+                         "reset_protocol": protocol, "settle": plant.settle_info,
+                         "factory_table": options.get("factory_table") is not None}}
     if sc.time_compression != 1.0:
         mi["compression_note"] = ("compressed result: report it only after mrm.scenarios."
                                   "require_compression_validated (07 P0-10)")
     return RunResult(metrics=m, trace=trace, truth_final=plant.truth(), manifest_inputs=mi, diagnostics=diag,
                      wall_s=wall, plant=plant)
+
+
+def warm_start_codes(plant: Plant, cfg, *, mode: str = "quasi_static") -> np.ndarray:
+    """Warm-start heater codes (B, N) for ``run(..., heater_code=mode)``.
+
+    ``'quasi_static'``: the oracle lock codes of :func:`quasi_static` (best stable relOMA point of each ring on its
+    declared line, 07 P1-1) at each world's base temperature and mean bias voltage at the plant's current (reset)
+    tick. Not included: aggressor power, laser power or wavelength offsets of the scenario at the start, and the
+    bus filtering by rings that are not locked (quasi_static assumes the whole bank locked). Use with
+    ``settle=True`` for a start that is a steady lock. A ring without a finite lock code (sampled worlds whose
+    oracle point the heater cannot reach) starts at code_min, with a warning that counts them.
+    """
+    if mode != "quasi_static":
+        raise ValueError(f"heater_code mode must be 'quasi_static', got {mode!r}")
+    pp = plant.pp
+    B = int(pp.batch)
+    t_base_c = plant.S.wf[:, K.WF_T_BASE0] - 273.15
+    bias = plant.S.rf[:, K.RF_BI_VT, :].mean(axis=1)
+    amb_u, a_idx = np.unique(np.round(t_base_c, 6), return_inverse=True)
+    v_u, v_idx = np.unique(np.round(bias, 6), return_inverse=True)
+    qs = quasi_static(pp, cfg=cfg, ambient_c=amb_u, bias_v=v_u)
+    codes = np.stack([qs.heater_code[a_idx[b], v_idx[b], b] for b in range(B)])
+    bad = ~np.isfinite(codes)
+    if np.any(bad):
+        warnings.warn(f"warm_start_codes: {int(bad.sum())} of {bad.size} rings have no quasi-static lock code "
+                      f"(worlds {sorted(set(np.nonzero(bad)[0].tolist()))}); they start at code_min", stacklevel=2)
+        codes = np.where(bad, float(plant.heater_params.code_lo), codes)
+    return np.rint(codes).astype(np.int64)
 
 
 def _run_open(plant: Plant, n_ticks: int, n_threads=None) -> None:

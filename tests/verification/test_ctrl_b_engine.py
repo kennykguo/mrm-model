@@ -130,3 +130,24 @@ def test_bitstat_lock_recovers_from_a_laser_power_step():
         out[name] = (before, late)
         print(f"\n{name}: detuning {before:.1f} pm before the step, {late:.1f} pm 8.5 ms after")
     assert abs(out["bitstat"][1] - out["bitstat"][0]) < 0.5 * abs(out["monitor"][1] - out["monitor"][0])
+
+
+def test_ramp_lock_recovers_from_a_line_failover_gap():
+    """[B2] laser failover with a 1 ms dark gap on ring 0's line (line 7) at 3 ms, then the spare laser at +10 GHz and
+    -1 dB (mrm.scenarios.library.laser_failover). In the dark the lock is lost and the self-heating goes away (the
+    resonance moves ~1 nm blue); the re-search covers only this resonance, in a window moved by the drift the loop
+    had tracked, and FAIL re-arms after fail_rearm_s. Ring 0 must end locked on the red side of line 7 again. Before
+    the review the re-search ran in the full window: a search still climbing when the light came back took the next
+    resonance up (a foreign line), and a FAIL was final."""
+    sc = lib.laser_failover(line=7, t_fail_s=3e-3, gap_s=1e-3)
+    ctrl = RampAcquire(rings=[0])
+    res = run_engine(ctrl, 14e-3, scenario=sc, assignment=[7, 1, 2, 3, 4, 5, 6, 7])
+    f = ctrl.fsm
+    d = detuning_pm(res)[:, 0]
+    t = res.trace[[k for k in res.trace if k.startswith("detuning_m")][0]]["t_s"]
+    before = float(d[(t > 2.0e-3) & (t < 3.0e-3)].mean())
+    tail = d[t > 13e-3]
+    print(f"\nfailover gap: {before:.1f} pm before, {tail.mean():.1f} pm after (p-p {np.ptp(tail):.2f} pm), state "
+          f"{f.state[0, 0]}, retries {f.retries[0, 0]}, jumps {f.jumps[0, 0]}")
+    assert f.state[0, 0] == ST_LOCK
+    assert 80.0 < tail.mean() < 260.0 and np.ptp(tail) < 1.0, tail

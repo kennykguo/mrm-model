@@ -9,8 +9,12 @@ Run::
     python -m mrm.extraction.thermal_fem --family inring_noundercut --film 160
     python -m mrm.extraction.thermal_fem --quick             # cheap run used by the tests (temporary output)
     python -m mrm.extraction.thermal_fem --stage val8        # imec replication only
+    python -m mrm.extraction.thermal_fem --stage propagate   # no solver: refresh diagnostics, copy shared records
+    python -m mrm.extraction.thermal_fem --stage 3d --h3d-levels 0.5 0.35 0.25 --h3d-bank 0.25   # finer 3-D
 
-Run every solver job through ``tools/memguard.py --limit-gb 3 --heavy``.
+Run every solver job through ``tools/memguard.py --heavy`` (6 GB default cap for heavy jobs since commit 812fd1c;
+the committed artefacts were produced under the earlier 3 GB cap: see docs/handoff/extract_thermal.md, "Memory
+cap", for what that cap reduced).
 
 Physics and numerics
 --------------------
@@ -1285,10 +1289,49 @@ def convergence_study(cfg: ThermalConfig, mw: ModeWeight, mw_c: ModeWeight, scal
             r["gci_rel"] = 1.25 * r["rel_err_est"]
             est[k] = r
     worst = max(est.items(), key=lambda kv: kv[1]["rel_err_est"]) if est else (None, {"rel_err_est": None})
-    return {"levels": levels, "refinement_ratio": ratio, "richardson": est, "production_scale": scales[ip],
-            "max_rel_err_est": worst[1]["rel_err_est"], "worst_metric": worst[0],
-            "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the "
-                    "last three levels (or the last change when convergence is not monotone)"}
+    out = {"levels": levels, "refinement_ratio": ratio, "richardson": est, "production_scale": scales[ip],
+           "max_rel_err_est": worst[1]["rel_err_est"], "worst_metric": worst[0],
+           "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the "
+                   "last three levels (or the last change when convergence is not monotone)"}
+    if est:
+        out["conservative_bound"] = conservative_mesh_bound(out)
+    return out
+
+
+MESH_NOISE_REL = 1e-4      # level-to-level changes below this are gmsh re-meshing noise (4-level studies)
+
+
+def conservative_mesh_bound(conv: dict, noise: float = MESH_NOISE_REL) -> dict:
+    """A bound on the production-level mesh error per tracked metric, from the stored levels only (no solver).
+
+    ``richardson`` clamps the observed order to >= 1, which understates the error when the changes shrink slowly
+    (observed order < 1, e.g. the 10 % self-heating time). Here, with relative changes c_prev, c_last between the last
+    three levels: when they have the same sign, |c_last| < |c_prev| and |c_last| is above the re-meshing noise, the
+    remaining changes are summed as a geometric series (ratio q = c_last/c_prev); otherwise the bound is the largest
+    of the last two changes. The result is never below the Richardson estimate (rel_err_est)."""
+    levels = conv["levels"]
+    scales = [lv["scale"] for lv in levels]
+    ip = int(np.argmin(np.abs(np.array(scales) - conv["production_scale"])))
+    per = {}
+    for k, r in conv["richardson"].items():
+        f = np.array([lv[k] for lv in levels], float)
+        fp = abs(f[ip])
+        c_prev, c_last = (f[-2] - f[-3]) / fp, (f[-1] - f[-2]) / fp
+        after = (f[-1] - f[ip]) / fp
+        if c_prev * c_last > 0 and abs(c_last) < abs(c_prev) and abs(c_last) > noise:
+            q = c_last / c_prev
+            b, kind = abs(after + c_last * q / (1 - q)), f"geometric tail, q = {q:.3f}"
+        else:
+            b, kind = max(abs(c_prev), abs(c_last), abs(after)), "largest of the last two changes"
+        per[k] = {"bound": float(max(b, r["rel_err_est"])), "method": kind,
+                  "observed_order": r.get("order"), "rel_err_est": r["rel_err_est"]}
+    worst = max(per, key=lambda k: per[k]["bound"])
+    return {"per_metric": per, "max_bound": per[worst]["bound"], "worst_metric": worst,
+            "noise_rel": noise,
+            "note": "bound on |f(production) - f(converged)| / |f(production)| from the stored levels: geometric tail "
+                    "of the changes when they shrink monotonically above the re-meshing noise, else the largest of "
+                    "the last two changes; never below rel_err_est. It exceeds rel_err_est where the observed order "
+                    "is < 1 (Richardson clamps the order to >= 1)"}
 
 
 # =============================================================================================== diagnostics
@@ -1316,7 +1359,8 @@ def dlambda_dt_hypotheses(film_nm: float) -> dict:
             d = json.loads(c.read_text())
             v = d.get("dlambda_dt_pm_per_k") or d.get("data", {}).get("dlambda_dt_pm_per_k")
             tc, val = np.asarray(v["t_c"], float), np.asarray(v["value"], float)
-            hyp["H_solver"] = {"pm_per_k": float(np.interp(25.0, tc, val)), "source": f"{c.name} at 25 C"}
+            hyp["H_solver"] = {"pm_per_k": float(np.interp(25.0, tc, val)), "source": f"{c.name} at 25 C",
+                               "sha256": sha256_file(c)}
             break
         except Exception:      # noqa: BLE001 - optional input; fall back below
             continue
@@ -1414,9 +1458,11 @@ def write_artefact(cfg: ThermalConfig, fr: FitResult, sidecar: dict, out_dir=OUT
         for k in ("stages", "k_temp_scaling"):
             if k in old and k not in sidecar:
                 sidecar[k] = old[k]
-        for k in ("superposition_rel_err", "superposition_note"):
-            if old.get("validation", {}).get(k) is not None and sidecar.get("validation", {}).get(k) is None:
-                sidecar.setdefault("validation", {})[k] = old["validation"][k]
+        # the bank result does not depend on this artefact's fit: keep every superposition_* key (rel_err, note,
+        # target, pass), so a re-extraction does not drop the target/pass flags the runtime and the tests read
+        for k, v in (old.get("validation") or {}).items():
+            if k.startswith("superposition_") and v is not None and sidecar.get("validation", {}).get(k) is None:
+                sidecar.setdefault("validation", {})[k] = v
         sidecar["previous_sha256"] = old.get("sha256")
     sidecar["site_offsets_um"] = {n: list(map(float, cfg.site_offsets_um[n])) for n in names}
     sidecar.update({"schema": SCHEMA, "file": npz_path.name, "sha256": sha256_file(npz_path),
@@ -1466,6 +1512,11 @@ class RunOptions:
     step_error_estimate: bool = True
     cross_r: tuple = CROSS_R_UM
     polish: bool = True
+    # 3-D stage mesh sizes at the rings (um). The defaults reproduce the committed crosscheck_3d record; they were
+    # coarsened from (0.35, 0.25) / 0.25 to stay under the former 3 GB cap. Under the 6 GB heavy cap
+    # (0.5, 0.35, 0.25) / 0.25 is estimated to fit (bank ~1.5 M tets, <= 5.4 GB; handoff "Memory cap").
+    h3d_levels: tuple = (0.5, 0.35)
+    h3d_bank: float = 0.4
 
     @classmethod
     def quick_options(cls) -> "RunOptions":
@@ -1582,7 +1633,8 @@ def extract(family: str, film_nm: float, opts: RunOptions, out_dir=OUT_DIR, cfg_
                                          "CMOS film",
                                "aggressor": f"uniform disk r = {cfg.aggressor_radius_um} um in the CMOS film"}},
         "summary": summary,
-        "inputs": {"config": cfg.to_dict(), "assumptions": ASSUMPTIONS, "materials": mt.materials_provenance(),
+        "inputs": {"config": cfg.to_dict(), "assumptions": ASSUMPTIONS,
+                   "assumption_ranges": assumption_ranges(family, film_nm), "materials": mt.materials_provenance(),
                    "material_values_k_r_k_z_rho_c": material_table(cfg),
                    "material_notes": ["air (undercut) k = 0.026 W/(m K), rho c = 1.2e3 J/(m^3 K): handbook, not in "
                                       "mrm.materials", "slab and CMOS film k clamped to the 150 nm value of "
@@ -1593,7 +1645,7 @@ def extract(family: str, film_nm: float, opts: RunOptions, out_dir=OUT_DIR, cfg_
         "tool_versions": tool_versions(),
         "mesh": {"ring_model": A.info, "site_model": Bm.info, "convergence": conv,
                  "production_scale": s_prod},
-        "rom": _jsonable(fr.fit_info),
+        "rom": _jsonable(fr.fit_info) | {"taus_note": TAUS_NOTE},
         "validation": val,
         "validation_per_pair_summary": {"n": len(per_pair),
                                         "max_time_err": max(r.get("time_err", 0) for r in per_pair)},
@@ -1604,6 +1656,10 @@ def extract(family: str, film_nm: float, opts: RunOptions, out_dir=OUT_DIR, cfg_
     npz, js = write_artefact(cfg, fr, side, out_dir)
     log(f"wrote {npz} and {js.name} in {side['runtime_seconds']} s")
     return {"npz": str(npz), "json": str(js), "summary": summary, "validation": val}
+
+
+TAUS_NOTE = ("taus_vf_s are the vector-fitting poles before the variable-projection polish (rom.varpro) and the "
+             "pole separation; the final shared poles are taus_s in the .npz (strictly increasing)")
 
 
 # =============================================================================================== uncertainty stage
@@ -1626,6 +1682,88 @@ SWEEPS = {"bottom": [{"bottom_bc": "dirichlet"}, {"h_bottom_w_per_m2_k": 1e5}, {
           "mode_weight": [{"mode_weight": "uniform_core"}, {"mode_bent": False}],
           "air_k": [{"air_k_w_per_m_k": 1e-4}]}
 T_SCALE_K = (300.0, 325.0, 350.0, 375.0, 400.0)
+# Assumed values that no Jacobian or sweep explores: a plausible range (labelled, never used in a computation), so
+# every assumption carries one; their sensitivity is unknown (docs/handoff/extract_thermal.md, "Not done")
+NOT_SWEPT_RANGES = {
+    "slab_in_um": ((1.0, 3.0), "slab extent inside the rib (in-ring/undercut families extend it to the heater)"),
+    "beol_lo_um": ((1.5, 4.0), "lower (thin-Cu, low-k) BEOL level thickness; 9 levels printed, total not public"),
+    "pass_um": ((0.5, 2.0), "passivation thickness"),
+    "cmos_film_nm": ((70.0, 100.0), "CMOS SOI film under the driver and aggressor sites"),
+    "driver_radius_um": ((2.0, 10.0), "driver heat-source disk radius"),
+    "aggressor_radius_um": ((5.0, 20.0), "aggressor heat-source disk radius"),
+    "pd_radius_um": ((2.0, 5.0), "monitor-PD observer disk radius"),
+    "sensor_radius_um": ((1.0, 5.0), "temperature-sensor observer disk radius"),
+}
+FAMILY_FIELDS = {"inring_noundercut": ("heater_gap_um", "heater_width_um", "heater_doping_factor"),
+                 "silicide_undercut": ("sil_gap_um", "sil_width_um", "undercut_margin_um", "undercut_depth_um",
+                                       "air_k_w_per_m_k"),
+                 "metal_above": ("metal_gap_um", "metal_width_um", "metal_thick_um", "metal", "tbr_shell_um")}
+
+
+def assumption_ranges(family: str, film_nm: float) -> dict:
+    """Every geometry, boundary and site value of ThermalConfig with its provenance and range, and where its
+    sensitivity is recorded: 'jacobian' (1-sigma = the assumed sigma of JAC_COMMON / JAC_FAMILY; d ln(metric)/d param in
+    stages.uncertainty.jacobian), 'sweep' (the variants of SWEEPS; ratios in stages.uncertainty.sweeps), or
+    'not swept' (a plausible range from NOT_SWEPT_RANGES, sensitivity unknown). Pure bookkeeping (no solver)."""
+    cfg = default_config(family, film_nm)
+    jac = {p: (step, sig) for p, step, sig in JAC_COMMON + JAC_FAMILY[family]}
+    sweep_vals: dict = {}
+    for name, variants in SWEEPS.items():
+        for over in variants:
+            for p, v in over.items():
+                sweep_vals.setdefault(p, {"sweep": name, "values": []})["values"].append(v)
+    other_fam = {f for fam, fs in FAMILY_FIELDS.items() if fam != family for f in fs} - set(FAMILY_FIELDS[family])
+    skip = {"family", "t_k", "lam_m", "film_nm", "mode_weight", "mode_bent"}
+    out = {}
+    for fld in dataclasses.fields(ThermalConfig):
+        p = fld.name
+        if p in skip or p in other_fam:
+            continue
+        base = getattr(cfg, p)
+        prov, note = ASSUMPTIONS.get(p, ("assumed", ""))
+        rec = {"value": base, "provenance": prov}
+        if note:
+            rec["note"] = note
+        if p == "bottom_bc":
+            rec.update(how="sweep", sweep="bottom", variants=sweep_vals[p]["values"] + [
+                {"h_bottom_w_per_m2_k": v} for v in sweep_vals["h_bottom_w_per_m2_k"]["values"]],
+                range=["robin h 5e3 .. 1e5 W/(m^2 K)", "dirichlet"])
+        elif p in jac:
+            step, sig = jac[p]
+            rec.update(how="jacobian", sigma_1=sig, range_1sigma=[round(base - sig, 12), round(base + sig, 12)],
+                       fd_step=step)
+            if p in sweep_vals:
+                rec.update(sweep=sweep_vals[p]["sweep"], variants=sweep_vals[p]["values"])
+        elif p in sweep_vals:
+            vals = sweep_vals[p]["values"]
+            num = [v for v in vals + [base] if isinstance(v, (int, float))]
+            rec.update(how="sweep", sweep=sweep_vals[p]["sweep"], variants=vals,
+                       range=[min(num), max(num)] if num else None)
+        elif p == "pitch_um":
+            rec.update(how="table", range=[CROSS_R_UM[0], CROSS_R_UM[-1]],
+                       note="unpublished; only the summary and the 3-D bank use it (50 um); the runtime uses the "
+                            "radial cross_res table at any distance in this range")
+        elif p == "site_offsets_um":
+            rec.update(how="table", range=[CROSS_R_UM[0], CROSS_R_UM[-1]],
+                       note=note + "; self_res holds the sites at these offsets, any other site position uses the "
+                                   "radial cross_res table (d >= 20 um)")
+        elif p in NOT_SWEPT_RANGES:
+            rng, why = NOT_SWEPT_RANGES[p]
+            rec.update(how="not swept", range=list(rng), note=why + "; plausible range, not explored by any run "
+                                                                     "(sensitivity unknown)")
+        elif p == "metal":
+            rec.update(how="not swept", range=["tin_film", "w"], note="metal_above heater material (assumed TiN)")
+        elif p == "tbr_shell_um":
+            rec.update(how="numerical", range=None, note="thickness of the shell that carries the metal/dielectric "
+                                                         "boundary resistance of mrm.materials (not a geometry)")
+        else:
+            rec.update(how="not swept", range=None, note=(note + "; " if note else "") + "no range recorded")
+        out[p] = rec
+    return {"family": family, "film_nm": float(film_nm), "params": out,
+            "note": "1-sigma ranges are the assumed sigmas of the geometry Jacobian (stages.uncertainty.jacobian); sweep "
+                    "ranges are the variants of stages.uncertainty.sweeps; 'not swept' ranges are plausible values no "
+                    "run has explored (their sensitivity is unknown); 'printed' values carry the Jacobian sigma of the "
+                    "reading (radius) or of the process (BOX)"}
 
 
 def _metrics_for(cfg: ThermalConfig, scale: float, t_k=None, mw=None):
@@ -1720,6 +1858,7 @@ def uncertainty(family: str, film_nm: float, opts: RunOptions) -> dict:
                                          "and taus by the t63 ratio", "points": kt},
             "uncertainty_thermal_suggestion": sugg,
             "g25_consistency": {"efficiency_nm_per_mw": FSR_PFSR["fsr_1p80thz_window_b"],
+                                "dlambda_dt_hypotheses": dlambda_dt_hypotheses(film_nm),
                                 "note": "rom_dc_scale = (FSR/P_FSR) / (Z * dlambda/dT) per variant; 1 means the "
                                         "variant reproduces the G25 median efficiency under that hypothesis",
                                 "variants": g25}}
@@ -2124,6 +2263,38 @@ def run_3d(cfg: ThermalConfig, centres, driven, h_ring, mw_c, leads, bus, per_de
     return dc, fm, info
 
 
+SUPERPOSITION_TARGET = 0.10      # 07 P1-3
+
+
+def superposition_record(c3d: dict) -> dict:
+    """The flat sidecar keys (validation.superposition_*) from a crosscheck_3d stage record (the default family's).
+
+    The error is the step metric max_step_err_frac_all (max over 10 ns .. 10 ms of |y_bank - y_ax| / y_ax(inf));
+    records written before that metric existed carry max_residue_l1_rel_err_all only (not used: ill-posed).
+    y_ax is the axisymmetric single-ring FEM of the same comparison variant at the exact bank distances (its Krylov
+    ROM), so the number excludes the Foster-fit error and the distance-interpolation error of the cross_r_um grid,
+    which are recorded separately (validation.all_pairs, stages.crosscheck_3d.distance_interpolation)."""
+    bank = c3d["bank"]
+    err = float(bank["max_step_err_frac_all"])
+    h = bank.get("h_ring_um", (bank.get("info") or {}).get("h_ring_um"))
+    v = c3d.get("variant", {})
+    di = c3d.get("distance_interpolation") or {}
+    di_max = max((abs(x.get("rel_err", 0.0)) for x in di.values()), default=None)
+    return {"superposition_rel_err": err, "superposition_target": SUPERPOSITION_TARGET,
+            "superposition_pass": bool(err < SUPERPOSITION_TARGET),
+            "superposition_note": (
+                f"max over pairs and over t in [10 ns, 10 ms] of |y_bank(t) - y_ax(t)| / y_ax(inf) for the "
+                f"{bank['n_rings']}-ring 3-D bank (inring_noundercut 160, pitch {c3d.get('pitch_um')} um, "
+                f"{v.get('bottom_bc', 'dirichlet')} bottom under {v.get('sub_um', 200.0)} um substrate, 3-D mesh "
+                f"{h} um at the rings); y_ax = the axisymmetric single-ring FEM of the same variant at the exact bank "
+                f"distances, so the Foster-fit error (validation.all_pairs) and the distance-interpolation error of "
+                f"the cross_r_um grid (log-log, max {di_max if di_max is None else round(di_max, 4)} at the bank "
+                f"distances; stages.crosscheck_3d.distance_interpolation of thermal_rom_inring_noundercut_160.json) "
+                f"come on top; measured on the default family only; it mixes 3-D discretization error and multibody "
+                f"effects (decomposition keys max_discretization_dc_rel_all / max_multibody_step_err_frac_all in "
+                f"stages.crosscheck_3d.bank{'' if 'max_multibody_step_err_frac_all' in bank else ' are pending'})")}
+
+
 def stage_three_d(fams, films, opts, out):
     """3-D checks on the default family: (a) single ring, no leads, against the axisymmetric model (formulation);
     (b) single ring with leads and bus (lead effect); (c) the 8-ring bank at the design pitch with leads and bus
@@ -2149,7 +2320,7 @@ def stage_three_d(fams, films, opts, out):
     t_grid = np.logspace(-8, -2, 61)
     res = {"variant": {"bottom_bc": "dirichlet", "sub_um": 200.0}, "pitch_um": pitch, "axisym_scale": ax_scale}
     # (a) + (b): single ring
-    levels = (0.5, 0.35) if not opts.quick else (0.6,)
+    levels = tuple(opts.h3d_levels) if not opts.quick else (0.6,)
     single = []
     victims = [(d, 0.0) for d in d_list]
     for h in levels:
@@ -2168,20 +2339,37 @@ def stage_three_d(fams, films, opts, out):
         "rel_diff_z_heater_ring": single[-1]["z_heater_ring"] / ax["z_heater_ring"] - 1,
         "rel_diff_z_heater_heater": single[-1]["z_heater_heater"] / ax["z_heater_heater"] - 1,
         "rel_diff_t63": single[-1]["t63_heater_ring_s"] / t63_ax - 1,
-        "mesh_change_last_level": (single[-1]["z_heater_ring"] / single[0]["z_heater_ring"] - 1) if len(single) > 1
+        "mesh_change_last_level": (single[-1]["z_heater_ring"] / single[-2]["z_heater_ring"] - 1) if len(single) > 1
         else None}
-    h_b = 0.4 if not opts.quick else 0.6
+    if len(single) >= 3:        # three or more levels: Richardson estimate of the 3-D discretization error
+        ratio = levels[-2] / levels[-1]
+        res["single_ring_no_leads"]["richardson"] = {
+            k: richardson([lv[k] for lv in single], ratio) for k in ("z_heater_ring", "z_heater_heater",
+                                                                     "t63_heater_ring_s")}
+        res["single_ring_no_leads"]["richardson_note"] = (f"refinement ratio taken as {ratio:.3f} (levels "
+                                                          f"{list(levels)} um are not exactly geometric)")
+    h_b = float(opts.h3d_bank) if not opts.quick else 0.6
     dc, fm, info = run_3d(cfg, [(0.0, 0.0)], [0], h_b, mw_c, leads=True, bus=True, victims=victims)
+    same = [lv for lv in single if abs(lv["h_ring_um"] - h_b) < 1e-9]
+    ref_nl = same[0] if same else single[-1]      # the lead effect is clean only at equal mesh size
     res["single_ring_with_leads"] = {"info": info, "z_heater_ring": dc[0, 0], "z_heater_heater": dc[1, 0],
-                                     "lead_effect_z_heater_ring": dc[0, 0] / single[-1]["z_heater_ring"] - 1,
-                                     "lead_effect_z_heater_heater": dc[1, 0] / single[-1]["z_heater_heater"] - 1,
+                                     "lead_effect_z_heater_ring": dc[0, 0] / ref_nl["z_heater_ring"] - 1,
+                                     "lead_effect_z_heater_heater": dc[1, 0] / ref_nl["z_heater_heater"] - 1,
+                                     "lead_effect_reference_h_um": ref_nl["h_ring_um"],
+                                     "lead_effect_equal_mesh": bool(same),
                                      "xt_dc": {str(d): float(dc[2 + k, 0]) for k, d in enumerate(d_list)}}
     yS = fm.step(t_grid)        # 3-D single ring with leads, victims probed (no victim structures)
     dcS = dc
     # (c) the bank
     centres = [(pitch * k, 0.0) for k in range(n_bank)]
     driven = [0, n_bank // 2 - 1] if n_bank > 2 else [0]
-    cache = pathlib.Path(tempfile.gettempdir()) / f"mrm_thermal_bank3d_{n_bank}_{int(pitch)}_{h_b}.npz"
+    # cache of the bank solve (temp dir): keyed by everything that enters it, so a changed config, mode weight,
+    # materials file or mesh is never served a stale bank result
+    ckey = hashlib.sha256(json.dumps(_jsonable({
+        "cfg": cfg.to_dict(), "mode": mw_c.info, "materials": mt.materials_provenance(), "n_bank": n_bank,
+        "pitch": pitch, "h_b": h_b, "driven": [0, n_bank // 2 - 1] if n_bank > 2 else [0]}),
+        sort_keys=True).encode()).hexdigest()[:16]
+    cache = pathlib.Path(tempfile.gettempdir()) / f"mrm_thermal_bank3d_{ckey}.npz"
     if cache.exists():
         z = np.load(cache, allow_pickle=False)
         dcB, yB, infoB = z["dcB"], z["yB"], json.loads(str(z["info"]))
@@ -2229,10 +2417,11 @@ def stage_three_d(fams, films, opts, out):
                                     " = 3-D single ring (leads, bus, probe-only victim) vs the axisymmetric ROM; "
                                     "multibody = the bank (victim structures, keep-outs, leads, bus) vs that 3-D "
                                     "single ring on the same mesh settings",
-                   "target": "superposition error < 10 % on the crosstalk (07 P1-3)"}
+                   "target": "superposition error < 10 % on the crosstalk (07 P1-3)", "h_ring_um": h_b}
     res["bank"]["pass_target"] = bool(res["bank"]["max_step_err_frac_all"] < 0.10)
     res["bank"]["pass_target_multibody_only"] = bool(res["bank"]["max_multibody_step_err_frac_all"] < 0.10)
-    # distance interpolation error of the artefact grid (log-log between grid points)
+    # distance interpolation error of the artefact grid: log-log between grid points, and linear in d (the scheme
+    # mrm.plant.thermal uses on the residues; at DC both act on the DC table)
     grid = np.array(CROSS_R_UM)
     Ag = build_ring_model(cfg, ax_scale, mw, mw_c, cross_r=tuple(grid))
     Gg = Ag.fem.dc(Ag.B, Ag.C)
@@ -2240,14 +2429,25 @@ def stage_three_d(fams, films, opts, out):
     interp = {}
     for d in d_list:
         v = float(np.exp(np.interp(np.log(d), np.log(grid), np.log(gvals))))
-        interp[str(d)] = {"interp": v, "exact": ax["xt"][d], "rel_err": v / ax["xt"][d] - 1}
+        vl = float(np.interp(d, grid, gvals))
+        interp[str(d)] = {"interp": v, "exact": ax["xt"][d], "rel_err": v / ax["xt"][d] - 1,
+                          "interp_linear_runtime": vl, "rel_err_linear_runtime": vl / ax["xt"][d] - 1}
     res["distance_interpolation"] = interp
     prev = {}
     _, js_prev = artefact_paths(fam, int(film), out)
     if js_prev.exists():
         prev = json.loads(js_prev.read_text()).get("stages", {}).get("crosscheck_3d", {})
-    if not opts.quick and "silicide_arcs" in prev:
-        res["silicide_arcs"] = prev["silicide_arcs"]          # unchanged inputs: reuse the earlier 3-D result
+    prev_arcs_h = (prev.get("silicide_arcs", {}).get("info_full") or {}).get("h_ring_um")
+    # update_sidecar replaces the stage record: keep the memory-cap record, and the arithmetic derived from the
+    # previous levels only when this run used the same 3-D meshes (otherwise it is stale)
+    if "memory_cap" in prev:
+        res["memory_cap"] = prev["memory_cap"]
+    prev_levels = [lv.get("h_ring_um") for lv in (prev.get("single_ring_no_leads") or {}).get("levels", [])]
+    prev_hb = ((prev.get("bank") or {}).get("info") or {}).get("h_ring_um")
+    if "derived_equal_mesh" in prev and prev_levels == list(levels) and prev_hb == h_b:
+        res["derived_equal_mesh"] = prev["derived_equal_mesh"]
+    if not opts.quick and "silicide_arcs" in prev and prev_arcs_h is not None and abs(prev_arcs_h - levels[-1]) < 1e-9:
+        res["silicide_arcs"] = prev["silicide_arcs"]          # unchanged inputs and mesh: reuse the earlier result
     elif not opts.quick:
         # non-axisymmetric family: four silicide arcs (GF PDK) against two full annuli, same total power
         cfs = default_config("silicide_undercut", film, bottom_bc="dirichlet", sub_um=200.0)
@@ -2274,17 +2474,13 @@ def stage_three_d(fams, films, opts, out):
         f"{res['single_ring_with_leads']['lead_effect_z_heater_ring']:+.3%}, bank step err "
         f"{res['bank']['max_step_err_frac_all']:.3%} (multibody {res['bank']['max_multibody_step_err_frac_all']:.3%})")
     update_sidecar(fam, int(film), "crosscheck_3d", res, out)
-    sup = float(res["bank"]["max_step_err_frac_all"])
+    sup = superposition_record(res)
     for f2 in FAMILIES:
         for fl in FILMS:
             if (f2, fl) != (fam, int(film)):
                 update_sidecar(f2, fl, "crosscheck_3d", {"see": f"thermal_rom_{fam}_{int(film)}.json",
                                                           "note": "3-D bank run on the default family only"}, out)
-            update_sidecar(f2, fl, "validation", {
-                "superposition_rel_err": sup,
-                "superposition_note": f"max L1 residue error of the {n_bank}-ring 3-D bank (inring_noundercut 160, "
-                                      f"pitch {pitch} um, Dirichlet comparison variant) against the single-ring "
-                                      f"axisymmetric ROM; measured on the default family only"}, out)
+            update_sidecar(f2, fl, "validation", sup, out)
     _write_aux(out, "crosscheck_3d", res)
     return {k: v for k, v in res.items() if k != "bank"} | {"bank_summary": {k: v for k, v in res["bank"].items()
                                                                               if k not in ("pairs",)}}
@@ -2733,17 +2929,111 @@ def stage_val8(fams, films, opts, out):
                "created_utc": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     path = pathlib.Path(out) / "thermal_val8_imec.json"
     path.write_text(json.dumps(_jsonable(payload), indent=1))
+    write_val8_sidecar(path)
     log(f"VAL-8: {comp}")
     return comp
+
+
+def write_val8_sidecar(path) -> pathlib.Path:
+    """ARCHITECTURE 5 sidecar ``thermal_val8_imec.sidecar.json`` (the mrm/extraction/common.py naming for a .json
+    artefact): schema, sha256 of the data file, inputs, tool versions, mesh, validation numbers, created_utc, all
+    taken from the data file itself (so it can also be written after the fact, without a solver)."""
+    path = pathlib.Path(path)
+    d = json.loads(path.read_text())
+    comp = d.get("comparison", {})
+    nom = d.get("nominal", {})
+    side = {
+        "schema": d.get("schema", SCHEMA_VAL8), "data_file": path.name, "sha256": sha256_file(path),
+        "created_utc": d.get("created_utc"),
+        "sidecar_written_utc": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "inputs": {"config": d.get("config"), "assumptions": d.get("assumptions"), "source": d.get("source"),
+                   "targets": d.get("targets"), "materials_set": nom.get("materials"),
+                   "materials": mt.materials_provenance(),
+                   "materials_note": "the data file does not record the materials sha256: this block is read when "
+                                     "the sidecar is written; it describes the run only while mrm/data/materials.json "
+                                     "is unchanged since created_utc (check with git log)",
+                   "dlambda_dt": d.get("dlambda_dt")},
+        "tool_versions": d.get("tool_versions"),
+        "mesh": {"element": "P2 triangle, axisymmetric",
+                 "levels": {k: {"scale": v.get("scale"), "dofs": v.get("dofs")}
+                            for k, v in (d.get("mesh_levels") or {}).items()},
+                 "production_scale": nom.get("scale"),
+                 "mesh_change_last_level": comp.get("mesh_change_last_level")},
+        "validation": {tid: {k: c[k] for k in ("predicted", "target", "rel_err", "rel_err_tau", "tolerance", "pass",
+                                               "status") if k in c} for tid, c in comp.items() if tid.startswith("VAL-")},
+        "note": "07 VAL-8 replication (validation, not calibration); the data file holds the variants and the bounded "
+                "geometry search"}
+    sp = path.with_name(path.stem + ".sidecar.json")
+    sp.write_text(json.dumps(_jsonable(side), indent=1) + "\n")
+    return sp
 
 
 # =============================================================================================== CLI
 STAGES = ("extract", "uncertainty", "analytic", "3d", "val8", "propagate")
 
 
+def g25_rom_dc_scales(g25: dict, hyp: dict) -> list:
+    """rom_dc_scale per dlambda/dT hypothesis for every g25_consistency variant: (FSR/P_FSR) / (Z * dlambda/dT)."""
+    eff = float(g25["efficiency_nm_per_mw"])
+    return [{h: eff * 1e3 / hv["pm_per_k"] / v["z_heater_ring_k_per_mw"] for h, hv in hyp.items()}
+            for v in g25["variants"]]
+
+
+def analytic_disagreements(ca: dict, rel: float = 0.01) -> dict:
+    """Records of the analytic cross-check where FEM and the exact layered solution differ by more than ``rel``, with
+    the size of the response itself (|H_analytic| / self DC), so that a reader can tell a meaningful disagreement from
+    quadrature noise on a negligible response (no solver)."""
+    out = []
+    for case, r in ca["results"].items():
+        recs = r.get("records", [])
+        self_dc = next((abs(complex(*x["analytic_k_per_w"])) for x in recs if x["pair"] == "self" and x["f_hz"] == 0.0),
+                       None) or max(abs(complex(*x["analytic_k_per_w"])) for x in recs if x["pair"] == "self")
+        for x in recs:
+            if abs(x["rel_err"]) > rel:
+                out.append({"case": case, "pair": x["pair"], "f_hz": x["f_hz"], "rel_err": x["rel_err"],
+                            "response_of_self_dc": abs(complex(*x["analytic_k_per_w"])) / self_dc,
+                            "err_of_self_dc": x["rel_err_of_self_dc"], "fem_mesh_change": x["fem_mesh_change"]})
+    big = [x for x in out if x["response_of_self_dc"] >= 1e-5]
+    emax = max((abs(x["err_of_self_dc"]) for x in out), default=0.0)
+    return {"threshold_rel": rel, "n": len(out), "records": out, "max_err_of_self_dc": emax,
+            "note": f"every point listed has an absolute error <= {emax:.3g} of the self DC; points whose response is "
+                    f">= 1e-5 of the self DC: {sorted({(x['pair'], x['f_hz']) for x in big})} (cause, Hankel "
+                    "quadrature or FEM, not separated; the FEM mesh change there is listed and is far smaller than "
+                    "the disagreement)"}
+
+
+def derive_sidecar_fields(d: dict, family: str, film_nm: float) -> dict:
+    """Bookkeeping derived from numbers a sidecar already holds (no solver; used by --stage propagate):
+    mesh.convergence.conservative_bound, inputs.assumption_ranges, rom.taus_note, and the g25_consistency
+    rom_dc_scale per hypothesis re-evaluated with the current dlambda/dT hypotheses (same as rom_dc_scale)."""
+    conv = (d.get("mesh") or {}).get("convergence")
+    if conv and conv.get("richardson") and len(conv.get("levels", [])) >= 3:
+        conv["conservative_bound"] = conservative_mesh_bound(conv)
+    d.setdefault("inputs", {})["assumption_ranges"] = assumption_ranges(family, film_nm)
+    if "rom" in d:
+        d["rom"]["taus_note"] = TAUS_NOTE
+    ca = (d.get("stages") or {}).get("crosscheck_analytic") or {}
+    if ca.get("results"):
+        ca["disagreements_above_1pct"] = analytic_disagreements(ca)
+    g25 = ((d.get("stages") or {}).get("uncertainty") or {}).get("g25_consistency")
+    if g25 and g25.get("variants"):
+        hyp = dlambda_dt_hypotheses(film_nm)
+        for v, sc in zip(g25["variants"], g25_rom_dc_scales(g25, hyp)):
+            v["rom_dc_scale_by_hypothesis"] = sc
+        g25["dlambda_dt_hypotheses"] = hyp
+        g25["hypotheses_note"] = ("rom_dc_scale_by_hypothesis re-evaluated by --stage propagate from the stored "
+                                  "z_heater_ring_k_per_mw with the hypotheses above (the same set as rom_dc_scale)")
+    return d
+
+
 def stage_propagate(fams, films, opts, out):
     """No solver: copy the family-independent results of the default sidecar (the analytic check and the 3-D bank
-    superposition error, both run on inring_noundercut 160) into the other sidecars."""
+    superposition error, both run on inring_noundercut 160) into the other sidecars, refresh the rom_dc_scale
+    diagnostic from the modes artefacts present now, add the derived bookkeeping (derive_sidecar_fields), and
+    (re)write the VAL-8 sidecar."""
+    v8 = pathlib.Path(out) / "thermal_val8_imec.json"
+    if v8.exists():
+        write_val8_sidecar(v8)
     # refresh the rom_dc_scale diagnostic with whatever modes artefacts exist now (H_solver from modes_rib<film>)
     for fam in FAMILIES:
         for film in FILMS:
@@ -2752,26 +3042,39 @@ def stage_propagate(fams, films, opts, out):
                 d = json.loads(js.read_text())
                 z = d["summary"]["z_heater_ring_k_per_mw"] * 1e3
                 update_sidecar(fam, film, "top", {"rom_dc_scale": rom_dc_scale(z, film)}, out)
+                d = json.loads(js.read_text())
+                derive_sidecar_fields(d, fam, film)
+                d["updated_utc"] = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                js.write_text(json.dumps(_jsonable(d), indent=1))
     _, js0 = artefact_paths("inring_noundercut", 160, out)
     if not js0.exists():
         return {"propagated": 0}
     d0 = json.loads(js0.read_text())
     st0 = d0.get("stages", {})
+    sup = None
+    if "max_step_err_frac_all" in (st0.get("crosscheck_3d", {}).get("bank") or {}):
+        sup = superposition_record(st0["crosscheck_3d"])
+        update_sidecar("inring_noundercut", 160, "validation", sup, out)
+    elif d0.get("validation", {}).get("superposition_rel_err") is not None:
+        sup = {k: d0["validation"][k] for k in ("superposition_rel_err", "superposition_note", "superposition_target",
+                                                "superposition_pass") if k in d0["validation"]}
     n = 0
     for fam in FAMILIES:
         for film in FILMS:
             if (fam, film) == ("inring_noundercut", 160):
                 continue
-            if "crosscheck_analytic" in st0:
-                n += update_sidecar(fam, film, "crosscheck_analytic", st0["crosscheck_analytic"], out)
+            if "crosscheck_analytic" in st0:      # a machinery check (family independent): a reference + key numbers
+                ca = st0["crosscheck_analytic"]
+                n += update_sidecar(fam, film, "crosscheck_analytic", {
+                    "see": "thermal_rom_inring_noundercut_160.json", "method": ca.get("method"),
+                    "max_err_of_self_dc": {c: r.get("max_err_of_self_dc") for c, r in ca.get("results", {}).items()},
+                    "note": "FEM machinery vs the exact layered solution, run once on the default stack"}, out)
             if "crosscheck_3d" in st0:
                 update_sidecar(fam, film, "crosscheck_3d", {"see": "thermal_rom_inring_noundercut_160.json",
                                                              "note": "3-D bank run on the default family only"}, out)
-            if d0.get("validation", {}).get("superposition_rel_err") is not None:
-                update_sidecar(fam, film, "validation", {
-                    "superposition_rel_err": d0["validation"]["superposition_rel_err"],
-                    "superposition_note": d0["validation"].get("superposition_note")}, out)
-    return {"propagated": n}
+            if sup is not None:
+                update_sidecar(fam, film, "validation", sup, out)
+    return {"propagated": n, "superposition": sup}
 
 
 def main(argv=None) -> int:
@@ -2781,6 +3084,10 @@ def main(argv=None) -> int:
     ap.add_argument("--stage", choices=STAGES + ("all",), action="append")
     ap.add_argument("--quick", action="store_true", help="cheap run used by the tests (writes to a temp dir)")
     ap.add_argument("--out", type=pathlib.Path, default=None, help="output directory (default mrm/data/extracted)")
+    ap.add_argument("--h3d-levels", type=float, nargs="+", default=None,
+                    help="3-D stage: single-ring mesh sizes at the ring, coarse to fine, um (default 0.5 0.35)")
+    ap.add_argument("--h3d-bank", type=float, default=None, help="3-D stage: bank mesh size at the rings, um "
+                                                                  "(default 0.4)")
     a = ap.parse_args(argv)
     fams = a.family or list(FAMILIES)
     films = a.film or list(FILMS)
@@ -2788,6 +3095,10 @@ def main(argv=None) -> int:
     if "all" in stages:
         stages = list(STAGES)
     opts = RunOptions.quick_options() if a.quick else RunOptions()
+    if a.h3d_levels:
+        opts = dataclasses.replace(opts, h3d_levels=tuple(sorted(a.h3d_levels, reverse=True)))
+    if a.h3d_bank is not None:
+        opts = dataclasses.replace(opts, h3d_bank=float(a.h3d_bank))
     out = a.out or (pathlib.Path(tempfile.gettempdir()) / "mrm_thermal_quick" if a.quick else OUT_DIR)
     out.mkdir(parents=True, exist_ok=True)
     log(f"stages {stages}, families {fams}, films {films}, out {out}")

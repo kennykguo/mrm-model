@@ -3,6 +3,36 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-09: engine and controllers stage integration
+
+Integrator changes (details in docs/handoff/integrator.md section 6 and docs/ENGINE.md):
+
+- **Settled warm start (07 P0-1 item 6).** `Plant.settle()`, `Plant.reset(..., settle=True)` and
+  `mrm.sim.runner.run(..., settle=True)` start from the thermal steady state of the warm-start codes and the inputs
+  at t = 0 (the kernel run with the DC coefficients of every lag until the ring temperatures move < 2 mK), instead of
+  cold lags. It needs reset protocol branch_low or branch_high (laser_ramp starts dark: ValueError).
+  `run(..., heater_code='quasi_static')` (`runner.warm_start_codes`) takes the oracle lock codes of `quasi_static`.
+  Requested by controllers_a (handoff 2.3), controllers_c (4.3b) and the engine (6a).
+- **`run(..., factory_table=table)`** calls `controller.load_factory_cal(table)` before `controller.reset(spec)`
+  (controllers_b handoff 2; engine handoff 6b). The runner does not run the factory procedure itself.
+- **Baseline registry**: `mrm/control/baselines/__init__.py` imports every baseline module, so all 17 baselines
+  resolve by name (controllers_a/b/c handoffs).
+- **Schema keys** `metrics.lock_reference` (line | oracle | target, default line) and `metrics.lock_target_pm`
+  (engine handoff 3 item 21); `MetricsSpec.from_config` reads both. PARAMETERS_FORMAT.md appendix regenerated.
+- **g26 loss budget re-solved for the landed modes_rib160 artefact** (n_g 3.9405 instead of the 4.0 fallback,
+  alpha_rad 0.119 instead of 1.0 dB/cm). With the old numbers the G25 notch fell to 26.5 dB (CAL-2: 27.9) and every
+  eta hypothesis missed its label by 0.8 % (closure tests). Now alpha_i = 110.08 dB/cm keeps Q_i = 7503 (notch 27.9
+  dB under-coupled), and eta = 0.848 at alpha_fca 80: `alpha_other_abs` 14.74 -> 13.35 (over-coupled alternative
+  5.97 -> 4.71), `alpha_scatter` 16.0 -> 16.61, the eta_* alternatives of alpha_fca / alpha_scatter re-solved
+  (fca + scatter = 96.61 in every eta world), the 200 nm `strip400x200_q_anchor` 10.37 -> 11.09 dB/cm. Recompute
+  when modes_rib160 changes (the notes in g26.yaml give the recipe). PARAMETERS.md regenerated.
+- tests/validation/test_replicas_static.py::test_other_lines_match_the_control_models_static_point: the per-ring
+  bound "other lines add > 3 % heat" became "> 2 % per ring and > 8 % on the first rings" (measured 2.9 % on ring 7,
+  last on the bus, whose foreign line was partly dropped by the ring that owns it; 9 % on rings 0-2).
+- pytest marker `perf` registered (engine handoff).
+- **docs/ENGINE.md** replaces docs/handoff/ENGINE_BRIEF.md as the engine reference (the brief is kept for its
+  leaf-signature tables).
+
 ## 2026-10-09: foundation-stage integration
 
 Integrator decisions (details in docs/handoff/integrator.md):

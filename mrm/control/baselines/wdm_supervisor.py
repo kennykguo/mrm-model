@@ -662,6 +662,15 @@ class WdmSupervisor(BaseController):
     def _track_step(self, b):
         f = self.fsm
         p = self.params
+        # a ring that lost its lock in TRACK and whose re-search failed (no light for a while: a line failover gap,
+        # a fibre re-mate) is re-armed after fail_rearm_s, in its window moved by the drift its loop had tracked
+        # (RampFSM LOCK branch); rings that never got a line (assigned -1) are left alone
+        if f.rearm_steps is not None:
+            again = (f.state[b] == ST_FAIL) & (self.assigned[b] >= 0) & (f.fail_steps[b] >= f.rearm_steps)
+            if np.any(again):
+                mask = np.zeros((self.B, self.N), bool)
+                mask[b] = again
+                f.rearm(mask)
         locked = f.state[b] == ST_LOCK
         hot = np.any(locked & (f.code[b] >= p.excess_code_frac * f.code_max))
         over = not self._budget_ok(np.where(locked, f.code[b], 0))

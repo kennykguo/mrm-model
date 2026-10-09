@@ -1,0 +1,218 @@
+{
+ "schema": "thermal_val8/1",
+ "data_file": "thermal_val8_imec.json",
+ "sha256": "6d96ee399a67abc440282e6b00dff1a1b8c2acb8c3878f8f5efd7143f7b424ab",
+ "created_utc": "2026-10-09T12:55:49Z",
+ "sidecar_written_utc": "2026-10-09T19:15:20Z",
+ "inputs": {
+  "config": {
+   "family": "metal_above",
+   "film_nm": 220.0,
+   "t_k": 300.0,
+   "lam_m": 1.55e-06,
+   "radius_um": 7.5,
+   "width_nm": 450.0,
+   "slab_nm": 70.0,
+   "slab_out_um": 1.5,
+   "slab_in_um": 1.5,
+   "contact_offset_um": 1.0,
+   "box_um": 2.0,
+   "sub_um": 240.0,
+   "die_side_mm": 0.24,
+   "bottom_bc": "dirichlet",
+   "h_bottom_w_per_m2_k": 20000.0,
+   "clad_um": 1.42,
+   "beol_lo_um": 1.5,
+   "beol_hi_um": 0.5,
+   "pass_um": 1.0,
+   "fill_lo": 0.15,
+   "fill_hi": 0.0,
+   "via_ratio": 0.1,
+   "keepout_um": 2.0,
+   "heater_gap_um": 2.0,
+   "heater_width_um": 1.0,
+   "heater_doping_factor": 0.8,
+   "sil_gap_um": 1.5,
+   "sil_width_um": 1.0,
+   "undercut_margin_um": 0.0,
+   "undercut_depth_um": 15.0,
+   "air_k_w_per_m_k": 0.026,
+   "metal_gap_um": 0.45,
+   "metal_width_um": 0.6,
+   "metal_thick_um": 0.1,
+   "metal": "w_film",
+   "tbr_shell_um": 0.0,
+   "driver_radius_um": 5.0,
+   "aggressor_radius_um": 10.0,
+   "cmos_film_nm": 88.0,
+   "pd_radius_um": 3.0,
+   "sensor_radius_um": 2.0,
+   "site_offsets_um": {
+    "monitor_pd": [
+     0.0,
+     25.0
+    ],
+    "temp_sensor": [
+     40.0,
+     0.0
+    ],
+    "driver": [
+     0.0,
+     -30.0
+    ],
+    "aggressor": [
+     60.0,
+     0.0
+    ]
+   },
+   "pitch_um": 50.0,
+   "mode_weight": "femwell",
+   "mode_bent": true
+  },
+  "assumptions": "replication with mrm.materials on the printed geometry and boundary conditions; the dimensions imec does not print are assumed (imec_config) and swept; tau = 63 % time of the step response; heater node = heater_resistor observer, waveguide = femwell TE0 mode-weighted ring observer (the rib volume average is also given)",
+  "source": "Coenen et al., JLT 40(13) 4357 (2022), Tables I-IV, Figs. 6, 10, 16; CO22-TCPMT Table I",
+  "targets": {
+   "VAL-8a_tau_heater_us": 5.0,
+   "VAL-8b_tau_wg_us": 10.0,
+   "VAL-8c_eff_no_ucut_pm_per_mw": 222.0,
+   "VAL-8d_eff_full_ucut_pm_per_mw": 843.0,
+   "VAL-8e_two_pole": {
+    "tau_us": [
+     3.18,
+     13.01
+    ],
+    "share": [
+     0.427,
+     0.573
+    ]
+   },
+   "tolerance": {
+    "VAL-8a": 0.3,
+    "VAL-8b": 0.3,
+    "VAL-8c": 0.25,
+    "VAL-8d": 0.3,
+    "VAL-8e": 0.3
+   },
+   "imec_model": {
+    "tau_heater_us": 4.92,
+    "tau_wg_us": 10.38,
+    "eta_h_c_per_mw": 3.16,
+    "r_h_c_per_mw": 5.4,
+    "coupling": 0.584,
+    "ucut_tau_heater_us": 18.1,
+    "ucut_tau_wg_us": 38.1,
+    "ucut_eta_h_c_per_mw": 9.73,
+    "no_cu_eta_ratio": 1.18
+   }
+  },
+  "materials_set": "mrm",
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "materials_note": "the data file does not record the materials sha256: this block is read when the sidecar is written; it describes the run only while mrm/data/materials.json is unchanged since created_utc (check with git log)",
+  "dlambda_dt": {
+   "n_eff": 2.4848032621290934,
+   "n_g": 3.9650579751350685,
+   "dneff_dt_per_k": 0.0001865660202037045,
+   "alpha_l_per_k": 2.56806293533473e-06,
+   "dlambda_dt_pm_per_k": 75.42590461167639,
+   "dlambda_dt_thermo_optic_only_pm_per_k": 72.93142575195039,
+   "method": "femwell bent TE0 (R = 7.50 um), central differences +/-10 K and +/-5 nm, mrm.materials"
+  }
+ },
+ "tool_versions": {
+  "python": "3.12.8",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "femwell": "0.1.12",
+  "pyamg": "5.3.0",
+  "meshio": "5.3.5"
+ },
+ "mesh": {
+  "element": "P2 triangle, axisymmetric",
+  "levels": {
+   "2.0": {
+    "scale": 2.0,
+    "dofs": 3226
+   },
+   "1.414": {
+    "scale": 1.414,
+    "dofs": 4930
+   },
+   "1.0": {
+    "scale": 1.0,
+    "dofs": 7728
+   }
+  },
+  "production_scale": 1.0,
+  "mesh_change_last_level": {
+   "tau_heater_us": 0.0002146896393588893,
+   "tau_wg_us": 0.0004656644602762938,
+   "eta_h_c_per_mw": 0.0011599444879910603
+  }
+ },
+ "validation": {
+  "VAL-8a": {
+   "predicted": 1.1342867458414903,
+   "target": 5.0,
+   "rel_err": -0.773142650831702,
+   "tolerance": 0.3,
+   "pass": false
+  },
+  "VAL-8b": {
+   "predicted": 3.123643118566137,
+   "target": 10.0,
+   "rel_err": -0.6876356881433863,
+   "tolerance": 0.3,
+   "pass": false
+  },
+  "VAL-8c": {
+   "predicted": 290.8996980517859,
+   "target": 222.0,
+   "rel_err": 0.3103590002332697,
+   "tolerance": 0.25,
+   "pass": false
+  },
+  "VAL-8d": {
+   "predicted": 676.3979483780283,
+   "target": 843.0,
+   "rel_err": -0.1976299544744622,
+   "tolerance": 0.3,
+   "pass": true
+  },
+  "VAL-8e": {
+   "predicted": {
+    "tau_us": [
+     3.5155878337523943,
+     32.67140505158389
+    ],
+    "share": [
+     0.873426590512189,
+     0.1265734094878111
+    ]
+   },
+   "target": {
+    "tau_us": [
+     3.18,
+     13.01
+    ],
+    "share": [
+     0.427,
+     0.573
+    ]
+   },
+   "rel_err_tau": [
+    0.10553076533094163,
+    1.5112532706828508
+   ],
+   "status": "cross_check"
+  }
+ },
+ "note": "07 VAL-8 replication (validation, not calibration); the data file holds the variants and the bounded geometry search"
+}

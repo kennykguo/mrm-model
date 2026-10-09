@@ -827,6 +827,48 @@ def write_artefact(name: str, data: Mapping, sidecar: Mapping, *, out_dir: Path 
     return path, sp
 
 
+GEOMETRY_PROVENANCE_NOTE = ("one provenance word for the whole cross-section (the weakest of its parts): every "
+                            "hypothesis has at least one unpublished dimension (slab depth, rib width, sidewall "
+                            "angle or cladding), so it is 'assumed'; per-field provenance is in provenance_by_field")
+
+
+def geometry_input(xs: XSec) -> dict:
+    """Sidecar ``inputs.geometry``: the cross-section with a single provenance word, so that
+    ``mrm.params.config.resolve_from`` labels values from the artefact ``solver(assumed-geometry, ...)`` (the
+    junction sidecar convention). The per-field provenance moves to ``provenance_by_field``."""
+    d = xs.as_dict()
+    d["provenance_by_field"] = d.pop("provenance")
+    d["provenance"] = "assumed"
+    d["provenance_note"] = GEOMETRY_PROVENANCE_NOTE
+    d["ranges_not_assigned"] = unranged_assumptions(xs)
+    return d
+
+
+def unranged_assumptions(xs: XSec) -> dict:
+    """The assumed geometry values that have NO range in ``ranges_nm`` (so neither a Jacobian nor ``realize``
+    propagates their uncertainty): the sidewall angle, every other field whose provenance starts with 'assumed',
+    and the cladding stack."""
+    prov = dict(xs.provenance)
+    out = {}
+    if "sidewall_deg" not in xs.ranges_nm:
+        out["sidewall_deg"] = (f"{xs.sidewall_deg:g} deg ({prov.get('sidewall_deg', 'assumed: vertical walls')}); "
+                               "no range assigned and no sensitivity computed; realize has no sidewall dimension")
+    for k, v in prov.items():
+        if k in ("note", "sidewall_deg") or k in xs.ranges_nm or not str(v).startswith("assumed"):
+            continue
+        out[k] = f"{v}; no range assigned and no sensitivity computed"
+    out["clad"] = (f"SiO2 ({xs.top_kind}) above and beside the core, SiO2 ({xs.box_kind}) BOX, indices from "
+                   "mrm.materials: the cladding stack (no liner, no index spread, thickness) is assumed and has no "
+                   "range")
+    return out
+
+
+def materials_input() -> dict:
+    """Sidecar ``inputs.materials``: the mrm.materials record with the provenance word 'literature'."""
+    from mrm import materials as M
+    return {**M.materials_provenance(), "provenance": "literature"}
+
+
 def load_artefact(name: str, *, verify: bool = True, out_dir: Path | None = None) -> tuple[dict, dict]:
     d = Path(out_dir) if out_dir is not None else DATA_DIR
     path = d / f"{name}.json"

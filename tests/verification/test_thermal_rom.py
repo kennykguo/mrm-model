@@ -201,16 +201,225 @@ def test_analytic_crosscheck_recorded():
         assert r["max_err_of_self_dc"] < 2e-3, case
 
 
-def test_3d_crosscheck_recorded():
+def _crosscheck_3d():
     js = tf.artefact_paths("inring_noundercut", 160)[1]
     if not js.exists():
         pytest.skip("default artefact not extracted yet")
     st = json.loads(js.read_text()).get("stages", {})
     if "crosscheck_3d" not in st:
         pytest.skip("3-D stage not run")
-    r = st["crosscheck_3d"]
+    return st["crosscheck_3d"]
+
+
+def test_3d_crosscheck_recorded():
+    """The 3-D formulation check and the bank record exist; a missing discretization/multibody split is declared as
+    pending with the command that produces it (the re-run was interrupted)."""
+    r = _crosscheck_3d()
     assert abs(r["single_ring_no_leads"]["rel_diff_z_heater_ring"]) < 0.05
-    assert "max_residue_l1_rel_err_all" in r["bank"]
+    bank = r["bank"]
+    assert "max_step_err_frac_all" in bank and bank["n_rings"] == 8
+    if "max_multibody_step_err_frac_all" not in bank:
+        assert "--stage 3d" in r["pending"]["decomposition"]["command"]
+
+
+def test_superposition_recorded_consistently():
+    """Every sidecar carries the default family's bank result under the flat keys the runtime reads, with the
+    target and the pass flag (07 P1-3)."""
+    c3d = _crosscheck_3d()
+    ref = tf.superposition_record(c3d)
+    pending = "max_multibody_step_err_frac_all" not in c3d["bank"]
+    for fam, film in PRESENT:
+        v = json.loads(tf.artefact_paths(fam, film)[1].read_text())["validation"]
+        assert v["superposition_rel_err"] == pytest.approx(ref["superposition_rel_err"], rel=1e-12)
+        assert v["superposition_target"] == tf.SUPERPOSITION_TARGET
+        assert v["superposition_pass"] is (v["superposition_rel_err"] < tf.SUPERPOSITION_TARGET)
+        assert ("pending" in v["superposition_note"]) is pending
+
+
+@pytest.mark.xfail(strict=True, reason="docs/handoff/extract_thermal.md#not-done: 8-ring bank superposition error "
+                                       "13.9 % > 10 % (one 3-D mesh level at 0.4 um; discretization/multibody split "
+                                       "pending)")
+def test_superposition_meets_target():
+    """07 P1-3: the distance-interpolated single-ring ROM reproduces the 8-ring bank within 10 %."""
+    assert _crosscheck_3d()["bank"]["max_step_err_frac_all"] < tf.SUPERPOSITION_TARGET
+
+
+def test_runtime_reader_accepts_artefacts():
+    """mrm.plant.thermal.load_rom (the runtime reader) verifies every artefact (schema, sha256), finds the site
+    offsets it needs, and reads the four 07 P1-3 numbers; the only quality warning is a failing superposition."""
+    import warnings
+
+    from mrm.plant import thermal as th
+    if not PRESENT:
+        pytest.skip("no thermal ROM artefact extracted yet")
+    for fam, film in PRESENT:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            r = th.load_rom(tf.artefact_paths(fam, film)[0])
+        assert {"monitor_pd", "temp_sensor", "driver"} <= set(r.site_offsets_um)
+        vals = th.rom_validation_numbers(r.meta)
+        assert all(v is not None for v in vals.values()), vals
+        msgs = [str(x.message) for x in w if issubclass(x.category, RuntimeWarning)]
+        assert [m for m in msgs if "superposition_rel_err" not in m] == [], msgs
+        n_sup = sum("superposition_rel_err" in m for m in msgs)
+        assert n_sup == (0 if vals["superposition_rel_err"] < tf.SUPERPOSITION_TARGET else 1), msgs
+
+
+def test_val8_sidecar_matches_data():
+    """ARCHITECTURE 5: the VAL-8 artefact has its sidecar with the sha256 of the data file."""
+    p = tf.OUT_DIR / "thermal_val8_imec.json"
+    if not p.exists():
+        pytest.skip("thermal_val8_imec.json not produced yet")
+    side = json.loads(p.with_name(p.stem + ".sidecar.json").read_text())
+    assert side["schema"] == tf.SCHEMA_VAL8 and side["data_file"] == p.name
+    assert side["sha256"] == tf.sha256_file(p)
+    assert set(side["validation"]) >= {"VAL-8a", "VAL-8b", "VAL-8c", "VAL-8d"}
+    assert len(side["mesh"]["levels"]) >= 3 and side["tool_versions"] and side["created_utc"]
+
+
+def test_rom_dc_scale_uses_same_film_modes_artefact(rom):
+    """07 P1-2 diagnostic: H_solver comes from modes_rib<film>.json when that artefact exists (not from another
+    cross-section whose name merely contains the film number)."""
+    film = int(rom["sidecar"]["film_nm"])
+    if not (tf.OUT_DIR / f"modes_rib{film}.json").exists():
+        pytest.skip("modes artefact missing")
+    hyp = rom["sidecar"]["rom_dc_scale"]["dlambda_dt_hypotheses"]
+    assert hyp["H_solver"]["source"].startswith(f"modes_rib{film}.json")
+
+
+def test_write_val8_sidecar_and_superposition_record(tmp_path):
+    """No-solver helpers: the VAL-8 sidecar hashes the data file; superposition_record reads the step metric."""
+    p = tmp_path / "thermal_val8_imec.json"
+    p.write_text(json.dumps({"schema": tf.SCHEMA_VAL8, "created_utc": "x", "tool_versions": {"a": 1},
+                             "nominal": {"scale": 1.0, "materials": "mrm"},
+                             "mesh_levels": {"2.0": {"scale": 2.0, "dofs": 10}},
+                             "comparison": {"VAL-8a": {"predicted": 1.0, "target": 2.0, "rel_err": -0.5,
+                                                       "tolerance": 0.3, "pass": False},
+                                            "mesh_change_last_level": None}}))
+    sp = tf.write_val8_sidecar(p)
+    side = json.loads(sp.read_text())
+    assert sp.name == "thermal_val8_imec.sidecar.json" and side["sha256"] == tf.sha256_file(p)
+    assert side["validation"]["VAL-8a"]["pass"] is False
+    rec = tf.superposition_record({"pitch_um": 50.0, "variant": {"bottom_bc": "dirichlet", "sub_um": 200.0},
+                                   "bank": {"n_rings": 8, "max_step_err_frac_all": 0.05, "h_ring_um": 0.25,
+                                            "max_multibody_step_err_frac_all": 0.01}})
+    assert rec["superposition_pass"] and rec["superposition_rel_err"] == 0.05
+    assert "pending" not in rec["superposition_note"]
+
+
+def test_cli_3d_mesh_options(tmp_path, monkeypatch):
+    """--h3d-levels / --h3d-bank reach RunOptions (sorted coarse to fine); defaults reproduce the committed record."""
+    seen = {}
+
+    def fake_propagate(fams, films, opts, out):
+        seen["opts"] = opts
+        return {}
+
+    monkeypatch.setattr(tf, "stage_propagate", fake_propagate)
+    assert tf.main(["--stage", "propagate", "--out", str(tmp_path), "--h3d-levels", "0.25", "0.5", "0.35",
+                    "--h3d-bank", "0.25"]) == 0
+    assert seen["opts"].h3d_levels == (0.5, 0.35, 0.25) and seen["opts"].h3d_bank == 0.25
+    assert tf.RunOptions().h3d_levels == (0.5, 0.35) and tf.RunOptions().h3d_bank == 0.4
+
+
+def test_conservative_mesh_bound_recorded(rom):
+    """The derived bound (geometric tail of the level-to-level changes) is recorded, reproduces from the stored
+    levels, and supports the stated mesh errors: < 0.3 % for the DC gains and the heater time constant; the 10 %
+    self-heating time (slow convergence, observed order < 1) stays below 3 %."""
+    conv = rom["sidecar"]["mesh"]["convergence"]
+    if rom["sidecar"]["quick"]:
+        pytest.skip("quick artefact")
+    cb = conv["conservative_bound"]
+    ref = tf.conservative_mesh_bound(conv)
+    for k, v in ref["per_metric"].items():
+        assert cb["per_metric"][k]["bound"] == pytest.approx(v["bound"], rel=1e-12), k
+        assert v["bound"] >= conv["richardson"][k]["rel_err_est"] - 1e-15
+    for k in ("z_heater_ring_k_per_mw", "z_heater_heater_k_per_mw", "z_opt_ring_k_per_mw", "t63_heater_ring_s"):
+        assert cb["per_metric"][k]["bound"] < 3e-3, k
+    assert cb["max_bound"] < 0.03
+
+
+def test_conservative_mesh_bound_geometric_tail():
+    """Synthetic levels f_n = 1 + a q^n: the bound of level n equals the exact remaining error a q^n."""
+    a, q = 0.01, 0.8
+    levels = [{"scale": s, "m": 1 + a * q ** n} for n, s in enumerate((4.0, 2.0, 1.0, 0.5))]
+    conv = {"levels": levels, "production_scale": 1.0,
+            "richardson": {"m": {"rel_err_est": 0.0, "order": None}}}
+    b = tf.conservative_mesh_bound(conv)["per_metric"]["m"]
+    assert b["bound"] == pytest.approx(a * q ** 2 / (1 + a * q ** 2), rel=1e-9)
+    noisy = [{"scale": s, "m": 1 + 1e-5 * (-1) ** n} for n, s in enumerate((4.0, 2.0, 1.0, 0.5))]
+    conv["levels"] = noisy
+    assert tf.conservative_mesh_bound(conv)["per_metric"]["m"]["bound"] == pytest.approx(2e-5, rel=1e-3)
+
+
+def test_every_assumption_has_a_range(rom):
+    """Every geometry, boundary and site value of the model is labelled with its provenance and a range (Jacobian
+    1-sigma, swept variants, the radial table, or an explicit 'not swept' range)."""
+    fam, film = str(rom["family"]), float(rom["film_nm"])
+    ar = rom["sidecar"]["inputs"]["assumption_ranges"]
+    assert ar == json.loads(json.dumps(tf.assumption_ranges(fam, film)))
+    params = ar["params"]
+    other = {p for k, v in tf.FAMILY_FIELDS.items() if k != fam for p in v} - set(tf.FAMILY_FIELDS[fam])
+    for p in tf.ASSUMPTIONS:
+        if p == "film_nm" or p in other:     # film: a hypothesis (one artefact per film); other: another family
+            continue
+        assert p in params, p
+    for p, _, sig in tf.JAC_COMMON + tf.JAC_FAMILY[fam]:
+        assert params[p]["how"] == "jacobian" and params[p]["sigma_1"] == sig, p
+    for p, j in rom["sidecar"].get("stages", {}).get("uncertainty", {}).get("jacobian", {}).items():
+        assert params[p]["sigma_1"] == j["sigma_assumed"], p        # the label matches the sigma actually used
+    for p, r in params.items():
+        assert r["how"] in ("jacobian", "sweep", "table", "not swept", "numerical"), p
+        if r["how"] == "jacobian":
+            assert len(r["range_1sigma"]) == 2, p
+        elif r["how"] != "numerical":
+            assert r["range"] is not None, p
+
+
+def test_write_artefact_keeps_superposition_keys(tmp_path):
+    """A re-extraction keeps every validation.superposition_* key of the old sidecar (the bank result does not
+    depend on the fit), including the target and the pass flag the runtime and the tests read."""
+    cfg = tf.default_config("inring_noundercut", 160)
+    K, D = 2, 1
+    fr = tf.FitResult(taus=np.array([1e-6, 1e-3]), self_res=np.ones((5, 4, K)), cross_res=np.ones((5, 4, D, K)),
+                      dc_self=2 * np.ones((5, 4)), dc_cross=2 * np.ones((5, 4, D)), cross_r=np.array([50.0]),
+                      validation={}, fit_info={})
+    _, js = tf.artefact_paths(cfg.family, cfg.film_nm, tmp_path)
+    old = {"sha256": "x", "validation": {"superposition_rel_err": 0.139, "superposition_note": "n",
+                                         "superposition_target": 0.1, "superposition_pass": False}}
+    js.write_text(json.dumps(old))
+    tf.write_artefact(cfg, fr, {"validation": {"step_max_rel_err": 0.001}}, tmp_path)
+    v = json.loads(js.read_text())["validation"]
+    assert v["superposition_target"] == 0.1 and v["superposition_pass"] is False
+    assert v["superposition_rel_err"] == 0.139 and v["step_max_rel_err"] == 0.001
+
+
+def test_g25_consistency_uses_current_hypotheses(rom):
+    """The g25_consistency diagnostic uses the same dlambda/dT hypotheses as rom_dc_scale (refreshed without a
+    solver by --stage propagate), and its numbers follow (FSR/P_FSR)/(Z dlambda/dT)."""
+    g = rom["sidecar"].get("stages", {}).get("uncertainty", {}).get("g25_consistency")
+    if not g or not g.get("variants"):
+        pytest.skip("no g25_consistency record")
+    hyp = rom["sidecar"]["rom_dc_scale"]["dlambda_dt_hypotheses"]
+    assert g["dlambda_dt_hypotheses"] == hyp
+    for v, ref in zip(g["variants"], tf.g25_rom_dc_scales(g, hyp)):
+        assert set(v["rom_dc_scale_by_hypothesis"]) == set(hyp)
+        for h in hyp:
+            assert v["rom_dc_scale_by_hypothesis"][h] == pytest.approx(ref[h], rel=1e-12)
+
+
+def test_analytic_disagreements_recorded():
+    """Every FEM-vs-exact disagreement above 1 % is listed with its response size; each one is below 2e-5 of the
+    self DC in absolute terms (the meaningful-error scale of the check)."""
+    js = tf.artefact_paths("inring_noundercut", 160)[1]
+    if not js.exists():
+        pytest.skip("default artefact not extracted yet")
+    ca = json.loads(js.read_text()).get("stages", {}).get("crosscheck_analytic")
+    if not ca or "results" not in ca:
+        pytest.skip("analytic stage not run")
+    rec = ca["disagreements_above_1pct"]
+    assert rec == json.loads(json.dumps(tf.analytic_disagreements(ca)))
+    assert rec["max_err_of_self_dc"] < 2e-5
 
 
 # ------------------------------------------------------------------------------------------- code-level checks
