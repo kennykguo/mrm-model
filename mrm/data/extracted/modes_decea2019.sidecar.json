@@ -1,0 +1,317 @@
+{
+ "schema": "modes/1",
+ "xsec": "decea2019",
+ "inputs": {
+  "geometry": {
+   "name": "decea2019",
+   "width_nm": 1700.0,
+   "film_nm": 100.0,
+   "slab_nm": 0.0,
+   "sidewall_deg": 90.0,
+   "clad": {
+    "top": "SiO2 (beol)",
+    "box": "SiO2 (thermal), 0.145 um",
+    "below_box": "air"
+   },
+   "width_definition": "mid-height of the etched sidewall",
+   "lam0_nm": 1545.1999999999998,
+   "provenance": {
+    "width_nm": "printed (de Cea 2019 section 3)",
+    "film_nm": "printed as 'roughly 100 nm'",
+    "box_um": "assumed (zero-change 45 nm SOI BOX ~145 nm, substrate removed below the ring)",
+    "note": "outer radius 10 um printed; centreline radius 9.15 um"
+   },
+   "ranges_nm": {
+    "film_nm": [
+     80.0,
+     120.0
+    ],
+    "width_nm": [
+     1600.0,
+     1800.0
+    ]
+   }
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "film_nm": 100.0,
+  "lambda0_nm": 1545.1999999999998,
+  "t_ref_c": 25.0,
+  "fsr_design_thz": 1.8,
+  "settings": {
+   "quick": false,
+   "mesh_scale": 1.5,
+   "conv_scales": [
+    3.0,
+    2.0,
+    1.5,
+    1.0
+   ],
+   "lam_grid_nm": [
+    1260,
+    1270,
+    1280,
+    1290,
+    1300,
+    1310,
+    1320,
+    1330,
+    1340,
+    1350,
+    1360
+   ],
+   "t_list_c": [
+    0.0,
+    25.0,
+    50.0,
+    75.0,
+    105.0,
+    125.0
+   ],
+   "dlam_um": 0.002,
+   "dt_k": 2.5,
+   "dn_idx": 0.001,
+   "jac_steps_nm": [
+    [
+     "width_nm",
+     10.0
+    ],
+    [
+     "film_nm",
+     5.0
+    ],
+    [
+     "slab_nm",
+     10.0
+    ]
+   ],
+   "tidy3d": true,
+   "tidy3d_dl": [
+    0.01,
+    0.005,
+    0.0025
+   ],
+   "pml": true,
+   "families": true,
+   "alt_radius_um": 7.5
+  }
+ },
+ "mesh": {
+  "production": {
+   "h_core": 0.01,
+   "h_slab": 0.02,
+   "h_max": 0.2,
+   "core_dist": 0.4,
+   "slab_dist": 0.15,
+   "scale": 1.5,
+   "h_core_eff_nm": 15.0
+  },
+  "window_bent": {
+   "x_min": -2.45,
+   "x_max": 2.95,
+   "y_min": -1.0,
+   "y_max": 1.5,
+   "pml_left_um": 0.0,
+   "pml_right_um": 0.0,
+   "pml_strength": 2.0
+  },
+  "elements": "2nd-order Nedelec (transverse) x 2nd-order Lagrange (longitudinal)"
+ },
+ "validation": {
+  "mesh_convergence": {
+   "rows": [
+    {
+     "scale": 3.0,
+     "h_core_nm": 30.0,
+     "ntri": 1298,
+     "n_eff_straight": 2.141982889180319,
+     "n_eff_bent": 2.1751355377078063,
+     "n_eff_bent_isotropic": 2.214551220471619,
+     "n_g_bent": 3.3379538189824975,
+     "dneff_dt_bent": 0.00014440944078373264,
+     "w_si_pert": 0.7683737219727549,
+     "seconds": 9.4
+    },
+    {
+     "scale": 2.0,
+     "h_core_nm": 20.0,
+     "ntri": 2732,
+     "n_eff_straight": 2.1420909928940985,
+     "n_eff_bent": 2.175278182690474,
+     "n_eff_bent_isotropic": 2.214721057801225,
+     "n_g_bent": 3.3383243528291366,
+     "dneff_dt_bent": 0.00014442962107015235,
+     "w_si_pert": 0.768481961274705,
+     "seconds": 19.0
+    },
+    {
+     "scale": 1.5,
+     "h_core_nm": 15.0,
+     "ntri": 4622,
+     "n_eff_straight": 2.142113334206749,
+     "n_eff_bent": 2.1752893996076157,
+     "n_eff_bent_isotropic": 2.2147313526338714,
+     "n_g_bent": 3.3383273414324224,
+     "dneff_dt_bent": 0.00014443003839312852,
+     "w_si_pert": 0.7684842675892081,
+     "seconds": 35.4
+    },
+    {
+     "scale": 1.0,
+     "h_core_nm": 10.0,
+     "ntri": 9918,
+     "n_eff_straight": 2.1421256132054944,
+     "n_eff_bent": 2.175305872621262,
+     "n_eff_bent_isotropic": 2.2147506666952372,
+     "n_g_bent": 3.338390209354391,
+     "dneff_dt_bent": 0.00014443355849280692,
+     "w_si_pert": 0.768503228322266,
+     "seconds": 100.8
+    }
+   ],
+   "n_eff_straight": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.1421256132054944,
+     2.142113334206749,
+     2.1420909928940985,
+     2.141982889180319
+    ],
+    "f0": 2.1421314526204442,
+    "p": 2.792590824074349,
+    "err": 5.8394149498042225e-06,
+    "monotone": true
+   },
+   "n_eff_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.175305872621262,
+     2.1752893996076157,
+     2.175278182690474,
+     2.1751355377078063
+    ],
+    "f0": 2.175305872621262,
+    "p": null,
+    "err": 1.6473013646489676e-05,
+    "monotone": true
+   },
+   "n_eff_bent_isotropic": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.2147506666952372,
+     2.2147313526338714,
+     2.214721057801225,
+     2.214551220471619
+    ],
+    "f0": 2.2147506666952372,
+    "p": null,
+    "err": 1.9314061365793833e-05,
+    "monotone": true
+   },
+   "n_g_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     3.338390209354391,
+     3.3383273414324224,
+     3.3383243528291366,
+     3.3379538189824975
+    ],
+    "f0": 3.338390209354391,
+    "p": null,
+    "err": 6.286792196874558e-05,
+    "monotone": true
+   },
+   "dneff_dt_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     0.00014443355849280692,
+     0.00014443003839312852,
+     0.00014442962107015235,
+     0.00014440944078373264
+    ],
+    "f0": 0.00014443355849280692,
+    "p": null,
+    "err": 3.5200996784058493e-09,
+    "monotone": true
+   },
+   "w_si_pert": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     0.768503228322266,
+     0.7684842675892081,
+     0.768481961274705,
+     0.7683737219727549
+    ],
+    "f0": 0.768503228322266,
+    "p": null,
+    "err": 1.8960733057959978e-05,
+    "monotone": true
+   }
+  },
+  "index_weight_identity_residual": -2.8246558869682303e-08,
+  "crosscheck_delta_tidy3d": null,
+  "bend_formulation": "exact transform; see modes_study_bend.json"
+ },
+ "assumptions": {
+  "substrate": "omitted: the 2 um BOX makes substrate leakage negligible (decay exp(-2 k0 sqrt(n_eff^2 - n_ox^2) * 2 um) < 1e-14)",
+  "expansion": "ring length follows the substrate-clamped Si alpha_L; the change of the cross-section (width, film) with temperature and stress-optic terms are neglected (< 0.5 % of dn_eff/dT, estimated from the Jacobian x alpha_Si x dimensions)",
+  "doping": "undoped Si; the junction's free-carrier index change is in junction_<xsec>.json",
+  "geometry": {
+   "width_nm": "printed (de Cea 2019 section 3)",
+   "film_nm": "printed as 'roughly 100 nm'",
+   "box_um": "assumed (zero-change 45 nm SOI BOX ~145 nm, substrate removed below the ring)",
+   "note": "outer radius 10 um printed; centreline radius 9.15 um"
+  }
+ },
+ "runtime_s": 873.7,
+ "sha256": "bf64ae92e7594bd48e9db6cb8d10709979b4b73af4ae7440de6c4b5f5b6b8987",
+ "data_file": "modes_decea2019.json",
+ "created_utc": "2026-10-09T13:22:07Z",
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "femwell": "0.1.12",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0",
+  "meshio": "5.3.5"
+ }
+}

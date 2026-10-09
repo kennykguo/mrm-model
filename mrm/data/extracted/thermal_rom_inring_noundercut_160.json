@@ -28,24 +28,24 @@
   }
  },
  "summary": {
-  "z_heater_ring_k_per_mw": 2.845497442855955,
+  "z_heater_ring_k_per_mw": 2.8454974428559563,
   "z_heater_heater_k_per_mw": 7.534714183089104,
-  "z_opt_ring_k_per_mw": 5.015128681050244,
-  "z_junction_ring_k_per_mw": 4.245674998992318,
-  "z_ratio_opt_heater": 1.762478716556738,
-  "heater_to_ring_coupling": 0.37765167645541,
-  "t63_heater_ring_s": 4.9613098042529704e-06,
-  "t10_heater_ring_s": 4.6965599163733803e-07,
-  "t63_heater_heater_s": 1.4747498347002243e-06,
-  "t63_opt_ring_s": 1.7414522635757977e-06,
-  "t10_opt_ring_s": 9.552517654228849e-09,
+  "z_opt_ring_k_per_mw": 5.015128681050248,
+  "z_junction_ring_k_per_mw": 4.24567499899232,
+  "z_ratio_opt_heater": 1.7624787165567388,
+  "heater_to_ring_coupling": 0.37765167645541015,
+  "t63_heater_ring_s": 4.967962730673946e-06,
+  "t10_heater_ring_s": 4.6916064283809336e-07,
+  "t63_heater_heater_s": 1.4790115661210278e-06,
+  "t63_opt_ring_s": 1.7575522653246161e-06,
+  "t10_opt_ring_s": 9.507525830461377e-09,
   "pitch_um": 50.0,
   "xt_frac_heater_ring_at_pitch": 0.010248459413045221,
-  "t63_xt_heater_ring_at_pitch_s": 0.00011738063990376644,
-  "xt_frac_heater_ring_at_1000um": 0.0009191144979913832,
+  "t63_xt_heater_ring_at_pitch_s": 0.00011731781998114165,
+  "xt_frac_heater_ring_at_1000um": 0.0009191144979913829,
   "package_floor_k_per_mw": 0.002,
-  "share_of_dc_in_poles_below_1us_opt_ring": 0.6545551212836537,
-  "share_of_dc_in_poles_above_1ms_heater_ring": -0.0011867507671315585
+  "share_of_dc_in_poles_below_1us_opt_ring": 0.3850293211818587,
+  "share_of_dc_in_poles_above_1ms_heater_ring": 5.100975596844367e-06
  },
  "inputs": {
   "config": {
@@ -299,15 +299,15 @@
    "method": "femwell",
    "bent": true,
    "radius_um": 7.5,
-   "n_eff": 2.4420631547936296,
+   "n_eff": 2.4420631547936256,
    "te_fraction": 0.9836279732423118,
-   "power_fraction_core": 0.6521552410403619,
+   "power_fraction_core": 0.6521552410403637,
    "mesh_res_um": 0.02,
    "bin_um": 0.02,
    "lambda_um": 1.31,
    "n_si": 3.5057041190984966,
    "n_sio2": 1.4472375047184667,
-   "si_obs_weight_fraction": 0.9887703738139721
+   "si_obs_weight_fraction": 0.988770373813972
   }
  },
  "tool_versions": {
@@ -343,105 +343,105 @@
      "h_core_um": 0.1,
      "dofs_ring": 18845,
      "dofs_site": 17877,
-     "z_heater_ring_k_per_mw": 2.8417534982628885,
+     "z_heater_ring_k_per_mw": 2.84175349826289,
      "z_heater_heater_k_per_mw": 7.522385732484757,
      "z_opt_ring_k_per_mw": 5.009165919208865,
-     "z_junction_ring_k_per_mw": 4.240844433630591,
+     "z_junction_ring_k_per_mw": 4.240844433630592,
      "z_heater_pd_k_per_mw": 0.053890643699356026,
-     "xt_frac_at_pitch": 0.010264335585278625,
-     "t63_heater_ring_s": 4.964450082090755e-06,
-     "t63_opt_ring_s": 1.744686784990113e-06,
-     "t63_heater_heater_s": 1.4762719429368413e-06,
-     "t10_opt_ring_s": 9.562958933310632e-09,
-     "t63_xt_at_pitch_s": 0.00011727742261661714,
-     "z_heater_ring_at_50um_k_per_mw": 0.029168711556809786,
-     "z_heater_ring_at_300um_k_per_mw": 0.00532699248969082,
-     "z_driver_ring_k_per_mw": 0.07114456017664515,
-     "z_aggressor_ring_k_per_mw": 0.03373130239324214,
-     "seconds": 5.5
+     "xt_frac_at_pitch": 0.010264335585278618,
+     "t63_heater_ring_s": 4.96445008118278e-06,
+     "t63_opt_ring_s": 1.7446867849623196e-06,
+     "t63_heater_heater_s": 1.476271943038026e-06,
+     "t10_opt_ring_s": 9.56295884520631e-09,
+     "t63_xt_at_pitch_s": 0.00011727742166114157,
+     "z_heater_ring_at_50um_k_per_mw": 0.029168711556809782,
+     "z_heater_ring_at_300um_k_per_mw": 0.005326992489690819,
+     "z_driver_ring_k_per_mw": 0.07114456017664514,
+     "z_aggressor_ring_k_per_mw": 0.03373130239324212,
+     "seconds": 4.1
     },
     {
      "scale": 1.414213562373095,
      "h_core_um": 0.07071067811865475,
      "dofs_ring": 27443,
      "dofs_site": 27478,
-     "z_heater_ring_k_per_mw": 2.8440993196275115,
+     "z_heater_ring_k_per_mw": 2.8440993196275124,
      "z_heater_heater_k_per_mw": 7.530717467329637,
-     "z_opt_ring_k_per_mw": 5.012548289528448,
-     "z_junction_ring_k_per_mw": 4.243495381211013,
+     "z_opt_ring_k_per_mw": 5.012548289528447,
+     "z_junction_ring_k_per_mw": 4.243495381211014,
      "z_heater_pd_k_per_mw": 0.05387563487884969,
-     "xt_frac_at_pitch": 0.010254303188072302,
-     "t63_heater_ring_s": 4.9605063288954945e-06,
-     "t63_opt_ring_s": 1.744226054228524e-06,
-     "t63_heater_heater_s": 1.471665212514799e-06,
-     "t10_opt_ring_s": 9.534599629758592e-09,
-     "t63_xt_at_pitch_s": 0.00011729333871803537,
-     "z_heater_ring_at_50um_k_per_mw": 0.029164256720450657,
-     "z_heater_ring_at_300um_k_per_mw": 0.00532708505842895,
-     "z_driver_ring_k_per_mw": 0.07115579710339606,
-     "z_aggressor_ring_k_per_mw": 0.033728877231146474,
-     "seconds": 8.8
+     "xt_frac_at_pitch": 0.010254303188072304,
+     "t63_heater_ring_s": 4.96050632900438e-06,
+     "t63_opt_ring_s": 1.744226053966935e-06,
+     "t63_heater_heater_s": 1.4716652122540479e-06,
+     "t10_opt_ring_s": 9.534599663434405e-09,
+     "t63_xt_at_pitch_s": 0.00011729333835882665,
+     "z_heater_ring_at_50um_k_per_mw": 0.029164256720450667,
+     "z_heater_ring_at_300um_k_per_mw": 0.005327085058428953,
+     "z_driver_ring_k_per_mw": 0.07115579710339602,
+     "z_aggressor_ring_k_per_mw": 0.03372887723114648,
+     "seconds": 7.1
     },
     {
      "scale": 1.0,
      "h_core_um": 0.05,
      "dofs_ring": 45781,
      "dofs_site": 46201,
-     "z_heater_ring_k_per_mw": 2.845497442855955,
+     "z_heater_ring_k_per_mw": 2.8454974428559563,
      "z_heater_heater_k_per_mw": 7.534714183089104,
-     "z_opt_ring_k_per_mw": 5.015128681050244,
-     "z_junction_ring_k_per_mw": 4.245674998992318,
+     "z_opt_ring_k_per_mw": 5.015128681050248,
+     "z_junction_ring_k_per_mw": 4.24567499899232,
      "z_heater_pd_k_per_mw": 0.05387607605806976,
      "xt_frac_at_pitch": 0.010248459413045221,
-     "t63_heater_ring_s": 4.9607374187116345e-06,
-     "t63_opt_ring_s": 1.7442695005775722e-06,
-     "t63_heater_heater_s": 1.4710256551611806e-06,
-     "t10_opt_ring_s": 9.525725428385913e-09,
-     "t63_xt_at_pitch_s": 0.00011731531184618998,
-     "z_heater_ring_at_50um_k_per_mw": 0.029161965053033218,
+     "t63_heater_ring_s": 4.960737418145593e-06,
+     "t63_opt_ring_s": 1.744269500383024e-06,
+     "t63_heater_heater_s": 1.4710256551420635e-06,
+     "t10_opt_ring_s": 9.525725364573445e-09,
+     "t63_xt_at_pitch_s": 0.0001173153133816278,
+     "z_heater_ring_at_50um_k_per_mw": 0.029161965053033232,
      "z_heater_ring_at_300um_k_per_mw": 0.005326932063986521,
      "z_driver_ring_k_per_mw": 0.07116446856089466,
-     "z_aggressor_ring_k_per_mw": 0.03372939525223267,
-     "seconds": 10.9
+     "z_aggressor_ring_k_per_mw": 0.033729395252232654,
+     "seconds": 8.2
     },
     {
      "scale": 0.7071067811865475,
      "h_core_um": 0.035355339059327376,
      "dofs_ring": 77479,
      "dofs_site": 79296,
-     "z_heater_ring_k_per_mw": 2.8449145648578233,
+     "z_heater_ring_k_per_mw": 2.844914564857824,
      "z_heater_heater_k_per_mw": 7.532601537900889,
      "z_opt_ring_k_per_mw": 5.015632602503044,
-     "z_junction_ring_k_per_mw": 4.245812866723089,
+     "z_junction_ring_k_per_mw": 4.2458128667230906,
      "z_heater_pd_k_per_mw": 0.05386936678750447,
-     "xt_frac_at_pitch": 0.010249732686456528,
-     "t63_heater_ring_s": 4.9639721712024834e-06,
-     "t63_opt_ring_s": 1.7441899153962555e-06,
-     "t63_heater_heater_s": 1.4734422419710862e-06,
-     "t10_opt_ring_s": 9.518747585823082e-09,
-     "t63_xt_at_pitch_s": 0.00011733322094992151,
-     "z_heater_ring_at_50um_k_per_mw": 0.02915961380559948,
+     "xt_frac_at_pitch": 0.010249732686456525,
+     "t63_heater_ring_s": 4.963972171800506e-06,
+     "t63_opt_ring_s": 1.7441899161252304e-06,
+     "t63_heater_heater_s": 1.4734422423473367e-06,
+     "t10_opt_ring_s": 9.518747903219466e-09,
+     "t63_xt_at_pitch_s": 0.00011733321456195774,
+     "z_heater_ring_at_50um_k_per_mw": 0.029159613805599477,
      "z_heater_ring_at_300um_k_per_mw": 0.005326950729748687,
-     "z_driver_ring_k_per_mw": 0.07116464893944997,
+     "z_driver_ring_k_per_mw": 0.07116464893944999,
      "z_aggressor_ring_k_per_mw": 0.03372994242823715,
-     "seconds": 48.1
+     "seconds": 41.2
     }
    ],
    "refinement_ratio": 1.4142135623730951,
    "richardson": {
     "z_heater_ring_k_per_mw": {
      "values": [
-      2.8417534982628885,
-      2.8440993196275115,
-      2.845497442855955,
-      2.8449145648578233
+      2.84175349826289,
+      2.8440993196275124,
+      2.8454974428559563,
+      2.844914564857824
      ],
      "order": null,
-     "extrapolated": 2.8449145648578233,
-     "rel_err_est": 0.00020488418363478846,
+     "extrapolated": 2.844914564857824,
+     "rel_err_est": 0.00020488418363510063,
      "method": "last-change",
-     "gci_rel": 0.0002561052295434856,
-     "production_value": 2.845497442855955
+     "gci_rel": 0.0002561052295438758,
+     "production_value": 2.8454974428559563
     },
     "z_heater_heater_k_per_mw": {
      "values": [
@@ -460,30 +460,30 @@
     "z_opt_ring_k_per_mw": {
      "values": [
       5.009165919208865,
-      5.012548289528448,
-      5.015128681050244,
+      5.012548289528447,
+      5.015128681050248,
       5.015632602503044
      ],
-     "order": 4.712638402162204,
-     "extrapolated": 5.015754895058272,
-     "rel_err_est": 0.00012484940375488023,
+     "order": 4.7126384021935905,
+     "extrapolated": 5.0157548950582695,
+     "rel_err_est": 0.00012484940375346367,
      "method": "richardson",
-     "gci_rel": 0.0001560617546936003,
-     "production_value": 5.015128681050244
+     "gci_rel": 0.00015606175469182957,
+     "production_value": 5.015128681050248
     },
     "z_junction_ring_k_per_mw": {
      "values": [
-      4.240844433630591,
-      4.243495381211013,
-      4.245674998992318,
-      4.245812866723089
+      4.240844433630592,
+      4.243495381211014,
+      4.24567499899232,
+      4.2458128667230906
      ],
-     "order": 7.965436880675601,
-     "extrapolated": 4.245832562113199,
-     "rel_err_est": 3.7110064651704504e-05,
+     "order": 7.965436880676777,
+     "extrapolated": 4.2458325621132005,
+     "rel_err_est": 3.7110064651704484e-05,
      "method": "richardson",
-     "gci_rel": 4.638758081463063e-05,
-     "production_value": 4.245674998992318
+     "gci_rel": 4.6387580814630605e-05,
+     "production_value": 4.24567499899232
     },
     "z_heater_pd_k_per_mw": {
      "values": [
@@ -501,106 +501,106 @@
     },
     "xt_frac_at_pitch": {
      "values": [
-      0.010264335585278625,
-      0.010254303188072302,
+      0.010264335585278618,
+      0.010254303188072304,
       0.010248459413045221,
-      0.010249732686456528
+      0.010249732686456525
      ],
      "order": null,
-     "extrapolated": 0.010249732686456528,
-     "rel_err_est": 0.00012422503593576383,
+     "extrapolated": 0.010249732686456525,
+     "rel_err_est": 0.0001242250359354254,
      "method": "last-change",
-     "gci_rel": 0.0001552812949197048,
+     "gci_rel": 0.00015528129491928174,
      "production_value": 0.010248459413045221
     },
     "t63_heater_ring_s": {
      "values": [
-      4.964450082090755e-06,
-      4.9605063288954945e-06,
-      4.9607374187116345e-06,
-      4.9639721712024834e-06
+      4.96445008118278e-06,
+      4.96050632900438e-06,
+      4.960737418145593e-06,
+      4.963972171800506e-06
      ],
      "order": null,
-     "extrapolated": 4.9639721712024834e-06,
-     "rel_err_est": 0.0006516459761025047,
+     "extrapolated": 4.963972171800506e-06,
+     "rel_err_est": 0.0006516462105264877,
      "method": "last-change",
-     "gci_rel": 0.0008145574701281308,
-     "production_value": 4.9607374187116345e-06
+     "gci_rel": 0.0008145577631581097,
+     "production_value": 4.960737418145593e-06
     },
     "t63_opt_ring_s": {
      "values": [
-      1.744686784990113e-06,
-      1.744226054228524e-06,
-      1.7442695005775722e-06,
-      1.7441899153962555e-06
+      1.7446867849623196e-06,
+      1.744226053966935e-06,
+      1.744269500383024e-06,
+      1.7441899161252304e-06
      ],
      "order": null,
-     "extrapolated": 1.7441899153962555e-06,
-     "rel_err_est": 4.562873607636977e-05,
+     "extrapolated": 1.7441899161252304e-06,
+     "rel_err_est": 4.5628206571840224e-05,
      "method": "last-change",
-     "gci_rel": 5.703592009546221e-05,
-     "production_value": 1.7442695005775722e-06
+     "gci_rel": 5.703525821480028e-05,
+     "production_value": 1.744269500383024e-06
     },
     "t63_heater_heater_s": {
      "values": [
-      1.4762719429368413e-06,
-      1.471665212514799e-06,
-      1.4710256551611806e-06,
-      1.4734422419710862e-06
+      1.476271943038026e-06,
+      1.4716652122540479e-06,
+      1.4710256551420635e-06,
+      1.4734422423473367e-06
      ],
      "order": null,
-     "extrapolated": 1.4734422419710862e-06,
-     "rel_err_est": 0.0016400960560712659,
+     "extrapolated": 1.4734422423473367e-06,
+     "rel_err_est": 0.001640096323981717,
      "method": "last-change",
-     "gci_rel": 0.0020501200700890824,
-     "production_value": 1.4710256551611806e-06
+     "gci_rel": 0.0020501204049771463,
+     "production_value": 1.4710256551420635e-06
     },
     "t10_opt_ring_s": {
      "values": [
-      9.562958933310632e-09,
-      9.534599629758592e-09,
-      9.525725428385913e-09,
-      9.518747585823082e-09
+      9.56295884520631e-09,
+      9.534599663434405e-09,
+      9.525725364573445e-09,
+      9.518747903219466e-09
      ],
-     "order": 0.6936724877518317,
-     "extrapolated": 9.501901583671792e-09,
-     "rel_err_est": 0.002507271255583191,
+     "order": 0.6938618222887907,
+     "extrapolated": 9.501902821387757e-09,
+     "rel_err_est": 0.0025071339534293484,
      "method": "richardson",
-     "gci_rel": 0.003134089069478989,
-     "production_value": 9.525725428385913e-09
+     "gci_rel": 0.0031339174417866853,
+     "production_value": 9.525725364573445e-09
     },
     "t63_xt_at_pitch_s": {
      "values": [
-      0.00011727742261661714,
-      0.00011729333871803537,
-      0.00011731531184618998,
-      0.00011733322094992151
+      0.00011727742166114157,
+      0.00011729333835882665,
+      0.0001173153133816278,
+      0.00011733321456195774
      ],
-     "order": 0.5900942630614567,
-     "extrapolated": 0.0001173764573510401,
-     "rel_err_est": 0.0005209350003404407,
+     "order": 0.5916198926384961,
+     "extrapolated": 0.00011737643183429277,
+     "rel_err_est": 0.0005207046398483983,
      "method": "richardson",
-     "gci_rel": 0.0006511687504255508,
-     "production_value": 0.00011731531184618998
+     "gci_rel": 0.0006508807998104979,
+     "production_value": 0.0001173153133816278
     },
     "z_heater_ring_at_50um_k_per_mw": {
      "values": [
-      0.029168711556809786,
-      0.029164256720450657,
-      0.029161965053033218,
-      0.02915961380559948
+      0.029168711556809782,
+      0.029164256720450667,
+      0.029161965053033232,
+      0.029159613805599477
      ],
      "order": null,
-     "extrapolated": 0.02915961380559948,
-     "rel_err_est": 8.063369595403618e-05,
+     "extrapolated": 0.029159613805599477,
+     "rel_err_est": 8.06336959546311e-05,
      "method": "last-change",
-     "gci_rel": 0.00010079211994254523,
-     "production_value": 0.029161965053033218
+     "gci_rel": 0.00010079211994328887,
+     "production_value": 0.029161965053033232
     },
     "z_heater_ring_at_300um_k_per_mw": {
      "values": [
-      0.00532699248969082,
-      0.00532708505842895,
+      0.005326992489690819,
+      0.005327085058428953,
       0.005326932063986521,
       0.005326950729748687
      ],
@@ -613,73 +613,88 @@
     },
     "z_driver_ring_k_per_mw": {
      "values": [
-      0.07114456017664515,
-      0.07115579710339606,
+      0.07114456017664514,
+      0.07115579710339602,
       0.07116446856089466,
-      0.07116464893944997
+      0.07116464893944999
      ],
-     "order": 11.174349531920004,
-     "extrapolated": 0.07116467470781501,
-     "rel_err_est": 2.8967591181982884e-06,
+     "order": 11.174349531711865,
+     "extrapolated": 0.07116467470781504,
+     "rel_err_est": 2.8967591185883064e-06,
      "method": "richardson",
-     "gci_rel": 3.6209488977478604e-06,
+     "gci_rel": 3.620948898235383e-06,
      "production_value": 0.07116446856089466
     },
     "z_aggressor_ring_k_per_mw": {
      "values": [
-      0.03373130239324214,
-      0.033728877231146474,
-      0.03372939525223267,
+      0.03373130239324212,
+      0.03372887723114648,
+      0.033729395252232654,
       0.03372994242823715
      ],
      "order": null,
      "extrapolated": 0.03372994242823715,
-     "rel_err_est": 1.622226322056419e-05,
+     "rel_err_est": 1.6222263220975627e-05,
      "method": "last-change",
-     "gci_rel": 2.0277829025705238e-05,
-     "production_value": 0.03372939525223267
+     "gci_rel": 2.0277829026219532e-05,
+     "production_value": 0.033729395252232654
     }
    },
    "production_scale": 1.0,
-   "max_rel_err_est": 0.002507271255583191,
+   "max_rel_err_est": 0.0025071339534293484,
    "worst_metric": "t10_opt_ring_s",
    "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the last three levels (or the last change when convergence is not monotone)"
   },
   "production_scale": 1.0
  },
  "rom": {
-  "vf_iterations": 30,
-  "vf_last_change": 0.0003297830294286541,
+  "vf_iterations": 21,
+  "vf_last_change": 8.795789232607376e-05,
   "taus_vf_s": [
-   0.06758409227577176,
-   0.005615814250650266,
-   0.0017672488658757297,
-   0.0008840417202718772,
-   0.0004676315770675856,
-   0.00039212182552155134,
-   0.00020747753458503265,
-   0.00010806443895195107,
-   4.829709339609875e-05,
-   4.73500915648027e-05,
-   2.277470979147784e-05,
-   2.2328146854390038e-05,
-   8.519960652986192e-06,
-   8.352902600966855e-06,
-   3.5121594801952525e-06,
-   3.443293608034561e-06,
-   1.2611241236237595e-06,
-   1.2363961996311368e-06,
-   3.472491476295437e-07,
-   1.7580486911361042e-08
+   0.06758301300646832,
+   0.005622070058395525,
+   0.001764749457046827,
+   0.0008723179854735014,
+   0.0005255279652118679,
+   0.00038528406946142447,
+   0.00021013593185979115,
+   0.00010753168494542401,
+   5.59125525422241e-05,
+   4.732119457460598e-05,
+   2.5889951557171338e-05,
+   2.538230544820719e-05,
+   1.1080176457656947e-05,
+   1.0862918095742104e-05,
+   5.069137662082199e-06,
+   4.96974280596294e-06,
+   2.402120730086194e-06,
+   2.3550203236139155e-06,
+   9.954676775776193e-07,
+   9.7594870350747e-07,
+   5.6626336107964184e-08,
+   4.866915380576386e-09
   ],
-  "n_poles": 20,
+  "n_poles": 22,
   "varpro": {
-   "cost0": 11.807045701947821,
-   "cost": 0.37186521776676706,
+   "cost0": 3.4414030766157966,
+   "cost": 0.2086242093113628,
    "nfev": 60,
-   "status": 0
+   "status": 0,
+   "min_ratio": 1.5
   },
-  "fit_rms_max": 0.049595536411934656,
+  "fit_rms_max": 0.04704442364217514,
+  "min_pole_ratio": 1.500000029812136,
+  "max_abs_residue_over_dc": 6.674440306560463,
+  "nonneg_pairs": [
+   "heater->heater_resistor",
+   "waveguide_absorption->ring_mode_weighted"
+  ],
+  "residue_cancellation": {
+   "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+   "max_self": 6.674440306560463,
+   "max_cross": 6.331251330184324,
+   "max_cross_d_le_300um": 6.331251330184324
+  },
   "roms": {
    "ring": {
     "method": "galerkin_rational_krylov",
@@ -689,8 +704,8 @@
     "shifts_per_decade": 3.0,
     "n_moments": 2,
     "n_shifts": 39,
-    "seconds": 13.7,
-    "dc_rel_err_max": 4.5527675314957325e-08
+    "seconds": 11.2,
+    "dc_rel_err_max": 5.3850901764702306e-08
    },
    "site": {
     "method": "galerkin_rational_krylov",
@@ -700,8 +715,8 @@
     "shifts_per_decade": 3.0,
     "n_moments": 2,
     "n_shifts": 39,
-    "seconds": 10.7,
-    "dc_rel_err_max": 5.378534838771762e-09
+    "seconds": 9.0,
+    "dc_rel_err_max": 5.378535755045477e-09
    }
   },
   "n_pairs": 440,
@@ -715,6 +730,52 @@
    1e-10,
    10.0,
    111
+  ],
+  "attempts": [
+   {
+    "n_poles": 20,
+    "min_ratio": 1.5,
+    "pass": false,
+    "score": 2.0096087419196884,
+    "self": {
+     "max_db": 0.6028826225759065,
+     "max_deg": 1.8450384815519147,
+     "max_time_err_frac_of_dc": 0.0034619011163620904
+    },
+    "nearest_neighbour": {
+     "max_db": 0.15078550578183153,
+     "max_deg": 0.8250821971393169,
+     "max_time_err_frac_of_dc": 0.0009856114123154944
+    },
+    "residue_cancellation": {
+     "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+     "max_self": 8.764593774092006,
+     "max_cross": 2.9977832282960946,
+     "max_cross_d_le_300um": 2.9977832282960946
+    }
+   },
+   {
+    "n_poles": 22,
+    "min_ratio": 1.5,
+    "pass": true,
+    "score": 0.8343050383200579,
+    "self": {
+     "max_db": 0.13605056849551805,
+     "max_deg": 1.5814037956231735,
+     "max_time_err_frac_of_dc": 0.0023783150962629306
+    },
+    "nearest_neighbour": {
+     "max_db": 0.048845370200821345,
+     "max_deg": 0.22702854988908355,
+     "max_time_err_frac_of_dc": 0.00023658698539223585
+    },
+    "residue_cancellation": {
+     "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+     "max_self": 6.674440306560463,
+     "max_cross": 6.331251330184324,
+     "max_cross_d_le_300um": 6.331251330184324
+    }
+   }
   ]
  },
  "validation": {
@@ -744,51 +805,51 @@
   ],
   "rom_vs_fem": {
    "ring": {
-    "max_abs_err_frac_of_dc": 3.133994174153623e-06,
-    "seconds": 7.3,
+    "max_abs_err_frac_of_dc": 3.109828585127405e-06,
+    "seconds": 6.4,
     "fem_time_steps": 840,
-    "fem_step_seconds": 59.8,
-    "fem_time_discretization_err_frac_of_dc": 2.536910542393337e-05
+    "fem_step_seconds": 49.2,
+    "fem_time_discretization_err_frac_of_dc": 2.536910542406923e-05
    },
    "site": {
     "max_abs_err_frac_of_dc": 3.1948942457340615e-06,
-    "seconds": 6.9,
+    "seconds": 3.9,
     "fem_time_steps": 840,
-    "fem_step_seconds": 45.5,
+    "fem_step_seconds": 30.3,
     "fem_time_discretization_err_frac_of_dc": 3.2285982950771417e-05
    }
   },
   "self": {
    "n_pairs": 20,
-   "max_db": 0.17388394032944127,
-   "max_deg": 1.3109800731949934,
-   "max_time_err_frac_of_dc": 0.0017978943130161403,
-   "worst_time_pair": "waveguide_absorption->ring_mode_weighted@None",
+   "max_db": 0.13605056849551805,
+   "max_deg": 1.5814037956231735,
+   "max_time_err_frac_of_dc": 0.0023783150962629306,
+   "worst_time_pair": "heater->heater_resistor@None",
    "worst_phase_pair": "junction->heater_resistor@None"
   },
   "self_collocated": {
    "n_pairs": 6,
-   "max_db": 0.14783444816761573,
-   "max_deg": 1.3109800731949934,
-   "max_time_err_frac_of_dc": 0.0017978943130161403,
-   "worst_time_pair": "waveguide_absorption->ring_mode_weighted@None",
+   "max_db": 0.13605056849551805,
+   "max_deg": 1.5814037956231735,
+   "max_time_err_frac_of_dc": 0.0023783150962629306,
+   "worst_time_pair": "heater->heater_resistor@None",
    "worst_phase_pair": "junction->heater_resistor@None"
   },
   "nearest_neighbour": {
    "n_pairs": 20,
-   "max_db": 0.15737663759085643,
-   "max_deg": 0.6066611776237529,
-   "max_time_err_frac_of_dc": 0.0008295831865651387,
+   "max_db": 0.048845370200821345,
+   "max_deg": 0.22702854988908355,
+   "max_time_err_frac_of_dc": 0.00023658698539223585,
    "worst_time_pair": "driver->temp_sensor@50.0",
    "worst_phase_pair": "driver->temp_sensor@50.0",
    "d_um": 50.0
   },
   "all_pairs": {
    "n_pairs": 440,
-   "max_db": 2.8080577938619875,
-   "max_deg": 10.584899974952831,
-   "max_time_err_frac_of_dc": 0.012924661927716092,
-   "worst_time_pair": "driver->temp_sensor@1500.0",
+   "max_db": 2.588659284087038,
+   "max_deg": 7.545013433634249,
+   "max_time_err_frac_of_dc": 0.008906423146127754,
+   "worst_time_pair": "driver->temp_sensor@2000.0",
    "worst_phase_pair": "driver->temp_sensor@1500.0"
   },
   "key_pairs": [
@@ -797,12 +858,12 @@
     "source": "heater",
     "observer": "ring_mode_weighted",
     "d_um": null,
-    "dc_k_per_w": 2845.497442855955,
-    "freq_db": 0.12311920698937688,
-    "freq_deg": 0.41934723873077173,
+    "dc_k_per_w": 2845.4974428559563,
+    "freq_db": 0.059338633673118396,
+    "freq_deg": 0.5463147571129604,
     "freq_band_max_hz": 1000000.0,
     "collocated": true,
-    "time_err": 0.0008181924329788296
+    "time_err": 0.0005370336035789326
    },
    {
     "model": "ring",
@@ -810,11 +871,11 @@
     "observer": "heater_resistor",
     "d_um": null,
     "dc_k_per_w": 7534.714183089104,
-    "freq_db": 0.03719516193476898,
-    "freq_deg": 0.3663167595094659,
+    "freq_db": 0.13605056849551805,
+    "freq_deg": 0.5839598782148167,
     "freq_band_max_hz": 1000000.0,
     "collocated": true,
-    "time_err": 0.0007664234595919233
+    "time_err": 0.0023783150962629306
    },
    {
     "model": "ring",
@@ -822,11 +883,11 @@
     "observer": "monitor_pd",
     "d_um": null,
     "dc_k_per_w": 53.876076058069756,
-    "freq_db": 0.13550329785057064,
-    "freq_deg": 0.39226747056594263,
+    "freq_db": 0.065922433695431,
+    "freq_deg": 1.0178445347692993,
     "freq_band_max_hz": 200000.0,
     "collocated": false,
-    "time_err": 0.0005905430168630531
+    "time_err": 0.0004983863880692678
    },
    {
     "model": "ring",
@@ -834,23 +895,23 @@
     "observer": "temp_sensor",
     "d_um": null,
     "dc_k_per_w": 35.653268228125334,
-    "freq_db": 0.08958733750995398,
-    "freq_deg": 0.5209296864555973,
+    "freq_db": 0.010838536433031152,
+    "freq_deg": 0.15329912998308512,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0007806819138489011
+    "time_err": 0.00014254836231470026
    },
    {
     "model": "ring",
     "source": "heater",
     "observer": "ring_mode_weighted",
     "d_um": 50.0,
-    "dc_k_per_w": 29.161965053033217,
-    "freq_db": 0.10611128112455137,
-    "freq_deg": 0.3890596655473979,
+    "dc_k_per_w": 29.16196505303323,
+    "freq_db": 0.018961178231003056,
+    "freq_deg": 0.06884527444193872,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0004074537450108188
+    "time_err": 8.314412782961116e-05
    },
    {
     "model": "ring",
@@ -858,11 +919,11 @@
     "observer": "heater_resistor",
     "d_um": 50.0,
     "dc_k_per_w": 29.125295072167,
-    "freq_db": 0.1371569376888852,
-    "freq_deg": 0.4980861503696476,
+    "freq_db": 0.02165827371746546,
+    "freq_deg": 0.07714077882496985,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0005316593810629223
+    "time_err": 8.169546675022176e-05
    },
    {
     "model": "ring",
@@ -870,11 +931,11 @@
     "observer": "monitor_pd",
     "d_um": 50.0,
     "dc_k_per_w": 29.089042706531544,
-    "freq_db": 0.1551212927408775,
-    "freq_deg": 0.5610801226119702,
+    "freq_db": 0.023339732804621136,
+    "freq_deg": 0.08107987884716444,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0006044369961456987
+    "time_err": 8.08881173377447e-05
    },
    {
     "model": "ring",
@@ -882,59 +943,59 @@
     "observer": "temp_sensor",
     "d_um": 50.0,
     "dc_k_per_w": 29.08443094054572,
-    "freq_db": 0.15737663759085643,
-    "freq_deg": 0.5690506156153786,
+    "freq_db": 0.023584053687405668,
+    "freq_deg": 0.08153595044379022,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0006137278752942381
+    "time_err": 8.078052065668187e-05
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "ring_mode_weighted",
     "d_um": null,
-    "dc_k_per_w": 5015.128681050243,
-    "freq_db": 0.038648910812714654,
-    "freq_deg": 0.43837376296666575,
+    "dc_k_per_w": 5015.128681050248,
+    "freq_db": 0.12868364976266855,
+    "freq_deg": 0.6134500044466233,
     "freq_band_max_hz": 1000000.0,
     "collocated": true,
-    "time_err": 0.0017978943130161403
+    "time_err": 0.0021770240447146955
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "heater_resistor",
     "d_um": null,
-    "dc_k_per_w": 2845.837169171497,
-    "freq_db": 0.12281176782910172,
-    "freq_deg": 0.4073402670726186,
+    "dc_k_per_w": 2845.8371691714965,
+    "freq_db": 0.05899374112639863,
+    "freq_deg": 0.5366369167328495,
     "freq_band_max_hz": 1000000.0,
     "collocated": true,
-    "time_err": 0.0008095613159591544
+    "time_err": 0.000530048493439899
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "monitor_pd",
     "d_um": null,
-    "dc_k_per_w": 57.49982574406786,
-    "freq_db": 0.07600215710659439,
-    "freq_deg": 0.503181165989229,
+    "dc_k_per_w": 57.49982574406785,
+    "freq_db": 0.027652663507949454,
+    "freq_deg": 0.45264795298819516,
     "freq_band_max_hz": 200000.0,
     "collocated": false,
-    "time_err": 0.0004449770634760794
+    "time_err": 0.0002057368213963726
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "temp_sensor",
     "d_um": null,
-    "dc_k_per_w": 37.28791664536448,
-    "freq_db": 0.13055135497289555,
-    "freq_deg": 0.5989064561741417,
+    "dc_k_per_w": 37.287916645364476,
+    "freq_db": 0.0048470430684793555,
+    "freq_deg": 0.026027716621658224,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0008103108806217055
+    "time_err": 6.132999203774214e-05
    },
    {
     "model": "ring",
@@ -942,71 +1003,71 @@
     "observer": "ring_mode_weighted",
     "d_um": 50.0,
     "dc_k_per_w": 30.332375026816493,
-    "freq_db": 0.04238149354467334,
-    "freq_deg": 0.13895518928526382,
+    "freq_db": 0.019712413635125627,
+    "freq_deg": 0.13306785363709667,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.00015375592938119217
+    "time_err": 7.572070183687109e-05
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "heater_resistor",
     "d_um": 50.0,
-    "dc_k_per_w": 30.293462883960615,
-    "freq_db": 0.06198656309163198,
-    "freq_deg": 0.1948757519485591,
+    "dc_k_per_w": 30.293462883960597,
+    "freq_db": 0.025280991552776733,
+    "freq_deg": 0.1741243312701236,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0001764842656227303
+    "time_err": 7.463706423996911e-05
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "monitor_pd",
     "d_um": 50.0,
-    "dc_k_per_w": 30.253296420275294,
-    "freq_db": 0.07364249612570337,
-    "freq_deg": 0.23412262126653405,
+    "dc_k_per_w": 30.253296420275284,
+    "freq_db": 0.028834785774979166,
+    "freq_deg": 0.19756973611478656,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0002163979246285656
+    "time_err": 9.417964859025588e-05
    },
    {
     "model": "ring",
     "source": "waveguide_absorption",
     "observer": "temp_sensor",
     "d_um": 50.0,
-    "dc_k_per_w": 30.248188493497715,
-    "freq_db": 0.07514317800183057,
-    "freq_deg": 0.23942874560642863,
+    "dc_k_per_w": 30.248188493497707,
+    "freq_db": 0.029324253649165036,
+    "freq_deg": 0.20054835860892342,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.00022162108672449407
+    "time_err": 9.676475980422816e-05
    },
    {
     "model": "site",
     "source": "aggressor",
     "observer": "ring_mode_weighted",
     "d_um": null,
-    "dc_k_per_w": 33.72939525223266,
-    "freq_db": 0.06380740293671334,
-    "freq_deg": 0.27521105126470335,
+    "dc_k_per_w": 33.729395252232656,
+    "freq_db": 0.05443840988716405,
+    "freq_deg": 0.20071335129087478,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0007460910076217451
+    "time_err": 0.00023306672158717625
    },
    {
     "model": "site",
     "source": "aggressor",
     "observer": "heater_resistor",
     "d_um": null,
-    "dc_k_per_w": 33.711022483749325,
-    "freq_db": 0.07182895193549492,
-    "freq_deg": 0.2891703260347139,
+    "dc_k_per_w": 33.71102248374932,
+    "freq_db": 0.0626323810308013,
+    "freq_deg": 0.22554695407747707,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0008219068287904517
+    "time_err": 0.00028612443563938813
    },
    {
     "model": "site",
@@ -1014,11 +1075,11 @@
     "observer": "monitor_pd",
     "d_um": null,
     "dc_k_per_w": 30.585519188517907,
-    "freq_db": 0.027360765010549702,
-    "freq_deg": 0.21581516369827036,
+    "freq_db": 0.028010352156956478,
+    "freq_deg": 0.0635848475075019,
     "freq_band_max_hz": 30000.0,
     "collocated": false,
-    "time_err": 0.0004931432762692544
+    "time_err": 0.00011151144991586644
    },
    {
     "model": "site",
@@ -1026,35 +1087,35 @@
     "observer": "temp_sensor",
     "d_um": null,
     "dc_k_per_w": 109.97087266962055,
-    "freq_db": 0.17388394032944127,
-    "freq_deg": 0.3127804863308039,
+    "freq_db": 0.080550424178216,
+    "freq_deg": 0.40441464494808727,
     "freq_band_max_hz": 200000.0,
     "collocated": false,
-    "time_err": 0.00027400465806405697
+    "time_err": 0.0006112970272405523
    },
    {
     "model": "site",
     "source": "aggressor",
     "observer": "ring_mode_weighted",
     "d_um": 50.0,
-    "dc_k_per_w": 41.606918467069676,
-    "freq_db": 0.03543319869664012,
-    "freq_deg": 0.200964430052551,
+    "dc_k_per_w": 41.60691846706968,
+    "freq_db": 0.03613142557218987,
+    "freq_deg": 0.16173253695232628,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0004425453273172273
+    "time_err": 0.0001571892591099001
    },
    {
     "model": "site",
     "source": "aggressor",
     "observer": "heater_resistor",
     "d_um": 50.0,
-    "dc_k_per_w": 41.56758697572545,
-    "freq_db": 0.0456424387797288,
-    "freq_deg": 0.27832419819712056,
+    "dc_k_per_w": 41.56758697572544,
+    "freq_db": 0.041734562374553266,
+    "freq_deg": 0.18914138714353937,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0005696143993385683
+    "time_err": 0.00018934943454312458
    },
    {
     "model": "site",
@@ -1062,11 +1123,11 @@
     "observer": "monitor_pd",
     "d_um": 50.0,
     "dc_k_per_w": 41.50000914658858,
-    "freq_db": 0.05011088693594412,
-    "freq_deg": 0.36025079410008576,
+    "freq_db": 0.045176369080093065,
+    "freq_deg": 0.20660107377692427,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.000660614965820767
+    "time_err": 0.00021036330534778886
    },
    {
     "model": "site",
@@ -1074,11 +1135,11 @@
     "observer": "temp_sensor",
     "d_um": 50.0,
     "dc_k_per_w": 41.49143434850114,
-    "freq_db": 0.05058094490375497,
-    "freq_deg": 0.3770687139546911,
+    "freq_db": 0.04554255623280695,
+    "freq_deg": 0.2085849357917144,
     "freq_band_max_hz": 100000.0,
     "collocated": false,
-    "time_err": 0.0006736128929952733
+    "time_err": 0.00021279641234766061
    }
   ],
   "thresholds": {
@@ -1089,17 +1150,18 @@
   "pass_self": true,
   "pass_nearest_neighbour": true,
   "pass_all_pairs": false,
-  "step_max_rel_err": 0.0017978943130161403,
-  "freq_max_db_err": 0.17388394032944127,
-  "freq_max_deg_err": 1.3109800731949934,
-  "superposition_rel_err": null
+  "step_max_rel_err": 0.0023783150962629306,
+  "freq_max_db_err": 0.13605056849551805,
+  "freq_max_deg_err": 1.5814037956231735,
+  "superposition_rel_err": 0.13888853863606415,
+  "superposition_note": "max step-response error of the 8-ring 3-D bank (inring_noundercut 160, pitch 50 um, leads and bus, Dirichlet comparison variant) against the single-ring axisymmetric ROM over 10 ns-10 ms, relative to the ROM DC; measured on the default family only"
  },
  "validation_per_pair_summary": {
   "n": 440,
-  "max_time_err": 0.012924661927716092
+  "max_time_err": 0.008906423146127754
  },
  "rom_dc_scale": {
-  "z_fem_heater_ring_k_per_mw": 2.845497442855955,
+  "z_fem_heater_ring_k_per_mw": 2.8454974428559563,
   "dlambda_dt_hypotheses": {
    "H86": {
     "pm_per_k": 85.9,
@@ -1113,9 +1175,9 @@
     "pm_per_k": 62.5,
     "source": "Lightmatter bench equivalence (inferred); imec 62.54"
    },
-   "H_solver_proxy": {
-    "pm_per_k": 67.5,
-    "source": "06 section 2.7 femwell 66-69 pm/K at 22 C (400x200 strip); modes artefact not available when this ran"
+   "H_solver": {
+    "pm_per_k": 65.07512062636934,
+    "source": "modes_rib160.json at 25 C"
    }
   },
   "efficiency_nm_per_mw": {
@@ -1128,157 +1190,135 @@
   },
   "table": {
    "H86|printed_0p44": {
-    "rom_dc_scale": 1.8001194026793528,
+    "rom_dc_scale": 1.8001194026793519,
     "required_z_k_per_mw": 5.122235157159487,
     "warn": false
    },
    "H86|fsr_1p80thz_window_b": {
-    "rom_dc_scale": 1.655762622575222,
+    "rom_dc_scale": 1.6557626225752213,
     "required_z_k_per_mw": 4.711468308514264,
     "warn": false
    },
    "H86|fsr_1p40thz_window_a": {
-    "rom_dc_scale": 1.28763675794442,
+    "rom_dc_scale": 1.2876367579444195,
     "required_z_k_per_mw": 3.663967102058179,
     "warn": false
    },
    "H86|fsr_1p53thz_g25_cluster": {
-    "rom_dc_scale": 1.4082019974523245,
+    "rom_dc_scale": 1.4082019974523239,
     "required_z_k_per_mw": 4.007035182775238,
     "warn": false
    },
    "H86|fsr_1p60thz_pdk_size": {
-    "rom_dc_scale": 1.472503458523207,
+    "rom_dc_scale": 1.4725034585232064,
     "required_z_k_per_mw": 4.190004825824335,
     "warn": false
    },
    "H86|swept_device_0p348": {
-    "rom_dc_scale": 1.4237308003009426,
+    "rom_dc_scale": 1.423730800300942,
     "required_z_k_per_mw": 4.051222351571595,
     "warn": false
    },
    "materials_ceiling|printed_0p44": {
-    "rom_dc_scale": 2.1887166328083,
+    "rom_dc_scale": 2.1887166328082985,
     "required_z_k_per_mw": 6.227987581792313,
     "warn": true
    },
    "materials_ceiling|fsr_1p80thz_window_b": {
-    "rom_dc_scale": 2.0131971171571257,
+    "rom_dc_scale": 2.0131971171571243,
     "required_z_k_per_mw": 5.72854724883558,
     "warn": true
    },
    "materials_ceiling|fsr_1p40thz_window_a": {
-    "rom_dc_scale": 1.5656028066435508,
+    "rom_dc_scale": 1.56560280664355,
     "required_z_k_per_mw": 4.454918782832329,
     "warn": false
    },
    "materials_ceiling|fsr_1p53thz_g25_cluster": {
-    "rom_dc_scale": 1.7121948297375162,
+    "rom_dc_scale": 1.7121948297375154,
     "required_z_k_per_mw": 4.8720460096892895,
     "warn": false
    },
    "materials_ceiling|fsr_1p60thz_pdk_size": {
-    "rom_dc_scale": 1.7903772420542978,
+    "rom_dc_scale": 1.790377242054297,
     "required_z_k_per_mw": 5.094513864013002,
     "warn": false
    },
    "materials_ceiling|swept_device_0p348": {
-    "rom_dc_scale": 1.731075882312019,
+    "rom_dc_scale": 1.731075882312018,
     "required_z_k_per_mw": 4.925771996508466,
     "warn": false
    },
    "bench_62p5|printed_0p44": {
-    "rom_dc_scale": 2.474084107042503,
+    "rom_dc_scale": 2.4740841070425015,
     "required_z_k_per_mw": 7.04,
     "warn": true
    },
    "bench_62p5|fsr_1p80thz_window_b": {
-    "rom_dc_scale": 2.2756801484673854,
+    "rom_dc_scale": 2.2756801484673845,
     "required_z_k_per_mw": 6.475442043222005,
     "warn": true
    },
    "bench_62p5|fsr_1p40thz_window_a": {
-    "rom_dc_scale": 1.769727960118811,
+    "rom_dc_scale": 1.76972796011881,
     "required_z_k_per_mw": 5.035756385068762,
     "warn": false
    },
    "bench_62p5|fsr_1p53thz_g25_cluster": {
-    "rom_dc_scale": 1.9354328252984752,
+    "rom_dc_scale": 1.9354328252984743,
     "required_z_k_per_mw": 5.507269155206287,
     "warn": false
    },
    "bench_62p5|fsr_1p60thz_pdk_size": {
-    "rom_dc_scale": 2.023808753394296,
+    "rom_dc_scale": 2.0238087533942952,
     "required_z_k_per_mw": 5.758742632612967,
     "warn": true
    },
    "bench_62p5|swept_device_0p348": {
-    "rom_dc_scale": 1.9567756119336157,
+    "rom_dc_scale": 1.9567756119336148,
     "required_z_k_per_mw": 5.568,
     "warn": false
    },
-   "H_solver_proxy|printed_0p44": {
-    "rom_dc_scale": 2.2908186176319467,
-    "required_z_k_per_mw": 6.518518518518518,
+   "H_solver|printed_0p44": {
+    "rom_dc_scale": 2.376180869152289,
+    "required_z_k_per_mw": 6.761416586936082,
     "warn": true
    },
-   "H_solver_proxy|fsr_1p80thz_window_b": {
-    "rom_dc_scale": 2.107111248580912,
-    "required_z_k_per_mw": 5.9957796696500045,
+   "H_solver|fsr_1p80thz_window_b": {
+    "rom_dc_scale": 2.1856280543193947,
+    "required_z_k_per_mw": 6.219199039600076,
     "warn": true
    },
-   "H_solver_proxy|fsr_1p40thz_window_a": {
-    "rom_dc_scale": 1.6386370001100101,
-    "required_z_k_per_mw": 4.662737393582187,
+   "H_solver|fsr_1p40thz_window_a": {
+    "rom_dc_scale": 1.6996971568056647,
+    "required_z_k_per_mw": 4.836483913320058,
     "warn": false
    },
-   "H_solver_proxy|fsr_1p53thz_g25_cluster": {
-    "rom_dc_scale": 1.7920674308319213,
-    "required_z_k_per_mw": 5.099323291857673,
+   "H_solver|fsr_1p53thz_g25_cluster": {
+    "rom_dc_scale": 1.8588448306638732,
+    "required_z_k_per_mw": 5.2893382123200645,
     "warn": false
    },
-   "H_solver_proxy|fsr_1p60thz_pdk_size": {
-    "rom_dc_scale": 1.8738969938836072,
-    "required_z_k_per_mw": 5.332169104271266,
+   "H_solver|fsr_1p60thz_pdk_size": {
+    "rom_dc_scale": 1.943723590054918,
+    "required_z_k_per_mw": 5.530860505120067,
     "warn": false
    },
-   "H_solver_proxy|swept_device_0p348": {
-    "rom_dc_scale": 1.8118292703089034,
-    "required_z_k_per_mw": 5.155555555555556,
+   "H_solver|swept_device_0p348": {
+    "rom_dc_scale": 1.8793430510568105,
+    "required_z_k_per_mw": 5.347665846031265,
     "warn": false
    }
   },
   "definition": "efficiency_measured / (Z_FEM(0) * dlambda/dT) (07 P1-2)"
  },
  "reciprocity": {
-  "z_heater_to_ring_k_per_w": 2845.497442855956,
+  "z_heater_to_ring_k_per_w": 2845.4974428559563,
   "z_ringweight_to_heater_k_per_w": 2845.4974428559535,
-  "rel_err": 7.990647681448017e-16,
+  "rel_err": 9.58877721773762e-16,
   "heater_source_equals_heater_observer": true
  },
- "runtime_seconds": 299.3,
- "site_offsets_um": {
-  "monitor_pd": [
-   0.0,
-   25.0
-  ],
-  "temp_sensor": [
-   40.0,
-   0.0
-  ],
-  "driver": [
-   0.0,
-   -30.0
-  ],
-  "aggressor": [
-   60.0,
-   0.0
-  ]
- },
- "schema": "thermal_rom/1",
- "file": "thermal_rom_inring_noundercut_160.npz",
- "sha256": "ea97bd2e9e1268d861bb05f8949c981e10bfe4d343be0b9cb8130697dd6bbf9a",
- "created_utc": "2026-10-09T09:26:07Z",
+ "runtime_seconds": 319.4,
  "stages": {
   "uncertainty": {
    "mesh_scale": 2.0,
@@ -2449,9 +2489,1530 @@
      }
     ]
    }
+  },
+  "crosscheck_analytic": {
+   "method": "FEM (structured interface-aligned P2 mesh) vs exact layered Hankel-Laplace solution (LayeredAnalytic); laterally uniform stack with a continuous 160 nm Si film; annular volume source in the film; observers: the same annulus, an annulus 2-3 um inside, victim annuli at distance d",
+   "results": {
+    "dirichlet_sub200": {
+     "max_rel_err": 1.2635417834878466,
+     "max_err_of_self_dc": 0.0008172085288189162,
+     "max_rel_err_self_and_heater": 0.00429181136443314,
+     "fem_dofs": {
+      "2.0": 26754,
+      "1.0": 46200,
+      "0.5": 87764
+     },
+     "records": [
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2607.0992172245465,
+        0.0
+       ],
+       "fem_k_per_w": [
+        2607.710869622457,
+        0.0
+       ],
+       "rel_err": 0.00023461032624661586,
+       "rel_err_of_self_dc": 0.0002345552971518282,
+       "fem_mesh_change": 2.13802091461722e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1544.8397851879658,
+        0.0
+       ],
+       "fem_k_per_w": [
+        1546.5846228965959,
+        0.0
+       ],
+       "rel_err": 0.0011294619191968374,
+       "rel_err_of_self_dc": 0.0006691070428688463,
+       "fem_mesh_change": 7.986996343035076e-08
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        189.45661922922227,
+        0.0
+       ],
+       "fem_k_per_w": [
+        189.9559327476145,
+        0.0
+       ],
+       "rel_err": 0.0026355031585785435,
+       "rel_err_of_self_dc": 0.0001914757974930396,
+       "fem_mesh_change": 4.452261937073272e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        36.30816397961345,
+        0.0
+       ],
+       "fem_k_per_w": [
+        36.49556356995369,
+        0.0
+       ],
+       "rel_err": 0.0051613623438922455,
+       "rel_err_of_self_dc": 7.186363815225164e-05,
+       "fem_mesh_change": 4.127577209990874e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        12.384725916501017,
+        0.0
+       ],
+       "fem_k_per_w": [
+        12.45819457837628,
+        0.0
+       ],
+       "rel_err": 0.005932199256616305,
+       "rel_err_of_self_dc": 2.8173622594095632e-05,
+       "fem_mesh_change": 1.6726546204286995e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 0.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        0.9455329793135392,
+        0.0
+       ],
+       "fem_k_per_w": [
+        0.9780283971239311,
+        0.0
+       ],
+       "rel_err": 0.03436730238006473,
+       "rel_err_of_self_dc": 1.2461280960606097e-05,
+       "fem_mesh_change": 1.391048477341372e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2607.098154863935,
+        -0.38728674365777366
+       ],
+       "fem_k_per_w": [
+        2607.7098500197335,
+        -0.38311465839256253
+       ],
+       "rel_err": 0.00023463227713882545,
+       "rel_err_of_self_dc": 0.00023457714989627115,
+       "fem_mesh_change": 2.1380205471938755e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1544.8387232154907,
+        -0.3969424592182214
+       ],
+       "fem_k_per_w": [
+        1546.5835996833428,
+        -0.3918199079374876
+       ],
+       "rel_err": 0.0011294926151985821,
+       "rel_err_of_self_dc": 0.0006691247896656994,
+       "fem_mesh_change": 7.986969087037886e-08
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        189.4556284832715,
+        -0.2365480447027359
+       ],
+       "fem_k_per_w": [
+        189.95494479379863,
+        -0.23754507075314063
+       ],
+       "rel_err": 0.0026355348782629803,
+       "rel_err_of_self_dc": 0.0001914772499377908,
+       "fem_mesh_change": 4.452277923296892e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        36.30727488506422,
+        -0.15961360145420883
+       ],
+       "fem_k_per_w": [
+        36.49465540980099,
+        -0.1609558910788433
+       ],
+       "rel_err": 0.005161046160956634,
+       "rel_err_of_self_dc": 7.185817053772405e-05,
+       "fem_mesh_change": 4.1276378289593145e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        12.38399489961249,
+        -0.09757531232032968
+       ],
+       "fem_k_per_w": [
+        12.45744715140988,
+        -0.09836444586199243
+       ],
+       "rel_err": 0.005931382504306972,
+       "rel_err_of_self_dc": 2.8168955214700265e-05,
+       "fem_mesh_change": 1.6727321644888889e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        0.9452535403569139,
+        -0.019944524368250026
+       ],
+       "fem_k_per_w": [
+        0.97772791751419,
+        -0.020675834551307545
+       ],
+       "rel_err": 0.03435626632794643,
+       "rel_err_of_self_dc": 1.2456369646110952e-05,
+       "fem_mesh_change": 1.3911749714390895e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2599.9919995272676,
+        -34.43863531943021
+       ],
+       "fem_k_per_w": [
+        2600.9432574407624,
+        -34.27330666765075
+       ],
+       "rel_err": 0.00037132168167777307,
+       "rel_err_of_self_dc": 0.0003702550388976284,
+       "fem_mesh_change": 2.142678340041426e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1537.6735723289303,
+        -35.45071785050349
+       ],
+       "fem_k_per_w": [
+        1539.7819526347805,
+        -35.140751473624945
+       ],
+       "rel_err": 0.0013855199688734222,
+       "rel_err_of_self_dc": 0.0008172085288189162,
+       "fem_mesh_change": 8.007862972284766e-08
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        183.0261611838942,
+        -19.614118019135464
+       ],
+       "fem_k_per_w": [
+        183.49225710640053,
+        -19.751309047824016
+       ],
+       "rel_err": 0.0026395182121351154,
+       "rel_err_of_self_dc": 0.00018631937022933547,
+       "fem_mesh_change": 4.582545912967532e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        30.63377796993934,
+        -12.193932885672954
+       ],
+       "fem_k_per_w": [
+        30.76600260569331,
+        -12.253384380485215
+       ],
+       "rel_err": 0.004396986895093065,
+       "rel_err_of_self_dc": 5.559484798933064e-05,
+       "fem_mesh_change": 4.5600386689932305e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        8.083891756208152,
+        -6.423815529276255
+       ],
+       "fem_k_per_w": [
+        8.130707154742394,
+        -6.444318012854597
+       ],
+       "rel_err": 0.0049497218216118894,
+       "rel_err_of_self_dc": 1.9598819963398206e-05,
+       "fem_mesh_change": 2.2985548980947703e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.12905640897889292,
+        -0.5665455337014037
+       ],
+       "fem_k_per_w": [
+        -0.1128543760357646,
+        -0.5663742954204318
+       ],
+       "rel_err": 0.027885191922100826,
+       "rel_err_of_self_dc": 6.213471750259425e-06,
+       "fem_mesh_change": 2.3493251266654003e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2520.8215222279346,
+        -197.10113812965793
+       ],
+       "fem_k_per_w": [
+        2521.08918082092,
+        -197.56669634070178
+       ],
+       "rel_err": 0.00021238369102967737,
+       "rel_err_of_self_dc": 0.00020593365414479098,
+       "fem_mesh_change": 2.1475001122478296e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1455.8009353090445,
+        -204.78270472394425
+       ],
+       "fem_k_per_w": [
+        1457.3258264929643,
+        -205.42300248657898
+       ],
+       "rel_err": 0.0011249771237194916,
+       "rel_err_of_self_dc": 0.0006342215709140562,
+       "fem_mesh_change": 7.385636217078217e-08
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        123.4808003131377,
+        -60.168309028258754
+       ],
+       "fem_k_per_w": [
+        123.67319400199263,
+        -60.25920655224695
+       ],
+       "rel_err": 0.0015491100492455885,
+       "rel_err_of_self_dc": 8.159859861729961e-05,
+       "fem_mesh_change": 6.123231799481045e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        -2.5171383695892366,
+        -11.728832622022395
+       ],
+       "fem_k_per_w": [
+        -2.4644197725953854,
+        -11.755661007832703
+       ],
+       "rel_err": 0.004931057898934935,
+       "rel_err_of_self_dc": 2.268367025716387e-05,
+       "fem_mesh_change": 1.3041698908681185e-05
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -1.7272936830229053,
+        -0.16024388100249182
+       ],
+       "fem_k_per_w": [
+        -1.7069627781731442,
+        -0.16970344392578485
+       ],
+       "rel_err": 0.012926563542216761,
+       "rel_err_of_self_dc": 8.59905508657607e-06,
+       "fem_mesh_change": 4.4484569239371205e-05
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.010715611019662584,
+        -0.0010555862611103001
+       ],
+       "fem_k_per_w": [
+        0.002827552994625157,
+        -0.0023529071190327173
+       ],
+       "rel_err": 1.2635417834878466,
+       "rel_err_of_self_dc": 5.217280212696855e-06,
+       "fem_mesh_change": 2.603852544100375e-05
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        1824.3168798841227,
+        -694.8595282148814
+       ],
+       "fem_k_per_w": [
+        1823.9849175085862,
+        -695.2695051221439
+       ],
+       "rel_err": 0.0002702239027989122,
+       "rel_err_of_self_dc": 0.0002022933586808073,
+       "fem_mesh_change": 4.2462250204961175e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        691.3192221218798,
+        -659.2304085399003
+       ],
+       "fem_k_per_w": [
+        691.9689342814432,
+        -659.8064153789048
+       ],
+       "rel_err": 0.0009089533265880711,
+       "rel_err_of_self_dc": 0.00033296627544115645,
+       "fem_mesh_change": 5.632250159058853e-07
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        5.248926813101054,
+        -44.99439902447939
+       ],
+       "fem_k_per_w": [
+        5.335975788268079,
+        -45.07205822307952
+       ],
+       "rel_err": 0.0025752005872020445,
+       "rel_err_of_self_dc": 4.4734778973188175e-05,
+       "fem_mesh_change": 7.216132247190368e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        0.1304798867233367,
+        0.10311783533798308
+       ],
+       "fem_k_per_w": [
+        0.15288521817346112,
+        0.08039293211942151
+       ],
+       "rel_err": 0.19188933080046874,
+       "rel_err_of_self_dc": 1.2237819535734685e-05,
+       "fem_mesh_change": 0.0002387547044887523
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.01122557266642224,
+        0.005828175686229661
+       ],
+       "fem_k_per_w": [
+        -0.0006139917524897722,
+        -0.001446183407729773
+       ],
+       "rel_err": 1.017169756980292,
+       "rel_err_of_self_dc": 4.933650257005903e-06,
+       "fem_mesh_change": 0.002347608560569482
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 100000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.011918330217193095,
+        0.0024005833810014756
+       ],
+       "fem_k_per_w": [
+        1.2397219705763201e-09,
+        -3.7849975478405165e-09
+       ],
+       "rel_err": 1.0000001614350964,
+       "rel_err_of_self_dc": 4.662208089872784e-06,
+       "fem_mesh_change": 0.0002535734151439811
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        846.8771703685672,
+        -465.1862531286044
+       ],
+       "fem_k_per_w": [
+        846.1816987719479,
+        -465.31476529067714
+       ],
+       "rel_err": 0.0007319643419599594,
+       "rel_err_of_self_dc": 0.00027121313633623274,
+       "fem_mesh_change": 1.0338742930489612e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        17.308718073295104,
+        -180.98010950443273
+       ],
+       "fem_k_per_w": [
+        17.44549280383255,
+        -181.1613117482198
+       ],
+       "rel_err": 0.0012487366221024699,
+       "rel_err_of_self_dc": 8.706015316056135e-05,
+       "fem_mesh_change": 1.7358610122754289e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        -2.2171251452051393,
+        -1.2096389866420612
+       ],
+       "fem_k_per_w": [
+        -2.198887846722408,
+        -1.2338075595913491
+       ],
+       "rel_err": 0.011987985841915981,
+       "rel_err_of_self_dc": 1.1610707197017524e-05,
+       "fem_mesh_change": 8.001150116947132e-05
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        -0.002010421406448453,
+        0.007145941808887019
+       ],
+       "fem_k_per_w": [
+        -9.407247525153107e-07,
+        -2.0416928693179015e-07
+       ],
+       "rel_err": 0.999992164056158,
+       "rel_err_of_self_dc": 2.846673780437609e-06,
+       "fem_mesh_change": 0.026093432045289595
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.004084916699881744,
+        0.002464744049582338
+       ],
+       "fem_k_per_w": [
+        3.221759889957035e-11,
+        -2.2594565703954607e-11
+       ],
+       "rel_err": 1.0000000082286302,
+       "rel_err_of_self_dc": 1.8295365032683318e-06,
+       "fem_mesh_change": 0.05684846897214364
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 1000000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.006237823514428836,
+        0.00387697010600469
+       ],
+       "fem_k_per_w": [
+        3.3526130320969752e-25,
+        8.249768898126904e-25
+       ],
+       "rel_err": 1.0,
+       "rel_err_of_self_dc": 2.8164459799138015e-06,
+       "fem_mesh_change": 0.0942933499434904
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        335.83730279001253,
+        -263.63114539471593
+       ],
+       "fem_k_per_w": [
+        335.06155329438684,
+        -263.6641997044669
+       ],
+       "rel_err": 0.001818596125654897,
+       "rel_err_of_self_dc": 0.0002977528679947146,
+       "fem_mesh_change": 3.96091414742753e-06
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        -12.124808529911002,
+        -2.1689595167520483
+       ],
+       "fem_k_per_w": [
+        -12.101315823503734,
+        -2.2163159938135895
+       ],
+       "rel_err": 0.00429181136443314,
+       "rel_err_of_self_dc": 2.027197091968421e-05,
+       "fem_mesh_change": 1.2752893835959273e-05
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        0.011244266066732993,
+        0.0203245747539579
+       ],
+       "fem_k_per_w": [
+        0.014435624931264551,
+        0.013880697818397394
+       ],
+       "rel_err": 0.3095819969968443,
+       "rel_err_of_self_dc": 2.7575334059061463e-06,
+       "fem_mesh_change": 0.0016718517218666461
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        0.0024146896956836134,
+        0.0016293462604467291
+       ],
+       "fem_k_per_w": [
+        8.293071633249177e-18,
+        3.247414746460314e-17
+       ],
+       "rel_err": 0.9999999999999913,
+       "rel_err_of_self_dc": 1.1170668607621333e-06,
+       "fem_mesh_change": 1.4202710524624358
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.002122159287984683,
+        0.0013022404143398641
+       ],
+       "fem_k_per_w": [
+        -3.040807072866667e-22,
+        -8.994189481527545e-22
+       ],
+       "rel_err": 1.0,
+       "rel_err_of_self_dc": 9.548057964630882e-07,
+       "fem_mesh_change": 0.22241573577924575
+      },
+      {
+       "case": "dirichlet_sub200",
+       "f_hz": 10000000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.001320185640859953,
+        0.0019811916294091873
+       ],
+       "fem_k_per_w": [
+        5.300266518372749e-34,
+        1.035687027586468e-33
+       ],
+       "rel_err": 1.0,
+       "rel_err_of_self_dc": 9.129686860793076e-07,
+       "fem_mesh_change": 0.2397441115377137
+      }
+     ]
+    },
+    "robin_sub775": {
+     "max_rel_err": 1.2549859705890567,
+     "max_err_of_self_dc": 0.0008207872929130707,
+     "max_rel_err_self_and_heater": 0.004291808852325999,
+     "fem_dofs": {
+      "2.0": 43645,
+      "1.0": 68971,
+      "0.5": 121095
+     },
+     "records": [
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2599.6041164325425,
+        -34.61649810264141
+       ],
+       "fem_k_per_w": [
+        2600.5863035877446,
+        -34.40753847650976
+       ],
+       "rel_err": 0.0003862434870932015,
+       "rel_err_of_self_dc": 0.0003843029091739212,
+       "fem_mesh_change": 2.1449993396255394e-07
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1537.3081333338243,
+        -35.619932732830314
+       ],
+       "fem_k_per_w": [
+        1539.4249174443996,
+        -35.27510576596243
+       ],
+       "rel_err": 0.0013947178718474477,
+       "rel_err_of_self_dc": 0.0008207872929130707,
+       "fem_mesh_change": 8.038270866474318e-08
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        182.67226848985754,
+        -19.724911218935674
+       ],
+       "fem_k_per_w": [
+        183.13633272153118,
+        -19.884064166174586
+       ],
+       "rel_err": 0.002670145486029835,
+       "rel_err_of_self_dc": 0.0001877550140464792,
+       "fem_mesh_change": 4.717177718729738e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        30.29057737910573,
+        -12.317981072424011
+       ],
+       "fem_k_per_w": [
+        30.41518082826568,
+        -12.378546581253289
+       ],
+       "rel_err": 0.004236868943908215,
+       "rel_err_of_self_dc": 5.3021474194260585e-05,
+       "fem_mesh_change": 4.6911011194114405e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        7.754663623457087,
+        -6.5239751325208495
+       ],
+       "fem_k_per_w": [
+        7.7982656476483845,
+        -6.544544944475924
+       ],
+       "rel_err": 0.004757324316230223,
+       "rel_err_of_self_dc": 1.8450517405212124e-05,
+       "fem_mesh_change": 1.1375740122603801e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.30341824575779125,
+        -0.5324285908945677
+       ],
+       "fem_k_per_w": [
+        -0.28700914924527576,
+        -0.5351755639623903
+       ],
+       "rel_err": 0.027149177853925184,
+       "rel_err_of_self_dc": 6.36726917092344e-06,
+       "fem_mesh_change": 0.0001968369258968855
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        2520.8211541441565,
+        -197.10176631433234
+       ],
+       "fem_k_per_w": [
+        2521.088888694337,
+        -197.5673709814545
+       ],
+       "rel_err": 0.0002124146191404098,
+       "rel_err_of_self_dc": 0.00020554964618941553,
+       "fem_mesh_change": 2.1479393312731218e-07
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        1455.8005009759252,
+        -204.783391986003
+       ],
+       "fem_k_per_w": [
+        1457.3255345492068,
+        -205.42367798552468
+       ],
+       "rel_err": 0.001125063584334143,
+       "rel_err_of_self_dc": 0.000632995336221765,
+       "fem_mesh_change": 7.387285682946426e-08
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        123.48051021807542,
+        -60.16895867437703
+       ],
+       "fem_k_per_w": [
+        123.67294279530597,
+        -60.25988042904825
+       ],
+       "rel_err": 0.0015494411185742532,
+       "rel_err_of_self_dc": 8.145200973248265e-05,
+       "fem_mesh_change": 6.286988476560095e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        -2.517448967515428,
+        -11.729438921727194
+       ],
+       "fem_k_per_w": [
+        -2.464731144377522,
+        -11.756263760850317
+       ],
+       "rel_err": 0.004930595872198978,
+       "rel_err_of_self_dc": 2.263719830008442e-05,
+       "fem_mesh_change": 1.3341685651030545e-05
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -1.7276357683595436,
+        -0.16069073678398677
+       ],
+       "fem_k_per_w": [
+        -1.7072629052773516,
+        -0.17029971315611378
+       ],
+       "rel_err": 0.012982147353688562,
+       "rel_err_of_self_dc": 8.620570665297275e-06,
+       "fem_mesh_change": 4.6011184471203474e-05
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.0107788321621992,
+        -0.0009928375301245902
+       ],
+       "fem_k_per_w": [
+        0.0027438993280880807,
+        -0.0022872992795433546
+       ],
+       "rel_err": 1.2549859705890567,
+       "rel_err_of_self_dc": 5.198905512990984e-06,
+       "fem_mesh_change": 0.0022563081790845244
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        1824.3168803190197,
+        -694.8595285731558
+       ],
+       "fem_k_per_w": [
+        1823.984917568212,
+        -695.269505022338
+       ],
+       "rel_err": 0.0002702238413291221,
+       "rel_err_of_self_dc": 0.00020188671886115756,
+       "fem_mesh_change": 4.246283558737679e-07
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        691.3192225077474,
+        -659.2304088283214
+       ],
+       "fem_k_per_w": [
+        691.9689343616685,
+        -659.8064153416807
+       ],
+       "rel_err": 0.000908952860565981,
+       "rel_err_of_self_dc": 0.0003322968688673094,
+       "fem_mesh_change": 5.631863021398164e-07
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        5.248927351398005,
+        -44.99439949925623
+       ],
+       "fem_k_per_w": [
+        5.335960985185034,
+        -45.07206428106886
+       ],
+       "rel_err": 0.0025750299122045857,
+       "rel_err_of_self_dc": 4.464190716517944e-05,
+       "fem_mesh_change": 7.039066950327385e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        0.13048043586259828,
+        0.10311735020831525
+       ],
+       "fem_k_per_w": [
+        0.15288721439527508,
+        0.08039209316902224
+       ],
+       "rel_err": 0.19189680477726992,
+       "rel_err_of_self_dc": 1.2213707716181843e-05,
+       "fem_mesh_change": 0.00023376946886783924
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.011225018891068791,
+        0.005827686399371697
+       ],
+       "fem_k_per_w": [
+        -0.0006124529260801903,
+        -0.0014455004001375916
+       ],
+       "rel_err": 1.0172392546062365,
+       "rel_err_of_self_dc": 4.923791307550243e-06,
+       "fem_mesh_change": 0.002579650606771797
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 100000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.01191777411499971,
+        0.0024000920424732666
+       ],
+       "fem_k_per_w": [
+        -5.547692136342575e-10,
+        -3.0772943335303753e-09
+       ],
+       "rel_err": 1.0000000052382472,
+       "rel_err_of_self_dc": 4.6525909255312906e-06,
+       "fem_mesh_change": 0.09608717123320795
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        846.8771704601439,
+        -465.18625324737866
+       ],
+       "fem_k_per_w": [
+        846.1816988050068,
+        -465.3147652997911
+       ],
+       "rel_err": 0.0007319643807880764,
+       "rel_err_of_self_dc": 0.0002706680333785223,
+       "fem_mesh_change": 1.0339381685025217e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        17.308718154603664,
+        -180.98010960652556
+       ],
+       "fem_k_per_w": [
+        17.44549280650719,
+        -181.16131175431352
+       ],
+       "rel_err": 0.0012487359393307045,
+       "rel_err_of_self_dc": 8.688512155582623e-05,
+       "fem_mesh_change": 1.7358846595428648e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        -2.217125031831269,
+        -1.2096391371423896
+       ],
+       "fem_k_per_w": [
+        -2.198877403076078,
+        -1.2338213201082286
+       ],
+       "rel_err": 0.011994751138210554,
+       "rel_err_of_self_dc": 1.1593909663918465e-05,
+       "fem_mesh_change": 8.878065816268839e-05
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        -0.0020103057489222077,
+        0.007145788188663908
+       ],
+       "fem_k_per_w": [
+        -9.402429353011882e-07,
+        -2.056376701801108e-07
+       ],
+       "rel_err": 0.9999923730784056,
+       "rel_err_of_self_dc": 2.840884199608076e-06,
+       "fem_mesh_change": 0.02676182271844237
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.00408480006434702,
+        0.002464589123523338
+       ],
+       "fem_k_per_w": [
+        3.197101330554807e-11,
+        -2.3045691206370352e-11
+       ],
+       "rel_err": 1.0000000082335272,
+       "rel_err_of_self_dc": 1.8257904269219072e-06,
+       "fem_mesh_change": 0.059721372524374546
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 1000000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.006237706389037291,
+        0.0038768145285744647
+       ],
+       "fem_k_per_w": [
+        2.8954823507761333e-19,
+        -1.6931635526240151e-18
+       ],
+       "rel_err": 1.0000000000000002,
+       "rel_err_of_self_dc": 2.8107156415452117e-06,
+       "fem_mesh_change": 0.24780222744086894
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "self",
+       "analytic_k_per_w": [
+        335.83730280556296,
+        -263.63114542611567
+       ],
+       "fem_k_per_w": [
+        335.06155331244565,
+        -263.6641997176384
+       ],
+       "rel_err": 0.0018185961178329184,
+       "rel_err_of_self_dc": 0.00029715440658364684,
+       "fem_mesh_change": 3.960993563124287e-06
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "heater_annulus",
+       "analytic_k_per_w": [
+        -12.124808516129669,
+        -2.1689595442685956
+       ],
+       "fem_k_per_w": [
+        -12.10131582404552,
+        -2.216315993853274
+       ],
+       "rel_err": 0.004291808852325999,
+       "rel_err_of_self_dc": 2.023121397533897e-05,
+       "fem_mesh_change": 1.2752923189070221e-05
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "victim@20um",
+       "analytic_k_per_w": [
+        0.011244285402318123,
+        0.020324535502436528
+       ],
+       "fem_k_per_w": [
+        0.014434174693680359,
+        0.01388130727097539
+       ],
+       "rel_err": 0.30952922707221603,
+       "rel_err_of_self_dc": 2.7515189262764822e-06,
+       "fem_mesh_change": 0.0017455608166220423
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "victim@50um",
+       "analytic_k_per_w": [
+        0.002414709421941606,
+        0.0016293062087481282
+       ],
+       "fem_k_per_w": [
+        9.548925596463373e-18,
+        3.52489901273183e-17
+       ],
+       "rel_err": 0.9999999999999905,
+       "rel_err_of_self_dc": 1.114819327594862e-06,
+       "fem_mesh_change": 1.3086515825719667
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "victim@100um",
+       "analytic_k_per_w": [
+        -0.0021221393948221215,
+        0.0013022000232248698
+       ],
+       "fem_k_per_w": [
+        -3.298840405299489e-22,
+        -9.300815522626611e-22
+       ],
+       "rel_err": 1.0,
+       "rel_err_of_self_dc": 9.528721372166206e-07,
+       "fem_mesh_change": 0.21762767437910108
+      },
+      {
+       "case": "robin_sub775",
+       "f_hz": 10000000.0,
+       "pair": "victim@300um",
+       "analytic_k_per_w": [
+        -0.0013201656641386342,
+        0.0019811510685800787
+       ],
+       "fem_k_per_w": [
+        -8.706272259938932e-29,
+        4.727183901839327e-29
+       ],
+       "rel_err": 1.0,
+       "rel_err_of_self_dc": 9.111165327329787e-07,
+       "fem_mesh_change": 0.9077797677938492
+      }
+     ]
+    }
+   }
+  },
+  "crosscheck_3d": {
+   "variant": {
+    "bottom_bc": "dirichlet",
+    "sub_um": 200.0
+   },
+   "pitch_um": 50.0,
+   "axisym_scale": 1.0,
+   "single_ring_no_leads": {
+    "levels": [
+     {
+      "h_ring_um": 0.5,
+      "info": {
+       "nodes": 10443,
+       "tets": 57642,
+       "h_ring_um": 0.5,
+       "mesh_seconds": 2.0,
+       "total_seconds": 13.7,
+       "rom_order": 30,
+       "rom_dc_rel_err": 1.5257321467715636e-14,
+       "leads": false,
+       "bus": false,
+       "margin_um": 400.0
+      },
+      "z_heater_ring": 2742.0773934717786,
+      "z_heater_heater": 6977.8818641710295,
+      "t63_heater_ring_s": 4.966790731655842e-06
+     },
+     {
+      "h_ring_um": 0.35,
+      "info": {
+       "nodes": 16780,
+       "tets": 94964,
+       "h_ring_um": 0.35,
+       "mesh_seconds": 3.8,
+       "total_seconds": 21.9,
+       "rom_order": 30,
+       "rom_dc_rel_err": 1.444960119629359e-14,
+       "leads": false,
+       "bus": false,
+       "margin_um": 400.0
+      },
+      "z_heater_ring": 2769.4720660023227,
+      "z_heater_heater": 7160.382940510072,
+      "t63_heater_ring_s": 4.931664058696707e-06
+     }
+    ],
+    "axisym_z_heater_ring": 2840.185851503214,
+    "axisym_z_heater_heater": 7529.399596828137,
+    "axisym_t63_heater_ring_s": 4.939935641387445e-06,
+    "rel_diff_z_heater_ring": -0.02489759093175714,
+    "rel_diff_z_heater_heater": -0.04901010386983817,
+    "rel_diff_t63": -0.0016744312661559624,
+    "mesh_change_last_level": 0.0099904811570104
+   },
+   "single_ring_with_leads": {
+    "info": {
+     "nodes": 20518,
+     "tets": 112116,
+     "h_ring_um": 0.4,
+     "mesh_seconds": 11.8,
+     "total_seconds": 42.9,
+     "rom_order": 30,
+     "rom_dc_rel_err": 1.0393498450374907e-13,
+     "leads": true,
+     "bus": true,
+     "margin_um": 400.0
+    },
+    "z_heater_ring": 2650.2452940868907,
+    "z_heater_heater": 6764.2229209656925,
+    "lead_effect_z_heater_ring": -0.04305036088973213,
+    "lead_effect_z_heater_heater": -0.055326652615615424
+   },
+   "bank": {
+    "n_rings": 8,
+    "driven": [
+     0,
+     3
+    ],
+    "info": {
+     "nodes": 110832,
+     "tets": 634996,
+     "h_ring_um": 0.4,
+     "mesh_seconds": 47.5,
+     "total_seconds": 473.4,
+     "rom_order": 60,
+     "rom_dc_rel_err": 1.1616346852002318e-09,
+     "leads": true,
+     "bus": true,
+     "margin_um": 400.0
+    },
+    "pairs": [
+     {
+      "driven": 0,
+      "victim": 1,
+      "d_um": 50.0,
+      "dc_3d_bank": 20.780206939529393,
+      "dc_axisym": 23.910994633919888,
+      "dc_rel_err": -0.13093506741660976,
+      "step_max_err_frac_of_dc": 0.1312839206619213,
+      "residue_l1_rel_err": 0.9520813066938523
+     },
+     {
+      "driven": 0,
+      "victim": 2,
+      "d_um": 100.0,
+      "dc_3d_bank": 8.09193883178394,
+      "dc_axisym": 9.38906822884686,
+      "dc_rel_err": -0.13815315486553126,
+      "step_max_err_frac_of_dc": 0.13888853863606415,
+      "residue_l1_rel_err": 0.5812621756330696
+     },
+     {
+      "driven": 0,
+      "victim": 3,
+      "d_um": 150.0,
+      "dc_3d_bank": 4.126185648674665,
+      "dc_axisym": 4.615796279367301,
+      "dc_rel_err": -0.10607284227018543,
+      "step_max_err_frac_of_dc": 0.10735942699838456,
+      "residue_l1_rel_err": 0.16495366414315224
+     },
+     {
+      "driven": 0,
+      "victim": 4,
+      "d_um": 200.0,
+      "dc_3d_bank": 2.3490018768411702,
+      "dc_axisym": 2.5434868057585365,
+      "dc_rel_err": -0.07646390320446961,
+      "step_max_err_frac_of_dc": 0.07854139117536964,
+      "residue_l1_rel_err": 0.20660862689260828
+     },
+     {
+      "driven": 0,
+      "victim": 5,
+      "d_um": 250.0,
+      "dc_3d_bank": 1.416555466412762,
+      "dc_axisym": 1.4966031937958844,
+      "dc_rel_err": -0.053486273258641526,
+      "step_max_err_frac_of_dc": 0.05675037382124759,
+      "residue_l1_rel_err": 0.13006678114771023
+     },
+     {
+      "driven": 0,
+      "victim": 6,
+      "d_um": 300.0,
+      "dc_3d_bank": 0.8830410845214165,
+      "dc_axisym": 0.91572963287762,
+      "dc_rel_err": -0.03569672442889271,
+      "step_max_err_frac_of_dc": 0.04075422005011019,
+      "residue_l1_rel_err": 0.22871567937368942
+     },
+     {
+      "driven": 0,
+      "victim": 7,
+      "d_um": 350.0,
+      "dc_3d_bank": 0.5604842878899549,
+      "dc_axisym": 0.5737491526696523,
+      "dc_rel_err": -0.02311962417369351,
+      "step_max_err_frac_of_dc": 0.030833498992518818,
+      "residue_l1_rel_err": 0.16958744447648785
+     },
+     {
+      "driven": 3,
+      "victim": 0,
+      "d_um": 150.0,
+      "dc_3d_bank": 4.125444020447639,
+      "dc_axisym": 4.615796279367301,
+      "dc_rel_err": -0.10623351405510384,
+      "step_max_err_frac_of_dc": 0.10751826893228102,
+      "residue_l1_rel_err": 0.16546217471945074
+     },
+     {
+      "driven": 3,
+      "victim": 1,
+      "d_um": 100.0,
+      "dc_3d_bank": 8.128321070174774,
+      "dc_axisym": 9.38906822884686,
+      "dc_rel_err": -0.134278197574343,
+      "step_max_err_frac_of_dc": 0.13486301278195537,
+      "residue_l1_rel_err": 0.6249246809102738
+     },
+     {
+      "driven": 3,
+      "victim": 2,
+      "d_um": 50.0,
+      "dc_3d_bank": 20.88245841646841,
+      "dc_axisym": 23.910994633919888,
+      "dc_rel_err": -0.12665873017073193,
+      "step_max_err_frac_of_dc": 0.12687630239375514,
+      "residue_l1_rel_err": 0.9879840400581121
+     },
+     {
+      "driven": 3,
+      "victim": 4,
+      "d_um": 50.0,
+      "dc_3d_bank": 20.90727689937454,
+      "dc_axisym": 23.910994633919888,
+      "dc_rel_err": -0.12562077740941413,
+      "step_max_err_frac_of_dc": 0.12582820990020505,
+      "residue_l1_rel_err": 0.9861448225376781
+     },
+     {
+      "driven": 3,
+      "victim": 5,
+      "d_um": 100.0,
+      "dc_3d_bank": 8.138756219534082,
+      "dc_axisym": 9.38906822884686,
+      "dc_rel_err": -0.13316678277737226,
+      "step_max_err_frac_of_dc": 0.13369796013651503,
+      "residue_l1_rel_err": 0.6243734617558495
+     },
+     {
+      "driven": 3,
+      "victim": 6,
+      "d_um": 150.0,
+      "dc_3d_bank": 4.141308864495653,
+      "dc_axisym": 4.615796279367301,
+      "dc_rel_err": -0.10279643774414737,
+      "step_max_err_frac_of_dc": 0.1039004864228863,
+      "residue_l1_rel_err": 0.15676660149302926
+     },
+     {
+      "driven": 3,
+      "victim": 7,
+      "d_um": 200.0,
+      "dc_3d_bank": 2.3463859175086124,
+      "dc_axisym": 2.5434868057585365,
+      "dc_rel_err": -0.07749239658082019,
+      "step_max_err_frac_of_dc": 0.07957314568304563,
+      "residue_l1_rel_err": 0.2088919359645181
+     }
+    ],
+    "self": [
+     {
+      "driven": 0,
+      "z_heater_ring_3d_bank": 2651.0915350571586,
+      "rel_to_axisym": -0.06657814887218538,
+      "rel_to_3d_single_with_leads": 0.0003193066589557425
+     },
+     {
+      "driven": 3,
+      "z_heater_ring_3d_bank": 2652.958095819047,
+      "rel_to_axisym": -0.06592095217468741,
+      "rel_to_3d_single_with_leads": 0.0010236040181672568
+     }
+    ],
+    "max_dc_rel_err_nearest": 0.13093506741660976,
+    "max_dc_rel_err_all": 0.13815315486553126,
+    "max_residue_l1_rel_err_nearest": 0.9879840400581121,
+    "max_residue_l1_rel_err_all": 0.9879840400581121,
+    "max_step_err_frac_all": 0.13888853863606415,
+    "target": "superposition error < 10 % on the crosstalk residues (07 P1-3)",
+    "pass_target": false,
+    "max_step_err_frac_nearest": 0.1312839206619213,
+    "metric": "max over t in [10 ns, 10 ms] of |y_bank(t) - y_ROM(t)| / y_ROM(inf) per crosstalk pair; the earlier residue_l1 numbers are kept for reference but are ill-posed (non-unique real-pole residues)"
+   },
+   "distance_interpolation": {
+    "50.0": {
+     "interp": 23.910994633919888,
+     "exact": 23.910994633919888,
+     "rel_err": 0.0
+    },
+    "100.0": {
+     "interp": 9.389068228846861,
+     "exact": 9.38906822884686,
+     "rel_err": 2.220446049250313e-16
+    },
+    "150.0": {
+     "interp": 4.615796279367301,
+     "exact": 4.615796279367301,
+     "rel_err": 0.0
+    },
+    "200.0": {
+     "interp": 2.5434868057585365,
+     "exact": 2.5434868057585365,
+     "rel_err": 0.0
+    },
+    "250.0": {
+     "interp": 1.4966031937958844,
+     "exact": 1.4966031937958844,
+     "rel_err": 0.0
+    },
+    "300.0": {
+     "interp": 0.91572963287762,
+     "exact": 0.91572963287762,
+     "rel_err": 0.0
+    },
+    "350.0": {
+     "interp": 0.5592288372118317,
+     "exact": 0.5737491526696523,
+     "rel_err": -0.02530777673528173
+    }
+   },
+   "silicide_arcs": {
+    "arcs_deg": [
+     [
+      0.0,
+      140.0
+     ],
+     [
+      180.0,
+      140.0
+     ]
+    ],
+    "coverage": 0.7777777777777778,
+    "z_heater_ring_full_3d": 7543.682287323772,
+    "z_heater_ring_arcs_3d": 7621.178134282763,
+    "z_heater_ring_axisym": 8110.604094672351,
+    "arcs_vs_full_rel": 0.010272946819249507,
+    "full3d_vs_axisym_rel": -0.06989883869698132,
+    "t63_full_3d_s": 2.0149125436606932e-05,
+    "t63_arcs_3d_s": 2.0303947113975116e-05,
+    "t63_axisym_s": 2.148399714202867e-05,
+    "z_heater_heater_arcs_vs_full_rel": 0.07795263301294897,
+    "info_full": {
+     "nodes": 17727,
+     "tets": 100546,
+     "h_ring_um": 0.35,
+     "mesh_seconds": 3.9,
+     "total_seconds": 31.7,
+     "rom_order": 30,
+     "rom_dc_rel_err": 8.801154489365121e-15,
+     "leads": false,
+     "bus": false,
+     "margin_um": 400.0
+    },
+    "info_arcs": {
+     "nodes": 17576,
+     "tets": 99558,
+     "h_ring_um": 0.35,
+     "mesh_seconds": 5.1,
+     "total_seconds": 33.1,
+     "rom_order": 30,
+     "rom_dc_rel_err": 7.43474551074588e-14,
+     "leads": false,
+     "bus": false,
+     "margin_um": 400.0
+    },
+    "note": "the ring observer is the full-ring mode-weighted average; arcs leave the coupler regions free"
+   }
   }
  },
- "updated_utc": "2026-10-09T10:24:24Z",
  "k_temp_scaling": {
   "t_k": [
    300.0,
@@ -2507,5 +4068,29 @@
    ]
   },
   "note": "07 P2-5 quasi-static scaling: multiply residues by dc_ratio(T) and taus by tau_ratio(T) (T = mean temperature of the conduction path, K); k(T), rho c(T) from mrm.materials"
- }
+ },
+ "previous_sha256": "ea97bd2e9e1268d861bb05f8949c981e10bfe4d343be0b9cb8130697dd6bbf9a",
+ "site_offsets_um": {
+  "monitor_pd": [
+   0.0,
+   25.0
+  ],
+  "temp_sensor": [
+   40.0,
+   0.0
+  ],
+  "driver": [
+   0.0,
+   -30.0
+  ],
+  "aggressor": [
+   60.0,
+   0.0
+  ]
+ },
+ "schema": "thermal_rom/1",
+ "file": "thermal_rom_inring_noundercut_160.npz",
+ "sha256": "e421874206efb9eb4a2298a6b17273e287fc34f52c8ce231e8947e2a59009bd2",
+ "created_utc": "2026-10-09T12:52:27Z",
+ "updated_utc": "2026-10-09T15:10:31Z"
 }

@@ -190,7 +190,7 @@ def test_convergence_error_estimates(art):
     for k in ("dneff_1v6", "alpha_fca_0v_per_m", "n_eff"):
         e = mm[k]
         assert abs(e["error_estimate"] / e["extrapolated"]) < 0.01, k
-    assert side["convergence"]["bias_grid"]["max_rel_error"] < 0.005
+    assert side["convergence"]["bias_grid"]["max_abs_error_rel_to_dneff_1v6"] < 1e-3
 
 
 # ---------------------------------------------------------------------------------------------- reports

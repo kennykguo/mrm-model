@@ -1,0 +1,687 @@
+{
+ "schema": "modes/1",
+ "xsec": {
+  "name": "rib200",
+  "width_nm": 400.0,
+  "film_nm": 200.0,
+  "slab_nm": 80.0,
+  "sidewall_deg": 90.0,
+  "clad": {
+   "top": "SiO2 (beol)",
+   "box": "SiO2 (thermal), 2.0 um",
+   "below_box": "sio2"
+  },
+  "width_definition": "mid-height of the etched sidewall",
+  "lam0_nm": 1310.0,
+  "provenance": {
+   "film_nm": "printed (SMTAI render, conflicts with GF 160 nm; 07 D21)",
+   "width_nm": "printed (SMTAI render)",
+   "slab_nm": "assumed",
+   "sidewall_deg": "assumed",
+   "box_um": "printed (GF-IMAPS)",
+   "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
+  },
+  "ranges_nm": {
+   "width_nm": [
+    360.0,
+    450.0
+   ],
+   "film_nm": [
+    190.0,
+    210.0
+   ],
+   "slab_nm": [
+    50.0,
+    120.0
+   ]
+  }
+ },
+ "r_ref_um": 6.607632197861393,
+ "lambda0_nm": 1310.0,
+ "t_ref_c": 25.0,
+ "n_eff": 2.629681355475205,
+ "n_eff_poly_lambda": [
+  2.629681189783578,
+  -0.0010548925462165232,
+  2.715070279444137e-07
+ ],
+ "n_eff_poly_note": "n_eff_bent(lambda) = c0 + c1*(lam-lam0) + c2*(lam-lam0)^2, lam in nm, at t_ref_c, referenced to r_ref_um",
+ "n_g": 4.011644876624741,
+ "n_g_from_poly": 4.011590425327223,
+ "dn_g_dlambda_per_nm": -0.0007098568711297659,
+ "dn_g_dlambda_from_poly_per_nm": -0.000711348413214364,
+ "fsr_thz": 1.799999949322256,
+ "fsr_nm": 10.3037278977576,
+ "n_eff_t": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   2.6248202210048115,
+   2.629681355475205,
+   2.63472586232831,
+   2.639942229525921,
+   2.646412537753988,
+   2.650844569928692
+  ]
+ },
+ "n_g_t": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   4.003720495170876,
+   4.0116447521169425,
+   4.019784630328593,
+   4.028124234857944,
+   4.038373247054622,
+   4.04533982521658
+  ]
+ },
+ "dneff_dt_per_k": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   0.0001906235542912249,
+   0.0001981888458425729,
+   0.00020529341841220018,
+   0.00021193776866885728,
+   0.0002193043813416118,
+   0.00022384841690525903
+  ]
+ },
+ "n_eff_table": {
+  "lambda_nm": [
+   1260.0,
+   1285.0,
+   1310.0,
+   1335.0,
+   1360.0
+  ],
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "n_eff": [
+   [
+    2.678125487447297,
+    2.6831039239411276,
+    2.6882668274028205,
+    2.6936025322495865,
+    2.7002170793500726,
+    2.7047457832638773
+   ],
+   [
+    2.6513041045000194,
+    2.6562237583340558,
+    2.661327365459656,
+    2.66660333365797,
+    2.673145715058023,
+    2.677626070879813
+   ],
+   [
+    2.6248202210048115,
+    2.629681355475205,
+    2.63472586232831,
+    2.6399422295259214,
+    2.646412537753988,
+    2.6508445699286916
+   ],
+   [
+    2.5986751207430956,
+    2.6034777971003042,
+    2.6084631949812978,
+    2.6136198895042346,
+    2.620017965147348,
+    2.6244015283719917
+   ],
+   [
+    2.572872230012007,
+    2.5776163223291775,
+    2.58254241268336,
+    2.587639170474019,
+    2.5939646201308193,
+    2.5982994113330196
+   ]
+  ],
+  "note": "bent TE0 n_eff(lambda, T) at r_ref (rows: lambda_nm, columns: t_c)"
+ },
+ "alpha_l_per_k": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   2.3268382146054043e-06,
+   2.5525622767533294e-06,
+   2.7493246126968167e-06,
+   2.9210844648324308e-06,
+   3.0989718930115424e-06,
+   3.2028014183103896e-06
+  ],
+  "model": "Si, Okada & Tokumaru 1984, substrate-clamped (mrm.materials.alpha_l_si_per_k)"
+ },
+ "dlambda_dt_pm_per_k": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   64.36955910084986,
+   66.91037765062113,
+   69.2633244192347,
+   71.43288479379237,
+   73.80007701094878,
+   75.23805365099373
+  ],
+  "formula": "(lam/n_g)*(dneff/dT + n_eff*alpha_L) at lambda0 (a locked ring's resonance sits at its line)"
+ },
+ "dlambda_dt_thermo_optic_only_pm_per_k": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   62.371201092259774,
+   64.71843946719491,
+   66.9026833156478,
+   68.92500349259815,
+   71.13971938256198,
+   72.48870028618418
+  ]
+ },
+ "dlambda_dt_beta_per_k": {
+  "t0_c": [
+   25.0,
+   105.0
+  ],
+  "value": [
+   0.001461832814677907,
+   0.0010104005304768988
+  ],
+  "fit": "quadratic in T over the table"
+ },
+ "dlambda_dt_material_sigma_pm_per_k": {
+  "t_c": [
+   0.0,
+   25.0,
+   50.0,
+   75.0,
+   105.0,
+   125.0
+  ],
+  "value": [
+   2.328624905450426,
+   2.324025140710026,
+   2.6261318805634244,
+   2.9513402127651487,
+   3.339617407816603,
+   3.597256743903248
+  ],
+  "note": "(lam/n_g) * dn_eff/dn_Si * sigma(dn_Si/dT); geometry uncertainty enters via the Jacobian"
+ },
+ "index_weights": {
+  "si": 1.016702645530776,
+  "box": 0.06794286736377941,
+  "clad": 0.11000199693000923
+ },
+ "index_weight_check": {
+  "sum_ng_i_w_i": 4.011644715119887,
+  "n_g": 4.011644876624692,
+  "residual": -1.615048050851442e-07,
+  "perturbation": {
+   "si": 1.0167026982980367,
+   "box": 0.06794285398255658,
+   "clad": 0.11000198762937456
+  },
+  "n_g_material": {
+   "si": 3.689544327364221,
+   "box": 1.4620613711111488,
+   "clad": 1.4648697238926818
+  }
+ },
+ "power_fraction": {
+  "si": 0.7749003585554326,
+  "si_rib": 0.7272066809193681,
+  "si_slab": 0.04769367763606447,
+  "box": 0.11152675817363716,
+  "clad": 0.1135728832709304
+ },
+ "energy_fraction": {
+  "si": 0.9325345831477874,
+  "box": 0.025728764344211754,
+  "clad": 0.041736652508001085
+ },
+ "mode_area_um2": 0.1084084387090361,
+ "te_fraction": 0.9841409135865816,
+ "power_centroid_x_um": 0.022676661396065226,
+ "straight": {
+  "n_eff": 2.625785198801628,
+  "n_g": 4.014554791910379,
+  "dneff_dt_per_k": 0.00019862344052228308,
+  "power_fraction": {
+   "si": 0.7795847929574601,
+   "si_rib": 0.7362386775816139,
+   "si_slab": 0.04334611537584625,
+   "box": 0.1094447294765665,
+   "clad": 0.11097047756597356
+  },
+  "energy_fraction": {
+   "si": 0.9341605988920698,
+   "box": 0.025015316893720007,
+   "clad": 0.04082408421421023
+  },
+  "mode_area_um2": 0.10646044273932721,
+  "te_fraction": 0.9846466503178231,
+  "power_centroid_x_um": 1.2346772466940879e-06,
+  "index_weights": {
+   "fd": {
+    "si": 1.0191474071030715,
+    "box": 0.06610242522020471,
+    "clad": 0.10766780314885871
+   },
+   "perturbation": {
+    "si": 1.0191474556154734,
+    "box": 0.06610241324488246,
+    "clad": 0.10766779517229184
+   },
+   "n_g_material": {
+    "si": 3.689544327364221,
+    "box": 1.4620613711111488,
+    "clad": 1.4648697238926818
+   },
+   "sum_ng_i_w_i": 4.014554642147117,
+   "n_g": 4.014554791910379,
+   "identity_residual": -1.4976326134785722e-07,
+   "n_g_fd_error": 1.097964275054153e-08,
+   "sum_n_i_w_i": 3.824250684886336,
+   "fd_step": 0.001
+  }
+ },
+ "materials_at_ref": {
+  "n": {
+   "si": 3.5053459852983964,
+   "box": 1.447221691288467,
+   "clad": 1.45003004407,
+   "air": 1.0
+  },
+  "n_g": {
+   "si": 3.689544327364221,
+   "box": 1.4620613711111488,
+   "clad": 1.4648697238926818,
+   "air": 1.0
+  },
+  "dn_dt": {
+   "si": 0.00019332792705156274,
+   "box": 8.5256e-06,
+   "clad": 9.5756e-06,
+   "air": 0.0
+  }
+ },
+ "si_level_alternative": {
+  "n_eff_li_level": 2.625529433082597,
+  "delta_n_eff": -0.004151922392607865,
+  "delta_lambda_res_nm": -1.355807530723533
+ },
+ "discretization_error": {
+  "n_eff_bent": 1.375560319916147e-05,
+  "n_g_bent": 4.559104461954178e-06,
+  "dneff_dt_bent": 1.1060350489210807e-09,
+  "w_si_pert": 6.702335236363766e-06
+ },
+ "alpha_rad_db_per_cm": 1.0277698732867064,
+ "alpha_rad": {
+  "fem_pml": [
+   {
+    "pml_um": 1.0,
+    "strength": 2.0,
+    "extra_window_um": 0.0,
+    "n_eff_re": 2.629682511544255,
+    "n_eff_im": -2.467021892849475e-06,
+    "alpha_db_per_cm": 1.0277698732867064,
+    "x_max_um": 3.602713532057032
+   },
+   {
+    "pml_um": 1.0,
+    "strength": 4.0,
+    "extra_window_um": 0.0,
+    "n_eff_re": 2.6296825121933307,
+    "n_eff_im": -2.4676216821425544e-06,
+    "alpha_db_per_cm": 1.0280197475855661,
+    "x_max_um": 3.602713532057032
+   },
+   {
+    "pml_um": 1.5,
+    "strength": 2.0,
+    "extra_window_um": 0.0,
+    "n_eff_re": 2.629682103392776,
+    "n_eff_im": -2.467640528906407e-06,
+    "alpha_db_per_cm": 1.0280275992127255,
+    "x_max_um": 4.102713532057032
+   },
+   {
+    "pml_um": 1.0,
+    "strength": 2.0,
+    "extra_window_um": 1.0,
+    "n_eff_re": 2.6296805594633152,
+    "n_eff_im": -2.467418801067385e-06,
+    "alpha_db_per_cm": 1.027935226626298,
+    "x_max_um": 4.602713532057032
+   },
+   {
+    "pml_um": 2.0,
+    "strength": 3.0,
+    "extra_window_um": 1.0,
+    "n_eff_re": 2.6296819631807855,
+    "n_eff_im": -2.467643930114536e-06,
+    "alpha_db_per_cm": 1.0280290161678234,
+    "x_max_um": 5.602713532057032
+   }
+  ],
+  "alpha_rad_db_per_cm": 1.0277698732867064,
+  "alpha_rad_upper_bound_db_per_cm": null,
+  "alpha_rad_spread_db_per_cm": 0.00025914288111694717,
+  "alpha_rad_rel_spread": 0.00025214095864498716,
+  "second_method": "Tidy3D's local mode solver with bend_radius and PML returned only PML modes for this geometry (graded and uniform grids, 12-60 PML cells; tested), so the FEM-PML is validated instead against the exact complex-frequency (Hankel) solution of a 2-D ring in modes_study_bend.json (Q_rad within 0.2 % for Q_rad > 2e4).",
+  "q_rad": 813054.1703444688
+ },
+ "crosscheck": {
+  "rows": [
+   {
+    "dl_nm": 10.0,
+    "n_eff_straight": 2.634531845670968,
+    "n_eff_bent_mean": 2.6383546878781683,
+    "n_eff_bent_plusR": 2.637089994230908,
+    "n_eff_bent_minusR": 2.6396193815254287,
+    "cells": [
+     122,
+     93
+    ],
+    "seconds": 4.6
+   },
+   {
+    "dl_nm": 5.0,
+    "n_eff_straight": 2.6300123190703757,
+    "n_eff_bent_mean": 2.633876457572185,
+    "n_eff_bent_plusR": 2.6332280307192852,
+    "n_eff_bent_minusR": 2.6345248844250846,
+    "cells": [
+     200,
+     150
+    ],
+    "seconds": 4.3
+   },
+   {
+    "dl_nm": 2.5,
+    "n_eff_straight": 2.627768982250801,
+    "n_eff_bent_mean": 2.631645855359786,
+    "n_eff_bent_plusR": 2.6313045594986457,
+    "n_eff_bent_minusR": 2.631987151220926,
+    "cells": [
+     346,
+     257
+    ],
+    "seconds": 19.4
+   }
+  ],
+  "straight_extrapolated": {
+   "h": [
+    2.5,
+    5.0,
+    10.0
+   ],
+   "f": [
+    2.627768982250801,
+    2.6300123190703757,
+    2.634531845670968
+   ],
+   "f0": 2.625558024215566,
+   "p": 1.0105254188272408,
+   "err": 0.0022109580352349667,
+   "monotone": true
+  },
+  "bent_extrapolated": {
+   "h": [
+    2.5,
+    5.0,
+    10.0
+   ],
+   "f": [
+    2.631645855359786,
+    2.633876457572185,
+    2.6383546878781683
+   ],
+   "f0": 2.629432150056777,
+   "p": 1.005495466949097,
+   "err": 0.002213705303008684,
+   "monotone": true
+  },
+  "tidy3d_bend_shift": [
+   0.0038228422072004165,
+   0.0038641385018092222,
+   0.0038768731089851016
+  ],
+  "femwell_exact_bend_shift": 0.0038961566735769004,
+  "femwell_isotropic_bend_shift": 0.007885333264775696,
+  "tidy3d_n_eff": 2.629432150056777,
+  "femwell_n_eff": 2.629681355475205,
+  "delta": 0.000249205418427767,
+  "delta_finest": -0.001964499884580917,
+  "same_r_ref": true,
+  "r_ref_um": 6.607632197861393
+ },
+ "jacobian": {
+  "d": [
+   "width_nm",
+   "film_nm",
+   "slab_nm"
+  ],
+  "of": {
+   "n_eff_per_nm": [
+    0.0011279213378460272,
+    0.0027968157466544685,
+    0.002409361818917177
+   ],
+   "lambda_res_nm_per_nm": [
+    0.3683219721635674,
+    0.913298345390924,
+    0.7867755197307178
+   ],
+   "n_g_per_nm": [
+    0.00010949666968729233,
+    0.00270194094030769,
+    -0.0012367009243981375
+   ],
+   "dlambda_dt_pm_per_k_per_nm": [
+    0.013249737908778059,
+    0.024555075066903954,
+    -0.04124440840564532
+   ],
+   "alpha_rad_db_per_cm_per_nm": [
+    -0.04227636048634913,
+    -0.11638237988363746,
+    0.9636061134007929
+   ]
+  },
+  "evaluations": {
+   "width_nm": {
+    "step_nm": 10.0,
+    "plus": {
+     "n_eff": 2.6406995514592833,
+     "n_g": 4.012315242558397,
+     "dlambda_dt": 67.03778946456647,
+     "alpha_rad": 0.6958947165870842
+    },
+    "minus": {
+     "n_eff": 2.6181411247023627,
+     "n_g": 4.010125309164652,
+     "dlambda_dt": 66.77279470639091,
+     "alpha_rad": 1.5414219263140667
+    }
+   },
+   "film_nm": {
+    "step_nm": 5.0,
+    "plus": {
+     "n_eff": 2.643416682380284,
+     "n_g": 4.024508068535175,
+     "dlambda_dt": 67.02885130391921,
+     "alpha_rad": 0.603215739051513
+    },
+    "minus": {
+     "n_eff": 2.6154485249137394,
+     "n_g": 3.997488659132098,
+     "dlambda_dt": 66.78330055325017,
+     "alpha_rad": 1.7670395378878876
+    }
+   },
+   "slab_nm": {
+    "step_nm": 10.0,
+    "plus": {
+     "n_eff": 2.6549486748907523,
+     "n_g": 4.025466858082711,
+     "dlambda_dt": 65.9103841647149,
+     "alpha_rad": 19.295595110996906
+    },
+    "minus": {
+     "n_eff": 2.6067614385124087,
+     "n_g": 4.050200876570674,
+     "dlambda_dt": 66.7352723328278,
+     "alpha_rad": 0.023472842981045166
+    }
+   }
+  },
+  "note": "central differences at fixed r_ref and fixed order; lambda_res_nm_per_nm = (lambda0/n_g) dn_eff/dp; evaluated at T_ref; alpha_rad from the FEM PML (first configuration)"
+ },
+ "slab_sweep": {
+  "r_um": 6.607632197861393,
+  "rows": [
+   {
+    "slab_nm": 40.0,
+    "n_eff": 2.547378689805462,
+    "n_g": 4.177178144282843,
+    "alpha_rad_db_per_cm": null
+   },
+   {
+    "slab_nm": 50.0,
+    "n_eff": 2.5655110091233664,
+    "n_g": 4.1334465003357375,
+    "alpha_rad_db_per_cm": 7.76898537501278e-07
+   },
+   {
+    "slab_nm": 60.0,
+    "n_eff": 2.5853533801564654,
+    "n_g": 4.09090414461374,
+    "alpha_rad_db_per_cm": 0.00021316413774724426
+   },
+   {
+    "slab_nm": 80.0,
+    "n_eff": 2.629681355475205,
+    "n_g": 4.0116447521169425,
+    "alpha_rad_db_per_cm": 1.0277698733112586
+   },
+   {
+    "slab_nm": 100.0,
+    "n_eff": 2.680418142622131,
+    "n_g": 3.9434778983921426,
+    "alpha_rad_db_per_cm": 172.32490223510814
+   }
+  ]
+ },
+ "mode_families": {
+  "slab_te0_n_eff": 2.1659767766910467,
+  "slab_tm0_n_eff": 1.4968518458411857,
+  "cladding_index": 1.45003004407,
+  "TM0": {
+   "straight": {
+    "n_eff": 1.9150180583793999,
+    "n_g": 3.9592802647610386,
+    "te_fraction": 0.3686017260257563,
+    "core_power_fraction": 0.3315783388542092
+   },
+   "bent": {
+    "found": false,
+    "note": "mode TM0 not found among [(2.09538, -0.0, 0.794, 0.219), (1.9602, 0.0, 0.003, 0.0), (1.95347, 0.0, 0.563, 0.222), (1.90809, -0.0, 0.619, 0.203), (1.82635, 0.0, 0.002, 0.0), (1.79675, -0.0, 0.824, 0.114), (1.74251, 0.0, 1.0, 0.0), (1.73775, 0.0, 1.0, 0.0), (1.73593, -0.0, 0.008, 0.001), (1.7273, 0.0,"
+   },
+   "guided_straight": false,
+   "guided_bent": false,
+   "criterion": "straight: n_eff above the lateral radiation channel (TE slab mode of a rib, cladding of a strip); bent: FEM-PML radiation loss < 100 dB/cm (about the intrinsic loss of the doped ring). A family that is not guided cannot form a resonance dip of useful Q."
+  },
+  "TE1": {
+   "straight": {
+    "n_eff": 2.1726148865384123,
+    "n_g": 3.3744351281966383,
+    "te_fraction": 0.9250429839321799,
+    "core_power_fraction": 0.14142909937818568
+   },
+   "bent": {
+    "n_eff": 2.2157045268484357,
+    "n_g": 4.03799537344495,
+    "te_fraction": 0.9699393655551616,
+    "core_power_fraction": 0.08049114296980783,
+    "alpha_rad_db_per_cm": 7536.067608663218,
+    "pml": [
+     {
+      "pml_um": 1.0,
+      "strength": 2.0,
+      "extra_window_um": 0.0,
+      "n_eff_re": 2.2184118785945923,
+      "n_eff_im": -0.018089306039990947,
+      "alpha_db_per_cm": 7536.067608663218,
+      "x_max_um": 3.602713532057032
+     }
+    ]
+   },
+   "guided_straight": true,
+   "guided_bent": false,
+   "criterion": "straight: n_eff above the lateral radiation channel (TE slab mode of a rib, cladding of a strip); bent: FEM-PML radiation loss < 100 dB/cm (about the intrinsic loss of the doped ring). A family that is not guided cannot form a resonance dip of useful Q."
+  }
+ },
+ "alt_radius": {
+  "r_um": 7.5,
+  "n_eff": 2.6287867028731546,
+  "n_g": 4.012482786498019,
+  "dneff_dt_per_k": 0.00019829965267526006,
+  "dlambda_dt_pm_per_k": 66.93183373367161,
+  "fsr_thz": 1.5855005202904935,
+  "fsr_nm": 9.075870223761651,
+  "n_eff_isotropic": 2.6318675843028303,
+  "alpha_rad_db_per_cm": 0.19177310636792774
+ },
+ "solver": {
+  "primary": "FEM, exact bend transform (mrm.extraction.common.FemProblem; femwell mesh and formulation, scikit-fem)",
+  "nsolves": 263,
+  "solve_seconds": 1561.2
+ }
+}

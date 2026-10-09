@@ -510,6 +510,7 @@ def run_devsim(*args, **kw):
 
 _DEVSIM_STAGE = ["start"]
 DC_REL_TOL = 1e-8     # Newton relative update; 1e-10 hits a round-off floor (~1.1e-10) in deeply depleted nodes
+DC_REL_TOL_FALLBACK = 1e-6
 
 
 def _run_devsim(xs: XSec, d: Doping, v_rev, *, scale=1.0, t_k=T_REF_K, oxide=True, ox_extent_um=OX_EXTENT_UM,
@@ -602,7 +603,11 @@ def _run_devsim(xs: XSec, d: Doping, v_rev, *, scale=1.0, t_k=T_REF_K, oxide=Tru
         def dc(v_anode):
             _DEVSIM_STAGE[0] = f"dc {-v_anode:+.4f} V reverse"
             ds.circuit_alter(name="V1", value=voff + v_anode)
-            ds.solve(type="dc", absolute_error=1e10, relative_error=DC_REL_TOL, maximum_iterations=40)
+            try:
+                ds.solve(type="dc", absolute_error=1e10, relative_error=DC_REL_TOL, maximum_iterations=40)
+            except Exception:
+                # coarse meshes at high doping stall above 1e-8 (round-off in depleted nodes); accept 1e-6 there
+                ds.solve(type="dc", absolute_error=1e10, relative_error=DC_REL_TOL_FALLBACK, maximum_iterations=80)
 
         dc(0.0)
         vol_um2 = np.array(ds.get_node_model_values(device=dev, region=reg, name="NodeVolume")) * 1e8
@@ -1078,7 +1083,10 @@ def overlap(dv, w_nodes, model="nsm2011"):
 def direct_resolve_dneff(xs, d, dv, v_list, mode_res_um, radius_um, model="nsm2011"):
     """Direct femwell re-solve with the carrier-perturbed complex permittivity of the Si elements (element averages
     of the DEVSIM fields from a 7x7 sub-sampling of each triangle). Returns dn_eff(V) - dn_eff(0) and alpha (1/m)."""
+    import gc
+
     import matplotlib.tri as mtri
+    mode_res_um = max(mode_res_um, 0.0141)    # memory: the 10 nm mode mesh plus the carrier fields exceed 2.7 GB
     m = _mode_mesh(xs, d, mode_res_um)
     from skfem import Basis, ElementTriP0
     b0 = Basis(m, ElementTriP0())
@@ -1116,6 +1124,8 @@ def direct_resolve_dneff(xs, d, dv, v_list, mode_res_um, radius_um, model="nsm20
         mr = solve_te0(xs, d, radius_um=radius_um, mesh=m, eps_si_override=eps_c)
         out_dn.append(mr.n_eff.real - base.real)
         out_a.append(2 * k0 * abs(mr.n_eff.imag))
+        del mr
+        gc.collect()
     return np.array(out_dn), np.array(out_a), int(m.nelements), float(base.real)
 
 
@@ -1436,10 +1446,11 @@ def _summ(rr, n_g, r_contact):
 
 AC_V = np.array([-0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
 QUICK = {"scale": 2.8284, "ladder": [4.0, 3.3636, 2.8284], "study": 4.0}   # --quick (tests)
-# Production DEVSIM scales (1 = 1 nm at the junction). Peak memory is about 50 kB per mesh node (measured), so the
-# L-shape (fine in x and y) runs one level coarser than the lateral junction; both keep a three-level ladder
+# Production DEVSIM scales (1 = 1 nm at the junction). Peak memory is about 50 kB per mesh node for the lateral
+# junction and about 90 kB per node for the L-shape (measured: 2.86 GB at 31k nodes), so the L-shape (fine in x and
+# y) runs two levels coarser than the lateral junction; both keep a three-level ladder
 # ending at the production mesh, and run side studies (Jacobian, oxide extent, temperature) at ``study``.
-PROD = {"lshape": {"scale": 1.4142, "ladder": [2.8284, 2.0, 1.4142], "study": 2.0},
+PROD = {"lshape": {"scale": 2.0, "ladder": [2.8284, 2.3784, 2.0], "study": 2.8284},
         "lateral": {"scale": 1.0, "ladder": [2.0, 1.4142, 1.0], "study": 1.4142}}
 V_SUBSET = np.array([-0.5, 0.0, 1.0, 1.6, 2.0, 4.0])
 
@@ -1537,9 +1548,9 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
     log(f"  {dv['nodes_si']} Si nodes, {dv['seconds']} s")
     v_acp = AC_V if not quick else np.array([-0.5, 0.0, 1.0, 2.0, 4.0])
     log(f"[{xs_name}] DEVSIM small-signal AC at {v_acp.tolist()} V (20 GHz)")
-    # two isolated AC jobs (DEVSIM keeps each AC matrix allocated); 0 V is in both so dn_eff has the same reference
+    # several isolated AC jobs (DEVSIM keeps each AC matrix allocated); 0 V is in all so dn_eff has one reference
     parts = [_devsim_and_overlap(xs, d, np.union1d(chunk, [0.0]), wf, scale, ac=True, ac_v=chunk)
-             for chunk in np.array_split(v_acp, 2)]
+             for chunk in np.array_split(v_acp, 4 if not quick else 2)]
     ra = {k: np.concatenate([q[k] for q in parts]) for k in ("v", "dneff", "v_ac", "c_ac", "r_ac")}
     dne_straight, alpha_straight = overlap(dv, wfs.weight_at(dv["x_um"], dv["y_um"]))
     ne, nh = r["ne_per_m"], r["nh_per_m"]
@@ -1567,18 +1578,26 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
     vc = V_SUBSET
     scales = cfg["ladder"]
     log(f"[{xs_name}] DEVSIM mesh convergence (scales {scales})")
-    sc_rows = []
+    sc_rows, sc_ok, sc_failed = [], [], []
     for sc in scales:
-        rr = _devsim_and_overlap(xs, d, vc, wf, sc)
+        try:
+            rr = _devsim_and_overlap(xs, d, vc, wf, sc)
+        except Exception as exc:          # a coarse level may not converge at high doping; record it
+            sc_failed.append({"scale": sc, "error": str(exc)[:200]})
+            log(f"  scale {sc}: FAILED ({str(exc)[:80]})")
+            continue
         sn = _summ(rr, n_g, r_contact)
         sn["nodes_si"] = rr["nodes_si"]
         sc_rows.append(sn)
+        sc_ok.append(sc)
         log(f"  scale {sc}: {sn['nodes_si']} Si nodes, dneff(1.6) {sn['dneff_1v6']:.7e}, C(1) "
             f"{sn['c_1v_f_per_m']:.6e}, alpha(0) {sn['alpha_fca_0v_per_m']:.5f}, r(1) {sn['r_series_1v_ohm_m']:.6e}")
+    scales = sc_ok
     ckeys = ("dneff_1v6", "dneff_1v", "dneff_4v", "dneff_fwd0v5", "alpha_fca_0v_per_m", "alpha_fca_2v_per_m",
              "c_1v_f_per_m", "c_2v_f_per_m", "r_series_1v_ohm_m")
     conv["devsim_mesh"] = {"scales": scales, "h_junction_nm": [1.0 * x for x in scales],
                            "nodes_si": [x["nodes_si"] for x in sc_rows], "production_scale": scale,
+                           "failed_levels": sc_failed,
                            **{k: richardson([x[k] for x in sc_rows], scales, order=2) for k in ckeys}}
     if not quick and not light:
         log(f"[{xs_name}] oxide-extent convergence and fringe fraction")
@@ -1628,7 +1647,11 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
         solved = np.interp(vm, rr["v"], rr["dneff"])
         lin = np.interp(vm, v, r["dneff"])
         conv["bias_grid"] = {"v_mid": _fl(vm), "dneff_solved": _fl(solved), "dneff_linear_interp": _fl(lin),
-                             "max_rel_error": _f(np.max(np.abs(lin - solved) / np.abs(solved)), 4)}
+                             "max_rel_error": _f(np.max(np.abs(lin - solved) / np.abs(solved)), 4),
+                             "max_abs_error_rel_to_dneff_1v6": _f(np.max(np.abs(lin - solved))
+                                                                  / abs(_pick(v, r["dneff"], 1.6)), 4),
+                             "note": "linear interpolation of the 0.05 V table at mid-points; the relative error "
+                                     "is largest just above 0 V where dn_eff itself is small"}
         log(f"  bias-grid interpolation error {conv['bias_grid']['max_rel_error']}")
         rr = _devsim_and_overlap(xs, d, np.array([0.0, 1.0]), wf, study, f_hi_hz=5e10)
         rr2 = _devsim_and_overlap(xs, d, np.array([0.0, 1.0]), wf, study, f_hi_hz=2e10, two_freq=True)
@@ -2080,6 +2103,48 @@ def doping_sweep(xs_name="rib160", topology=DEFAULT_TOPOLOGY, levels=(5e17, 1e18
                     "at Q_i = 7000; DEVSIM scale %.4g, mode res %.4g um" % (scale, mode_res)}
 
 
+def recheck_modes(out_dir=OUT_DIR, log=print):
+    """Post-processing (no solver): compare every junction artefact with the modes artefact of its cross-section
+    (r_ref, n_eff, n_g, Si index weight) and store the comparison in the junction sidecar (the data file and its
+    sha256 are unchanged)."""
+    out_dir = pathlib.Path(out_dir)
+    for p in sorted(out_dir.glob("junction_*.json")):
+        if p.name.endswith(".sidecar.json"):
+            continue
+        sc = p.with_name(p.stem + ".sidecar.json")
+        art = json.loads(p.read_text())
+        side = json.loads(sc.read_text())
+        xs_name = art["xsec"]["name"]
+        mp_ = out_dir / f"modes_{xs_name}.json"
+        ms_ = out_dir / f"modes_{xs_name}.sidecar.json"
+        if not (mp_.exists() and ms_.exists()):
+            log(f"{p.name}: no modes artefact for {xs_name}")
+            continue
+        ma, msd = json.loads(mp_.read_text()), json.loads(ms_.read_text())
+        if msd.get("sha256") != _sha256(mp_):
+            log(f"{p.name}: modes_{xs_name}.json fails its sha256; skipped")
+            continue
+        ov = art["overlap"]
+        comp = {"modes_sha256": msd["sha256"], "modes_r_ref_um": ma.get("r_ref_um"), "junction_r_ref_um": ov["r_ref_um"],
+                "modes_n_eff": ma.get("n_eff"), "junction_n_eff_bent": ov["n_eff_bent"],
+                "modes_n_g": ma.get("n_g"), "junction_n_g_bent": ov["n_g_bent"],
+                "modes_index_weight_si": (ma.get("index_weights") or {}).get("si"),
+                "junction_index_weight_si": ov["dneff_dnsi_bent"],
+                "note": "modes: exact anisotropic bend transform on its own mesh; junction: femwell isotropic conformal "
+                        "map; same geometry and materials (post-processed by recheck_modes, no solver re-run)"}
+        try:
+            comp["rel_diff_n_g"] = ov["n_g_bent"] / ma["n_g"] - 1
+            comp["rel_diff_index_weight_si"] = ov["dneff_dnsi_bent"] / ma["index_weights"]["si"] - 1
+            comp["delta_r_ref_um"] = ov["r_ref_um"] - ma["r_ref_um"]
+        except Exception:
+            pass
+        side.setdefault("validation", {})["modes_artefact_consistency"] = comp
+        side["sha256"] = _sha256(p)
+        sc.write_text(json.dumps(side, indent=1, default=_json_default) + "\n")
+        log(f"{p.name}: n_g {comp.get('rel_diff_n_g')}, index weight {comp.get('rel_diff_index_weight_si')}, "
+            f"r_ref {comp.get('delta_r_ref_um')}")
+
+
 # ---------------------------------------------------------------------------------------------------- CLI
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m mrm.extraction.junction", description=__doc__.split("\n")[0])
@@ -2091,10 +2156,15 @@ def main(argv=None):
     ap.add_argument("--no-crosschecks", action="store_true")
     ap.add_argument("--doping-sweep", action="store_true", help="also run the doping consistency sweep")
     ap.add_argument("--doping-sweep-only", action="store_true", help="only print the doping consistency sweep")
+    ap.add_argument("--recheck-modes", action="store_true",
+                    help="no solver: compare the junction artefacts with the modes artefacts and update the sidecars")
     a = ap.parse_args(argv)
     out = pathlib.Path(a.out) if a.out else (pathlib.Path(tempfile.gettempdir()) / "mrm_junction_quick"
                                               if a.quick else OUT_DIR)
     log = lambda s: print(s, flush=True)  # noqa: E731
+    if a.recheck_modes:
+        recheck_modes(out, log=log)
+        return 0
     if a.doping_sweep_only:
         for name in a.xsec:
             for topo in a.topology:

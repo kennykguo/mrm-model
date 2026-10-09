@@ -1177,7 +1177,8 @@
   "step_max_rel_err": 0.003120381769836549,
   "freq_max_db_err": 0.08696851756905377,
   "freq_max_deg_err": 1.4141385471426138,
-  "superposition_rel_err": null
+  "superposition_rel_err": 0.13888853863606415,
+  "superposition_note": "max step-response error of the 8-ring 3-D bank (inring_noundercut 160, pitch 50 um, leads and bus, Dirichlet comparison variant) against the single-ring axisymmetric ROM over 10 ns-10 ms, relative to the ROM DC; measured on the default family only"
  },
  "validation_per_pair_summary": {
   "n": 440,
@@ -2440,6 +2441,10 @@
      }
     ]
    }
+  },
+  "crosscheck_3d": {
+   "see": "thermal_rom_inring_noundercut_160.json",
+   "note": "3-D bank run on the default family only"
   }
  },
  "k_temp_scaling": {
@@ -2520,5 +2525,6 @@
  "schema": "thermal_rom/1",
  "file": "thermal_rom_metal_above_160.npz",
  "sha256": "f5621f676c2f05f3a9fcae61fc42165e08313bd8c0ce977b4ff25e67b3c9ea6b",
- "created_utc": "2026-10-09T10:59:29Z"
+ "created_utc": "2026-10-09T10:59:29Z",
+ "updated_utc": "2026-10-09T15:10:31Z"
 }

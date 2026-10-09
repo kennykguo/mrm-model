@@ -62,7 +62,7 @@ class CmtSettings:
     dx_um: float = 0.005
     du_um: float = 0.0025
     dz_um: float = 0.04
-    gaps_nm: tuple = (60, 80, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 500)
+    gaps_nm: tuple = (60, 80, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450, 500, 600, 700)
     lam_table_nm: tuple = (1270.0, 1290.0, 1300.0, 1310.0, 1320.0, 1330.0, 1350.0)
     dlam_nm: float = 10.0
     method_b: bool = True
@@ -379,16 +379,27 @@ class CouplerModel:
         return cmt_overlap(bus, ring, g, gap_nm * 1e-3, dz=self.st.dz_um, **kw)
 
 
-def _interp_gap_for_k2(gaps, k2, target):
-    """Gap (nm) at which kappa2(gap) = target, by interpolation of ln kappa2 (monotone decreasing in gap)."""
+def _interp_gap_for_k2(gaps, k2, target, *, extrapolate: bool = False):
+    """Gap (nm) at which kappa2(gap) = target, by interpolation of ln kappa2 (monotone decreasing in gap). With
+    extrapolate=True a target outside the table is reached log-linearly from the two end points (ln K^2 is linear
+    in the gap far from the guides); the caller flags it."""
     lg = np.log(np.asarray(k2))
     gs = np.asarray(gaps, float)
-    if not (lg.min() <= math.log(target) <= lg.max()):
-        return None
+    t = math.log(target)
+    if not (lg.min() <= t <= lg.max()):
+        if not extrapolate:
+            return None
+        o = np.argsort(gs)
+        g2, l2 = gs[o], lg[o]
+        if t < l2[-1]:
+            slope = (l2[-1] - l2[-2]) / (g2[-1] - g2[-2])
+            return float(g2[-1] + (t - l2[-1]) / slope)
+        slope = (l2[1] - l2[0]) / (g2[1] - g2[0])
+        return float(g2[0] + (t - l2[0]) / slope)
     order = np.argsort(lg)
     from scipy.interpolate import PchipInterpolator
     f = PchipInterpolator(lg[order], gs[order])
-    return float(f(math.log(target)))
+    return float(f(t))
 
 
 def q_to_k2(q: float, lam_um: float, fsr_hz: float) -> float:
@@ -406,7 +417,11 @@ def design_gaps(gaps, k2, lam_um: float, fsr_hz: float) -> dict:
 
     def gap_for_q(qe):
         k2 = q_to_k2(qe, lam_um, fsr_hz)
-        return {"q_e": qe, "kappa2": k2, "gap_nm": _interp_gap_for_k2(gaps, k2_tab, k2)}
+        g = _interp_gap_for_k2(gaps, k2_tab, k2)
+        if g is not None:
+            return {"q_e": qe, "kappa2": k2, "gap_nm": g}
+        return {"q_e": qe, "kappa2": k2, "gap_nm": _interp_gap_for_k2(gaps, k2_tab, k2, extrapolate=True),
+                "extrapolated": True}
     k2_tab = k2
     # critical coupling at the nominal Q_i and drop: kappa_e = kappa_i + kappa_d, Q_L = 1/(1/Qi + 1/Qe + 1/Qd)
     # with kappa_d = x kappa: 1/Qd = x/Q_L and 1/Qe = 1/Qi + x/Q_L  ->  1/Q_L = 2/Qi + 2x/Q_L
@@ -827,7 +842,23 @@ def main(argv=None):
                     help="run only the (light) Meep 2-D validation runs and write them to JSON")
     ap.add_argument("--meep2d-json", default=None, help="precomputed Meep 2-D runs (from --meep2d-only)")
     ap.add_argument("--meep-res", nargs="*", type=int, default=None, help="Meep 2-D resolutions (px/um)")
+    ap.add_argument("--redesign", action="store_true",
+                    help="recompute only the 'design' block of existing artefacts from their stored kappa2(gap)")
     a = ap.parse_args(argv)
+    if a.redesign:
+        out_dir = Path(a.out) if a.out else C.DATA_DIR
+        for name in a.xsec:
+            data, side = C.load_artefact(f"coupling_{name}", out_dir=out_dir)
+            kg = data["kappa2_vs_gap_lambda0"]
+            data["design"] = design_gaps(kg["gap_nm"], kg["kappa2"], data["lambda0_nm"] * 1e-3,
+                                         data["fsr_design_thz"] * 1e12)
+            side.setdefault("history", []).append({"redesign_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                                   "note": "design block recomputed from kappa2_vs_gap_lambda0 "
+                                                           "(log-linear extrapolation beyond the gap table)"})
+            side.pop("sha256", None)
+            C.write_artefact(f"coupling_{name}", data, side, out_dir=out_dir)
+            C.log(f"redesigned coupling_{name}")
+        return out_dir
     st = CmtSettings.quick_settings() if a.quick else CmtSettings()
     if a.no_meep:
         st.meep2d = False

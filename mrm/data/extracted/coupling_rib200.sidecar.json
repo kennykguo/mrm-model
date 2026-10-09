@@ -1,0 +1,231 @@
+{
+ "schema": "coupling/1",
+ "xsec": "rib200",
+ "inputs": {
+  "geometry": {
+   "name": "rib200",
+   "width_nm": 400.0,
+   "film_nm": 200.0,
+   "slab_nm": 80.0,
+   "sidewall_deg": 90.0,
+   "clad": {
+    "top": "SiO2 (beol)",
+    "box": "SiO2 (thermal), 2.0 um",
+    "below_box": "sio2"
+   },
+   "width_definition": "mid-height of the etched sidewall",
+   "lam0_nm": 1310.0,
+   "provenance": {
+    "film_nm": "printed (SMTAI render, conflicts with GF 160 nm; 07 D21)",
+    "width_nm": "printed (SMTAI render)",
+    "slab_nm": "assumed",
+    "sidewall_deg": "assumed",
+    "box_um": "printed (GF-IMAPS)",
+    "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
+   },
+   "ranges_nm": {
+    "width_nm": [
+     360.0,
+     450.0
+    ],
+    "film_nm": [
+     190.0,
+     210.0
+    ],
+    "slab_nm": [
+     50.0,
+     120.0
+    ]
+   }
+  },
+  "r_ref": {
+   "source": "modes_rib200.json",
+   "sha256": "3fdaad0feeed0b3c6864d63939d630ba2ad8b11cf6fe87fb5f83c97603818503",
+   "n_g": 4.011644876624741,
+   "fsr_thz": 1.799999949322256
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "film_nm": 200.0,
+  "settings": {
+   "quick": false,
+   "mesh_scale": 1.5,
+   "dx_um": 0.005,
+   "du_um": 0.0025,
+   "dz_um": 0.04,
+   "gaps_nm": [
+    60,
+    80,
+    100,
+    120,
+    140,
+    160,
+    180,
+    200,
+    250,
+    300,
+    350,
+    400,
+    450,
+    500
+   ],
+   "lam_table_nm": [
+    1270.0,
+    1290.0,
+    1300.0,
+    1310.0,
+    1320.0,
+    1330.0,
+    1350.0
+   ],
+   "dlam_nm": 10.0,
+   "method_b": true,
+   "meep2d": true,
+   "meep_res": [
+    30,
+    45,
+    60
+   ],
+   "meep2d_json": "/private/tmp/claude-501/-Users-kenny-interactive-textbooks-lightmatter-capstone/d5794d65-9500-4988-a2ee-6908737d147d/scratchpad/meep2d_runs.json",
+   "jac": true
+  },
+  "targets": {
+   "q_loaded_nominal": 3850.0,
+   "q_loaded_range": [
+    3500.0,
+    4200.0
+   ],
+   "q_i_nominal": 7700.0,
+   "q_i_range": [
+    7000.0,
+    8400.0
+   ],
+   "notch_db_nominal": 27.9,
+   "kappa_d_over_kappa_nominal": 0.03,
+   "kappa_d_over_kappa_prior": [
+    0.004,
+    0.18
+   ],
+   "fsr_thz": 1.8
+  }
+ },
+ "mesh": {
+  "fem": {
+   "h_core": 0.01,
+   "h_slab": 0.02,
+   "h_max": 0.2,
+   "core_dist": 0.4,
+   "slab_dist": 0.15,
+   "scale": 1.5,
+   "h_core_eff_nm": 15.0
+  },
+  "overlap_grid_dx_um": 0.005,
+  "ring_u_grid_um": 0.0025,
+  "dz_um": 0.04
+ },
+ "validation": {
+  "sampling": {
+   "bus_power_on_grid": 1.0019300935381377,
+   "ring_power_on_grid": 1.0011074014039703,
+   "n_eff_bus": {
+    "re": 2.625785198801649,
+    "im": -6.04405704993579e-16
+   },
+   "n_eff_ring_bent": {
+    "re": 2.629681355475211,
+    "im": 3.097309318528848e-19
+   }
+  },
+  "convergence_at_through_gap": [
+   {
+    "dx_um": 0.01,
+    "du_um": 0.005,
+    "dz_um": 0.04,
+    "kappa2": 0.10426475551413779,
+    "power_out_over_in": 0.9991706380690614
+   },
+   {
+    "dx_um": 0.0075,
+    "du_um": 0.00375,
+    "dz_um": 0.03,
+    "kappa2": 0.09836379994071105,
+    "power_out_over_in": 0.9997315496541648
+   },
+   {
+    "dx_um": 0.005,
+    "du_um": 0.0025,
+    "dz_um": 0.04,
+    "kappa2": 0.10448607998573298,
+    "power_out_over_in": 0.9993266262699193
+   },
+   {
+    "dx_um": 0.005,
+    "du_um": 0.0025,
+    "dz_um": 0.02,
+    "kappa2": 0.10448373570046017,
+    "power_out_over_in": 0.9992959799467275
+   },
+   {
+    "mesh_scale": 2.0,
+    "kappa2": 0.1046069921142209
+   },
+   {
+    "mesh_scale": 1.0,
+    "kappa2": 0.10439761338153382
+   }
+  ],
+  "power_conservation_range": [
+   0.9991113534071839,
+   0.9999846707154655
+  ],
+  "method_B": {
+   "161.8": {
+    "kappa2": 0.09825178980117531,
+    "kappa2_no_phase_mismatch": 0.10150306163810359,
+    "kappa2_outer_edge_phase_ref": 0.09578421811224852,
+    "dln_kappa2_dlambda_per_nm": 0.00674748054992611,
+    "method_A_kappa2": 0.10448607998570499
+   },
+   "357.8": {
+    "kappa2": 0.006064307706706718,
+    "kappa2_no_phase_mismatch": 0.006288767038597012,
+    "kappa2_outer_edge_phase_ref": 0.005930944775192163,
+    "dln_kappa2_dlambda_per_nm": 0.010669128139787088,
+    "method_A_kappa2": 0.006600079668099419
+   }
+  },
+  "validation_2d": null
+ },
+ "assumptions": {
+  "bus": "straight bus of the ring's cross-section; slab continuous through the gap (rib)",
+  "drop": "drop bus identical to the through bus, on the opposite side",
+  "smoke_comparison": "femwell smoke (05 C2, strip 400x200, g0 200 nm, point coupler without phase mismatch) gave d ln K^2/d lambda 1.3-1.5 %/nm"
+ },
+ "runtime_s": 1770.1,
+ "data_file": "coupling_rib200.json",
+ "created_utc": "2026-10-09T14:36:59Z",
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "femwell": "0.1.12",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0",
+  "meshio": "5.3.5"
+ },
+ "history": [
+  {
+   "redesign_utc": "2026-10-09T14:38:11Z",
+   "note": "design block recomputed from kappa2_vs_gap_lambda0 (log-linear extrapolation beyond the gap table)"
+  }
+ ],
+ "sha256": "09a2aa719657694b93b0a8f6235b608ad9f2c6fe03701ae8fdbfc1872e487168"
+}
