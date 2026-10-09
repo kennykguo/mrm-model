@@ -1,0 +1,6 @@
+[
+  {"name": "nominal", "overrides": {}},
+  {"name": "lower-thermo-optic-gain", "overrides": {"optical.0.df_dtemperature_hz_per_k": -12000000000}},
+  {"name": "higher-thermo-optic-gain", "overrides": {"optical.0.df_dtemperature_hz_per_k": -18000000000}},
+  {"name": "slower-sampled-interface", "overrides": {"actuator.latency_s": 0.000015, "sensor.latency_s": 0.000025}}
+]

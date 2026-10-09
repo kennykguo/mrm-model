@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mrm-model"
+version = "0.1.0"
+description = "Calibratable microring modulator plant and controller comparison laboratory"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26,<3", "scipy>=1.12,<2"]
+
+[project.optional-dependencies]
+lab = ["streamlit>=1.45,<2", "plotly>=5.24,<7", "matplotlib>=3.8,<4"]
+physics = ["scikit-fem>=11,<13"]
+validation = ["sax==0.18.2"]
+dev = ["pytest>=8,<10", "ruff>=0.9"]
+
+[project.scripts]
+mrm = "mrm_model.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mrm_model"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]

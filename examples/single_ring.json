@@ -1,0 +1,186 @@
+{
+  "optical": [
+    {
+      "reference_frequency_hz": 229651090990187.75,
+      "length_m": 4e-05,
+      "group_index": 4.2,
+      "loss_power_np_per_m": 1000.0,
+      "coupling_bus_power": 0.08,
+      "coupling_drop_power": 0.01,
+      "df_dtemperature_hz_per_k": -15000000000.0,
+      "reference_temperature_k": 298.15,
+      "df_dvoltage_hz_per_v": 8000000000.0,
+      "loss_voltage_np_per_m_per_v": 0.0,
+      "phase_dispersion_s2": 0.0,
+      "intrinsic_absorption_fraction": 1.0,
+      "voltage_points_v": [],
+      "resonance_voltage_shifts_hz": [],
+      "loss_voltage_values_np_per_m": []
+    }
+  ],
+  "thermal": {
+    "capacitance_j_per_k": [
+      2e-09,
+      5e-10,
+      2e-06
+    ],
+    "conductance_w_per_k": [
+      [
+        0.00025,
+        -0.0002,
+        -5e-05
+      ],
+      [
+        -0.0002,
+        0.00022,
+        -2e-05
+      ],
+      [
+        -5e-05,
+        -2e-05,
+        0.0020700000000000002
+      ]
+    ],
+    "heater_map": [
+      [
+        0.0
+      ],
+      [
+        1.0
+      ],
+      [
+        0.0
+      ]
+    ],
+    "ring_map": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "boundary_map_w_per_k": [
+      [
+        -6.776263578034403e-21
+      ],
+      [
+        -3.3881317890172014e-21
+      ],
+      [
+        0.002
+      ]
+    ],
+    "reference_temperature_k": 300.0,
+    "heater_temperature_map": [
+      [
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "reference_state_map": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "physical_network": true,
+    "provenance": "illustrative passive RC network; NOT calibrated to Lightmatter"
+  },
+  "actuator": {
+    "dac_bits": 16,
+    "dac_reference_v": 1.6,
+    "min_voltage_v": 0.0,
+    "max_voltage_v": 1.6,
+    "heater_resistance_ohm": 56,
+    "resistance_tcr_per_k": 0.001,
+    "reference_temperature_k": 298.15,
+    "settling_time_s": 2e-06,
+    "latency_s": 0.0,
+    "slew_rate_v_per_s": null,
+    "max_current_a": 0.03,
+    "max_power_w": 0.04,
+    "dac_gain": 1.0,
+    "dac_offset_v": 0.0,
+    "voltage_noise_std_v": 0.0
+  },
+  "sensor": {
+    "responsivity_a_per_w": 0.8,
+    "dark_current_a": 1e-09,
+    "input_noise_density_a_per_sqrt_hz": 2e-12,
+    "bandwidth_hz": 200000.0,
+    "adc_bits": 16,
+    "adc_full_scale_a": 0.0001,
+    "adc_gain": 1.0,
+    "adc_offset_a": 0.0,
+    "latency_s": 0,
+    "shot_noise": true
+  },
+  "run": {
+    "duration_s": 0.01,
+    "sample_period_s": 1e-05,
+    "physics_substeps": 4,
+    "record_every": 1,
+    "seed": 7,
+    "input_power_w": 0.0001,
+    "laser_frequency_hz": [
+      228849204580152.7
+    ],
+    "initial_codes": [
+      20000.0
+    ],
+    "initial_temperature_k": null,
+    "initial_state_rise_k": null,
+    "junction_low_v": 0.0,
+    "junction_high_v": -1.0,
+    "data_one_fraction": 0.5,
+    "optical_heating": true,
+    "bus_loss_db_between_rings": 0.0,
+    "lock_tolerance_hz": 5000000000.0,
+    "target_detuning_hz": null,
+    "max_steps": 1000000,
+    "max_recorded_rows": 200000,
+    "max_trace_bytes": 256000000
+  },
+  "disturbance": {
+    "kind": "ambient_ramp",
+    "start_s": 0.002,
+    "ambient_temperature_k": 298.15,
+    "ambient_amplitude_k": 2.0,
+    "ramp_rate_k_per_s": 808.0,
+    "period_s": 0.1,
+    "laser_drift_hz_per_s": 0.0,
+    "laser_power_fraction_amplitude": 0.0,
+    "external_heat_peak_w": null
+  },
+  "controller": {
+    "kind": "pi",
+    "kp": 0.35,
+    "ki_per_s": 2000.0,
+    "dither_amplitude_codes": 10.0,
+    "dither_frequency_hz": 2000.0,
+    "dither_gain_codes_per_s": 100000.0,
+    "dither_target_gradient_per_code": 0.0,
+    "dither_objective": "flank",
+    "dither_phase_rad": 0.0,
+    "mpc_horizon": 8,
+    "mpc_move_penalty": 0.1,
+    "acquisition": false,
+    "scan_min_code": 0,
+    "scan_max_code": 65535,
+    "scan_points": 100,
+    "scan_dwell_samples": 40
+  },
+  "provenance": {
+    "profile": "synthetic G26-inspired controller laboratory; uncalibrated",
+    "public_constraints": {
+      "center_wavelength_m": 1.31e-06,
+      "per_direction_spacing_hz": 400000000000.0,
+      "df_dtemperature_magnitude_hz_per_k": 15000000000.0,
+      "nrz_bit_rate_bps": 50000000000.0
+    },
+    "source": "Anand et al., OFC 2026 M4B.3, supplied PDF",
+    "assumptions": "Every other numeric device/interface value is illustrative. The heater 56 ohm hypothesis resembles G25 textbook read-off, not a G26 specification. Reference resonance is synthetically aligned at a chosen initial heater bias.",
+    "calibrated": false
+  },
+  "schema_version": 1
+}

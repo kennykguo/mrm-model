@@ -1,0 +1,206 @@
+{
+  "schema": "mrm-model.full-vector-waveguide-convergence.v1",
+  "claim": "numerical convergence for declared generic geometry and materials; no measured Lightmatter accuracy claim",
+  "neff_absolute_mesh_change": 5.4199517177444534e-05,
+  "neff_relative_mesh_change": 2.1807321864863317e-05,
+  "ng_relative_mesh_change": 9.638732898820732e-05,
+  "neff_relative_boundary_domain_change": 6.11847675155278e-08,
+  "enlarged_domain_mode": {
+    "neff": 2.485381478621074,
+    "te_fraction": 0.9823378929933729,
+    "core_power_fraction": 0.8068182138512762,
+    "overlap_with_reference": 1.0,
+    "padding_m": 3e-06,
+    "mesh": {
+      "triangles": 4992,
+      "vertices": 2597,
+      "mixed_dofs": 35345,
+      "mesh_scale": 0.6,
+      "near_core_nominal_dx_m": 2.8571428571428575e-08,
+      "near_core_nominal_dy_m": 2e-08,
+      "max_mixed_dofs": 42000
+    }
+  },
+  "coarse": {
+    "schema": "mrm-model.full-vector-waveguide-reference.v1",
+    "calibration_status": "generic_geometry_material_reference_NOT_Lightmatter_PDK",
+    "solver": "Femwell full-vector order-2 mixed Nedelec/Lagrange Maxwell eigenproblem; sparse SciPy shift-invert",
+    "versions": {
+      "femwell": "0.1.12",
+      "scikit-fem": "12.0.2"
+    },
+    "geometry": {
+      "width_m": 4.0000000000000003e-07,
+      "height_m": 2.0000000000000002e-07,
+      "padding_m": 1.5e-06,
+      "topology": "straight rectangular silicon strip in infinite-oxide approximation to SOI BOX/cladding; no explicit handle substrate",
+      "boundary": "PEC at outer rectangle; evanescent mode/domain convergence must be checked"
+    },
+    "materials": {
+      "temperature_k": 293.0,
+      "silicon_index": 3.5002874953755083,
+      "silica_index": 1.4468043175527276,
+      "silicon_model": "Li 293K public CC0 tabulated index, shape-preserving cubic interpolation",
+      "silica_model": "Malitson 1965 fused silica Sellmeier",
+      "limitations": "real undoped bulk indices; 4-decimal Si source precision; no thin-film/doping/strain/absorption calibration"
+    },
+    "sources": [
+      "https://helgegehring.github.io/femwell/photonics/examples/waveguide_modes.html",
+      "https://github.com/HelgeGehring/femwell/blob/main/femwell/maxwell/waveguide.py",
+      "https://doi.org/10.1063/1.555624",
+      "https://doi.org/10.1364/JOSA.55.001205",
+      "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/Si/nk/Li-293K.yml"
+    ],
+    "mesh": {
+      "triangles": 1680,
+      "vertices": 899,
+      "mixed_dofs": 11993,
+      "mesh_scale": 1.0,
+      "near_core_nominal_dx_m": 5.0000000000000004e-08,
+      "near_core_nominal_dy_m": 3.3333333333333334e-08,
+      "max_mixed_dofs": 42000
+    },
+    "wavelength_m": 1.3100000000000002e-06,
+    "neff": 2.485327431171394,
+    "ng": 4.32804502005844,
+    "ng_coarse_wavelength_step": 4.328043098655282,
+    "wavelength_step_relative_ng_change": 4.439425071973373e-07,
+    "delta_wavelength_m": 2e-09,
+    "mode": {
+      "neff": 2.485327431171394,
+      "te_fraction": 0.9822793311359027,
+      "core_power_fraction": 0.8067006234910403,
+      "overlap_with_reference": 1.0
+    },
+    "wavelength_samples": [
+      {
+        "wavelength_m": 1.3080000000000002e-06,
+        "neff": 2.4881403039253165,
+        "te_fraction": 0.9824106262485605,
+        "core_power_fraction": 0.8074541960240891,
+        "overlap_with_reference": 0.9999984114664293
+      },
+      {
+        "wavelength_m": 1.312e-06,
+        "neff": 2.482513691200175,
+        "te_fraction": 0.982147363118309,
+        "core_power_fraction": 0.8059443977864132,
+        "overlap_with_reference": 0.9999984032932935
+      },
+      {
+        "wavelength_m": 1.309e-06,
+        "neff": 2.4867339774164154,
+        "te_fraction": 0.9823450628365904,
+        "core_power_fraction": 0.807077751315644,
+        "overlap_with_reference": 0.9999996023320783
+      },
+      {
+        "wavelength_m": 1.3110000000000002e-06,
+        "neff": 2.4839206681204047,
+        "te_fraction": 0.9822134312079618,
+        "core_power_fraction": 0.8063228413030451,
+        "overlap_with_reference": 0.9999996013313988
+      }
+    ],
+    "thermal_sensitivity": null,
+    "omissions": [
+      "ring bend and radiation loss",
+      "sidewall roughness",
+      "bus-ring coupler",
+      "junction/carriers",
+      "actual BOX/handle substrate",
+      "process-specific optical material data"
+    ]
+  },
+  "fine": {
+    "schema": "mrm-model.full-vector-waveguide-reference.v1",
+    "calibration_status": "generic_geometry_material_reference_NOT_Lightmatter_PDK",
+    "solver": "Femwell full-vector order-2 mixed Nedelec/Lagrange Maxwell eigenproblem; sparse SciPy shift-invert",
+    "versions": {
+      "femwell": "0.1.12",
+      "scikit-fem": "12.0.2"
+    },
+    "geometry": {
+      "width_m": 4.0000000000000003e-07,
+      "height_m": 2.0000000000000002e-07,
+      "padding_m": 1.5e-06,
+      "topology": "straight rectangular silicon strip in infinite-oxide approximation to SOI BOX/cladding; no explicit handle substrate",
+      "boundary": "PEC at outer rectangle; evanescent mode/domain convergence must be checked"
+    },
+    "materials": {
+      "temperature_k": 293.0,
+      "silicon_index": 3.5002874953755083,
+      "silica_index": 1.4468043175527276,
+      "silicon_model": "Li 293K public CC0 tabulated index, shape-preserving cubic interpolation",
+      "silica_model": "Malitson 1965 fused silica Sellmeier",
+      "limitations": "real undoped bulk indices; 4-decimal Si source precision; no thin-film/doping/strain/absorption calibration"
+    },
+    "sources": [
+      "https://helgegehring.github.io/femwell/photonics/examples/waveguide_modes.html",
+      "https://github.com/HelgeGehring/femwell/blob/main/femwell/maxwell/waveguide.py",
+      "https://doi.org/10.1063/1.555624",
+      "https://doi.org/10.1364/JOSA.55.001205",
+      "https://raw.githubusercontent.com/polyanskiy/refractiveindex.info-database/master/database/data/main/Si/nk/Li-293K.yml"
+    ],
+    "mesh": {
+      "triangles": 4992,
+      "vertices": 2597,
+      "mixed_dofs": 35345,
+      "mesh_scale": 0.6,
+      "near_core_nominal_dx_m": 2.8571428571428575e-08,
+      "near_core_nominal_dy_m": 2e-08,
+      "max_mixed_dofs": 42000
+    },
+    "wavelength_m": 1.3100000000000002e-06,
+    "neff": 2.4853816306885714,
+    "ng": 4.328462228971317,
+    "ng_coarse_wavelength_step": 4.328460308018729,
+    "wavelength_step_relative_ng_change": 4.4379562200232954e-07,
+    "delta_wavelength_m": 2e-09,
+    "mode": {
+      "neff": 2.4853816306885714,
+      "te_fraction": 0.9823380610633757,
+      "core_power_fraction": 0.8068174169073938,
+      "overlap_with_reference": 1.0
+    },
+    "wavelength_samples": [
+      {
+        "wavelength_m": 1.3080000000000002e-06,
+        "neff": 2.4881950559443897,
+        "te_fraction": 0.9824693436723817,
+        "core_power_fraction": 0.8075706174930996,
+        "overlap_with_reference": 0.999998412160506
+      },
+      {
+        "wavelength_m": 1.312e-06,
+        "neff": 2.4825673347922366,
+        "te_fraction": 0.9822061049938781,
+        "core_power_fraction": 0.8060615482258413,
+        "overlap_with_reference": 0.9999984039151828
+      },
+      {
+        "wavelength_m": 1.309e-06,
+        "neff": 2.486788453612115,
+        "te_fraction": 0.9824037865811247,
+        "core_power_fraction": 0.8071943534284476,
+        "overlap_with_reference": 0.9999996025179112
+      },
+      {
+        "wavelength_m": 1.3110000000000002e-06,
+        "neff": 2.4839745901032866,
+        "te_fraction": 0.9822721671794798,
+        "core_power_fraction": 0.8064398111834684,
+        "overlap_with_reference": 0.9999996014821442
+      }
+    ],
+    "thermal_sensitivity": null,
+    "omissions": [
+      "ring bend and radiation loss",
+      "sidewall roughness",
+      "bus-ring coupler",
+      "junction/carriers",
+      "actual BOX/handle substrate",
+      "process-specific optical material data"
+    ]
+  }
+}
