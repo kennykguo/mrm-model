@@ -1,0 +1,415 @@
+{
+  "created_utc": "2026-10-09T18:09:39.962399+00:00",
+  "purpose": "Reproducible numerical evidence for an assumed compact model; not measured Lightmatter accuracy or BER.",
+  "source_sha256": {
+    "examples/optical_accuracy_checks.py": "e1f82910b0033412a08e67b7d8118d9e0f49f4f3840c1c6db7b3093db9f21de4",
+    "src/ringlab/optics.py": "124083901eacd3fa45697d187303630ab75d032729c6b94bd7b824d70ae1cb9f",
+    "src/ringlab/junction.py": "ee2f423bced54448a1f0a18254d58245ebbd18c09d277bf2660f3caf5befc6ec",
+    "src/ringlab/waveform.py": "f8e2ab797f8923d87a7538b635e95b13a405cf37caf82ac01051ea1a1f998af1",
+    "src/ringlab/optical_tables.py": "1ce82e80f820d95cb915f7ccb4ea7e6c075babb82698f17bf67e2c0ad76f5bd8",
+    "src/ringlab/optical_calibration.py": "736e74ed406dde6b94b073de35314d984d7afee9fc55463615053f04480872ca"
+  },
+  "ring_parameters": {
+    "reference_wavelength_m": 1.31e-06,
+    "roundtrip_length_m": 6.283185307179587e-05,
+    "group_index": 4.0,
+    "intrinsic_loss_per_m": 250.0,
+    "input_coupling_power": 0.025,
+    "drop_coupling_power": 0.005,
+    "absorption_fraction": 0.8,
+    "reference_temperature_k": 300.0,
+    "thermal_frequency_slope_hz_per_k": -15000000000.0,
+    "thermal_frequency_curvature_hz_per_k2": 0.0,
+    "beta2_s2_per_m": 0.0
+  },
+  "junction_parameters": {
+    "built_in_voltage_v": 0.8,
+    "zero_bias_capacitance_f": 3e-14,
+    "parasitic_capacitance_f": 5e-15,
+    "series_resistance_ohm": 70.0,
+    "frequency_shift_scale_hz": -12000000000.0,
+    "loss_change_scale_per_m": -8.0,
+    "leakage_current_a": 1e-09,
+    "minimum_voltage_v": 0.0,
+    "maximum_voltage_v": 5.0,
+    "reference_voltage_v": 0.0
+  },
+  "conditions": {
+    "bit_rate_hz": 50000000000.0,
+    "input_power_w": 0.001,
+    "temperature_k": 300.0,
+    "voltage_levels_v": [
+      0.5,
+      2.5
+    ],
+    "laser_frequency_hz": 228841369993275.34,
+    "samples_per_bit": 16,
+    "discarded_initial_bits": 32,
+    "initialization": "First command voltage and its steady cavity field; discard32 bits before summary.",
+    "fsr_hz": 1192836289809.2356,
+    "loaded_linewidth_hz": 8740565963.967854
+  },
+  "assumptions_and_limits": [
+    "Device dimensions, coupling, loss split and electrical coefficients are synthetic assumptions;1310nm/50Gbps/thermal-slope magnitude are public operating context.",
+    "One optical traveling mode, high-Q TCMT near a resonance, constant temperature during each short waveform.",
+    "Stationary NRZ calculation assumes iid bits with probability0.5 and ideal instantaneous electrical levels.",
+    "FiniteRC waveform uses the assumed nonlinear first-order capacitance/resistance model; no packageRF model, jitter, phase noise or receiver.",
+    "Finite windows have random mark density, transition density and optical memory; their deviation from an infinite iid expectation is not solely integration error.",
+    "Two seeds do not establish a statistical confidence interval. No optical eye opening, receiverBER or Lightmatter reproduction is claimed.",
+    "The common absorption_fraction applies to TOTAL intrinsic loss, including its voltage delta; separate fully absorptive carrier loss and scattering baseline are not represented.",
+    "TPA, Kerr and carrier feedback remain omitted from these waveforms; optional perturbation screening is not a certified bound."
+  ],
+  "finite_rc_substep_refinement": {
+    "seed": 1041,
+    "bits": 128,
+    "results": [
+      {
+        "substeps": 1,
+        "elapsed_window_s": 1.92e-09,
+        "retained_bits": 96,
+        "empirical_mark_fraction": 0.4895833333333333,
+        "empirical_transition_fraction": 0.5578947368421052,
+        "mean_absorbed_power_w": 0.0004894578588133176,
+        "mean_through_power_w": 0.00018577218728852552,
+        "center_conditional_through_power_w": [
+          0.00017583242095527905,
+          0.00015867085508285714
+        ],
+        "center_conditional_oma_w": 1.7161565872421912e-05,
+        "waveform_array_bytes": 196704
+      },
+      {
+        "substeps": 2,
+        "elapsed_window_s": 1.92e-09,
+        "retained_bits": 96,
+        "empirical_mark_fraction": 0.4895833333333333,
+        "empirical_transition_fraction": 0.5578947368421052,
+        "mean_absorbed_power_w": 0.0004893861731620033,
+        "mean_through_power_w": 0.00018578579302989888,
+        "center_conditional_through_power_w": [
+          0.00017579747327756864,
+          0.00015876031010895848
+        ],
+        "center_conditional_oma_w": 1.7037163168610154e-05,
+        "waveform_array_bytes": 196704,
+        "max_through_difference_from_previous_w": 2.320126477505706e-06,
+        "max_junction_voltage_difference_from_previous_v": 0.004700201323049713
+      },
+      {
+        "substeps": 4,
+        "elapsed_window_s": 1.92e-09,
+        "retained_bits": 96,
+        "empirical_mark_fraction": 0.4895833333333333,
+        "empirical_transition_fraction": 0.5578947368421052,
+        "mean_absorbed_power_w": 0.0004893683612989409,
+        "mean_through_power_w": 0.00018578847314248232,
+        "center_conditional_through_power_w": [
+          0.00017579024253193008,
+          0.0001587798699460262
+        ],
+        "center_conditional_oma_w": 1.701037258590389e-05,
+        "waveform_array_bytes": 196704,
+        "max_through_difference_from_previous_w": 5.417974242444279e-07,
+        "max_junction_voltage_difference_from_previous_v": 0.001087104711856135
+      },
+      {
+        "substeps": 8,
+        "elapsed_window_s": 1.92e-09,
+        "retained_bits": 96,
+        "empirical_mark_fraction": 0.4895833333333333,
+        "empirical_transition_fraction": 0.5578947368421052,
+        "mean_absorbed_power_w": 0.0004893639918673941,
+        "mean_through_power_w": 0.0001857889919028164,
+        "center_conditional_through_power_w": [
+          0.00017578866303889342,
+          0.00015878422308869777
+        ],
+        "center_conditional_oma_w": 1.7004439950195647e-05,
+        "waveform_array_bytes": 196704,
+        "max_through_difference_from_previous_w": 1.2894022082188998e-07,
+        "max_junction_voltage_difference_from_previous_v": 0.00025940645636923776
+      }
+    ]
+  },
+  "stationary_iid": {
+    "mean_absorbed_power_w": 0.00047674189132495133,
+    "mean_through_power_w": 0.00020984519636747258,
+    "conditional_oma_w": 1.5766345605248804e-06
+  },
+  "finite_windows": [
+    {
+      "seed_entropy": [
+        927,
+        256
+      ],
+      "bits": 256,
+      "include_rc": false,
+      "substeps": 4,
+      "elapsed_window_s": 4.4799999999999994e-09,
+      "retained_bits": 224,
+      "empirical_mark_fraction": 0.5,
+      "empirical_transition_fraction": 0.5022421524663677,
+      "mean_absorbed_power_w": 0.00048464268704119897,
+      "mean_through_power_w": 0.0001955255697540283,
+      "center_conditional_through_power_w": [
+        0.0001795094311497034,
+        0.00017434515371387698
+      ],
+      "center_conditional_oma_w": 5.1642774358264215e-06,
+      "waveform_array_bytes": 393312,
+      "fractional_heat_difference_from_stationary_iid": 0.01657248053929128
+    },
+    {
+      "seed_entropy": [
+        927,
+        256
+      ],
+      "bits": 256,
+      "include_rc": true,
+      "substeps": 4,
+      "elapsed_window_s": 4.4799999999999994e-09,
+      "retained_bits": 224,
+      "empirical_mark_fraction": 0.5,
+      "empirical_transition_fraction": 0.5022421524663677,
+      "mean_absorbed_power_w": 0.0004853179460609833,
+      "mean_through_power_w": 0.0001943823117270542,
+      "center_conditional_through_power_w": [
+        0.00017805694920045254,
+        0.0001745783489736532
+      ],
+      "center_conditional_oma_w": 3.478600226799344e-06,
+      "waveform_array_bytes": 393312,
+      "fractional_heat_difference_from_stationary_iid": 0.017988884325221832
+    },
+    {
+      "seed_entropy": [
+        927,
+        1024
+      ],
+      "bits": 1024,
+      "include_rc": false,
+      "substeps": 4,
+      "elapsed_window_s": 1.9839999999999998e-08,
+      "retained_bits": 992,
+      "empirical_mark_fraction": 0.5241935483870968,
+      "empirical_transition_fraction": 0.5116044399596368,
+      "mean_absorbed_power_w": 0.00047685849426362654,
+      "mean_through_power_w": 0.0002095335106276421,
+      "center_conditional_through_power_w": [
+        0.0001792605083612314,
+        0.00020330127827510264
+      ],
+      "center_conditional_oma_w": 2.404076991387123e-05,
+      "waveform_array_bytes": 1572960,
+      "fractional_heat_difference_from_stationary_iid": 0.00024458295106222216
+    },
+    {
+      "seed_entropy": [
+        927,
+        1024
+      ],
+      "bits": 1024,
+      "include_rc": true,
+      "substeps": 4,
+      "elapsed_window_s": 1.9839999999999998e-08,
+      "retained_bits": 992,
+      "empirical_mark_fraction": 0.5241935483870968,
+      "empirical_transition_fraction": 0.5116044399596368,
+      "mean_absorbed_power_w": 0.0004772531938649531,
+      "mean_through_power_w": 0.00020870443583830743,
+      "center_conditional_through_power_w": [
+        0.00018002021508948667,
+        0.00020207192335518643
+      ],
+      "center_conditional_oma_w": 2.205170826569976e-05,
+      "waveform_array_bytes": 1572960,
+      "fractional_heat_difference_from_stationary_iid": 0.0010724934168901967
+    },
+    {
+      "seed_entropy": [
+        928,
+        256
+      ],
+      "bits": 256,
+      "include_rc": false,
+      "substeps": 4,
+      "elapsed_window_s": 4.4799999999999994e-09,
+      "retained_bits": 224,
+      "empirical_mark_fraction": 0.5,
+      "empirical_transition_fraction": 0.47085201793721976,
+      "mean_absorbed_power_w": 0.0004639104120085092,
+      "mean_through_power_w": 0.00023181893522821414,
+      "center_conditional_through_power_w": [
+        0.00021816877400440923,
+        0.00021265927036297032
+      ],
+      "center_conditional_oma_w": 5.509503641438915e-06,
+      "waveform_array_bytes": 393312,
+      "fractional_heat_difference_from_stationary_iid": -0.026914939823687756
+    },
+    {
+      "seed_entropy": [
+        928,
+        256
+      ],
+      "bits": 256,
+      "include_rc": true,
+      "substeps": 4,
+      "elapsed_window_s": 4.4799999999999994e-09,
+      "retained_bits": 224,
+      "empirical_mark_fraction": 0.5,
+      "empirical_transition_fraction": 0.47085201793721976,
+      "mean_absorbed_power_w": 0.0004641509324804837,
+      "mean_through_power_w": 0.00023116524811543908,
+      "center_conditional_through_power_w": [
+        0.00021915770686836296,
+        0.00021143856880643405
+      ],
+      "center_conditional_oma_w": 7.719138061928912e-06,
+      "waveform_array_bytes": 393312,
+      "fractional_heat_difference_from_stationary_iid": -0.026410431039477378
+    },
+    {
+      "seed_entropy": [
+        928,
+        1024
+      ],
+      "bits": 1024,
+      "include_rc": false,
+      "substeps": 4,
+      "elapsed_window_s": 1.9839999999999998e-08,
+      "retained_bits": 992,
+      "empirical_mark_fraction": 0.5141129032258065,
+      "empirical_transition_fraction": 0.467204843592331,
+      "mean_absorbed_power_w": 0.00047207199730103615,
+      "mean_through_power_w": 0.00021764795161413963,
+      "center_conditional_through_power_w": [
+        0.00018895923300743154,
+        0.00021128546526316423
+      ],
+      "center_conditional_oma_w": 2.2326232255732688e-05,
+      "waveform_array_bytes": 1572960,
+      "fractional_heat_difference_from_stationary_iid": -0.009795434613343312
+    },
+    {
+      "seed_entropy": [
+        928,
+        1024
+      ],
+      "bits": 1024,
+      "include_rc": true,
+      "substeps": 4,
+      "elapsed_window_s": 1.9839999999999998e-08,
+      "retained_bits": 992,
+      "empirical_mark_fraction": 0.5141129032258065,
+      "empirical_transition_fraction": 0.467204843592331,
+      "mean_absorbed_power_w": 0.0004727180478461865,
+      "mean_through_power_w": 0.00021642221811419781,
+      "center_conditional_through_power_w": [
+        0.00018760632329788298,
+        0.00021112630112509059
+      ],
+      "center_conditional_oma_w": 2.3519977827207608e-05,
+      "waveform_array_bytes": 1572960,
+      "fractional_heat_difference_from_stationary_iid": -0.00844029767885901
+    }
+  ],
+  "periodic_vs_isolated_mode": [
+    {
+      "detuning_from_midpoint_hz": 0.0,
+      "exact_quasistatic_absorbed_fraction": 0.28484325194295224,
+      "tcmt_quasistatic_absorbed_fraction": 0.2848280370611961,
+      "tcmt_iid_absorbed_fraction": 0.47674189132495126,
+      "tcmt_minus_exact_quasistatic_fraction": -1.5214881756153709e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 0.19191385426375518
+    },
+    {
+      "detuning_from_midpoint_hz": 20000000000.0,
+      "exact_quasistatic_absorbed_fraction": 0.030976874294069964,
+      "tcmt_quasistatic_absorbed_fraction": 0.03095207371357075,
+      "tcmt_iid_absorbed_fraction": 0.032522357502634706,
+      "tcmt_minus_exact_quasistatic_fraction": -2.4800580499213104e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 0.0015702837890639552
+    },
+    {
+      "detuning_from_midpoint_hz": 50000000000.0,
+      "exact_quasistatic_absorbed_fraction": 0.004602809506812676,
+      "tcmt_quasistatic_absorbed_fraction": 0.0045769339923122385,
+      "tcmt_iid_absorbed_fraction": 0.004621497529047382,
+      "tcmt_minus_exact_quasistatic_fraction": -2.587551450043777e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 4.456353673514338e-05
+    },
+    {
+      "detuning_from_midpoint_hz": 100000000000.0,
+      "exact_quasistatic_absorbed_fraction": 0.0011550529488463363,
+      "tcmt_quasistatic_absorbed_fraction": 0.0011287734542132911,
+      "tcmt_iid_absorbed_fraction": 0.0011317009784660664,
+      "tcmt_minus_exact_quasistatic_fraction": -2.6279494633045172e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 2.9275242527753136e-06
+    },
+    {
+      "detuning_from_midpoint_hz": 150000000000.0,
+      "exact_quasistatic_absorbed_fraction": 0.0005270764561797919,
+      "tcmt_quasistatic_absorbed_fraction": 0.0005003067517806613,
+      "tcmt_iid_absorbed_fraction": 0.0005008904814625855,
+      "tcmt_minus_exact_quasistatic_fraction": -2.676970439913055e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 5.837296819242218e-07
+    },
+    {
+      "detuning_from_midpoint_hz": 400000000000.0,
+      "exact_quasistatic_absorbed_fraction": 0.00010312305320758483,
+      "tcmt_quasistatic_absorbed_fraction": 7.020800646382907e-05,
+      "tcmt_iid_absorbed_fraction": 7.021963091505227e-05,
+      "tcmt_minus_exact_quasistatic_fraction": -3.291504674375576e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 1.1624451223203234e-08
+    },
+    {
+      "detuning_from_midpoint_hz": 596418144904.6178,
+      "exact_quasistatic_absorbed_fraction": 7.788130137039698e-05,
+      "tcmt_quasistatic_absorbed_fraction": 3.1571904201294106e-05,
+      "tcmt_iid_absorbed_fraction": 3.1573945518157785e-05,
+      "tcmt_minus_exact_quasistatic_fraction": -4.630939716910287e-05,
+      "tcmt_dynamic_minus_quasistatic_fraction": 2.041316863678514e-09
+    }
+  ],
+  "independent_table_holdout": {
+    "seed": 8917,
+    "points": 10000,
+    "construction_report": {
+      "validated": true,
+      "reason": "quarter/midpoint and independent heldout checks passed",
+      "absolute_tolerance": 1e-07,
+      "quarter_midpoint_max_error": 9.996177169346865e-08,
+      "independent_heldout_max_error": 9.877603431750681e-08,
+      "periodic_endpoint_error": 2.220446049250313e-16,
+      "heldout_points": 2048,
+      "seed": 7319,
+      "independent_validation_round": 0,
+      "nodes": 18804,
+      "max_nodes": 32769,
+      "refinements": 6,
+      "reference_point_evaluations": 162503,
+      "stored_energy_normalization_rate_per_s": 54524712215.49762,
+      "memory_bytes": 2256480,
+      "interpretation": "Sampled interpolation validation of the stated compact model, not a device-accuracy claim or rigorous uniform bound."
+    },
+    "maximum_absolute_error_as_fraction_of_input": {
+      "through_power_w": 4.406367781630934e-08,
+      "drop_power_w": 1.0834769773475153e-08,
+      "intrinsic_loss_power_w": 3.322890789434792e-08,
+      "absorbed_power_w": 2.658312631549126e-08,
+      "oma_w": 1.8787673843712653e-07,
+      "stored_energy_scaled_to_power": 9.880606103805446e-08
+    },
+    "maximum_power_balance_error_fraction": 9.807040552084019e-16,
+    "interpretation": "Independent numerical holdout against direct equations; not physical validation. OMA can accumulate errors in two interpolated levels."
+  },
+  "runtime_s": 35.508086582878605,
+  "peak_process_rss_bytes": 119128064,
+  "runtime_platform": {
+    "python": "3.13.5",
+    "numpy": "2.5.3",
+    "system": "Darwin",
+    "machine": "arm64"
+  }
+}

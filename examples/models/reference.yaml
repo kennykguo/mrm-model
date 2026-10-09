@@ -1,0 +1,35 @@
+version: 1
+name: synthetic_single_mrm
+# A reproducible teaching/research plant, not an identified Lightmatter device.
+array:
+  count: 1
+  cold_offset_hz: 300.0e9
+data:
+  averaging: stationary_nrz
+  bit_rate_hz: 50.0e9
+controller:
+  name: scan_pi
+  parameters:
+    scan_steps: 48
+    settle_frames: 2
+    target_fraction: 0.65
+    kp: 0.25
+    ki_per_s: 1500.0
+simulation:
+  duration_s: 0.004
+  seed: 7
+scenario:
+  kind: ambient_step
+  start_s: 0.003
+  ambient_step_k: 0.25
+evidence:
+  ring.reference_wavelength_m:
+    status: published_context
+    source: Anand et al., OFC 2026 M4B.3, sections 1–2; grid centered near 1310 nm
+  ring.thermal_frequency_slope_hz_per_k:
+    status: published_magnitude_with_inferred_sign
+    source: Anand et al., OFC 2026 M4B.3 introduction (~15 GHz/K); red-shift sign inferred for silicon
+  data.bit_rate_hz:
+    status: published_context
+    source: Anand et al., OFC 2026 M4B.3; 50 Gb/s NRZ per lane
+

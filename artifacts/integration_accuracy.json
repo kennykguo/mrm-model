@@ -1,0 +1,1766 @@
+{
+  "claim": "Numerical comparison on a synthetic self-heating trajectory, not Lightmatter validation.",
+  "comparison": {
+    "direct_default": {
+      "configuration": {
+        "array": {
+          "bus_loss_db": 0.0,
+          "cold_offset_hz": 10000000000.0,
+          "count": 1,
+          "resonance_errors_hz": [],
+          "spacing_hz": 400000000000.0
+        },
+        "controller": {
+          "name": "hold",
+          "parameters": {
+            "code": 500
+          }
+        },
+        "data": {
+          "averaging": "stationary_nrz",
+          "bias_v": 1.5,
+          "bit_rate_hz": 50000000000.0,
+          "driver_power_w": 0.0,
+          "junction_heat_fraction": 1.0,
+          "mark_probability": 0.5,
+          "swing_v": 1.0
+        },
+        "evidence": {
+          "array.bus_loss_db": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.cold_offset_hz": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "array.count": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.resonance_errors_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.spacing_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "controller.name": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters.code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.averaging": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bias_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bit_rate_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.driver_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.junction_heat_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.mark_probability": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.swing_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.current_max_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.power_max_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_temperature_coefficient_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.settling_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.voltage_max_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.built_in_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.frequency_shift_scale_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.leakage_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.loss_change_scale_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.maximum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.minimum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.parasitic_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.reference_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.series_resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.zero_bias_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.frequency_noise_rms_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_fractional_noise_rms": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_per_line_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.absorption_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.beta2_s2_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.drop_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.group_index": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.input_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.intrinsic_loss_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_wavelength_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.roundtrip_length_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_curvature_hz_per_k2": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_slope_hz_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_ring": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_ramp_k_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_step_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_duration_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.kind": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.laser_drift_hz_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.power_step_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.collection_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_activation_energy_ev": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.filter_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.full_scale_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.input_noise_a_per_sqrt_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.noise_enabled": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "sensor.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.responsivity_a_per_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.sample_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.temperature_resolution_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.compute_latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.control_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.current_atol_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.duration_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.heater_energy_atol_j": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.initial_heater_code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.initial_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.max_step_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.method": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.oma_integral_atol_j": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.optical_evaluation": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.optical_table_tolerance": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_memory_limit_mb": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_period_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.rtol": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.seed": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.temperature_atol_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.tick_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.voltage_atol_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.aggressor_package_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_waveguide_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.neighbor_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_boundary_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          }
+        },
+        "heater": {
+          "bits": 12,
+          "current_max_a": 0.02,
+          "latency_s": 2e-06,
+          "power_max_w": 0.002,
+          "reference_temperature_k": 300.0,
+          "resistance_ohm": 500.0,
+          "resistance_temperature_coefficient_per_k": 0.001,
+          "settling_time_s": 1e-06,
+          "voltage_max_v": 0.6
+        },
+        "junction": {
+          "built_in_voltage_v": 0.8,
+          "frequency_shift_scale_hz": -12000000000.0,
+          "leakage_current_a": 1e-09,
+          "loss_change_scale_per_m": -8.0,
+          "maximum_voltage_v": 5.0,
+          "minimum_voltage_v": 0.0,
+          "parasitic_capacitance_f": 5e-15,
+          "reference_voltage_v": 0.0,
+          "series_resistance_ohm": 70.0,
+          "zero_bias_capacitance_f": 3e-14
+        },
+        "laser": {
+          "frequency_noise_rms_hz": 0.0,
+          "power_fractional_noise_rms": 0.0,
+          "power_per_line_w": 0.0005
+        },
+        "name": "synthetic_reference",
+        "ring": {
+          "absorption_fraction": 0.8,
+          "beta2_s2_per_m": 0.0,
+          "drop_coupling_power": 0.005,
+          "group_index": 4.0,
+          "input_coupling_power": 0.025,
+          "intrinsic_loss_per_m": 250.0,
+          "reference_temperature_k": 300.0,
+          "reference_wavelength_m": 1.31e-06,
+          "roundtrip_length_m": 6.283185307179587e-05,
+          "thermal_frequency_curvature_hz_per_k2": 0.0,
+          "thermal_frequency_slope_hz_per_k": -15000000000.0
+        },
+        "scenario": {
+          "aggressor_period_s": 0.2,
+          "aggressor_power_w": 0.0,
+          "aggressor_ring": 0,
+          "ambient_ramp_k_per_s": 0.0,
+          "ambient_step_k": 0.0,
+          "ambient_temperature_k": 300.0,
+          "dropout_duration_s": 0.0,
+          "dropout_start_s": -1.0,
+          "kind": "constant",
+          "laser_drift_hz_per_s": 0.0,
+          "power_step_fraction": 0.0,
+          "start_s": 0.002
+        },
+        "sensor": {
+          "bits": 12,
+          "collection_fraction": 1.0,
+          "dark_activation_energy_ev": 0.35,
+          "dark_current_a": 5e-09,
+          "filter_time_s": 2e-06,
+          "full_scale_a": 0.0002,
+          "input_noise_a_per_sqrt_hz": 2e-12,
+          "latency_s": 2e-06,
+          "noise_enabled": false,
+          "reference_temperature_k": 300.0,
+          "responsivity_a_per_w": 0.8,
+          "sample_period_s": 5e-06,
+          "temperature_resolution_k": 0.05
+        },
+        "simulation": {
+          "compute_latency_s": 1e-06,
+          "control_period_s": 2e-05,
+          "current_atol_a": 1e-12,
+          "duration_s": 4e-05,
+          "heater_energy_atol_j": 1e-15,
+          "initial_heater_code": 0,
+          "initial_temperature_k": 300.0,
+          "max_step_s": 5e-06,
+          "method": "Radau",
+          "oma_integral_atol_j": 1e-18,
+          "optical_evaluation": "direct",
+          "optical_table_tolerance": 1e-07,
+          "record_memory_limit_mb": 256.0,
+          "record_period_s": 1e-06,
+          "rtol": 1e-06,
+          "seed": 1,
+          "temperature_atol_k": 1e-07,
+          "tick_s": 1e-06,
+          "voltage_atol_v": 1e-08
+        },
+        "thermal": {
+          "aggressor_package_fraction": 0.8,
+          "heater_capacity_j_per_k": 3e-10,
+          "heater_package_conductance_w_per_k": 1e-05,
+          "heater_waveguide_conductance_w_per_k": 3e-05,
+          "neighbor_conductance_w_per_k": 1e-06,
+          "package_boundary_conductance_w_per_k": 0.002,
+          "package_capacity_j_per_k": 4e-08,
+          "waveguide_capacity_j_per_k": 1.2e-10,
+          "waveguide_package_conductance_w_per_k": 2e-05
+        },
+        "version": 1
+      },
+      "diagnostics": {
+        "commands": 2,
+        "config_sha256": "d1509fb4ceedb79d5366333660ab95c78276f639130679dc97da122c1b0353da",
+        "controller": {
+          "name": "hold"
+        },
+        "event_boundary_convention": "integer-tick canonical right limits; integration closes on the pre-event left limit",
+        "events": 40,
+        "fsr_hz": [
+          1192836289809.2356
+        ],
+        "heater_energy_atol_j": 1e-15,
+        "junction_heat_w_per_ring": 0.00028499871603218245,
+        "nearest_line_note": "Nearest periodic resonance is an identity-risk diagnostic even when no lane is locked.",
+        "numerical_method": "Radau",
+        "oma_integral_atol_j": 1e-18,
+        "optical_model": "stationary_nrz",
+        "record_count": 41,
+        "rhs_calls": 2080,
+        "rtol": 1e-06,
+        "spectral_table": null,
+        "stationary_nrz_note": "Photon memory near resonance, exact quasistatic tails, continuous blend; ideal electrical edges and iid bits.",
+        "trace_bytes": 3936,
+        "wall_s": 3.7453124169260263
+      },
+      "heater_energy_difference_j": [
+        -1.6709358566300866e-20
+      ],
+      "max_recorded_detuning_difference_hz": 75.0,
+      "max_recorded_oma_difference_w": 1.1300183878903969e-13,
+      "max_recorded_temperature_difference_k": 4.998753411200596e-09,
+      "mean_oma_difference_w": [
+        1.7664521659341672e-12
+      ]
+    },
+    "direct_refined": {
+      "configuration": {
+        "array": {
+          "bus_loss_db": 0.0,
+          "cold_offset_hz": 10000000000.0,
+          "count": 1,
+          "resonance_errors_hz": [],
+          "spacing_hz": 400000000000.0
+        },
+        "controller": {
+          "name": "hold",
+          "parameters": {
+            "code": 500
+          }
+        },
+        "data": {
+          "averaging": "stationary_nrz",
+          "bias_v": 1.5,
+          "bit_rate_hz": 50000000000.0,
+          "driver_power_w": 0.0,
+          "junction_heat_fraction": 1.0,
+          "mark_probability": 0.5,
+          "swing_v": 1.0
+        },
+        "evidence": {
+          "array.bus_loss_db": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.cold_offset_hz": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "array.count": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.resonance_errors_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.spacing_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "controller.name": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters.code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.averaging": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bias_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bit_rate_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.driver_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.junction_heat_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.mark_probability": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.swing_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.current_max_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.power_max_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_temperature_coefficient_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.settling_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.voltage_max_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.built_in_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.frequency_shift_scale_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.leakage_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.loss_change_scale_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.maximum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.minimum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.parasitic_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.reference_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.series_resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.zero_bias_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.frequency_noise_rms_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_fractional_noise_rms": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_per_line_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.absorption_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.beta2_s2_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.drop_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.group_index": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.input_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.intrinsic_loss_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_wavelength_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.roundtrip_length_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_curvature_hz_per_k2": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_slope_hz_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_ring": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_ramp_k_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_step_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_duration_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.kind": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.laser_drift_hz_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.power_step_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.collection_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_activation_energy_ev": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.filter_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.full_scale_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.input_noise_a_per_sqrt_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.noise_enabled": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "sensor.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.responsivity_a_per_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.sample_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.temperature_resolution_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.compute_latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.control_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.current_atol_a": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.duration_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.heater_energy_atol_j": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.initial_heater_code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.initial_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.max_step_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.method": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.oma_integral_atol_j": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.optical_evaluation": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.optical_table_tolerance": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_memory_limit_mb": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_period_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.rtol": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.seed": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.temperature_atol_k": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.tick_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.voltage_atol_v": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "thermal.aggressor_package_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_waveguide_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.neighbor_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_boundary_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          }
+        },
+        "heater": {
+          "bits": 12,
+          "current_max_a": 0.02,
+          "latency_s": 2e-06,
+          "power_max_w": 0.002,
+          "reference_temperature_k": 300.0,
+          "resistance_ohm": 500.0,
+          "resistance_temperature_coefficient_per_k": 0.001,
+          "settling_time_s": 1e-06,
+          "voltage_max_v": 0.6
+        },
+        "junction": {
+          "built_in_voltage_v": 0.8,
+          "frequency_shift_scale_hz": -12000000000.0,
+          "leakage_current_a": 1e-09,
+          "loss_change_scale_per_m": -8.0,
+          "maximum_voltage_v": 5.0,
+          "minimum_voltage_v": 0.0,
+          "parasitic_capacitance_f": 5e-15,
+          "reference_voltage_v": 0.0,
+          "series_resistance_ohm": 70.0,
+          "zero_bias_capacitance_f": 3e-14
+        },
+        "laser": {
+          "frequency_noise_rms_hz": 0.0,
+          "power_fractional_noise_rms": 0.0,
+          "power_per_line_w": 0.0005
+        },
+        "name": "synthetic_reference",
+        "ring": {
+          "absorption_fraction": 0.8,
+          "beta2_s2_per_m": 0.0,
+          "drop_coupling_power": 0.005,
+          "group_index": 4.0,
+          "input_coupling_power": 0.025,
+          "intrinsic_loss_per_m": 250.0,
+          "reference_temperature_k": 300.0,
+          "reference_wavelength_m": 1.31e-06,
+          "roundtrip_length_m": 6.283185307179587e-05,
+          "thermal_frequency_curvature_hz_per_k2": 0.0,
+          "thermal_frequency_slope_hz_per_k": -15000000000.0
+        },
+        "scenario": {
+          "aggressor_period_s": 0.2,
+          "aggressor_power_w": 0.0,
+          "aggressor_ring": 0,
+          "ambient_ramp_k_per_s": 0.0,
+          "ambient_step_k": 0.0,
+          "ambient_temperature_k": 300.0,
+          "dropout_duration_s": 0.0,
+          "dropout_start_s": -1.0,
+          "kind": "constant",
+          "laser_drift_hz_per_s": 0.0,
+          "power_step_fraction": 0.0,
+          "start_s": 0.002
+        },
+        "sensor": {
+          "bits": 12,
+          "collection_fraction": 1.0,
+          "dark_activation_energy_ev": 0.35,
+          "dark_current_a": 5e-09,
+          "filter_time_s": 2e-06,
+          "full_scale_a": 0.0002,
+          "input_noise_a_per_sqrt_hz": 2e-12,
+          "latency_s": 2e-06,
+          "noise_enabled": false,
+          "reference_temperature_k": 300.0,
+          "responsivity_a_per_w": 0.8,
+          "sample_period_s": 5e-06,
+          "temperature_resolution_k": 0.05
+        },
+        "simulation": {
+          "compute_latency_s": 1e-06,
+          "control_period_s": 2e-05,
+          "current_atol_a": 1e-14,
+          "duration_s": 4e-05,
+          "heater_energy_atol_j": 1e-17,
+          "initial_heater_code": 0,
+          "initial_temperature_k": 300.0,
+          "max_step_s": 2.5e-07,
+          "method": "Radau",
+          "oma_integral_atol_j": 1e-20,
+          "optical_evaluation": "direct",
+          "optical_table_tolerance": 1e-07,
+          "record_memory_limit_mb": 256.0,
+          "record_period_s": 1e-06,
+          "rtol": 1e-08,
+          "seed": 1,
+          "temperature_atol_k": 1e-09,
+          "tick_s": 1e-06,
+          "voltage_atol_v": 1e-10
+        },
+        "thermal": {
+          "aggressor_package_fraction": 0.8,
+          "heater_capacity_j_per_k": 3e-10,
+          "heater_package_conductance_w_per_k": 1e-05,
+          "heater_waveguide_conductance_w_per_k": 3e-05,
+          "neighbor_conductance_w_per_k": 1e-06,
+          "package_boundary_conductance_w_per_k": 0.002,
+          "package_capacity_j_per_k": 4e-08,
+          "waveguide_capacity_j_per_k": 1.2e-10,
+          "waveguide_package_conductance_w_per_k": 2e-05
+        },
+        "version": 1
+      },
+      "diagnostics": {
+        "commands": 2,
+        "config_sha256": "1099b106498e02e444f853f382b325a001e548ebc381e9aca08c869305704862",
+        "controller": {
+          "name": "hold"
+        },
+        "event_boundary_convention": "integer-tick canonical right limits; integration closes on the pre-event left limit",
+        "events": 40,
+        "fsr_hz": [
+          1192836289809.2356
+        ],
+        "heater_energy_atol_j": 1e-17,
+        "junction_heat_w_per_ring": 0.00028499871603218245,
+        "nearest_line_note": "Nearest periodic resonance is an identity-risk diagnostic even when no lane is locked.",
+        "numerical_method": "Radau",
+        "oma_integral_atol_j": 1e-20,
+        "optical_model": "stationary_nrz",
+        "record_count": 41,
+        "rhs_calls": 4599,
+        "rtol": 1e-08,
+        "spectral_table": null,
+        "stationary_nrz_note": "Photon memory near resonance, exact quasistatic tails, continuous blend; ideal electrical edges and iid bits.",
+        "trace_bytes": 3936,
+        "wall_s": 8.816170249832794
+      },
+      "heater_energy_difference_j": [
+        0.0
+      ],
+      "max_recorded_detuning_difference_hz": 0.0,
+      "max_recorded_oma_difference_w": 0.0,
+      "max_recorded_temperature_difference_k": 0.0,
+      "mean_oma_difference_w": [
+        0.0
+      ]
+    },
+    "table_default": {
+      "configuration": {
+        "array": {
+          "bus_loss_db": 0.0,
+          "cold_offset_hz": 10000000000.0,
+          "count": 1,
+          "resonance_errors_hz": [],
+          "spacing_hz": 400000000000.0
+        },
+        "controller": {
+          "name": "hold",
+          "parameters": {
+            "code": 500
+          }
+        },
+        "data": {
+          "averaging": "stationary_nrz",
+          "bias_v": 1.5,
+          "bit_rate_hz": 50000000000.0,
+          "driver_power_w": 0.0,
+          "junction_heat_fraction": 1.0,
+          "mark_probability": 0.5,
+          "swing_v": 1.0
+        },
+        "evidence": {
+          "array.bus_loss_db": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.cold_offset_hz": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "array.count": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.resonance_errors_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "array.spacing_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "controller.name": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "controller.parameters.code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.averaging": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bias_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.bit_rate_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.driver_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.junction_heat_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.mark_probability": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "data.swing_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.current_max_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.power_max_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.resistance_temperature_coefficient_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.settling_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "heater.voltage_max_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.built_in_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.frequency_shift_scale_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.leakage_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.loss_change_scale_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.maximum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.minimum_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.parasitic_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.reference_voltage_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.series_resistance_ohm": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "junction.zero_bias_capacitance_f": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.frequency_noise_rms_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_fractional_noise_rms": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "laser.power_per_line_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.absorption_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.beta2_s2_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.drop_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.group_index": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.input_coupling_power": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.intrinsic_loss_per_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.reference_wavelength_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.roundtrip_length_m": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_curvature_hz_per_k2": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "ring.thermal_frequency_slope_hz_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_power_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.aggressor_ring": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_ramp_k_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_step_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.ambient_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_duration_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.dropout_start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.kind": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.laser_drift_hz_per_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.power_step_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "scenario.start_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.bits": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.collection_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_activation_energy_ev": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.dark_current_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.filter_time_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.full_scale_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.input_noise_a_per_sqrt_hz": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.noise_enabled": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "sensor.reference_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.responsivity_a_per_w": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.sample_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "sensor.temperature_resolution_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.compute_latency_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.control_period_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.current_atol_a": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.duration_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.heater_energy_atol_j": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.initial_heater_code": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.initial_temperature_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.max_step_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.method": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.oma_integral_atol_j": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.optical_evaluation": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.optical_table_tolerance": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_memory_limit_mb": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.record_period_s": {
+            "source": "experiment input",
+            "status": "override"
+          },
+          "simulation.rtol": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.seed": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.temperature_atol_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.tick_s": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "simulation.voltage_atol_v": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.aggressor_package_fraction": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.heater_waveguide_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.neighbor_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_boundary_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.package_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_capacity_j_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          },
+          "thermal.waveguide_package_conductance_w_per_k": {
+            "source": "synthetic reference; requires calibration",
+            "status": "assumed"
+          }
+        },
+        "heater": {
+          "bits": 12,
+          "current_max_a": 0.02,
+          "latency_s": 2e-06,
+          "power_max_w": 0.002,
+          "reference_temperature_k": 300.0,
+          "resistance_ohm": 500.0,
+          "resistance_temperature_coefficient_per_k": 0.001,
+          "settling_time_s": 1e-06,
+          "voltage_max_v": 0.6
+        },
+        "junction": {
+          "built_in_voltage_v": 0.8,
+          "frequency_shift_scale_hz": -12000000000.0,
+          "leakage_current_a": 1e-09,
+          "loss_change_scale_per_m": -8.0,
+          "maximum_voltage_v": 5.0,
+          "minimum_voltage_v": 0.0,
+          "parasitic_capacitance_f": 5e-15,
+          "reference_voltage_v": 0.0,
+          "series_resistance_ohm": 70.0,
+          "zero_bias_capacitance_f": 3e-14
+        },
+        "laser": {
+          "frequency_noise_rms_hz": 0.0,
+          "power_fractional_noise_rms": 0.0,
+          "power_per_line_w": 0.0005
+        },
+        "name": "synthetic_reference",
+        "ring": {
+          "absorption_fraction": 0.8,
+          "beta2_s2_per_m": 0.0,
+          "drop_coupling_power": 0.005,
+          "group_index": 4.0,
+          "input_coupling_power": 0.025,
+          "intrinsic_loss_per_m": 250.0,
+          "reference_temperature_k": 300.0,
+          "reference_wavelength_m": 1.31e-06,
+          "roundtrip_length_m": 6.283185307179587e-05,
+          "thermal_frequency_curvature_hz_per_k2": 0.0,
+          "thermal_frequency_slope_hz_per_k": -15000000000.0
+        },
+        "scenario": {
+          "aggressor_period_s": 0.2,
+          "aggressor_power_w": 0.0,
+          "aggressor_ring": 0,
+          "ambient_ramp_k_per_s": 0.0,
+          "ambient_step_k": 0.0,
+          "ambient_temperature_k": 300.0,
+          "dropout_duration_s": 0.0,
+          "dropout_start_s": -1.0,
+          "kind": "constant",
+          "laser_drift_hz_per_s": 0.0,
+          "power_step_fraction": 0.0,
+          "start_s": 0.002
+        },
+        "sensor": {
+          "bits": 12,
+          "collection_fraction": 1.0,
+          "dark_activation_energy_ev": 0.35,
+          "dark_current_a": 5e-09,
+          "filter_time_s": 2e-06,
+          "full_scale_a": 0.0002,
+          "input_noise_a_per_sqrt_hz": 2e-12,
+          "latency_s": 2e-06,
+          "noise_enabled": false,
+          "reference_temperature_k": 300.0,
+          "responsivity_a_per_w": 0.8,
+          "sample_period_s": 5e-06,
+          "temperature_resolution_k": 0.05
+        },
+        "simulation": {
+          "compute_latency_s": 1e-06,
+          "control_period_s": 2e-05,
+          "current_atol_a": 1e-12,
+          "duration_s": 4e-05,
+          "heater_energy_atol_j": 1e-15,
+          "initial_heater_code": 0,
+          "initial_temperature_k": 300.0,
+          "max_step_s": 5e-06,
+          "method": "Radau",
+          "oma_integral_atol_j": 1e-18,
+          "optical_evaluation": "table",
+          "optical_table_tolerance": 1e-07,
+          "record_memory_limit_mb": 256.0,
+          "record_period_s": 1e-06,
+          "rtol": 1e-06,
+          "seed": 1,
+          "temperature_atol_k": 1e-07,
+          "tick_s": 1e-06,
+          "voltage_atol_v": 1e-08
+        },
+        "thermal": {
+          "aggressor_package_fraction": 0.8,
+          "heater_capacity_j_per_k": 3e-10,
+          "heater_package_conductance_w_per_k": 1e-05,
+          "heater_waveguide_conductance_w_per_k": 3e-05,
+          "neighbor_conductance_w_per_k": 1e-06,
+          "package_boundary_conductance_w_per_k": 0.002,
+          "package_capacity_j_per_k": 4e-08,
+          "waveguide_capacity_j_per_k": 1.2e-10,
+          "waveguide_package_conductance_w_per_k": 2e-05
+        },
+        "version": 1
+      },
+      "diagnostics": {
+        "commands": 2,
+        "config_sha256": "eb5de218f8a0220c683bfbc7526d7850f906b54973ec2c38b0423bc7a508009e",
+        "controller": {
+          "name": "hold"
+        },
+        "event_boundary_convention": "integer-tick canonical right limits; integration closes on the pre-event left limit",
+        "events": 40,
+        "fsr_hz": [
+          1192836289809.2356
+        ],
+        "heater_energy_atol_j": 1e-15,
+        "junction_heat_w_per_ring": 0.00028499871603218245,
+        "nearest_line_note": "Nearest periodic resonance is an identity-risk diagnostic even when no lane is locked.",
+        "numerical_method": "Radau",
+        "oma_integral_atol_j": 1e-18,
+        "optical_model": "stationary_nrz",
+        "record_count": 41,
+        "rhs_calls": 2114,
+        "rtol": 1e-06,
+        "spectral_table": {
+          "absolute_tolerance": 1e-07,
+          "heldout_points": 2048,
+          "independent_heldout_max_error": 9.898274380638807e-08,
+          "independent_validation_round": 0,
+          "interpretation": "Sampled interpolation validation of the stated compact model, not a device-accuracy claim or rigorous uniform bound.",
+          "max_nodes": 32769,
+          "memory_bytes": 2284920,
+          "nodes": 19041,
+          "periodic_endpoint_error": 2.220446049250313e-16,
+          "quarter_midpoint_max_error": 9.998289174362185e-08,
+          "reason": "quarter/midpoint and independent heldout checks passed",
+          "reference_point_evaluations": 216848,
+          "refinements": 7,
+          "seed": 7319,
+          "stored_energy_normalization_rate_per_s": 54505206454.90575,
+          "validated": true
+        },
+        "stationary_nrz_note": "Photon memory near resonance, exact quasistatic tails, continuous blend; ideal electrical edges and iid bits.",
+        "trace_bytes": 3936,
+        "wall_s": 3.4093675001058728
+      },
+      "heater_energy_difference_j": [
+        -2.4273925268098305e-20
+      ],
+      "max_recorded_detuning_difference_hz": 895.75,
+      "max_recorded_oma_difference_w": 3.317714115588788e-11,
+      "max_recorded_temperature_difference_k": 5.971605787635781e-08,
+      "mean_oma_difference_w": [
+        2.5458001312711454e-12
+      ]
+    }
+  },
+  "coverage": "40 us one-ring near-resonance transient, held heater code, stationary iid NRZ; no sensor noise",
+  "interpretation": "Separates lookup interpolation and ODE refinement effects. It does not bound model discrepancy, all parameter choices, discontinuous controller decisions, or omitted physics.",
+  "platform": "macOS-26.1-arm64-arm-64bit-Mach-O",
+  "process_peak_rss_bytes": 181043200,
+  "python": "3.13.5",
+  "reference": "direct_refined; this too is a finite-tolerance computation, not exact truth",
+  "source_sha256": {
+    "pyproject.toml": "dc8be4eac1ffcc2bc022e31b2c4bc0434acf50311bcbd16e04eb3f916b1026c4",
+    "src/ringlab/__init__.py": "e20fdd13a425e2c9d57c9be8a1f1f1c38c31e974ea91a8dc7356610ed180ece6",
+    "src/ringlab/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "src/ringlab/calibration.py": "14b509287fea2cd5c37dba5051491cbd49f883ac93b53b4b6fdbbe74c6e348ab",
+    "src/ringlab/cli.py": "afcdee14226abd16af6df4851d6872baca6e79a5f8d8984c7912e2a0daa1c453",
+    "src/ringlab/config.py": "517ef7c7d5ddd89a3e2705c5866ab4447033846353e3bc958b958b099fbb0467",
+    "src/ringlab/controllers.py": "9bbb7aadeb2179dd90a631d65497406ee15ee02f8519e46fde5421c972f14bd2",
+    "src/ringlab/experiments.py": "98f7844f0408eb45b171029fd2f83b71d7d4efb181f4c7062d92a27a14eff803",
+    "src/ringlab/extraction/thermal.py": "7aaa15b8c14a8ff9172fec57ead16552fc7da8aa89bffd08b9c857ec054997d4",
+    "src/ringlab/junction.py": "ee2f423bced54448a1f0a18254d58245ebbd18c09d277bf2660f3caf5befc6ec",
+    "src/ringlab/optical_calibration.py": "736e74ed406dde6b94b073de35314d984d7afee9fc55463615053f04480872ca",
+    "src/ringlab/optical_tables.py": "1ce82e80f820d95cb915f7ccb4ea7e6c075babb82698f17bf67e2c0ad76f5bd8",
+    "src/ringlab/optics.py": "124083901eacd3fa45697d187303630ab75d032729c6b94bd7b824d70ae1cb9f",
+    "src/ringlab/plant.py": "a4fe3ae2d4d20ea1f67afaf1b98133407925c4605537944bfcc51cea42f01fe3",
+    "src/ringlab/provenance.py": "5ef9402349f80a5b128feb86269a46e68179c5819f50c1a1b16918eb9b3580c4",
+    "src/ringlab/thermal.py": "5306bb5a6b0353a9a48c03d13839a401c01c86928a0741dbf14b344a226177f2",
+    "src/ringlab/waveform.py": "f8e2ab797f8923d87a7538b635e95b13a405cf37caf82ac01051ea1a1f998af1",
+    "uv.lock": "5edf85afbac66156b53a72fe4b14f2541e371c46471bcf5a33dfdb59f302df69"
+  },
+  "validation_script_sha256": "d75d8a89bf16ac9e238a92000fc1fde92b6e99a9a8dcaa868db66af34e8f33cb",
+  "versions": {
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.3",
+    "pyyaml": "6.0.3",
+    "scipy": "1.18.1"
+  },
+  "wall_s": 16.081971292151138
+}

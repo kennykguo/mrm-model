@@ -1,0 +1,29 @@
+model: ../models/reference.yaml
+controllers:
+  - name: hold
+    parameters: {code: 1500}
+  - name: scan_pi
+    parameters: {scan_steps: 48, settle_frames: 2, target_fraction: 0.65, kp: 0.25, ki_per_s: 1500.0}
+  - name: dither
+    parameters: {initial_code: 1500, amplitude_codes: 16, gain: 0.4, dwell_frames: 4}
+cases:
+  nominal: {}
+  slower_heater:
+    thermal.heater_capacity_j_per_k: 6.0e-10
+    thermal.waveguide_capacity_j_per_k: 2.4e-10
+  darker_monitor:
+    sensor.dark_current_a: 20.0e-9
+samples: 2
+seed: 18
+# Deliberately small screening study. These ranges are assumed sensitivity
+# ranges, not confidence intervals or a measured fabrication distribution.
+uncertainty:
+  thermal.heater_waveguide_conductance_w_per_k:
+    kind: uniform
+    low: 2.4e-5
+    high: 3.6e-5
+  ring.absorption_fraction:
+    kind: uniform
+    low: 0.5
+    high: 0.95
+

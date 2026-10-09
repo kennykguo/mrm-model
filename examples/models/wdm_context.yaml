@@ -1,0 +1,32 @@
+version: 1
+name: eight_lane_public_context_with_assumed_devices
+# Context only. FSR, optical losses, thermal network, and I/O are NOT known from
+# the paper. This combination may fail wrong-line capture, which is informative.
+array:
+  count: 8
+  spacing_hz: 400.0e9
+  cold_offset_hz: 300.0e9
+ring:
+  roundtrip_length_m: 47.1238898038469e-6
+controller:
+  name: scan_pi
+  parameters:
+    scan_steps: 48
+    settle_frames: 2
+simulation:
+  # Sequential acquisition includes conservative post-application sample gating.
+  duration_s: 0.03
+scenario:
+  kind: constant
+evidence:
+  array.count:
+    status: published
+    source: Anand et al., OFC 2026 M4B.3 Fig. 1, eight TX MRMs per transceiver
+  array.spacing_hz:
+    status: published
+    source: Anand et al., OFC 2026 M4B.3 section 2, 400 GHz per direction
+  ring.roundtrip_length_m:
+    status: inferred_from_approximate_talk_diameter
+    source: OFC 2026 presentation slide 7 ~15 µm diameter; centerline/precise geometry unknown
+    note: This and assumed group index do not establish the actual device FSR.
+

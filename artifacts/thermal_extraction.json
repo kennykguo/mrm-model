@@ -1,0 +1,295 @@
+{
+  "geometry_status": "assumed, not a foundry device",
+  "levels": [
+    {
+      "refinement": 1,
+      "cells": 256,
+      "gain_k_per_w": [
+        [
+          5185.702976838293,
+          65.57792863329077,
+          5481.857826987789,
+          64.22943650634787,
+          2047.7400506358058,
+          29.640859894650713
+        ],
+        [
+          65.57792863329065,
+          5185.702976838292,
+          64.22943650634782,
+          5481.85782698779,
+          170.31736646604165,
+          2058.963194885798
+        ]
+      ],
+      "power_balance_relative_error": 2.220446049250313e-15,
+      "relative_gain_difference_to_finest": 0.13358840377706532
+    },
+    {
+      "refinement": 2,
+      "cells": 1024,
+      "gain_k_per_w": [
+        [
+          5279.300710343431,
+          65.34641254954144,
+          6122.832951756884,
+          63.38295883070012,
+          2086.1860601345597,
+          30.132297136738668
+        ],
+        [
+          65.34641254954114,
+          5279.300710343157,
+          63.38295883070017,
+          6122.832951756589,
+          164.8255100260806,
+          2097.170546961289
+        ]
+      ],
+      "power_balance_relative_error": 8.992806499463768e-14,
+      "relative_gain_difference_to_finest": 0.05972218328635844
+    },
+    {
+      "refinement": 4,
+      "cells": 4096,
+      "gain_k_per_w": [
+        [
+          5333.278554521238,
+          65.16094175511932,
+          6489.333076037829,
+          63.17434814543467,
+          2089.431510014699,
+          30.199639400328184
+        ],
+        [
+          65.16094175511927,
+          5333.2785545215,
+          63.174348145434706,
+          6489.333076038097,
+          163.9513377600882,
+          2100.392529426211
+        ]
+      ],
+      "power_balance_relative_error": 1.3700152123874432e-13,
+      "relative_gain_difference_to_finest": 0.017596230559028304
+    },
+    {
+      "refinement": 8,
+      "cells": 16384,
+      "gain_k_per_w": [
+        [
+          5339.870227715371,
+          65.1327641821509,
+          6687.921257316152,
+          63.12234312492335,
+          2091.533249053335,
+          30.227895635084245
+        ],
+        [
+          65.13276418215405,
+          5339.870227720799,
+          63.122343124923304,
+          6687.921257321774,
+          163.5883295541966,
+          2102.478185118864
+        ]
+      ],
+      "power_balance_relative_error": 2.4573676427053215e-12,
+      "relative_gain_difference_to_finest": 0.005043023471857683
+    },
+    {
+      "refinement": 16,
+      "cells": 65536,
+      "gain_k_per_w": [
+        [
+          5339.040528873524,
+          65.13428765317765,
+          6643.668381688307,
+          63.135088220435605,
+          2092.522120956779,
+          30.23701940212491
+        ],
+        [
+          65.13428765316738,
+          5339.040528851131,
+          63.1350882204358,
+          6643.668381665396,
+          163.58218287760127,
+          2103.467277470512
+        ]
+      ],
+      "power_balance_relative_error": 1.1837975044670657e-11,
+      "relative_gain_difference_to_finest": 0.0
+    }
+  ],
+  "reference_is_exact": false,
+  "source_sha256": {
+    "src/ringlab/thermal.py": "5306bb5a6b0353a9a48c03d13839a401c01c86928a0741dbf14b344a226177f2",
+    "src/ringlab/extraction/thermal.py": "7aaa15b8c14a8ff9172fec57ead16552fc7da8aa89bffd08b9c857ec054997d4",
+    "src/ringlab/calibration.py": "14b509287fea2cd5c37dba5051491cbd49f883ac93b53b4b6fdbbe74c6e348ab",
+    "examples/thermal_extraction.py": "1759143c0baa0476f619f8d7da27d288ebfa7ee977f85778a408265cbdf0b56f"
+  },
+  "software": {
+    "python": "3.13.5 (main, Jul 11 2025, 22:26:07) [Clang 20.1.4 ]",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1"
+  },
+  "provenance": "synthetic geometry; independent numerical verification only; not foundry validation",
+  "boundary_conditions": "isothermal bottom, adiabatic top and sides, uniform 20 um extrusion",
+  "si_units": true,
+  "geometry": {
+    "width_m": 8e-05,
+    "extrusion_depth_m": 2e-05,
+    "ring_pitch_m": 3e-05,
+    "layer_thicknesses_m": [
+      2e-05,
+      2e-06,
+      2.2e-07,
+      1.5e-06
+    ],
+    "layer_conductivity_w_per_m_k": [
+      130.0,
+      1.4,
+      80.0,
+      1.4
+    ],
+    "layer_volumetric_capacity_j_per_m3_k": [
+      1630000.0,
+      1550000.0,
+      1630000.0,
+      1550000.0
+    ],
+    "status": "all geometry and material values assumed"
+  },
+  "krylov_heater_step": [
+    {
+      "moments": 1,
+      "modes": 6,
+      "relative_dc_gain_matrix_error": 2.894809050854811e-13,
+      "maximum_temperature_error_k": 0.7368471160457943
+    },
+    {
+      "moments": 2,
+      "modes": 12,
+      "relative_dc_gain_matrix_error": 2.8907398520652e-13,
+      "maximum_temperature_error_k": 0.17432457240215626
+    },
+    {
+      "moments": 4,
+      "modes": 24,
+      "relative_dc_gain_matrix_error": 2.8458329202996184e-13,
+      "maximum_temperature_error_k": 0.018820334694112262
+    },
+    {
+      "moments": 8,
+      "modes": 48,
+      "relative_dc_gain_matrix_error": 2.917497721412315e-13,
+      "maximum_temperature_error_k": 0.0009187954879621429
+    }
+  ],
+  "krylov_reference_cells": 4096,
+  "krylov_step_sampling_s": [
+    0.0,
+    1e-08,
+    1.215474250076286e-08,
+    1.4773776525985097e-08,
+    1.7957144943716407e-08,
+    2.1826447283974873e-08,
+    2.6529484644318945e-08,
+    3.224590545296398e-08,
+    3.919406774847221e-08,
+    4.7639380104013405e-08,
+    5.790443980602483e-08,
+    7.038135554931547e-08,
+    8.554672535565684e-08,
+    1.03979841848149e-07,
+    1.2638482029342972e-07,
+    1.5361749466718295e-07,
+    1.8671810912919208e-07,
+    2.2695105366946685e-07,
+    2.7585316176291813e-07,
+    3.352924149249553e-07,
+    4.075392965871778e-07,
+    4.95353520895917e-07,
+    6.020894493336126e-07,
+    7.318242219076182e-07,
+    8.895134973108237e-07,
+    1.0811807510766079e-06,
+    1.3141473626117555e-06,
+    1.5973122800602524e-06,
+    1.9414919457438816e-06,
+    2.3598334667821937e-06,
+    2.868316813342009e-06,
+    3.4863652276780875e-06,
+    4.237587160604063e-06,
+    5.150678076168122e-06,
+    6.2605165720148155e-06,
+    7.609496685459868e-06,
+    9.249147277217335e-06,
+    1.1242100350620863e-05,
+    1.3664483492953244e-05,
+    1.6608827826277167e-05,
+    2.0187602546790388e-05,
+    2.4537511066398168e-05,
+    2.982471286216888e-05,
+    3.6251170499885277e-05,
+    4.406236427773573e-05,
+    5.355666917706897e-05,
+    6.509675230458164e-05,
+    7.912342618981327e-05,
+    9.617248711152965e-05,
+    0.00011689518164985776,
+    0.0001420830832533921,
+    0.00017269832906594324,
+    0.00020991037201085544,
+    0.00025514065200312873,
+    0.00031011689265747754,
+    0.00037693909753883635,
+    0.0004581597669054491,
+    0.0005568813990945267,
+    0.0006768750009458527,
+    0.0008227241341700457,
+    0.001
+  ],
+  "krylov_48mode_all_sources": [
+    {
+      "source": "heater_0",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.0009187954879621429,
+      "minimum_predicted_rise_k": -0.00046369653131250743
+    },
+    {
+      "source": "heater_1",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.0013025498854517537,
+      "minimum_predicted_rise_k": -0.0013025428685864426
+    },
+    {
+      "source": "absorption_0",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.04796545303776156,
+      "minimum_predicted_rise_k": -0.005564682358681239
+    },
+    {
+      "source": "absorption_1",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.043797315792232894,
+      "minimum_predicted_rise_k": -0.005564682358681239
+    },
+    {
+      "source": "aggressor_0",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.0012035043329206019,
+      "minimum_predicted_rise_k": -0.0012035043329206019
+    },
+    {
+      "source": "aggressor_1",
+      "step_power_w": 0.001,
+      "maximum_temperature_error_k": 0.000772861354903398,
+      "minimum_predicted_rise_k": -0.000772861354903398
+    }
+  ],
+  "rom_limit": "Projected modes preserve stable diffusion dynamics and DC gains, but not pointwise positivity. Negative tiny neighbor rises are truncation error, not cooling; the full FV and RC models retain positivity. Fixed uniform boundary only. ROM is not the default control plant.",
+  "wall_s": 2.982118583051488,
+  "process_peak_rss_bytes": 245448704
+}
