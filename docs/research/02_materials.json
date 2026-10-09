@@ -1,0 +1,958 @@
+{
+  "si_refractive_index_li1980": {
+    "value": {
+      "1310nm_273K": 3.49652,
+      "1310nm_300K": 3.50162,
+      "1310nm_375K": 3.51689,
+      "1310nm_400K": 3.52227
+    },
+    "unit": "dimensionless",
+    "model": "n^2 = eps(T) + (L(T)/lam^2)*(A0 + A1*T + A2*T^2); eps = e0 + e1*T + e2*T^2 + e3*T^3; L = exp(-3*dLL); dLL = c0 + c1*T + c2*T^2 + c3*T^3 (lam in um, T in K)",
+    "coefficients": {
+      "e0": 11.4445,
+      "e1": 0.00027739,
+      "e2": 1.705e-06,
+      "e3": -8.1347e-10,
+      "A0": 0.8948,
+      "A1": 0.00043977,
+      "A2": 7.3835e-08,
+      "dLL_293_1600K": {
+        "c0": -0.00071,
+        "c1": 1.887e-06,
+        "c2": 1.934e-09,
+        "c3": -4.544e-13
+      },
+      "note_c0": "printed as -0.071; must be read as -0.071 % (-7.1e-4) to reproduce Li's Table 1 (derived check)"
+    },
+    "valid_range": "1.2-14 um; 100-750 K recommended (L branches cover 20-1600 K)",
+    "uncertainty": "n +/-2e-3 (lam < 2.55 um); dn/dT +/-0.15e-4 /K (printed)",
+    "source": "H. H. Li, J. Phys. Chem. Ref. Data 9, 561 (1980), eq. (22), Table 1",
+    "provenance": "printed (formula); values derived"
+  },
+  "si_refractive_index_frey2006": {
+    "value": {
+      "1300nm_295K": 3.50616,
+      "1300nm_250K": 3.49818
+    },
+    "unit": "dimensionless",
+    "model": "n^2 - 1 = sum_{i=1..3} S_i(T) lam^2/(lam^2 - lam_i(T)^2); S_i, lam_i = 4th-order polynomials in T",
+    "coefficients": {
+      "S1": [
+        10.4907,
+        -0.00020802,
+        4.21694e-06,
+        -5.82298e-09,
+        3.44688e-12
+      ],
+      "S2": [
+        -1346.61,
+        29.1664,
+        -0.278724,
+        0.00105939,
+        -1.35089e-06
+      ],
+      "S3": [
+        44282700.0,
+        -1762130.0,
+        -76157.5,
+        678.414,
+        103.243
+      ],
+      "lam1": [
+        0.299713,
+        -1.14234e-05,
+        1.67134e-07,
+        -2.51049e-10,
+        2.32484e-14
+      ],
+      "lam2": [
+        -3517.1,
+        42.3892,
+        -0.357957,
+        0.00117504,
+        -1.13212e-06
+      ],
+      "lam3": [
+        1714000.0,
+        -144984.0,
+        -6907.44,
+        -39.3699,
+        23.577
+      ]
+    },
+    "valid_range": "1.1-5.6 um, 20-300 K ONLY (polynomials diverge near 325 K)",
+    "uncertainty": "absolute +/-1e-4 (Table 1: 8.67e-5 at 1.5 um, 295 K); fit residual 1e-4",
+    "source": "B. J. Frey, D. B. Leviton, T. J. Madison, Proc. SPIE 6273, 62732J (2006), Tables 2, 4, 5 (arXiv:physics/0606168)",
+    "provenance": "printed",
+    "notes": "Sellmeier dn/dT at 293 K (1.82e-4) undershoots the paper's own measured Table 4 (1.94e-4 at 1.3 um, 295 K)"
+  },
+  "si_refractive_index_recommended": {
+    "value": {
+      "1310nm_300K": 3.5057,
+      "1310nm_375K": 3.52097
+    },
+    "unit": "dimensionless",
+    "model": "n_Li(lam,T) + [n_Frey(lam,295K) - n_Li(lam,295K)]",
+    "coefficients": {
+      "offset_1260nm": 0.00462,
+      "offset_1310nm": 0.004085,
+      "offset_1360nm": 0.00367
+    },
+    "valid_range": "1.26-1.36 um, 273-400 K",
+    "uncertainty": "+/-5e-4 absolute (derived); Li vs Frey disagree by 4.1e-3 at 1310 nm, 2x Li's stated uncertainty",
+    "source": "Li 1980 + Frey 2006; Franta et al., Appl. Surf. Sci. 421, 405 (2017) agrees with Frey level (3.50555 at 300 K)",
+    "provenance": "derived"
+  },
+  "si_dn_dT_1310nm": {
+    "value": {
+      "273K": 0.0001861,
+      "300K": 0.0001938,
+      "325K": 0.0002006,
+      "350K": 0.0002068,
+      "375K": 0.0002126,
+      "400K": 0.0002179
+    },
+    "unit": "1/K",
+    "model": "analytic derivative of Li 1980 eq. (22)",
+    "coefficients": {
+      "see": "si_refractive_index_li1980"
+    },
+    "valid_range": "1.2-14 um, 100-750 K",
+    "uncertainty": "recommended 1.94e-4 +/-0.07e-4 at 300 K; 2.13e-4 +/-0.1e-4 at 375 K (spread of sources)",
+    "source": "Li 1980; cross-checks: Frey 2006 Table 4 = 1.94e-4 (1.3 um, 295 K, printed); Franta 2017 = 1.87e-4 (300 K) / 2.00e-4 (375 K) (read-off+derived); Lukes 1959/60 = 2.04e-4 (1.327 um, 300 K, printed in Li Table A-3); Cocorullo 1999 at 1523 nm = 1.855e-4 (300 K), scaled to 1310 nm = 1.95e-4 (derived); Wang 2025 SOI 224 nm film ~2.3e-4 (298-338 K, derived, noisy)",
+    "provenance": "derived",
+    "notes": "Textbook REF.dnSi_dT = 1.86e-4 is the 1523 nm, 300 K value (Cocorullo 1999). Della Corte group (1.5 um) found no dependence on doping type/level/orientation."
+  },
+  "si_d2n_dT2_1310nm": {
+    "value": {
+      "300K": 2.78e-07,
+      "375K": 2.22e-07
+    },
+    "unit": "1/K^2",
+    "model": "second derivative of Li 1980",
+    "coefficients": {},
+    "valid_range": "as Li 1980",
+    "uncertainty": "sources span 1.7e-7 to 2.8e-7 (Franta 1.88e-7 at 300 K, 1.70e-7 at 375 K; Cocorullo 1523 nm 2.58e-7 at 300 K, 2.35e-7 at 375 K)",
+    "source": "Li 1980; Franta 2017; Cocorullo, Della Corte, Rendina, APL 74, 3338 (1999)",
+    "provenance": "derived"
+  },
+  "si_dn_dT_cocorullo_1523nm": {
+    "value": {
+      "300K": 0.0001855,
+      "375K": 0.000204
+    },
+    "unit": "1/K",
+    "model": "dn/dT = a0 + a1*T + a2*T^2",
+    "coefficients": {
+      "a0": 9.48e-05,
+      "a1": 3.47e-07,
+      "a2": -1.49e-10
+    },
+    "valid_range": "1523 nm only, 300-550 K",
+    "uncertainty": "not stated in the abstract",
+    "source": "G. Cocorullo, F. G. Della Corte, I. Rendina, Appl. Phys. Lett. 74, 3338 (1999)",
+    "provenance": "printed"
+  },
+  "si_group_index_material_1310nm": {
+    "value": {
+      "300K": 3.6736,
+      "375K": 3.6941
+    },
+    "unit": "dimensionless",
+    "model": "n - lam*dn/dlam from Li 1980",
+    "coefficients": {},
+    "valid_range": "as Li",
+    "uncertainty": "+/-0.02 [corrected by checker from +/-0.01: Frey 2006 Sellmeier gives 3.689 at 1.31 um, 295 K; Franta 2017 gives 3.690 at 300 K; both ~0.016 above Li]",
+    "source": "Li 1980; Frey 2006",
+    "provenance": "derived"
+  },
+  "si_absorption_1310nm": {
+    "value": {
+      "1310nm_300K": 2.7e-05,
+      "1260nm_300K": 0.00036
+    },
+    "unit": "1/cm",
+    "model": "alpha = 4*pi*k/lam, band-to-band",
+    "coefficients": {
+      "k_1310nm": 2.8147e-10,
+      "k_1260nm": 3.6096e-09
+    },
+    "valid_range": "300 K; band edge moves ~27 meV red by 400 K, still < ~0.02 dB/cm at 1260 nm (derived estimate)",
+    "uncertainty": "order of magnitude",
+    "source": "M. A. Green, Sol. Energy Mater. Sol. Cells 92, 1305 (2008)",
+    "provenance": "printed (k); inferred (alpha)"
+  },
+  "ring_thermal_shift_ceiling_1310nm": {
+    "value": {
+      "273K": 68.3,
+      "300K": 71.1,
+      "350K": 75.8,
+      "375K": 77.8,
+      "400K": 79.7
+    },
+    "unit": "pm/K",
+    "model": "dlam/dT <= lam*(dn_Si/dT)/n_g,Si + lam*(neff/ng)*alpha_Si  (all electric energy in Si; first-order perturbation with material dispersion)",
+    "coefficients": {
+      "neff_over_ng": 0.6
+    },
+    "valid_range": "any Si-core, SiO2-clad ring at 1260-1360 nm, 273-400 K",
+    "uncertainty": "-2 to -4 pm/K with Franta dn/dT; +3 pm/K with Lukes at 300 K",
+    "source": "this file, from Li 1980 and Okada & Tokumaru 1984",
+    "provenance": "derived",
+    "notes": "In GHz/K: 12.4 (300 K), 13.6 (375 K), 13.9 (400 K). Lightmatter M4B.3 prints '~15 GHz/C' (85.8 pm/K) in its introduction; that is 1.08-1.26x above this ceiling over 273-400 K and needs dn_Si/dT ~2.35e-4, which Li reaches only near 500 K."
+  },
+  "sio2_index_fused_silica": {
+    "value": {
+      "1310nm": 1.4468,
+      "group_index_1310nm": 1.4616
+    },
+    "unit": "dimensionless",
+    "model": "n^2 - 1 = B1 lam^2/(lam^2-C1^2) + B2 lam^2/(lam^2-C2^2) + B3 lam^2/(lam^2-C3^2)",
+    "coefficients": {
+      "B1": 0.6961663,
+      "C1": 0.0684043,
+      "B2": 0.4079426,
+      "C2": 0.1162414,
+      "B3": 0.8974794,
+      "C3": 9.896161
+    },
+    "valid_range": "0.21-3.71 um, 20 C (air-referenced)",
+    "uncertainty": "+/-1e-5 vs CHARMS after air correction (derived check)",
+    "source": "I. H. Malitson, JOSA 55, 1205 (1965); Leviton & Frey arXiv:0805.0091 (1.44845 at 1.2 um, 1.44502 at 1.5 um, 295 K)",
+    "provenance": "printed"
+  },
+  "sio2_index_films": {
+    "value": {
+      "thermal_oxide_assumed": 1.447,
+      "pecvd_beol_assumed": 1.45,
+      "ebeam_300C_RdM2016_1310nm": 1.4579,
+      "ebeam_25C_Franta2016_1310nm": 1.4628,
+      "ebeam_300C_Franta2016_1310nm": 1.4598,
+      "pecvd_1550nm_Arbabi2013": 1.428
+    },
+    "unit": "dimensionless",
+    "model": "tabulated / constant",
+    "coefficients": {},
+    "valid_range": "room temperature",
+    "uncertainty": "+/-0.01 between processes",
+    "source": "Rodriguez-de Marcos et al., Opt. Mater. Express 6, 3622 (2016); Franta et al., Proc. SPIE 9890, 989014 (2016); Arbabi & Goddard, Opt. Lett. 38, 3878 (2013)",
+    "provenance": "read-off (tabulated) / printed / assumed"
+  },
+  "sio2_dn_dT": {
+    "value": {
+      "295K": 8.45e-06,
+      "300K": 8.57e-06,
+      "375K": 1.04e-05
+    },
+    "unit": "1/K",
+    "model": "dn/dT = 8.45e-6 + 2.4e-8*(T - 295)",
+    "coefficients": {
+      "base_295K": 8.45e-06,
+      "slope": 2.4e-08
+    },
+    "valid_range": "measured 30-310 K (fused silica, 1.2-1.5 um); linear extension above 300 K is assumed",
+    "uncertainty": "RT values span 0.84e-5 (Leviton) to 0.96e-5 (Corning, PECVD); +/-15 %",
+    "source": "Leviton & Frey arXiv:0805.0091 Table 6 (8.40-8.45e-6 at 295 K); Corning 7980 data sheet 9.6e-6 at 1128.64 nm (polynomial gives 9.53e-6 at 1310 nm, inferred); Arbabi & Goddard 2013 PECVD (0.95+/-0.10)e-5; Elshaari 2016 PECVD (0.96+/-0.09)e-5",
+    "provenance": "printed (RT); inferred (slope); assumed (>300 K)"
+  },
+  "si3n4_index_lpcvd": {
+    "value": {
+      "1310nm": 2.0031,
+      "group_index_1310nm": 2.042,
+      "1550nm_Arbabi2013": 1.977
+    },
+    "unit": "dimensionless",
+    "model": "n^2 - 1 = B1 lam^2/(lam^2-C1^2) + B2 lam^2/(lam^2-C2^2)",
+    "coefficients": {
+      "B1": 3.0249,
+      "C1": 0.1353406,
+      "B2": 40314,
+      "C2": 1239.842
+    },
+    "valid_range": "0.31-5.5 um, room temperature",
+    "uncertainty": "+/-3e-3",
+    "source": "K. Luke et al., Opt. Lett. 40, 4823 (2015)",
+    "provenance": "printed"
+  },
+  "si3n4_dn_dT": {
+    "value": 2.45e-05,
+    "unit": "1/K",
+    "model": "constant",
+    "coefficients": {},
+    "valid_range": "room temperature, 1550 nm",
+    "uncertainty": "+/-0.09e-5 (LPCVD); PECVD SiN (2.51+/-0.08)e-5",
+    "source": "Arbabi & Goddard, Opt. Lett. 38, 3878 (2013); Elshaari et al., IEEE Photonics J. (2016)",
+    "provenance": "printed"
+  },
+  "k_si_bulk": {
+    "value": {
+      "273K": 167.2,
+      "300K": 148.0,
+      "375K": 110.7,
+      "400K": 101.8
+    },
+    "unit": "W/(m K)",
+    "model": "k = k300*(T/300)^alpha",
+    "coefficients": {
+      "k300": 148.0,
+      "alpha": -1.3
+    },
+    "valid_range": "~250-500 K",
+    "uncertainty": "+/-5 % (handbook values vary 68.8-157 per Electronics Cooling 1998; Glassbrenner & Slack 1964 ~156 at 300 K is recalled, not re-checked)",
+    "source": "V. Palankovski, PhD thesis TU Wien (2000) sec. 3.2.3; consistent with CRC/TPRC set 168/148/98.9 at 273/300/400 K (quoted from memory, assumed)",
+    "provenance": "printed"
+  },
+  "k_si_film": {
+    "value": {
+      "100nm": {
+        "300K": 54.8,
+        "375K": 51.3
+      },
+      "200nm": {
+        "300K": 80.0,
+        "375K": 70.1
+      },
+      "220nm": {
+        "273K": 87.2,
+        "300K": 83.5,
+        "375K": 72.5,
+        "400K": 69.1
+      },
+      "250nm": {
+        "300K": 88.1,
+        "375K": 75.7
+      }
+    },
+    "unit": "W/(m K)",
+    "model": "1/k = 1/k_bulk(T) + 1/k_b; k_b = 148*(d/d0)*cp(T)/cp(300)",
+    "coefficients": {
+      "d0_nm": 170.0,
+      "d0_nm_range": [
+        125.0,
+        221.0
+      ]
+    },
+    "valid_range": "single-crystal SOI film 150-300 nm, 273-400 K, undoped to ~1e18 cm^-3",
+    "uncertainty": "+/-15 % (73-95 W/(m K) at 220 nm, 300 K, from the +/-10 W/(m K) of the anchor measurement)",
+    "source": "anchored to M. S. Aubain & P. Bandaru, MRS Proc. 1267, DD12-01 (2010): 260 nm SOI device layer, 90 +/- 10 W/(m K) at room temperature. Cross-checks: Ju & Goodson, APL 74, 3005 (1999) (up to 50 % reduction for films down to 74 nm; fit under-predicts there: 45 vs ~74); Asheghi et al., J. Heat Transfer 120, 30 (1998) (~40 % below bulk at 0.42 um; fit over-predicts: 105 vs ~89)",
+    "provenance": "derived",
+    "notes": "Corrected by checker 2026-10-09: previous version used d0 = 250 nm (69 W/(m K) at 220 nm), anchored to '32 and 38 W/mK at 50 and 80 nm' attributed to the Aubain & Bandaru MRS paper, which reports only 260 nm, 90 +/- 10 W/(m K). Heavy doping 1e19-1e20: ~80 % of undoped (Electronics Cooling 1998 estimate, assumed). Asheghi et al., J. Appl. Phys. 91, 5079 (2002) covers 1e17-3e19 doped films."
+  },
+  "k_sio2": {
+    "value": {
+      "300K": 1.38,
+      "375K": 1.485,
+      "corning7980_25C": 1.3
+    },
+    "unit": "W/(m K)",
+    "model": "k = k300*(T/300)^alpha",
+    "coefficients": {
+      "k300": 1.38,
+      "alpha": 0.33,
+      "pecvd_factor": 0.9
+    },
+    "valid_range": "~250-500 K; films > ~50-100 nm",
+    "uncertainty": "+/-10 %; PECVD ~10 % below thermal oxide for films > 100 nm; apparent 0.83-1.23 for 50-500 nm PECVD",
+    "source": "Palankovski 2000; Corning 7980 data sheet; S.-M. Lee & D. G. Cahill, J. Appl. Phys. 81, 2590 (1997); arXiv:1905.08570",
+    "provenance": "printed"
+  },
+  "k_low_k_ild": {
+    "value": {
+      "dense_SiOC_H": 0.7,
+      "porous_30pct": 0.1
+    },
+    "unit": "W/(m K)",
+    "model": "tabulated",
+    "coefficients": {},
+    "valid_range": "room temperature",
+    "uncertainty": "factor ~2; process dependent",
+    "source": "2014 microfin/IR thermometry study of SiOC:H and SiC:H films (abstract via search)",
+    "provenance": "printed (abstract)"
+  },
+  "k_metals": {
+    "value": {
+      "Cu_bulk": 400,
+      "Cu_beol_line": [
+        250,
+        380
+      ],
+      "W_bulk": 173,
+      "W_film": [
+        60,
+        100
+      ],
+      "TiN_film": [
+        10,
+        30
+      ]
+    },
+    "unit": "W/(m K)",
+    "model": "Wiedemann-Franz k = L0*T/rho (+ phonon part for W, TiN)",
+    "coefficients": {
+      "L0": 2.44e-08
+    },
+    "valid_range": "300 K",
+    "uncertainty": "+/-30 % for films",
+    "source": "handbook bulk values (assumed); W phonon fraction 62 % (arXiv:2505.07613)",
+    "provenance": "assumed/derived"
+  },
+  "thermal_boundary_resistance": {
+    "value": {
+      "Si_PECVD_SiO2": 2e-08,
+      "metal_dielectric": 2e-07
+    },
+    "unit": "m^2 K/W",
+    "model": "series interface resistance",
+    "coefficients": {},
+    "valid_range": "room temperature",
+    "uncertainty": "Si/SiO2 printed; metal/dielectric ~10x larger (printed ratio, 2008 study), value inferred",
+    "source": "Lee & Cahill 1997 (equivalent to ~20 nm SiO2); 2008 Cr/PECVD SiO2 study (abstract)",
+    "provenance": "printed / inferred",
+    "notes": "Si/SiO2 is ~1.4 % of a 2 um BOX: negligible. Metal/oxide ~0.25 um oxide equivalent: not negligible for a metal heater <=1 um from the ring."
+  },
+  "cp_si": {
+    "value": {
+      "273K": 677.1,
+      "300K": 711.0,
+      "375K": 780.7,
+      "400K": 797.9
+    },
+    "unit": "J/(kg K)",
+    "model": "cp = c300 + c1*((T/300)^b - 1)/((T/300)^b + c1/c300)",
+    "coefficients": {
+      "c300": 711.0,
+      "c1": 255.0,
+      "b": 1.85
+    },
+    "valid_range": "200-400 K checked",
+    "uncertainty": "within 0.5 % (298 K) and 1.2 % (400 K) of NIST-JANAF (20.000 and 22.142 J/mol K)",
+    "source": "Palankovski 2000 sec. 3.2.4; NIST-JANAF Si (cr)",
+    "provenance": "printed"
+  },
+  "cp_sio2": {
+    "value": {
+      "273K": 659.7,
+      "300K": 709.0,
+      "375K": 825.3,
+      "400K": 858.0
+    },
+    "unit": "J/(kg K)",
+    "model": "same form as cp_si",
+    "coefficients": {
+      "c300": 709.0,
+      "c1": 696.0,
+      "b": 1.5
+    },
+    "valid_range": "~250-500 K",
+    "uncertainty": "+/-5 %",
+    "source": "Palankovski 2000 sec. 3.2.4",
+    "provenance": "printed"
+  },
+  "density": {
+    "value": {
+      "Si": 2329,
+      "SiO2_fused": 2201,
+      "SiO2_thermal": [
+        2200,
+        2270
+      ],
+      "SiO2_pecvd": [
+        2100,
+        2300
+      ]
+    },
+    "unit": "kg/m^3",
+    "model": "constant",
+    "coefficients": {},
+    "valid_range": "room temperature",
+    "uncertainty": "films +/-3 %",
+    "source": "Si standard value; Corning 7980 data sheet (2.201 g/cm3); film ranges assumed",
+    "provenance": "printed / assumed"
+  },
+  "volumetric_heat_capacity": {
+    "value": {
+      "Si": {
+        "273K": 1.577,
+        "300K": 1.656,
+        "375K": 1.818,
+        "400K": 1.858
+      },
+      "SiO2": {
+        "273K": 1.451,
+        "300K": 1.56,
+        "375K": 1.816,
+        "400K": 1.888
+      },
+      "Cu": 3.45,
+      "W": 2.55,
+      "TiN": 3.1
+    },
+    "unit": "MJ/(m^3 K)",
+    "model": "rho*cp(T)",
+    "coefficients": {},
+    "valid_range": "273-400 K",
+    "uncertainty": "Si +/-1.5 %, SiO2 +/-5 %, metals assumed",
+    "source": "derived from cp and density",
+    "provenance": "derived"
+  },
+  "thermal_diffusivity": {
+    "value": {
+      "Si_300K": 8.9e-05,
+      "SiO2_300K": 8.8e-07,
+      "corning7980_printed": 7.5e-07
+    },
+    "unit": "m^2/s",
+    "model": "k/(rho cp)",
+    "coefficients": {},
+    "valid_range": "300 K",
+    "uncertainty": "+/-10 %",
+    "source": "derived; Corning 7980 data sheet 0.0075 cm^2/s",
+    "provenance": "derived / printed"
+  },
+  "cte_si": {
+    "value": {
+      "273K": 2.327e-06,
+      "300K": 2.568e-06,
+      "375K": 3.082e-06,
+      "400K": 3.212e-06
+    },
+    "unit": "1/K",
+    "model": "alpha = [3.725*(1 - exp(-5.88e-3*(T - 124))) + 5.548e-4*T]*1e-6",
+    "coefficients": {
+      "a": 3.725,
+      "b": 0.00588,
+      "T0": 124.0,
+      "c": 0.0005548
+    },
+    "valid_range": "120-1500 K",
+    "uncertainty": "+/-2e-7 /K",
+    "source": "Y. Okada, Y. Tokumaru, J. Appl. Phys. 56, 314 (1984)",
+    "provenance": "printed"
+  },
+  "cte_sio2": {
+    "value": {
+      "5_35C": 5.2e-07,
+      "0_200C": 5.7e-07,
+      "-100_200C": 4.8e-07
+    },
+    "unit": "1/K",
+    "model": "mean CTE",
+    "coefficients": {},
+    "valid_range": "fused silica; thermal oxide assumed similar",
+    "uncertainty": "+/-0.05e-6",
+    "source": "Corning 7980 data sheet",
+    "provenance": "printed"
+  },
+  "thermo_mechanical_contribution": {
+    "value": {
+      "expansion_term_300K": 2.0,
+      "expansion_term_375K": 2.4,
+      "photoelastic_upper_bound": 1.0
+    },
+    "unit": "pm/K",
+    "model": "expansion: lam*(neff/ng)*alpha_Si; photoelastic: oxide biaxial stress E/(1-nu)*(alpha_Si-alpha_SiO2) ~0.18 MPa/K times stress-optic 1e-12..4e-12 /Pa",
+    "coefficients": {
+      "neff_over_ng": 0.6,
+      "E_SiO2_GPa": 72.7,
+      "nu_SiO2": 0.16,
+      "stress_optic_SiO2_per_Pa": 3.5e-12
+    },
+    "valid_range": "SOI ring on thick Si substrate",
+    "uncertainty": "photoelastic part is an order-of-magnitude estimate (<~1 pm/K), no source",
+    "source": "derived; E, nu and stress coefficient (35.0 nm/(cm MPa)) printed on Corning 7980 data sheet",
+    "provenance": "derived"
+  },
+  "plasma_dispersion_nsm2011_1300nm": {
+    "value": {
+      "dn_at_1e18_each": -0.001918,
+      "dalpha_at_1e18_each": 8.69
+    },
+    "unit": "dn: dimensionless; dalpha: 1/cm",
+    "model": "dalpha = a*dNe^b + c*dNh^d ; dn = -(p*dNe^q + r*dNh^s) (dN in cm^-3)",
+    "coefficients": {
+      "1300nm": {
+        "a": 3.48e-22,
+        "b": 1.229,
+        "c": 1.02e-19,
+        "d": 1.089,
+        "p": 2.98e-22,
+        "q": 1.016,
+        "r": 1.25e-18,
+        "s": 0.835
+      },
+      "1550nm": {
+        "a": 8.88e-21,
+        "b": 1.167,
+        "c": 5.84e-20,
+        "d": 1.109,
+        "p": 5.4e-22,
+        "q": 1.011,
+        "r": 1.53e-18,
+        "s": 0.838
+      }
+    },
+    "valid_range": "~1e17-1e20 cm^-3, 300 K",
+    "uncertainty": "~10-20 % (spread vs Soref-Bennett ~10 % in dn at 1e18)",
+    "source": "M. Nedeljkovic, R. Soref, G. Z. Mashanovich, IEEE Photonics J. 3, 1171 (2011); transcribed from flexcompute/tidy3d default_nedeljkovic_soref_mashanovich_coeffs (primary PDF not opened)",
+    "provenance": "printed"
+  },
+  "plasma_dispersion_soref1987_1300nm": {
+    "value": {
+      "dn_at_1e18_each": -0.002127,
+      "dalpha_at_1e18_each": 10.0
+    },
+    "unit": "dn: dimensionless; dalpha: 1/cm",
+    "model": "dn = -(6.2e-22*dNe + 6.0e-18*dNh^0.8); dalpha = 6.0e-18*dNe + 4.0e-18*dNh",
+    "coefficients": {
+      "pe": 6.2e-22,
+      "ph": 6e-18,
+      "sh": 0.8,
+      "sigma_e": 6e-18,
+      "sigma_h": 4e-18
+    },
+    "valid_range": "~1e17-1e20 cm^-3, 300 K",
+    "uncertainty": "~10-20 %",
+    "source": "R. A. Soref, B. R. Bennett, IEEE J. Quantum Electron. 23, 123 (1987)",
+    "provenance": "printed"
+  },
+  "plasma_dispersion_temperature_dependence": {
+    "value": {
+      "dn_per_carrier_pct_per_K": [
+        -0.05,
+        -0.02
+      ],
+      "dalpha_pct_per_K": [
+        0.1,
+        0.3
+      ]
+    },
+    "unit": "%/K",
+    "model": "Drude: dn ~ N/(n m*_opt); dalpha ~ N/(n m*^2 mu_opt)",
+    "coefficients": {},
+    "valid_range": "300-400 K",
+    "uncertainty": "no 1.3 um measurement found",
+    "source": "trend from D. M. Riffe, JOSA B 19, 1092 (2002) (effective mass rises with T); magnitudes assumed",
+    "provenance": "assumed"
+  },
+  "fca_cross_sections_1300nm": {
+    "value": {
+      "nsm_sigma_e": {
+        "1e16": 1.97e-18,
+        "1e17": 3.34e-18,
+        "1e18": 5.66e-18
+      },
+      "nsm_sigma_h": {
+        "1e16": 2.95e-18,
+        "1e17": 3.62e-18,
+        "1e18": 4.44e-18
+      },
+      "sb_sigma_e": 6e-18,
+      "sb_sigma_h": 4e-18,
+      "nsm_dn_dNe": {
+        "1e16": -5.46e-22,
+        "1e17": -5.66e-22,
+        "1e18": -5.88e-22
+      },
+      "nsm_dn_dNh": {
+        "1e16": -2.39e-21,
+        "1e17": -1.64e-21,
+        "1e18": -1.12e-21
+      }
+    },
+    "unit": "sigma: cm^2; dn/dN: cm^3",
+    "model": "small-signal derivatives of NSM 2011; SB 1987 linear",
+    "coefficients": {},
+    "valid_range": "1.3 um, 300 K",
+    "uncertainty": "~20 %",
+    "source": "derived from NSM 2011 and SB 1987",
+    "provenance": "derived"
+  },
+  "tpa_beta_1310nm": {
+    "value": 0.9,
+    "unit": "cm/GW (x1e-11 = m/W)",
+    "model": "constant",
+    "coefficients": {
+      "Lin2007_1315nm": [
+        0.57,
+        0.17
+      ],
+      "Bristow2007_1220nm": [
+        2.1,
+        0.4
+      ],
+      "Bristow2007_peak": [
+        2.0,
+        0.5
+      ],
+      "earlier_1300_1500nm": 0.8,
+      "Dinu2003_1540nm": 0.8
+    },
+    "valid_range": "~1.3 um, 300 K; rises with T (1.55 um: 0.76 at 300 K vs 0.42 at 5.5 K, Sinclair 2019); >300 K not measured (assume +0.1 to +0.3 %/K)",
+    "uncertainty": "0.5-2.0 cm/GW: factor-3 disagreement between z-scan groups, not resolved",
+    "source": "Q. Lin et al., APL 91, 021111 (2007); A. D. Bristow et al., APL 90, 191104 (2007); M. Dinu et al., APL 82, 2954 (2003); G. F. Sinclair et al., Phys. Rev. Applied 11, 044084 (2019)",
+    "provenance": "inferred (central value); individual values printed"
+  },
+  "kerr_n2_1310nm": {
+    "value": 4e-14,
+    "unit": "cm^2/W (x1e-4 = m^2/W)",
+    "model": "constant",
+    "coefficients": {
+      "Bristow2007_1220nm": [
+        4.7e-14,
+        2e-14
+      ],
+      "earlier_1300_1550nm": 3e-14,
+      "Dinu2003_1540nm": 4e-14,
+      "Sinclair2019_1550nm_300K_m2_per_W": 5.2e-18
+    },
+    "valid_range": "1.2-1.55 um, 300 K",
+    "uncertainty": "3-6e-14 cm^2/W",
+    "source": "Bristow 2007; Dinu 2003; Sinclair 2019",
+    "provenance": "inferred"
+  },
+  "free_carrier_lifetime": {
+    "value": {
+      "no_junction_typical_ns": [
+        1,
+        10
+      ],
+      "no_junction_Borghi2021_ns": [
+        20,
+        60
+      ],
+      "reverse_biased_junction_ps": [
+        10,
+        100
+      ]
+    },
+    "unit": "ns / ps as labelled",
+    "model": "SRH (Borghi: tau_n 35 ns, tau_p 22.5 ns, trap E_i+0.10 eV, 1e15 p-type)",
+    "coefficients": {
+      "tau_n_ns": 35,
+      "tau_p_ns": 22.5
+    },
+    "valid_range": "sub-um SOI waveguides, room temperature",
+    "uncertainty": "geometry and surface dependent; reverse-bias value assumed (Turner-Foster 2010 not opened)",
+    "source": "M. Borghi et al., Opt. Express 29, 4363 (2021); D. Dimitropoulos et al., APL 86, 071115 (2005); A. C. Turner-Foster et al., Opt. Express 18, 3582 (2010)",
+    "provenance": "printed (Borghi) / assumed (junction)"
+  },
+  "doped_si_resistivity": {
+    "value": {
+      "n_1e18": 0.023,
+      "n_1e19": 0.0055,
+      "n_1e20": 0.00078,
+      "p_1e18": 0.045,
+      "p_1e19": 0.0085,
+      "p_1e20": 0.0012
+    },
+    "unit": "ohm cm",
+    "model": "rho = 1/(q N mu); mu from Masetti (300 K) or Arora (250-500 K), full ionization",
+    "coefficients": {
+      "masetti_P": {
+        "mu_min1": 68.5,
+        "mu_min2": 68.5,
+        "mu1": 56.1,
+        "mu_max": 1414,
+        "Cr": 9.2e+16,
+        "Cs": 3.41e+20,
+        "alpha": 0.711,
+        "beta": 1.98,
+        "Pc": 0
+      },
+      "masetti_B": {
+        "mu_min1": 44.9,
+        "mu_min2": 0,
+        "mu1": 29.0,
+        "mu_max": 470.5,
+        "Cr": 2.23e+17,
+        "Cs": 6.1e+20,
+        "alpha": 0.719,
+        "beta": 2.0,
+        "Pc": 9.23e+16
+      },
+      "arora_n": {
+        "mu_min": 88,
+        "mu_min_exp": -0.57,
+        "mu0_prefactor": 740000000.0,
+        "mu0_T_exp": -2.33,
+        "Nref": 1.26e+17,
+        "Nref_exp": 2.4,
+        "alpha0": 0.88,
+        "alpha_exp": -0.146
+      },
+      "arora_p": {
+        "mu_min": 54.3,
+        "mu_min_exp": -0.57,
+        "mu0_prefactor": 136000000.0,
+        "mu0_T_exp": -2.23,
+        "Nref": 2.35e+17,
+        "Nref_exp": 2.4,
+        "alpha0": 0.88,
+        "alpha_exp": -0.146
+      }
+    },
+    "valid_range": "reference table at 23 C; Arora 250-500 K, 1e13-1e20 (weak above 1e19)",
+    "uncertainty": "table values printed; models +/-10 % (Arora -13 % at 1e20 n)",
+    "source": "resistivity-dopant table for c-Si at 23 C (via search); G. Masetti et al., IEEE TED 30, 764 (1983); N. D. Arora et al., IEEE TED 29, 292 (1982) (coefficients via nextnano/DESSIS and COMSOL docs)",
+    "provenance": "printed"
+  },
+  "doped_si_tcr": {
+    "value": {
+      "n_1e18": {
+        "300K": 0.00126,
+        "375K": 0.00152
+      },
+      "p_1e18": {
+        "300K": 0.00162,
+        "375K": 0.00182
+      },
+      "n_1e19": {
+        "300K": 0.00125,
+        "375K": 0.00106
+      },
+      "p_1e19": {
+        "300K": 0.00131,
+        "375K": 0.00112
+      },
+      "n_1e20": {
+        "300K": 0.00175,
+        "375K": 0.00139
+      },
+      "p_1e20": {
+        "300K": 0.00176,
+        "375K": 0.0014
+      }
+    },
+    "unit": "1/K",
+    "model": "TCR = (1/rho) drho/dT with Arora mobility, full ionization",
+    "coefficients": {},
+    "valid_range": "250-500 K",
+    "uncertainty": "+/-50 % (incomplete ionization at 1e17-1e18 lowers it; Arora weak above 1e19)",
+    "source": "derived from Arora 1982; textbook fit for the G25 heater is 1e-3 /K (REF.heaterTcrPerK, derived)",
+    "provenance": "derived"
+  },
+  "metal_heater_tcr": {
+    "value": {
+      "TiN_mems": 0.000487,
+      "TiN_conventional_patent": 0.00055,
+      "W_bulk": 0.0045,
+      "W_thick_film": 0.0046,
+      "Cu_bulk": 0.0039,
+      "silicide_assumed": [
+        0.002,
+        0.004
+      ]
+    },
+    "unit": "1/K",
+    "model": "linear R = R0 (1 + TCR (T - T0))",
+    "coefficients": {},
+    "valid_range": "room temperature to ~100 C",
+    "uncertainty": "process dependent; low-stress TiN nonlinear, can change sign; W film sign depends on deposition",
+    "source": "AIP Advances 2022 microheater comparison (TiN 487 ppm/C, Pt 2641, Ti 4146); TaN heater patent (TiN ~550 ppm/C); Sensors & Actuators A 2008 (TiN stress); Micromachines 2024 (W films); thick-film W patent (0.0046 /C); Cu, silicides assumed",
+    "provenance": "printed (abstracts/patents) / assumed"
+  },
+  "ge_pd_responsivity_1310nm": {
+    "value": {
+      "quantum_limit": 1.0566,
+      "lightmatter_G25_range": [
+        0.88,
+        1.04
+      ],
+      "lightmatter_G25_worst_case": 0.9
+    },
+    "unit": "A/W",
+    "model": "R = eta*lam[um]/1.23984; assumed constant vs T at 1310 nm (+/-3 % over 0-105 C, assumed)",
+    "coefficients": {
+      "hc_over_q_eV_um": 1.239841984
+    },
+    "valid_range": "1310 nm",
+    "uncertainty": "T dependence not measured at 1310 nm in sources found",
+    "source": "physics; Lightmatter OFC 2025 talk via textbook REF ([LM-T]); L. Colace et al., J. Lightwave Technol. (2008) (defective Ge loses responsivity with T)",
+    "provenance": "derived / printed"
+  },
+  "ge_pd_dark_current_vs_T": {
+    "value": {
+      "ratio_85C_vs_25C": 11.2,
+      "ratio_105C_vs_25C": 21.0
+    },
+    "unit": "ratio",
+    "model": "I(T) = I0 * exp(-Ea/k * (1/T - 1/T0)), T0 = 298.15 K",
+    "coefficients": {
+      "Ea_eV": 0.37,
+      "Ea_range_eV": [
+        0.35,
+        0.38
+      ],
+      "GOI_vertical_pin_Ea_eV": [
+        0.15,
+        0.36
+      ]
+    },
+    "valid_range": "25-85 C data; 105 C extrapolated",
+    "uncertainty": "Ea +/-0.03 eV for the x1.6/10 C reading; device dependent. [checker: Balbi et al., Physica E 2009 (same group) report x1.6-1.9 per 10 C, i.e. Ea up to ~0.5 eV and up to ~x65 at 105 C vs 25 C]",
+    "source": "L. Colace et al. (2008): x1.6 per 10 C; S. J. Koester et al. (2006): x10 at 85 C vs RT (abstracts); GOI p-i-n study (abstract)",
+    "provenance": "inferred"
+  },
+  "si_bandgap": {
+    "value": {
+      "273K": 1.1312,
+      "300K": 1.1245,
+      "375K": 1.1042,
+      "400K": 1.0969
+    },
+    "unit": "eV",
+    "model": "Eg = Eg0 - a*T^2/(T + b)",
+    "coefficients": {
+      "Eg0": 1.17,
+      "a": 0.000473,
+      "b": 636.0
+    },
+    "valid_range": "0-1000 K",
+    "uncertainty": "+/-2 meV",
+    "source": "C. D. Thurmond, J. Electrochem. Soc. 122, 1133 (1975) (as reproduced in device texts)",
+    "provenance": "printed"
+  },
+  "si_intrinsic_density": {
+    "value": {
+      "273K": 843000000.0,
+      "300K": 9700000000.0,
+      "325K": 66700000000.0,
+      "350K": 353000000000.0,
+      "375K": 1510000000000.0,
+      "400K": 5470000000000.0
+    },
+    "unit": "cm^-3",
+    "model": "ni = A*(T/300)^m * exp(-B/T)",
+    "coefficients": {
+      "A": 5.29e+19,
+      "m": 2.54,
+      "B": 6726.0
+    },
+    "valid_range": "78-340 K (extrapolated to 400 K)",
+    "uncertainty": "+/-1 % at 300 K (9.7e9 +/- 0.1e9); Altermatt 2003 / Couderc 2014 give 9.65e9",
+    "source": "K. Misiakos, D. Tsamakis, J. Appl. Phys. 74, 3293 (1993); alt. R. Couderc et al., J. Appl. Phys. 115, 093705 (2014): ni = 1.541e15*T^1.712*exp(-Eg0/(2kT)) (Eg0 model not read)",
+    "provenance": "printed"
+  },
+  "pn_builtin_voltage": {
+    "value": {
+      "1e18_1e18": {
+        "273K": 0.9836,
+        "300K": 0.954,
+        "375K": 0.8661,
+        "400K": 0.8353
+      },
+      "5e17_5e17_300K": 0.9182,
+      "dVbi_dT_300K": -0.001122,
+      "dVbi_dT_375K": -0.001219
+    },
+    "unit": "V (dVbi/dT in V/K)",
+    "model": "Vbi = (kT/q) ln(NA ND / ni(T)^2), step junction, full ionization, no BGN",
+    "coefficients": {
+      "k_eV_per_K": 8.617333262e-05
+    },
+    "valid_range": "273-400 K",
+    "uncertainty": "band-gap narrowing at ~1e18 lowers Vbi by a few tens of mV (assumed)",
+    "source": "derived with Misiakos & Tsamakis ni(T)",
+    "provenance": "derived"
+  }
+}
