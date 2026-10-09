@@ -1,6 +1,13 @@
 # Handoff: extract_modes (`mrm/extraction/common.py`, `modes.py`, `coupling.py`)
 
-Status: see the numbers section (filled from the committed artefacts). Nothing is committed.
+Status (resumed run, 2026-10-09): finished from the results that existed when a session restart stopped the first
+run. All artefacts below are committed (0a9941e, df1f69e) except `modes_study_bend.json`, which the resumed run
+assembled from stored results without any solver run (see "Bend-formulation study"); it, the edits to `modes.py`,
+the test file and this handoff are not committed yet. The resumed run made no new
+solver run (no femwell, Tidy3D, scikit-fem, DEVSIM or Meep) and did not change any committed artefact. Parts of the
+original task that were NOT done are listed in "Not done", each with the command that would produce it and the runtime
+fallback used meanwhile. Fast tests: `pytest tests/verification/test_extraction_modes.py -m "not slow"` gives 60
+passed (also with `-W error`). Every number below was re-read from the committed artefacts.
 
 ## Files
 
@@ -11,6 +18,9 @@ Status: see the numbers section (filled from the committed artefacts). Nothing i
   `write_artefact` (data + `<name>.sidecar.json`).
 - `mrm/extraction/modes.py`: `python -m mrm.extraction.modes [--quick] [--xsec ...] [--study yes|no|only] [--out DIR]`.
   Writes `modes_<xsec>.json` (schema `modes/1`) and `modes_study_bend.json` (schema `modes_bend_study/1`).
+  `--assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON` writes the study from stored results with no solver run
+  (`assemble_bend_study`); `meep_series_verdict` is the pure Richardson analysis of the cylindrical Meep rows that both
+  paths use.
 - `mrm/extraction/coupling.py`: `python -m mrm.extraction.coupling [--quick] [--xsec ...] [--out DIR]`. Writes
   `coupling_<xsec>.json` (schema `coupling/1`). Needs `modes_<xsec>.json` for r_ref.
 - `tests/verification/test_extraction_modes.py`: fast artefact tests + `@pytest.mark.slow` re-runs.
@@ -70,27 +80,70 @@ Jacobians (per nm, at fixed r_ref; inputs width, film, slab):
 | dlambda_dt_pm_per_k_per_nm | 0.018, 0.061, 0.027 | 0.013, 0.025, -0.041 | 0.026, 0.038 |
 | alpha_rad_db_per_cm_per_nm | -0.006, -0.024, 0.236 | -0.042, -0.116, 0.964 | 0, 0 |
 
-**alpha_rad is exponential in the slab**: the linear Jacobian is valid only within about +-5 nm. Use the
-`slab_sweep` table (log-interpolate) for larger excursions. A slab of 80 nm on the 160 nm film would radiate
-~80 dB/cm at r_ref, most of the 107-128 dB/cm intrinsic budget (07 D1), so the slab is bounded at about 70 nm if
-Q_i is 7000-8400 and the loss is mostly absorption (`P0-2` loss budget: `alpha_bend_radiation_db_per_cm`).
+**alpha_rad is exponential in the geometry, and its Jacobian entry is a secant.** `alpha_rad_db_per_cm_per_nm` is
+the central difference over the stored steps (width +-10, film +-5, slab +-10 nm), not the local slope. From the same
+stored evaluations (`jacobian.evaluations`, no new solve), d ln(alpha_rad)/dp and the local slope alpha_0 d ln/dp are:
+
+| | width | film | slab |
+|---|---|---|---|
+| rib160: d ln alpha_rad / dp (1/nm) | -0.0485 | -0.1785 | +0.4104 |
+| rib160: local slope (dB/cm/nm); secant / local | -0.0058; 1.05 | -0.0212; 1.14 | +0.0488; 4.83 |
+| rib200: d ln alpha_rad / dp (1/nm) | -0.0398 | -0.1075 | +0.3356 |
+| rib200: local slope (dB/cm/nm); secant / local | -0.0409; 1.03 | -0.1105; 1.05 | +0.3449; 2.79 |
+
+The linear offset can give a negative radiation loss: on rib160 a film draw of +8.4 nm (2 sigma of the preset's die
+spread) gives 0.119 - 0.024 x 8.4 = -0.085 dB/cm, where the exponential gives +0.027 dB/cm. The effect on the total
+loss (~110 dB/cm) is below 0.1 %, but the sign is unphysical (handoff request to realize below). For slab excursions use
+the `slab_sweep` table (log-interpolate) or exp(d ln alpha/dp x delta).
+
+A slab of 80 nm on the 160 nm film would radiate ~80 dB/cm at r_ref, most of the 107-128 dB/cm intrinsic budget
+(07 D1), so the slab is bounded at about 70 nm if Q_i is 7000-8400 and the loss is mostly absorption (`P0-2` loss
+budget: `alpha_bend_radiation_db_per_cm`).
 
 Convergence (Richardson over h_core 30/20/15/10 nm, recorded in each sidecar): error of n_eff 1.4e-5 to 2.3e-5, of n_g
 5e-6 to 2.7e-4, of dn_eff/dT 1e-9 (5e-6 relative), of the Si index weight 7e-6 to 3e-5. PML loss spread over four PML
-and window settings: 0.09 % (rib160), 0.03 % (rib200).
+and window settings: 0.09 % (rib160), 0.03 % (rib200). Limits of this evidence: the strip's n_g series is not yet
+asymptotic (observed order 0.46; error estimate 2.7e-4, the largest of the set); alpha_rad has PML/window convergence
+but no mesh-refinement series; the Jacobians use one finite-difference step each (no step-size study).
 
 Cross-checks:
 - Tidy3D local solver (interface-aligned grid, 10/5/2.5 nm, Richardson): n_eff delta (FEM - Tidy3D) -1.6e-4
   (rib160), +2.5e-4 (rib200), -1.9e-4 (strip). Bend shift at r_ref: FEM 0.003032 / 0.003896 / 0.000575 against
   Tidy3D 0.003020 / 0.003877 / 0.000580 (finest grid). femwell's isotropic map gives 0.006398 / 0.007885 / 0.002147.
-- Bend formulation (`modes_study_bend.json`): exact transform vs analytic 2-D Bessel eigenvalue < 1e-7 (isotropic
-  off by 3.6e-3 to 4.4e-3 at R = 3 um); Tidy3D +-R mean equals the exact shift (0.000378 vs 0.000378 at 7.5 um);
-  cylindrical Meep (3-D vectorial, averaged, 30-120 px/um, first order, Richardson) 1.30758 um vs FEM exact
-  1.30750 um and isotropic 1.30954 um at R = 3 um, m = 36. Verdict: the exact transform; femwell's isotropic map is
-  wrong by 3.7x at 7.5 um.
-- PML radiation loss vs the exact complex-frequency (Hankel) solution of a 2-D ring: Q_rad within 0.2 % for
-  Q_rad > 2e4 (R = 4 and 5 um). Tidy3D's local solver with bend + PML returned only PML modes (tested, not used).
+- Bend formulation: see "Bend-formulation study" below. Verdict: the exact transform; femwell's isotropic map
+  overestimates the bend shift 3.7x at 7.5 um.
+- PML radiation loss vs the exact complex-frequency (Hankel) solution of a 2-D ring (rib160 effective-index model):
+  Q_rad 27527 (FEM, four PML/window settings within 2e-4) against 27468 (exact), +0.21 %, at R = 4 um. Only R = 4 um
+  is stored; the interrupted run's statement "R = 4 and 5 um" is not backed by a stored number. Tidy3D's local solver
+  with bend + PML returned only PML modes (tested, not used).
 - 07 P0-3 test_dldt_perturbation_vs_resolve: sum w_i dn_i/dT agrees with the re-solved dn_eff/dT to < 1e-4.
+
+## Bend-formulation study (`modes_study_bend.json`, assembled from stored results)
+
+The full study (`--study only`) was waiting for the heavy lock when the session restarted, so it never ran. The resumed
+run assembled the artefact with `python -m mrm.extraction.modes --assemble-study <quick study JSON> <Meep rows JSON>`
+from: the `--quick` study (Bessel and PML-Hankel benchmarks), the stored cylindrical Meep runs (9 runs, 30-120 px/um),
+the committed `modes_<xsec>.json` (production FEM and Tidy3D at r_ref; the strip at 7.5 um) and the Tidy3D +-R check
+of 05 (`05_tools_smoke/verify/v01_tidy3d_bend_asym.json`). The sidecar lists every input with its sha256 (the two
+scratchpad inputs are embedded in the artefact, so the artefact is self-contained).
+
+| check | exact transform | femwell isotropic map |
+|---|---|---|
+| 2-D ring vs analytic Bessel eigenvalue (R = 3 um, h = 10 nm, both polarizations) | max error 6.4e-8 | 3.6e-3 / 4.4e-3 |
+| 3-D bend shift vs Tidy3D +-R mean, strip at r_ref 6.095 um | 0.000575 vs 0.000580 (extrapolated 0.000576) | 0.002147 |
+| strip at 7.5 um (Tidy3D: 05 V1, constant indices, 20/10/5 nm) | 0.000379 vs 0.000378 | 0.001418 (3.74x) |
+| rib160 / rib200 at r_ref | 0.003032 / 0.003896 vs 0.003020 / 0.003877 | 0.006398 / 0.007885 |
+| largest exact-vs-Tidy3D difference of the shift (5 rows) | 1.0 % | ratio >= 2.03 |
+| isotropic excess shift, r_ref vs 7.5 um | ratio 1.5139 against 1/R^2 = 1.5143 | |
+| cylindrical Meep, R = 3 um, m = 36 (3-D vectorial, subpixel averaging, observed order 0.97) | 1.30750 um vs Meep 1.30750 +- 0.23 nm | 1.30954 um: 2.04 nm away (9x the uncertainty) |
+
+Meep: the estimate is the mid-range of three Richardson extrapolations of the averaged series (free order on 120/80/60
+px/um: 1.30727; first order on 120/80: 1.30759; first order on 80/60: 1.30772); the uncertainty is their half-range.
+The finest run (120 px/um) is still 10 nm above the estimate, so Meep alone cannot resolve better than ~0.2 nm here.
+Without averaging the series is not monotone (staircasing) and is not used. The FEM predictions of the Meep resonance
+(exact 1.30750, isotropic 1.30954 um) come from the interrupted run (recorded in this handoff; the output file was not
+kept) and were not recomputed. They are consistent with the stored data: the isotropic excess shift at 7.5 um, scaled by
+(7.5/3)^2 and converted with n_g 4.142 (05 t01), predicts a 2.049 nm difference against the recorded 2.040 nm (0.4 %).
 
 ## Numbers: couplers (lambda0 = 1310 nm, ring at r_ref, straight bus of the ring's cross-section)
 
@@ -120,6 +173,11 @@ Method validation:
   1.024; method B (supermode + curved gap, centreline phase) / Meep = 0.962 and 0.949. Method A is used.
 - Method B in 3-D at the design gaps: 0.0985 (through, A 0.1045) and 0.00613 (drop, A 0.00660); its dispersion
   0.780 %/nm agrees with A's 0.767 %/nm. Ignoring the bent/straight phase mismatch changes B's K^2 by +3 %.
+- rib200 and strip400x200 have the same overlap-grid and FEM-mesh convergence rows in their sidecars (rib200: 0.10426 /
+  0.10449 on 10 / 5 nm grids, 0.10461 / 0.10449 / 0.10440 on FEM 20 / 15 / 10 nm; strip: 0.10321 / 0.10339 and
+  0.10348 / 0.10339 / 0.10318). The overlap grid has only two interface-aligned levels (10 and 5 nm); the FEM mesh has
+  three. rib200 has method B but no 2-D full-wave check (`validation_2d` is null; the code runs it for rib160 and the
+  strip only).
 
 - Strip (oxide gap, high contrast): the same 2-D check gives A/Meep = 0.815 at 100 nm and 0.937 at 200 nm (Meep
   converged to 0.2 %: 0.0998 and 0.0129). Method A underestimates K^2 by 6-18 % there, i.e. the strip's design gaps are
@@ -164,6 +222,24 @@ pipeline is consistent with the paper only under that reading; the thickness is 
 - Couplers: straight bus of the ring's own cross-section, slab continuous through the gap (rib), drop identical to
   the through coupler on the opposite side. A pulley bus or a slab-free gap would change K^2(gap) and its dispersion.
 
+## Not done (state at the end of the resumed run, 2026-10-09)
+
+The resumed run was not allowed to start solver jobs. `MG` below stands for
+`.venv/bin/python tools/memguard.py --limit-gb 3 --heavy --`.
+
+| part of the original task | what exists instead | command that would produce it | runtime fallback meanwhile |
+|---|---|---|---|
+| full bend study: strip rows at R = 3 and 5 um with Tidy3D, Bessel at R = 6.5 um and h = 5 nm, PML-Hankel at R = 3 and 5 um, stored FEM predictions of the Meep resonance | `modes_study_bend.json` assembled from stored results (above) | write `meep_cylindrical.rows` of `modes_study_bend.json` to a file F, then `MRM_MEEP_CYL_JSON=F MG .venv/bin/python -m mrm.extraction.modes --study only` (FEM + Tidy3D; Meep rows reused) | none needed: the runtime does not read the study; every `modes_<xsec>.json` already uses the exact transform |
+| more Meep resolution (e.g. 160 px/um) to tighten the first-order extrapolation | 9 stored runs, 30-120 px/um; estimate +-0.23 nm | `MG .venv/bin/python -m mrm.extraction.modes --meep-cyl-only F2` (edit `resolutions` in `meep_cyl_runs` first); not run, per Kenny | Meep is a check only; nothing at runtime |
+| 2-D full-wave (Meep) check of the rib200 couplers | rib160 check (same slab-gap topology: A/Meep 0.994 and 1.024) and method B in 3-D for rib200 | add `rib200` to the two name filters in `coupling.py` (`extract_coupling`, `--meep2d-only`), then `MG .venv/bin/python -m mrm.extraction.coupling --xsec rib200 --meep2d-only F3` and `MG .venv/bin/python -m mrm.extraction.coupling --xsec rib200 --meep2d-json F3` | the presets use `coupling_rib160` in every world (the 200 nm world keeps the 160 nm couplers) |
+| a third interface-aligned overlap-grid level (2.5 nm) for K^2 | 10 / 5 nm aligned + FEM mesh 20 / 15 / 10 nm | set `CmtSettings.dx_um = 0.0025, du_um = 0.00125` and run `MG .venv/bin/python -m mrm.extraction.coupling --no-meep --out <tmp>` (no CLI flag) | committed K^2 (5 nm grid; 10 -> 5 nm changes it by 0.15 %) |
+| mesh-refinement series for alpha_rad; step-size study of the Jacobians | PML/window spread (0.09 %, 0.03 %); one step per Jacobian; log-derivatives in this handoff | change `Settings.conv_scales` / `jac_steps_nm` and run `MG .venv/bin/python -m mrm.extraction.modes --study no --xsec rib160 rib200 --out <tmp>` (no CLI flag) | secant Jacobian applied as a linear offset by `realize` |
+| Tidy3D cross-check of TM0 / TE1 and of the de Cea geometry | FEM only (`mode_families`; `modes_decea2019.json` crosscheck is null) | needs a family selector in `tidy3d_block` (not written) | TM0 / TE1 are not used at runtime (07 P2-3 optional); VAL-7 uses the FEM |
+| sidewall-angle sensitivity | nominal 90 deg; `XSec.sidewall_deg` works in the FEM, not in the Tidy3D wrapper | add `sidewall_deg` to `jac_steps_nm` and re-extract (no CLI flag) | none; `realize` has no sidewall dimension |
+| n_eff(lambda, T) cross term (dlambda/dT per line) | n_eff(lambda) at 25 C and dn_eff/dT(T) at 1310 nm | not written | s(T) at 1310 nm for every line |
+| coupler K^2 versus temperature | K^2 at 25 C | not written | K^2 at 25 C (07 P1-5 excludes a ring-bus mismatch, < 1 %) |
+| VAL-7 replication of de Cea 2019 at the printed thickness | done, but it fails (see VAL-7) | - | `replicas.py` reads `modes_decea2019.json` |
+
 ## Open issues
 
 1. The slab depth is the dominant optical unknown: it moves lambda_res by ~1 nm/nm, n_g by -0.005/nm and
@@ -183,14 +259,35 @@ pipeline is consistent with the paper only under that reading; the thickness is 
   {t_c: ...}`). `ring.geometry.radius_um` = r_ref_um; `ring.optics.n_eff` = n_eff, `n_g`, `dn_g_dlambda_per_nm`;
   `ring.geometry.jacobian` = `jacobian`; `ring.geometry.jacobian_coupling` = coupling `jacobian`.
 - **loss budget (07 P0-2):** `alpha_bend_radiation_db_per_cm` = `alpha_rad_db_per_cm` (0.12 dB/cm rib160, 1.0 rib200).
-  Use `slab_sweep` rather than the linear Jacobian for slab excursions beyond +-5 nm.
+  For slab excursions use `slab_sweep` (log-interpolate), not the linear Jacobian (a secant, see the Jacobian note).
+- **realize (07 P1-16):** `alpha_rad_db_per_cm_per_nm` is applied as a linear offset, which can make the bend
+  radiation negative (rib160: -0.085 dB/cm at a +8.4 nm film draw). Either clamp `alpha_bend_radiation_db_per_cm` at
+  0 after the Jacobian, or add a log-scale target (e.g. `ln_alpha_rad_per_nm`, "lnscale", +1) and use the
+  d ln alpha_rad/dp values of the Jacobian note (rib160: -0.0485, -0.1785, +0.4104 per nm of width, film, slab). I did
+  not add them to the artefacts: an unknown `of` name would make `realize` raise, and rewriting `modes_rib160.json`
+  would break the modes sha256 that `junction_rib160.json` and the coupling sidecars record.
+- **params_content (presets):** `modes_rib200.json` and `coupling_rib200.json` exist. The `uncertainty.film_thickness`
+  "200" choice still uses the strip400x200 artefacts as a stand-in "until modes_rib200 exists", and the note of
+  `strip400x200_q_anchor` asks for a recompute when the rib n_g lands (rib160 n_g 3.9405, rib200 4.0116). The
+  `ring.geometry.jacobian` fallback note ("until modes_rib160 exists") is stale. `ring.geometry.jacobian_coupling` is
+  not wired to `coupling_<xsec>.json:jacobian` yet. Five fast tests of `tests/closure/test_presets.py` fail because
+  the loss budget is still balanced for the fallbacks (n_g 4.0, bend radiation 1.0 dB/cm) while the artefacts now
+  resolve (n_g 3.9405, 0.119 dB/cm): realize of `g25_test_vehicle` gives a 26.46 dB notch (test: 27.9 +- 0.5);
+  overriding only n_g = 4.0 gives 29.86 dB, only the radiation = 1.0 gives 25.08 dB, both give 27.91 dB. Rebalance the
+  non-heating loss term so that Q_i (not alpha_i) is kept, as the `strip400x200_q_anchor` note describes.
+- **extract_junction:** `test_tidy3d_cross_check[rib160]` fails (delta n_eff -0.0177). The cause is the extrapolation,
+  not the solvers: the junction's Tidy3D runs use uniform grids without subpixel averaging and a forced first-order
+  Richardson over 20 / 10 / 6.7 nm (2.4596 / 2.4462 / 2.4372 -> 2.4192). The finest value 2.4372 agrees with the
+  junction's femwell 2.4368, and the modes artefact's independent Tidy3D run on interface-aligned 10 / 5 / 2.5 nm grids
+  extrapolates the same rib160 straight guide to 2.43706 against the FEM 2.43690 (delta 1.6e-4). Fitting the order
+  (as `mrm.extraction.common.richardson` does) or aligning the grid with the interfaces would remove the failure.
 - **coupling (07 P1-5, P1-9):** `dln_kappa2_through_dlambda_per_nm` = 0.0077 /nm (rib160), drop 0.0123 /nm;
   `dln_kappa2_dgap` -0.0135 /nm (so +-5 nm of drop gap is +-7 % of monitor gain, not +-10 %).
 - **plant_optics:** `coupler_phase_rad` follows your psi convention (delay, adds to phi).
 - **realize:** the coupling Jacobian is partial at fixed gap; a correlated width bias needs d/dw - d/dgap.
 - **validation (VAL-7):** use the table above; VAL-7 as frozen (n_g 2.73 +-3 %, Gamma 0.65 +-0.05) fails at 100 nm.
 - **docs (07 D10, 05 section 5.4):** the femwell-vs-Tidy3D bend disagreement is settled in favour of the exact
-  transform (three independent checks); cylindrical Meep with subpixel averaging converges at first order and
-  agrees after Richardson extrapolation.
+  transform (three independent checks: analytic Bessel, Tidy3D +-R mean, cylindrical Meep); cylindrical Meep with
+  subpixel averaging converges at first order and agrees after Richardson extrapolation (`modes_study_bend.json`).
 - **tools/memguard.py (owner unknown):** the heavy lock has no queue; with 5-6 waiters one agent's sequential jobs
   can starve others for an hour. A FIFO ticket would help.

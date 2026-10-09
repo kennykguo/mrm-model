@@ -1,0 +1,140 @@
+{
+ "schema": "modes_bend_study/1",
+ "inputs": {
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "geometry": {
+   "name": "strip400x200",
+   "width_nm": 400.0,
+   "film_nm": 200.0,
+   "slab_nm": 0.0,
+   "sidewall_deg": 90.0,
+   "clad": {
+    "top": "SiO2 (beol)",
+    "box": "SiO2 (thermal), 2.0 um",
+    "below_box": "sio2"
+   },
+   "width_definition": "mid-height of the etched sidewall",
+   "lam0_nm": 1310.0,
+   "provenance": {
+    "film_nm": "printed (SMTAI render; textbook REF.waveguideLmNm)",
+    "width_nm": "printed",
+    "note": "the textbook's reference strip (06 audit, 05 smoke tests); oxide-clad, vertical walls"
+   },
+   "ranges_nm": {
+    "width_nm": [
+     380.0,
+     420.0
+    ],
+    "film_nm": [
+     190.0,
+     210.0
+    ]
+   }
+  },
+  "sources": {
+   "quick_study": {
+    "file": "/private/tmp/claude-501/-Users-kenny-interactive-textbooks-lightmatter-capstone/d5794d65-9500-4988-a2ee-6908737d147d/scratchpad/quick_study/modes_study_bend.json",
+    "sha256": "669e25a36d816123ca1787f5b864000c926529cb447f225e75d31fe61fef2864",
+    "what": "python -m mrm.extraction.modes --quick --study only (2026-10-09): bessel_2d, pml_hankel_2d and a coarse-mesh (h_core 30 nm) strip row at R = 7.5 um"
+   },
+   "meep_cyl_runs": {
+    "file": "/private/tmp/claude-501/-Users-kenny-interactive-textbooks-lightmatter-capstone/d5794d65-9500-4988-a2ee-6908737d147d/scratchpad/meep_cyl_runs.json",
+    "sha256": "36849bf711bb6661415f68507c14541662b7fec2bf27242ecbd24e14987f5ddb",
+    "what": "python -m mrm.extraction.modes --meep-cyl-only (2026-10-09; 9 runs, peak RSS 0.23 GB)"
+   },
+   "tidy3d_v01": {
+    "file": "docs/research/05_tools_smoke/verify/v01_tidy3d_bend_asym.json",
+    "sha256": "c78a4fe5703dab0274af47324d92d0cccf38684e8e2ac7f705827f3049b89591",
+    "what": "Tidy3D local solver, strip 400 x 200 nm, constant n_Si 3.50053 / n_ox 1.44680, uniform 20/10/5 nm grids, +R/-R at 7.5 um (05 verification V1)"
+   },
+   "tidy3d_t01": {
+    "file": "docs/research/05_tools_smoke/out/t01_tidy3d_mode.json",
+    "sha256": "e4d49353b0a02188e3bfff3891d40dfe25055e3a8b693efd85c675323901a38d",
+    "what": "Tidy3D straight strip, constant indices: waveguide-only group index"
+   },
+   "modes_strip400x200": {
+    "file": "mrm/data/extracted/modes_strip400x200.json",
+    "sha256": "287b644f4421c6f43ccd2c2809288a4f72029ae7df65fdd68fb0369e58e4e306"
+   },
+   "modes_rib160": {
+    "file": "mrm/data/extracted/modes_rib160.json",
+    "sha256": "deab882d53fa1fb01564f6708435d457442b6cac79565fa6fbe2ec0d625d9b74"
+   },
+   "modes_rib200": {
+    "file": "mrm/data/extracted/modes_rib200.json",
+    "sha256": "3fdaad0feeed0b3c6864d63939d630ba2ad8b11cf6fe87fb5f83c97603818503"
+   }
+  }
+ },
+ "mesh": {
+  "bessel_2d_h_nm": [
+   10.0,
+   20.0
+  ],
+  "pml_hankel_2d": "core h 10 nm, outside 30 nm; four PML/window settings",
+  "strip_rows": "production FEM mesh h_core 15 nm (modes_<xsec>.json); quick row h_core 30 nm",
+  "tidy3d_grids_nm": {
+   "r_ref": [
+    10.0,
+    5.0,
+    2.5
+   ],
+   "7.5um": [
+    20.0,
+    10.0,
+    5.0
+   ]
+  },
+  "meep_resolution_px_per_um": [
+   30,
+   40,
+   60,
+   80,
+   120
+  ]
+ },
+ "validation": {
+  "exact_transform_max_abs_error_vs_bessel": 6.398162044618516e-08,
+  "isotropic_map_max_abs_error_vs_bessel": 0.004433849577472948,
+  "exact_vs_tidy3d_max_rel_diff_of_shift": 0.010176555932141285,
+  "isotropic_vs_tidy3d_min_ratio_of_shift": 2.0339415408001167,
+  "meep_distance_to_exact_nm": -0.004791049996732966,
+  "meep_distance_to_isotropic_nm": -2.0447910499965527,
+  "meep_extrapolation_uncertainty_nm": 0.2291352423845483,
+  "pml_vs_hankel_max_rel_err_q": 0.0021416187371352535,
+  "conclusion": "the exact (anisotropic) transform is right: it reproduces the analytic Bessel eigenvalue of a 2-D ring to < 1e-7 for both polarizations, Tidy3D's +/-R mean bend shift in 3-D to within 2 % at r_ref and 7.5 um (three cross-sections), and the cylindrical Meep resonance within the extrapolation range. femwell's isotropic eps(1+x/R)^2 overestimates the bend shift (x3.7 at R = 7.5 um; the excess scales as 1/R^2), because it approximates the conformal coordinate ln(r/R) by x/R and drops the mu tensor. modes.py uses the exact transform."
+ },
+ "assembly": {
+  "method": "assemble_bend_study(): no solver run; arithmetic on stored results",
+  "command": "python -m mrm.extraction.modes --assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON",
+  "full_study_command": "MRM_MEEP_CYL_JSON=<meep rows> .venv/bin/python tools/memguard.py --limit-gb 3 --heavy -- .venv/bin/python -m mrm.extraction.modes --study only",
+  "not_done": [
+   "strip rows at R = 3 and 5 um with Tidy3D (full study); replaced by r_ref and 7.5 um rows from the committed artefacts and 05 V1",
+   "Bessel benchmark at R = 6.5 um and h = 5 nm; R = 3 um at h = 20 / 10 nm is already at the 1e-7 level",
+   "PML-Hankel benchmark at R = 3 and 5 um; R = 4 um (Q_rad 2.7e4) is stored",
+   "FEM predictions of the Meep resonance re-run and stored (recorded values used)",
+   "a finer Meep resolution (160 px/um) to tighten the first-order extrapolation (Meep not run, per Kenny)"
+  ]
+ },
+ "sha256": "eea9a64f6feb6e888856caf870d084930b8ddf7f6b3127da831ee104da041111",
+ "data_file": "modes_study_bend.json",
+ "created_utc": "2026-10-09T16:41:11Z",
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "femwell": "0.1.12",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0",
+  "meshio": "5.3.5"
+ }
+}

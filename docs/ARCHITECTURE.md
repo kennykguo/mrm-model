@@ -213,5 +213,6 @@ Each with a Python implementation; the ones marked (c) also as a compiled numba 
 5. Calibration reads only `targets/calibration.yaml`; held-out targets are frozen by sha256 (07 P0-5).
 6. A controller claim is reported with the nominal result, the worst named corner and quantiles over the uncertainty
    set, and the first line of every controller report says performance is conditional on the assumed thermal dynamics.
-7. Memory: 16 GB machine. Solver runs go through `tools/memguard.py` (`--heavy` for > 1 GB); Monte Carlo records
-   metrics only.
+7. Memory: 16 GB machine. Solver runs go through `tools/memguard.py` (`--heavy` for > 1 GB). The heavy lock lets
+   only one heavy job run at a time, so a `--heavy` job defaults to a 6 GB cap; other jobs default to 3 GB. Monte
+   Carlo records metrics only.

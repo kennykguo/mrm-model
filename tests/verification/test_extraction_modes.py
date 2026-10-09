@@ -217,9 +217,38 @@ def test_bend_study_settles_formulation():
     v = d["verdict"]
     assert v["exact_transform_max_abs_error_vs_bessel"] < 1e-6
     assert v["isotropic_map_max_abs_error_vs_bessel"] > 1e-3
-    for r in d["strip_bend_shift"]:
+    rows = d["strip_bend_shift"] + d.get("rib_bend_shift", [])
+    assert sum("tidy3d_shift" in r for r in rows) >= 2
+    for r in rows:
         if "tidy3d_shift" in r:
             assert r["exact_shift"] == pytest.approx(r["tidy3d_shift"], rel=0.1, abs=3e-5)
+            assert r["isotropic_shift"] > 1.5 * r["tidy3d_shift"]
+    # the PML radiation loss matches the exact complex-frequency (Hankel) solution of a 2-D ring
+    assert v["pml_vs_hankel_max_rel_err_q"] < 0.005
+
+
+def test_bend_study_meep_and_scaling():
+    """Cylindrical Meep (stored runs, Richardson) lands on the exact-transform prediction, not on the isotropic one,
+    and the isotropic map's excess bend shift scales as 1/R^2."""
+    d, side, _ = _load("modes_study_bend")
+    m = d["meep_cylindrical"]
+    mv = m["verdict"]
+    assert mv["exact_inside_extrapolation_range"] and not mv["isotropic_inside_extrapolation_range"]
+    assert abs(mv["distance_to_isotropic_nm"]) > 5 * mv["extrapolation_uncertainty_nm"]
+    assert 0.8 < mv["observed_order"] < 1.2                              # first order, as expected for Meep here
+    lam_avg = m["series"]["averaging"]["lam_um"]
+    assert all(a < b for a, b in zip(lam_avg, lam_avg[1:]))             # monotone with averaging (finest first)
+    # the recorded FEM predictions agree with the 1/R^2-scaled excess shift of the production artefact
+    assert abs(m["fem_pred_difference_consistency"]["rel_diff_vs_recorded"]) < 0.05
+    sc = d["bend_shift_scaling"]
+    assert sc["ratio"] == pytest.approx(sc["ratio_if_1_over_r2"], rel=0.01)
+    assert 3.0 < sc["isotropic_over_exact_shift_7p5"] < 4.5
+    # every input of an assembled study is named with its sha256
+    if d.get("assembled_from_existing_results"):
+        for name, src in side["inputs"]["sources"].items():
+            assert len(src["sha256"]) == 64, name
+        for x in ("strip400x200", "rib160", "rib200"):
+            assert side["inputs"]["sources"][f"modes_{x}"]["sha256"] == C.sha256_file(DATA / f"modes_{x}.json")
 
 
 def test_decea_replication_reported():
