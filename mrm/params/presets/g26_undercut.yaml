@@ -1,0 +1,9 @@
+# Corner (07 P1-3, 4.8): the GF-PDK-like heater family, four silicide resistors with a substrate undercut (GF-ECIO):
+# imec undercut poles (2-pole fit 6.1 us / 45.7 us), slower heater node, silicide TCR.
+extends: g26
+meta:
+  name: g26_undercut
+  kind: corner
+  description: "g26 with uncertainty.thermal.family pinned to silicide_undercut"
+alts:
+  uncertainty.thermal.family: silicide_undercut

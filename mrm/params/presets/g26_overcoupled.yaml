@@ -1,0 +1,10 @@
+# Corner (07 P1-5): the over-coupled mirror of the G25 notch (27.9 dB at 0 V); Q_L pinned at its nominal 3850 so the
+# branch is exact (with Q_L drawn independently the regime holds only near the nominal, see the q_loaded note).
+extends: g26
+meta:
+  name: g26_overcoupled
+  kind: corner
+  description: "g26 with uncertainty.coupling_regime pinned to over and uncertainty.q_loaded to its nominal"
+alts:
+  uncertainty.coupling_regime: over
+  uncertainty.q_loaded: nominal

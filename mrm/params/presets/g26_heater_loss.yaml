@@ -1,0 +1,9 @@
+# Corner (07 P1-5, BND-4): the extinction change of the G25 sweep comes from loss that follows the heater temperature
+# (heater doping overlapping the mode); the only mechanism that drifts the ER under lock.
+extends: g26
+meta:
+  name: g26_heater_loss
+  kind: corner
+  description: "g26 with uncertainty.er_mechanism pinned to heater_t_loss"
+alts:
+  uncertainty.er_mechanism: heater_t_loss

@@ -1,0 +1,577 @@
+# Held-out validation targets (07 P0-5, section 4.4). FROZEN on 2026-10-09, before any fitting.
+#
+# Nothing under mrm/calibration may read this file (tests/verification/test_validation_isolation.py). Its sha256 is
+# recorded in the header of docs/VALIDATION.md; any edit is a re-freeze (procedure in README.md) and must be logged in
+# docs/CHANGELOG.md with a reason. Tolerances are fixed here and are not tuned after a comparison.
+#
+# Status: `active` entries are scored; `deferred` entries reserve an id whose data are still used by a calibration
+# target (they list `blocked_by`); `unverified` entries hold a value no research report has confirmed and are
+# reported but not scored; `cross_check` entries are solver-against-solver comparisons, reported but never counted as
+# validation (07 P0-5 "Why").
+#
+# Re-frozen on 2026-10-09 by the adversarial review of the split, before any replica existed and before any comparison
+# (so nothing is contaminated): every entry now states the 07 P0-5 condition keys (null where not applicable), every
+# read-off entry records its digitizer and crop (07 4.3 rule), and VAL-4c notes its dependence on the CAL-14 level.
+# No value or tolerance changed. Details: docs/handoff/validation_targets.md.
+schema: mrm.validation.targets/1
+role: validation
+frozen_on: "2026-10-09"
+conventions:
+  bias_v: Reverse bias across the junction in volts, positive = reverse (G25 prints reverse bias as negative volts).
+  t_c: Temperature in degC as printed; t_reference says which thermometer.
+  sigma: One standard deviation in the entry's unit, including read-off error.
+  tolerance: Fixed now. A prediction outside it fails the target; sigma is used only for the z-score in the report.
+targets:
+
+  - id: VAL-1
+    quantity: tuning_range_at_1p5v_nm
+    description: Thermal tuning range of the G25 swept device at 1.5 V heater drive (1301.89 -> 1314.89 nm).
+    kind: scalar
+    value: 13.0
+    unit: nm
+    sigma: 0.05
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: 1.5
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: [LM26-S, LM-P]
+    locator: LM26-S slide 8 embedded image (LM-P Fig. 1(e)), 1.5 V trace
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8", image: "LM26-S slide 8 embedded raster", method: "dip position, +-0.03 nm per trace", crop: "the whole 1000 x 700 px embedded image (no crop)"}
+    rechecked: true
+    verification: 01 section 2.2 and 2.4 (13.0 nm, +-0.05); 1314.89 - 1301.89 = 13.00 nm (recomputed).
+    replica: tuning_range_at_v
+    replica_args: {heater_v: 1.5, relative_to_v: 0.0}
+    tolerance: {kind: abs, value: 0.7}
+    tolerance_basis: 07 4.4.
+    tests: >-
+      The TCR / driver-law fit of CAL-4 extrapolated from 1.4 to 1.5 V. Semi-independent: it is a different trace of
+      the same sweep as CAL-4.
+    data_points: [g25_heater_sweep/resonance_nm@1.5v]
+    uses: [CAL-4, CAL-7]
+    status: active
+
+  - id: VAL-2a
+    quantity: notch_depth_at_1p4v_db
+    description: Through-port notch depth of the G25 swept device at 1.4 V heater drive.
+    kind: scalar
+    value: 18.0
+    unit: db
+    sigma: 0.5
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: 1.4
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: [LM26-S, LM-P]
+    locator: LM26-S slide 8 embedded image (LM-P Fig. 1(e)), 1.4 V trace
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8", image: "LM26-S slide 8 embedded raster", method: "deepest pixel per tab10 colour cluster", crop: "the whole 1000 x 700 px embedded image (no crop)"}
+    rechecked: true
+    verification: 01 section 2.2 (+-0.5 dB); agrees with the printed "> 18 dB, voltage-dependent" DC ER (LM-P section 3.1).
+    replica: notch_er_vs_heater_v
+    replica_args: {topology: [all_pass, add_drop], heater_v: 1.4}
+    tolerance: {kind: abs, value: 1.5}
+    tolerance_basis: 07 4.4.
+    tests: >-
+      Extrapolation of the extinction mechanism fitted on 0 to 1.2 V (CAL-2). Contamination warning: 03 key finding 5
+      fitted coupling dispersion to all 8 points (s = 1.48 %/nm), so that number must not be a preset default or prior.
+    data_points: [g25_heater_sweep/notch_db@1.4v]
+    uses: [CAL-1, CAL-2]
+    status: active
+
+  - id: VAL-2b
+    quantity: notch_depth_at_1p5v_db
+    description: Through-port notch depth of the G25 swept device at 1.5 V heater drive.
+    kind: scalar
+    value: 16.9
+    unit: db
+    sigma: 0.5
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: 1.5
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: [LM26-S, LM-P]
+    locator: LM26-S slide 8 embedded image (LM-P Fig. 1(e)), 1.5 V trace
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8", image: "LM26-S slide 8 embedded raster", method: "deepest pixel per tab10 colour cluster", crop: "the whole 1000 x 700 px embedded image (no crop)"}
+    rechecked: true
+    verification: 01 section 2.2 (+-0.5 dB).
+    replica: notch_er_vs_heater_v
+    replica_args: {topology: [all_pass, add_drop], heater_v: 1.5}
+    tolerance: {kind: abs, value: 1.5}
+    tolerance_basis: 07 4.4.
+    tests: Extrapolation of the extinction mechanism (same warning as VAL-2a).
+    data_points: [g25_heater_sweep/notch_db@1.5v]
+    uses: [CAL-1, CAL-2]
+    status: active
+
+  - id: VAL-3a
+    quantity: eo_bandwidth_at_2v_ghz
+    description: Electro-optic 3 dB bandwidth at 2 V reverse bias (printed "-2 V"), G25 plotted device.
+    kind: scalar
+    value: 35.4
+    unit: ghz
+    sigma: 0.7
+    components: {legend: 35.4, caption: 34.1}
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: 2.0
+      p_in_dbm: null
+      port: through
+      loop: open
+      detuning: null
+    generation: G25
+    source: LM-P
+    locator: OFC 2025 Tu3J.6 Fig. 1(f) legend ("-2V, 35.4 GHz"); caption "near 34.1 GHz for a -2V bias"
+    provenance: printed
+    rechecked: true
+    verification: 01 section 2.3 (verified by OCR of the figure). sigma is half the legend-caption gap.
+    replica: eo_bandwidth_at_bias
+    replica_args: {bias_v: 2.0, detuning: hypothesis}
+    tolerance: {kind: abs, value: 3.0}
+    tolerance_basis: 07 4.4.
+    tests: >-
+      The C(V) from the CAL-5 fit (with R_s from CAL-10). Caveat: CAL-10 is a population mean at 1 V while this is one
+      plotted device; VAL-3b removes that mismatch.
+    data_points: [g25_fig1f/eo_bw_device_2v]
+    uses: [CAL-5, CAL-10]
+    status: active
+
+  - id: VAL-3b
+    quantity: eo_bandwidth_ratio_2v_over_1v
+    description: >-
+      Ratio of the 3 dB bandwidth at 2 V to that at 1 V reverse bias for the same plotted G25 device (35.4 / 31.8 by
+      the legend, 34.1 / 31.8 by the caption). Added to 07 4.4 by this split; see the README.
+    kind: scalar
+    value: 1.09
+    unit: "1"
+    sigma: 0.02
+    components: {legend: 1.113, caption: 1.072}
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: [1.0, 2.0]
+      p_in_dbm: null
+      port: through
+      loop: open
+      detuning: null
+    generation: G25
+    source: LM-P
+    locator: OFC 2025 Tu3J.6 Fig. 1(f) legend ("-1V, 31.8 GHz", "-2V, 35.4 GHz") and caption (34.1 GHz)
+    provenance: inferred
+    rechecked: true
+    verification: Printed values (01 section 2.3, verified by OCR); ratios recomputed.
+    replica: eo_bandwidth_at_bias
+    replica_args: {bias_v: [1.0, 2.0], output: ratio, detuning: hypothesis}
+    tolerance: {kind: abs, value: 0.06}
+    tolerance_basis: >-
+      1.5 x the legend-caption spread. An RC-only abrupt junction with V_bi = 0.9 V would give about 1.24, so the
+      target separates the RC and photon-lifetime limits.
+    tests: The bias dependence of C(V) against the photon-lifetime limit on one device, free of the population mismatch of VAL-3a.
+    data_points: [g25_fig1f/eo_bw_device_1v, g25_fig1f/eo_bw_device_2v]
+    uses: [CAL-5, CAL-10, CAL-1]
+    status: active
+
+  - id: VAL-4a
+    quantity: reloma_minus3db_contour_bias_at_0c_v
+    description: Bias at which the stabilized relOMA map reaches its -3.0 dB contour at 0 degC.
+    kind: scalar
+    value: 3.15
+    unit: v
+    sigma: 0.1
+    conditions:
+      t_c: 0.0
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 3.75]
+      p_in_dbm: 0.0
+      port: through
+      loop: closed
+    generation: G26
+    source: [LM26-S, HC]
+    locator: OFC 2026 deck slide 9, loop-closed map (HC slide 16 shows the same map)
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 2.7", image: "LM26-S slide 9, loop-closed map", method: "contour position against the bias and temperature axes; not recorded in detail, not re-checked by the 01 verifier", crop: "not recorded"}
+    rechecked: false
+    verification: >-
+      01 section 2.7 (about 3.15 V at 0 degC); textbook REF reads 3.1 V. The 01 verifier did not re-check the slide-9
+      read-offs, hence sigma 0.1 V.
+    replica: relOMA_map
+    replica_args: {mode: oracle, t_c: 0.0, contour_db: -3.0, alternative_mode: setpoint_lock}
+    tolerance: {kind: abs, value: 0.3}
+    tolerance_basis: 07 4.4 (+-0.3 V on the contour position).
+    tests: >-
+      The shape of dlambda/dV(V), eta(V) and self-heating across bias, and the generation transfer from G25 to G26.
+      Contamination warning: 06 M6's swing inversion spans -2.1 to -3.0 dB and must not set the swing prior.
+    data_points: [g26_slide9_closed/contour_m3db_bias_at_0c]
+    uses: [CAL-14, CAL-5]
+    status: active
+
+  - id: VAL-4b
+    quantity: reloma_minus3db_contour_bias_at_105c_v
+    description: Bias at which the stabilized relOMA map reaches its -3.0 dB contour at 105 degC.
+    kind: scalar
+    value: 3.4
+    unit: v
+    sigma: 0.1
+    conditions:
+      t_c: 105.0
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 3.75]
+      p_in_dbm: 0.0
+      port: through
+      loop: closed
+    generation: G26
+    source: [LM26-S, HC]
+    locator: OFC 2026 deck slide 9, loop-closed map
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 2.7", image: "LM26-S slide 9, loop-closed map", method: "contour position against the bias and temperature axes; not recorded in detail, not re-checked by the 01 verifier", crop: "not recorded"}
+    rechecked: false
+    verification: 01 section 2.7 (about 3.4 V at 105 degC); not re-checked by the 01 verifier.
+    replica: relOMA_map
+    replica_args: {mode: oracle, t_c: 105.0, contour_db: -3.0, alternative_mode: setpoint_lock}
+    tolerance: {kind: abs, value: 0.3}
+    tolerance_basis: 07 4.4.
+    tests: As VAL-4a, plus the temperature dependence of the bias response (eta(V, T), dlambda/dT(T), self-heating).
+    data_points: [g26_slide9_closed/contour_m3db_bias_at_105c]
+    uses: [CAL-14, CAL-5]
+    status: active
+
+  - id: VAL-4c
+    quantity: reloma_stabilized_spread_db
+    description: Spread (max - min) of the stabilized relOMA over 0 to 105 degC and 1.0 to 3.75 V; printed below 1 dB, contours from -2.1 to -3.0 dB.
+    kind: scalar
+    value: 0.9
+    unit: db
+    sigma: 0.1
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 3.75]
+      p_in_dbm: 0.0
+      port: through
+      loop: closed
+    generation: G26
+    source: [LM26-S, HC]
+    locator: OFC 2026 deck slide 9 and HC slide 16, loop-closed map (contour labels)
+    provenance: printed
+    rechecked: false
+    verification: 01 section 2.7 ("< 1 dB spread", contours -2.1 ... -3.0 dB). The same printed fact gives the one-sided oracle bound BND-4.
+    replica: relOMA_map
+    replica_args: {mode: oracle, output: spread_db, alternative_mode: setpoint_lock}
+    tolerance: {kind: abs, value: 0.3}
+    tolerance_basis: 07 4.4 (+-0.3 dB on the spread).
+    tests: >-
+      The combined bias and temperature behaviour of the locked ring (swing, eta(V), Q(T), self-heating). Not fully
+      independent: the map's maximum is the CAL-14 level (-2.1 dB, fitted), so with a well-fitted CAL-14 this target
+      mainly tests the map's minimum, which is also what VAL-4a/b locate. Report it, but do not count it as a third
+      independent pass next to VAL-4a/b.
+    data_points: [g26_slide9_closed/spread_db]
+    uses: [CAL-14]
+    status: active
+
+  - id: VAL-5
+    quantity: reloma_open_loop_contour_offsets_k
+    description: >-
+      Loop-open relOMA map at 2.25 V bias: temperature offsets of the -16 dB and -24 dB contours from the map's peak
+      (69.6 degC). Read-off positions: -16 dB at 62 and 74.5 degC; -24 dB at 57 and 79 degC. The cold side is wider.
+    kind: contour_offsets
+    value:
+      levels_db: [-16.0, -24.0]
+      below_peak_k: [7.6, 12.6]
+      above_peak_k: [4.9, 9.4]
+    unit: k
+    sigma: 0.7
+    components:
+      peak_c: 69.6
+      contours_c: {m16db: [62.0, 74.5], m24db: [57.0, 79.0]}
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: fixed_unknown
+      bias_v: 2.25
+      p_in_dbm: 0.0
+      port: through
+      loop: open
+    conditions_note: >-
+      The heater code of the loop-open map is unpublished (07 Q7). The replica must choose the fixed code that puts
+      its relOMA peak at 69.6 degC; the peak position is therefore an alignment input and is not scored. Contour labels
+      are absolute relOMA (re 1 mW), and the map samples every 5 degC.
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 9, loop-open map at 2.25 V
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 2.7", image: "LM26-S slide 9, loop-open map", method: "contour crossings along the 2.25 V row, +-0.5 degC; not re-checked by the 01 verifier", crop: "not recorded"}
+    rechecked: false
+    verification: >-
+      01 section 2.7 (+-0.5 degC); not re-checked by the 01 verifier. sigma 0.7 K combines the read-offs of a contour
+      and the peak. The -8 dB contours (66.8 and 72.4 degC), the 2.85 degC half-width and k = 0.67 dB/degC^2 are
+      excluded (excluded.yaml EXC-4).
+    replica: relOMA_map
+    replica_args: {mode: fixed_code, bias_v: 2.25, align_peak_c: 69.6, sample_step_k: 5.0}
+    tolerance: {kind: contour_asymmetry, abs: 2.0, require: cold_side_wider}
+    tolerance_basis: 07 4.4 (sign of the asymmetry, +-2 degC on each offset).
+    tests: >-
+      The self-heating line shape (weak: the map interpolates 5 degC samples). Contamination warning: 06 V5's secant
+      matching used the -16 dB at about 6 degC anchor, so its Q / dlambda/dT pairs must not become priors.
+    data_points: [g26_slide9_open/contour_m16db_cold, g26_slide9_open/contour_m16db_hot, g26_slide9_open/contour_m24db_cold, g26_slide9_open/contour_m24db_hot]
+    uses: [CAL-14, CAL-1, CAL-6]
+    status: active
+
+  - id: VAL-6
+    quantity: stabilizer_code_excursion_0_105c
+    description: Stabilizer (heater) code excursion over 0 to 105 degC, from the slide-10 data.
+    kind: scalar
+    value: null
+    unit: codes
+    sigma: null
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 10, DAC panel
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8 and verification log item 6", image: "LM26-S slide 10", method: "as CAL-9a (deferred: no value is taken here)", crop: "the DAC panel of slide 10 (exact pixel crop not recorded)"}
+    rechecked: true
+    verification: >-
+      Deferred (07 4.4: "set when known"). The same data are calibration target CAL-9 until the DAC LSB and the driver
+      law are known (07 Q3). Activating VAL-6 requires a re-freeze that removes the data from CAL-9.
+    replica: stabilizer_code_vs_T
+    replica_args: {t_c: [0.0, 105.0]}
+    tolerance: {kind: pending}
+    tolerance_basis: Not settable before Q3 is answered.
+    tests: dlambda/dT x heater efficiency in controller units, once the code-to-power law is known.
+    data_points: [g26_slide10_dac/swing_top_lane, g26_slide10_dac/swing_bottom_lane]
+    blocked_by: [CAL-9a, CAL-9b, CAL-9c]
+    status: deferred
+
+  - id: VAL-7a
+    quantity: group_index_published_geometry
+    description: Group index of the de Cea et al. 2019 45 nm MRM (1545 nm), as reported by the [VAL] reviewer.
+    kind: scalar
+    value: 2.73
+    unit: "1"
+    sigma: null
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none, lambda_nm: 1545.2}
+    generation: none
+    source: DEC19
+    locator: de Cea, Atabaki, Ram, Opt. Express 27, 24274 (2019), Table 1 (as reported by [VAL] in 07 4.4)
+    provenance: literature
+    rechecked: false
+    verification: >-
+      UNVERIFIED. No research report confirms n_g = 2.73 (03 read the paper and its Table 1 but quotes only gamma_0,
+      gamma_lin, gamma_rad, gamma_th, tau and Gamma). The full text could not be fetched during this split (Optica
+      returns a JavaScript wall). A wrong value here would make a correct pipeline fail, so it is reported but not
+      scored until someone re-reads Table 1 and re-freezes.
+    replica: mode_solve_published_geometry
+    replica_args: {paper: DEC19, output: n_g}
+    tolerance: {kind: rel, value: 0.03}
+    tolerance_basis: 07 4.4 (+-3 % n_g).
+    tests: modes.py on a geometry that is actually published (third-party pipeline replication).
+    inputs_needed: The cross-section of the de Cea device (not yet extracted into docs/research).
+    data_points: [dec19/n_g]
+    status: unverified
+
+  - id: VAL-7b
+    quantity: confinement_factor_published_geometry
+    description: Confinement factor of the de Cea et al. 2019 MRM.
+    kind: scalar
+    value: 0.65
+    unit: "1"
+    sigma: null
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none, lambda_nm: 1545.2}
+    generation: none
+    source: DEC19
+    locator: de Cea et al. 2019 (as quoted in 03 section 7.1, verifier's note)
+    provenance: literature
+    rechecked: true
+    verification: >-
+      03 section 7.1 [corrected] note, written by a verifier who read the paper in full: "confinement factor (0.65 in
+      de Cea ...)", a Poynting-normalized (Johnson-style) overlap. The replica must compute the same definition (an
+      energy or power fraction in Si), not the index weight dn_eff/dn_Si (06 section 2.4).
+    replica: mode_solve_published_geometry
+    replica_args: {paper: DEC19, output: confinement_poynting_si}
+    tolerance: {kind: abs, value: 0.05}
+    tolerance_basis: 07 4.4 (+-0.05 Gamma).
+    tests: modes.py on a published geometry.
+    inputs_needed: The cross-section of the de Cea device (not yet extracted into docs/research).
+    data_points: [dec19/confinement]
+    status: active
+
+  - id: VAL-7c
+    quantity: self_heating_time_constant_published
+    description: Ring self-heating (waveguide-core) thermal time constant of the de Cea et al. 2019 MRM.
+    kind: scalar
+    value: 0.45
+    unit: us
+    sigma: 0.05
+    components: {from_gamma_th_2p4mhz_as_rate: 0.417, text: 0.5}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none, lambda_nm: 1545.2}
+    generation: none
+    source: DEC19
+    locator: de Cea et al. 2019 Table 1 (gamma_th = 2.4 MHz) and text (tau_th about 0.5 us)
+    provenance: literature
+    rechecked: true
+    verification: >-
+      03 section 6.3 and verification log item 7: Table 1 prints gamma_th = 2.4 MHz and the text prints tau_th about
+      0.5 us. 07 asked whether 2.4 MHz is angular: 1 / 2.4e6 s = 0.417 us agrees with the printed 0.5 us, while
+      1 / (2 pi x 2.4e6) = 66 ns does not, so gamma_th is a rate in 1/s (1/tau), not cycles per second (derived).
+    replica: self_heating_time_constant
+    replica_args: {paper: DEC19, source_site: waveguide_absorption, observer: ring_mode_weighted}
+    tolerance: {kind: rel, value: 0.5}
+    tolerance_basis: 07 4.4 (+-50 % on tau).
+    tests: thermal_fem.py with the absorption source in the waveguide core (07 P0-1) on a published device.
+    inputs_needed: The de Cea device stack (radius 10 um, 45 nm zero-change process); not yet extracted into docs/research.
+    data_points: [dec19/tau_th]
+    status: active
+
+  - id: VAL-8a
+    quantity: heater_node_time_constant_published
+    description: >-
+      Measured heater-node thermal time constant (63 % point of a first-order fit) of the imec 15 um-diameter
+      C-band depletion ring modulator with a W heater above the waveguide and no undercut.
+    kind: scalar
+    value: 5.0
+    unit: us
+    sigma: 0.5
+    components: {measured: 5.0, imec_model: 4.92}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: open}
+    generation: none
+    source: CO22-JLT
+    locator: Coenen et al., JLT 2022, Tables II-IV and Fig. 16 (no undercut)
+    provenance: literature
+    rechecked: true
+    verification: 04 table T1 and verification log V3 (author copy re-read). sigma is assumed (10 % of a value printed as a round number).
+    replica: thermal_step_published_stack
+    replica_args: {paper: CO22-JLT, observer: heater_resistor, undercut: none, tau_definition: first_order_63pct}
+    tolerance: {kind: rel, value: 0.3}
+    tolerance_basis: 07 4.4 (+-30 % on tau).
+    tests: >-
+      thermal_fem.py and the Foster fit on a published stack. Use our own materials (02), not imec's calibrated
+      Table I set, or the match becomes imec's fit instead of our prediction.
+    data_points: [co22jlt/tau_heater_no_ucut]
+    status: active
+
+  - id: VAL-8b
+    quantity: waveguide_time_constant_published
+    description: Measured waveguide (ring) thermal time constant of the same imec device, no undercut.
+    kind: scalar
+    value: 10.0
+    unit: us
+    sigma: 1.0
+    components: {measured: 10.0, imec_model: 10.38}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: open}
+    generation: none
+    source: CO22-JLT
+    locator: Coenen et al., JLT 2022, Tables II-IV and Fig. 16 (no undercut)
+    provenance: literature
+    rechecked: true
+    verification: 04 table T1 and verification log V3. sigma is assumed (10 % of a value printed as a round number).
+    replica: thermal_step_published_stack
+    replica_args: {paper: CO22-JLT, observer: ring_mode_weighted, undercut: none, tau_definition: first_order_63pct}
+    tolerance: {kind: rel, value: 0.3}
+    tolerance_basis: 07 4.4.
+    tests: >-
+      As VAL-8a. Caveat: the interim thermal model takes its poles from the same imec family (07 P1-2), so comparing the
+      interim model, rather than the FEM pipeline, with VAL-8 is tautological and must not be reported.
+    data_points: [co22jlt/tau_waveguide_no_ucut]
+    status: active
+
+  - id: VAL-8c
+    quantity: heater_efficiency_published_no_undercut_pm_per_mw
+    description: Measured heater tuning efficiency of the imec device without undercut (C-band). Added to 07 4.4; see the README.
+    kind: scalar
+    value: 222.0
+    unit: pm_per_mw
+    sigma: 10.0
+    components: {k_per_mw_by_imec: 2.99}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: open, lambda_nm: 1550.0}
+    generation: none
+    source: CO22-JLT
+    locator: Coenen et al., JLT 2022, Table II (222 +- 10 pm/mW, 2.99 +- 0.14 K/mW, no undercut)
+    provenance: literature
+    rechecked: true
+    verification: 04 table T1 and verification log V3. The K/mW conversion is imec's (simulated dn_eff/dT 1.95e-4 /K).
+    replica: thermal_step_published_stack
+    replica_args: {paper: CO22-JLT, output: dc_efficiency_pm_per_mw, undercut: none}
+    tolerance: {kind: rel, value: 0.25}
+    tolerance_basis: The +-25 % thin-film conductivity uncertainty of 07 P1-3.
+    tests: The DC thermal resistance of the FEM pipeline times its dlambda/dT, on a published stack.
+    data_points: [co22jlt/efficiency_no_ucut]
+    status: active
+
+  - id: VAL-8d
+    quantity: heater_efficiency_published_full_undercut_pm_per_mw
+    description: Measured heater tuning efficiency of the imec device with full undercut. Added to 07 4.4; see the README.
+    kind: scalar
+    value: 843.0
+    unit: pm_per_mw
+    sigma: 55.0
+    components: {k_per_mw_by_imec: 11.35}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: open, lambda_nm: 1550.0}
+    generation: none
+    source: CO22-JLT
+    locator: Coenen et al., JLT 2022, Table II (843 +- 55 pm/mW, 11.35 +- 0.74 K/mW, full undercut)
+    provenance: literature
+    rechecked: true
+    verification: 04 table T1 and verification log V3.
+    replica: thermal_step_published_stack
+    replica_args: {paper: CO22-JLT, output: dc_efficiency_pm_per_mw, undercut: full}
+    tolerance: {kind: rel, value: 0.3}
+    tolerance_basis: Thin-film conductivity (+-25 %) plus the undercut geometry, which the paper only partly specifies.
+    tests: The undercut heater family of thermal_fem.py (the GF-PDK-like hypothesis, 07 P1-3).
+    data_points: [co22jlt/efficiency_full_ucut]
+    status: active
+
+  - id: VAL-8e
+    quantity: foster_two_pole_fit_published
+    description: >-
+      Two-pole Foster fit of imec's calibrated FE step response for a 14 um double-ring filter, W heater above, no
+      undercut: 3.2 us (43 %) + 13.0 us (57 %). A simulation, not a measurement.
+    kind: set
+    value: {tau1_us: 3.18, tau2_us: 13.01, share1_frac: 0.427, share2_frac: 0.573}
+    unit: mixed
+    sigma: null
+    components: {t63_us: 7.35}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: open}
+    generation: none
+    source: CO22-TCPMT
+    locator: Coenen et al., IEEE TCPMT 2022, Table I (R x C per pole)
+    provenance: literature
+    rechecked: true
+    verification: >-
+      04 table T2 and verification log V4 (R x C recomputed exactly). [corrected in 04 V5] The 63 % point of this
+      two-pole fit is 7.35 us (04 V5 prints 7.3), not about 10 us; it is a different device from VAL-8a/b.
+    replica: thermal_step_published_stack
+    replica_args: {paper: CO22-TCPMT, output: foster_poles, undercut: none}
+    tolerance: {kind: rel, value: 0.3}
+    tolerance_basis: 07 4.4 (+-30 % on tau).
+    tests: Nothing about the hardware. It is solver against solver and is reported only as a cross-check (07 P0-5, 4.2).
+    data_points: [co22tcpmt/foster_two_pole]
+    status: cross_check

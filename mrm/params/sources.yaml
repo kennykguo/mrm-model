@@ -1,0 +1,90 @@
+# Source keys for the `source:` field of every preset leaf, uncertainty entry and variation entry (07 P1-14).
+#
+# Format: {KEY: citation}. The Lightmatter tags mirror the textbook's tags
+# (/Users/kenny/interactive-textbooks/lightmatter-capstone/docs/SOURCES_AND_GENERATIONS.md section 2) and the corpus
+# table of docs/research/01_lightmatter_public.md section 1. The other keys name the research reports of this
+# repository, the extraction artefacts, the literature the reports cite, and this model's own choices. A key says
+# WHERE a number comes from; the leaf's `provenance` word says HOW (printed, read-off, inferred, solver, literature,
+# assumed). Owner: params_content. Loaded by mrm.params.config.load_sources.
+sources:
+  # ------------------------------------------------------------------------------------------------- Lightmatter
+  LM-P: "R. Baghdadi, C. Dorta-Quinones et al., 'Monolithically Integrated Microring Transmitter and Receiver for High-Density 3D Co-Packaged Optics', OFC 2025 Tu3J.6 - the paper (submission version, lightmatter.co/wp-content/uploads/2025/04/OFC-2025-submission.pdf). G25."
+  LM-T: "The 17-slide OFC 2025 talk for Tu3J.6 - the talk. Q = 3500, 50 pm/V, 0.9 A/W, the wafer maps (25.45 mW per FSR, 1.195 V, 55.9 ohm). Reached only through the textbook REF table; not re-checked by 01 (talk not reachable). G25."
+  LM26-P: "R. Anand, ..., N. Kumar, ..., N. Harris, '16-Wavelength 800-Gbps Bidirectional Link over Single-Mode Fiber Using Microring Transceivers', OFC 2026 M4B.3 (IEEE Xplore). G26."
+  LM26-S: "N. Kumar, OFC 2026 talk deck for M4B.3 (18 slides, '16 lambda Bidi/PAM4', lightmatter.co/wp-content/uploads/2026/04/OFC-2026-16-lambda-Bidi_PAM4-Nikhil-Kumar.pdf). Slide 9 relOMA maps, slide 10 aggressor and DAC codes. G26."
+  HC: "D. Bunandar, 'Passage M1000', Hot Chips 37 (Aug 2025), 34 slides. '1 mW of laser into the MRM' (slide 16), ~15 um ring diameter."
+  YOLE: "N. Kumar, Yole Group market briefing at OFC 2026 (Apr 2026). EVK50 demo, Guide +-15 GHz."
+  PECC: "D. Bunandar, Optica PECC Summit deck (Oct 2025)."
+  SMTAI: "J. Rosenberg, SMTA International 2025 deck (Oct 2025): slide 15 the 400 x 200 nm waveguide render, slide 16 the 3 um waveguide pitch, slide 19 the 800 degC/s on-die heater label. Single source for both geometry figures."
+  QDSOA: "A. Sludds et al., OFC 2026 M1B.1 deck, QD-SOA in an 8-lambda 50G NRZ CPO link: laser 10 dBm per line into the TX, 12 dB laser-to-TP2 path loss (G26 hardware link budget)."
+  SIB: "N. Harris, 'Seeing is Believing' blog (5 Sep 2025): MRMs 5-15 um, ~1 mW; 50 nm/s laser sweep 'representing' 800 degC/s; 4.6 pJ/bit incl. 2.6 photonics."
+  WPW: "N. Harris, 'Wide and Parallel Wins' blog (15 Mar 2026): 53.125 Gbaud NRZ, ELS linewidth <= 1 MHz, >= 30 dB SMSR (textbook tag [B])."
+  BIDI: "T. Groves and L. Johnsson, 'One Fiber, Two Directions', Lightmatter technical brief (Sep 2026). L20 1311/1331 nm."
+  HOTI26: "N. Harris, Hot Interconnects 2026 deck (Aug 2026): L20 30 W TDP; Guide VLSP 3 GHz frequency accuracy (textbook tag [HOTI])."
+  HOTI25: "N. Harris, Hot Interconnects 2025 deck (Aug 2025): '5 dB transmit eff. loss', 25 -> 105 -> 25 degC."
+  ISES: "R. Jain, ISES Korea 2025 deck (Aug 2025)."
+  ARXIV: "A. Madhavan, P. Carson, T. Groves, T. Graham (Lightmatter), arXiv:2609.01821 (Sep 2026), section III-A: MRMs 100 um beneath the SerDes (M1000/Passage)."
+  ECTC: "S. R. Ahmed et al., IEEE ECTC 2026, 3D photonic integration and packaging (M1000 die gradient 63 K, PIC 100 degC). Not reached by 01."
+  OCP: "OCP Architecture Vision: Open Silicon Photonics for AI Systems, v1.0.6 (Jul 2026). Non-normative planning figures (80 pm/K, +9 dBm at the ring)."
+  OCI: "OCI MSA v1.0 Optical PHY Specification (Mar 2026). Normative; squelch to <= -15 dBm."
+  OCPW: "OCP educational webinar (Oct 2025): 50 nm/s laser sweep = 800 degC/s (textbook)."
+  L20: "Passage L20 / L20 CPX press release and product pages (Sep 2026)."
+  MRVL: "Marvell, 'Photonic Fabric Chiplets for Co-Packaged Optics in AI Data Centers', ECTC 2026, via the SemiAnalysis ECTC 2026 roundup (secondary): 10-120 degC/s at the PIC within ~30 ms of an XPU power step."
+  # ------------------------------------------------------------------------------------------------- patents
+  PAT-1: "US20240405908A1, 'Techniques for efficient tuning of micro-ring modulators for WDM' (Rosenberg, Kopa; prio. 2023-06-01): heater-only tuning, barrel-shift remap, 'thermal crosstalk is negligible' (para 48)."
+  PAT-2: "US11409045B2 / US11686902B2, 'Photonics stabilization circuitry' (Dorta-Quinones et al.; prio. 2019-07-02): dual-slope integrating ADC (T_int 1-10 us, 2 us = 400 x 5 ns), 8-bit DAC + 8-bit PWM heater drive over 2.56 us."
+  PAT-3: "US20230308188A1 -> US12470304B2, 'Photonic communication platform and related circuits' (prio. 2022-03-28): ramp-and-maximize ring lock, 1-1000 kHz pairing dither."
+  PAT-4: "US12355492B2, 'Spectrally interleaved optical transceivers' (prio. 2023-09-27): drop-port PD per TX ring, modulator FSR < 11.44 nm."
+  PAT-5: "WO2025122797A1 / US20250192912A1, 'Wavelength remapping in an on-chip WDM solution' (prio. 2023-12-07)."
+  PAT-6: "US12147078B2, 'Polarization locker for fiber connections' (prio. 2022-11-11)."
+  PAT-7: "US20260095014A1 / US20260095015A1 / WO2026072846A1, laser systems with active wavelength control (prio. 2024-09-27). Titles only."
+  # ------------------------------------------------------------------------------------------------- GF platform
+  GF-IMAPS: "GlobalFoundries, 'Establishing a packaging ecosystem for GlobalFoundries leadership silicon photonics wafers', IMAPS 2022 slides: 45SPCLO 160 nm photonics SOI, 88 nm CMOS SOI, 2 um BOX (single public source for 160 nm)."
+  GF-BIAN: "Y. Bian (GF), '300-mm Monolithic Silicon Photonics Foundry Technology', Optica webinar (Oct 2025): SOI rib 0.73 dB/cm, ridge 1.0 dB/cm; Ge PD > 0.95 A/W, < 30 nA."
+  GF-ECIO: "R. Nandi, ..., M. Rakowski (GF), 'Thermal Stabilization of Micro-ring Modulator using a Monolithically Integrated Analog Feedback Circuit', ECIO 2023: GF 45 nm PDK MRM, R = 7.5 um, add-drop, ~5 % drop coupling, four silicide undercut heaters."
+  BU-45CLO: "K. Al Qubaisi, A. Khilo, H. Gevorgyan, M. Popovic, 'Microring Modulators in a New Silicon Photonics-Optimized 45 nm Platform', CLEO 2021: rib ring R = 8 um, w = 410 nm, Q_L 5000, FSR 8.6 nm (n_g 3.91-3.98 inferred)."
+  EUPR: "Europractice and CMC pages for GF 45SPCLO: BEOL, IO voltages 1.5/1.8 V, substrate resistivity."
+  # ------------------------------------------------------------------------------------------------- literature
+  CO22-JLT: "S. Coenen et al. (imec / KU Leuven), J. Lightwave Technol. 2022: W heater above a 15 um ring modulator; heater 5 us, waveguide 10 us measured; 222 pm/mW (no undercut), 843 pm/mW (undercut)."
+  CO22-TCPMT: "S. Coenen et al. (imec), IEEE Trans. CPMT 2022: Foster fit 3.2 us (43 %) + 13.0 us (57 %) without undercut; 2.5 / 25.6 / 54.5 / 124 us with undercut; neighbour crosstalk taus 4.1-9.0 ms (simulated)."
+  CO24-JOM: "S. Coenen et al. (imec), J. Opt. Microsyst. 2024: ring-to-ring crosstalk 1.3-2.6 % at 100-300 um with an EIC flip-chipped on top; 62.54 pm/K printed for O-band rings."
+  CO24-PH: "S. Coenen et al. (imec), Photonics 2024: pure-thermal tau 5 / 9 / 18 us for no / small / large undercut."
+  WAT09: "M. R. Watts et al. (Sandia), CLEO 2009: doped-Si heater inside a 6 um ring, tau = 1 us measured."
+  DEC19: "M. de Cea, A. H. Atabaki, R. J. Ram, Opt. Express 27, 24274 (2019): 45 nm zero-change MRM, gamma_lin 19 GHz of gamma_0 30 GHz (eta 0.63), tau_th ~0.42-0.5 us."
+  ZHE12: "X. Zheng et al. (Oracle), Opt. Express 20, 11478 (2012): dopant free-carrier absorption dominates the loss of depletion rings and heats them."
+  SUN15: "C. Sun et al., VLSI 2015 (and JSSC 2016): bit-statistics ring lock, 76 kHz decisions, 16-128-bit windows."
+  KRA24: "D. Kramnik et al., arXiv:2411.05921 (2024), GF 45RFSOI rings: in-cavity photocurrent sensing, 10-bit heater DAC."
+  AYAR25: "Ayar Labs blog (28 Aug 2025): ASIC 0 -> 500 W step gives ~100 degC/s at an optical engine 3 mm away."
+  HAT24: "Hattori et al., GOMACTech 2024: 3.1 degC/s TEC cycling, 75.5 / 75.8 pm/K C-band rings."
+  MUL14: "J. Mueller et al., Sci. Rep. 2014: ring modulator small-signal model, loss/index ratio q = 0.13, C_j 17 fF, R_s 215 ohm."
+  HUA26: "Huang et al., arXiv:2609.36690 (2026): C_j 6-20 fF and R_s 16-386 ohm for published MRMs."
+  BAH18: "M. Bahadori et al., 2018 (AIM ring): backscatter field reflectance r_bs = 0.0124 per round trip."
+  NSM11: "M. Nedeljkovic, R. Soref, G. Mashanovich, IEEE Photonics J. 3, 1171 (2011): free-carrier dispersion at 1.3 um (via mrm.materials)."
+  SB87: "R. Soref and B. Bennett, IEEE J. Quantum Electron. 23, 123 (1987): plasma dispersion."
+  FREY06: "B. J. Frey, D. B. Leviton, T. J. Madison, Proc. SPIE 6273, 62732J (2006): Si dn/dT 1.94e-4 /K at 1.3 um, 295 K."
+  LI80: "H. H. Li, J. Phys. Chem. Ref. Data 9, 561 (1980): Si n(lambda, T)."
+  SOU18: "M. C. M. M. Souza et al., Nat. Commun. 9, 665 (2018), supplementary: Si dn/dT rises ~14 % per 100 K above 300 K."
+  OKA84: "Y. Okada and Y. Tokumaru, J. Appl. Phys. 56, 314 (1984): Si thermal expansion (substrate-clamped ring length, via mrm.materials.alpha_l_si_per_k)."
+  COL08: "L. Colace, M. Balbi, V. Sorianello, G. Assanto, J. Lightwave Technol. 26, 2211 (2008) and Balbi et al., Physica E 41, 1086 (2009): Ge-on-Si PD dark current x1.6-1.9 per 10 degC (E_a 0.35-0.38 eV)."
+  ARO82: "N. D. Arora, J. R. Hauser, D. J. Roulston, IEEE TED 29, 292 (1982): doped-Si mobility; heater TCR 1.0-1.8e-3 /K (02 section 9)."
+  BER-FAB: "Berkeley MRM fabrication-variation figures quoted by the textbook (REF.fabOffsetGlobalNm = 6 nm, fabOffsetLocalNm = 2 nm). Literature, not Lightmatter."
+  # ------------------------------------------------------------------------------------------------- research notes of this repository
+  R00: "docs/research/00_capstone_brief.md and 00_prior_notes_checklist.md."
+  R01: "docs/research/01_lightmatter_public.md (Lightmatter corpus, GF 45SPCLO platform, read-offs, verification log)."
+  R02: "docs/research/02_materials.md and mrm/data/materials.json (via mrm.materials)."
+  R03: "docs/research/03_mrm_compact_models.md (compact-model equations, G25 fits, parameter table)."
+  R04: "docs/research/04_thermal_and_control.md (thermal data, crosstalk, disturbances, control literature)."
+  R05: "docs/research/05_tools.md and 05_tools_smoke (solver cross-checks, femwell coupler dispersion t02)."
+  R06: "docs/research/06_textbook_audit.md (textbook audit, FEM thermo-optic weights)."
+  D07: "docs/research/07_design_critique.md (decisions D1-D22, P0/P1/P2 changes, section 4 validation plan and uncertainty set)."
+  VAL-TARGETS: "mrm/validation/targets/*.yaml and docs/handoff/validation_targets.md (frozen calibration / held-out split; BND-1 window correction)."
+  # ------------------------------------------------------------------------------------------------- extraction artefacts (mrm/data/extracted/)
+  X-MODES: "mrm/data/extracted/modes_<xsec>.json (schema modes/1, mrm.extraction.modes): bent-mode n_eff, n_g, dlambda/dT(T), index weights, Jacobian, bend radiation. Geometry inputs are assumed (solver(assumed-geometry))."
+  X-COUPLING: "mrm/data/extracted/coupling_<xsec>.json (schema coupling/1, mrm.extraction.coupling): K^2 per pass, dln K^2/dlambda, dln K^2/dgap of the through and drop couplers."
+  X-THERMAL: "mrm/data/extracted/thermal_rom_<family>_<film>.npz + .json (schema thermal_rom/1, mrm.extraction.thermal_fem): FEM Foster ROM; summary z_ratio_opt_heater, rom_dc_scale table."
+  X-JUNCTION: "mrm/data/extracted/junction_<xsec>.json (schema junction/1, mrm.extraction.junction): dneff(V), absolute alpha_FCA(V), C(V), r_s(V)."
+  # ------------------------------------------------------------------------------------------------- textbook
+  textbook-REF: "Kenny's textbook REF table, /Users/kenny/interactive-textbooks/lightmatter-capstone/src/physics/index.ts (HEAD 02c9c54), where no source tag is attached to the row; also its derived helpers (HEATER_OHM_COLD, heaterSelfHeatPerMw)."
+  textbook: "Kenny's textbook chapters (lightmatter-capstone/src/chapters), e.g. Ch11 heater DAC full scale 1.6 V, Ch17 plant model."
+  # ------------------------------------------------------------------------------------------------- this model
+  MODEL: "A choice made for this model, with no external source (a simulation default, a convention, or a placeholder for an unpublished number). The leaf note says which, and its provenance is 'assumed'."

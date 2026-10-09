@@ -21,7 +21,8 @@ mrm = "mrm.cli:main"
 include = ["mrm*"]
 
 [tool.setuptools.package-data]
-mrm = ["params/presets/*.yaml", "data/**/*"]
+mrm = ["params/presets/*.yaml", "params/*.yaml", "data/**/*", "validation/targets/*.yaml",
+       "validation/targets/README.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

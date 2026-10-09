@@ -1,0 +1,9 @@
+# Corner (07 P1-6, D17): FSR window A, restricted to 1.46-1.48 THz by the BND-1 review (its interior puts a second
+# order within 2 FWHM of a TX line); value 1.47 THz.
+extends: g26
+meta:
+  name: g26_fsr_window_a
+  kind: corner
+  description: "g26 with uncertainty.fsr pinned to window_a (1.47 THz)"
+alts:
+  uncertainty.fsr: window_a

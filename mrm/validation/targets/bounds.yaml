@@ -1,0 +1,254 @@
+# Bounds from the fact that the G26 link works (07 P0-5, section 4.5). FROZEN on 2026-10-09, before any fitting.
+#
+# A bound is a necessary condition: a plant world (one draw of the uncertainty set) that violates it is inconsistent
+# with Lightmatter's published, working link, whatever controller is used. Bounds demote hypotheses to stress corners;
+# they do not certify a plant. Nothing under mrm/calibration may read this file; its sha256 is in the header of
+# docs/VALIDATION.md (re-freeze procedure in README.md).
+#
+# Re-frozen on 2026-10-09 by the adversarial review of the split, before any replica existed and before any comparison
+# (so nothing is contaminated). Changes: BND-1's FSR windows corrected (07 4.5 checked only the first order; inside the
+# 2.8 THz TX span the second order also counts) and its replica told to scan every order; BND-2's H_solver margin
+# corrected to 1.8 to 2.0 nm; BND-3 split into BND-3a (slide-10 error band, sign convention unpublished, so either sign
+# is accepted) and BND-3b (the 808 degC/s run, +-0.5 uA), because one tolerance cannot state both criteria; every
+# entry now states sigma and the 07 P0-5 condition keys; the read-off bounds record their digitizer and crop.
+# Details: docs/handoff/validation_targets.md.
+schema: mrm.validation.targets/1
+role: bounds
+frozen_on: "2026-10-09"
+conventions:
+  bias_v: Reverse bias across the junction in volts, positive = reverse.
+  tolerance: >-
+    kind inequality: the replica's prediction must satisfy `op value`; `hard_value`, when present, separates a soft
+    failure (marginal) from a hard one (inconsistent with a working link). kind band: the predicted extremes must lie
+    inside [lo - slack, hi + slack]; with either_sign the mirrored band [-hi, -lo] is accepted too (used when the
+    source's sign convention is unpublished).
+targets:
+
+  - id: BND-1
+    quantity: next_order_distance_fwhm
+    description: >-
+      For every ring, the distance from each of its other resonance orders to the nearest other TX line of its bank,
+      in units of the ring's FWHM. The insertion loss and modulation crosstalk those orders impose must fit the link
+      margin.
+    kind: inequality
+    value: 2.0
+    unit: "1"
+    sigma: null
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 3.75]
+      p_in_dbm: null
+      port: through
+      loop: closed
+      grid: 8 lines per direction on a 400 GHz grid centred at 1310 nm (G26, printed)
+    generation: G26
+    source: [LM26-P, LM-P, PAT-4]
+    locator: LM26-P section 2 and Fig. 1 caption (grid, interleaver keeps the RX comb off the TX bus); LM-P section 2 (1.8 THz design); PAT-4 (FSR < 11.44 nm)
+    provenance: derived
+    rechecked: true
+    verification: >-
+      Re-derived (Lorentzian through port, T_min about 0.01): at 2 FWHM the penalty is 0.26 dB IL; at 1.0 to 1.3 FWHM
+      it is 0.96 to 0.59 dB IL, and 07 gives -5 to -9 dB crosstalk relative to the victim's OMA (checked there). With
+      FWHM about 60 GHz (Q 3500 -> 65.4 GHz, Q 4200 -> 54.5 GHz), enumerating every ring, every order +-1 to +-3 and
+      every other TX line, the FSR ranges between 1.0 and 2.9 THz that keep >= 2 FWHM are 1.06-1.08, 1.32-1.34,
+      1.46-1.48, 1.72-1.88, 2.12-2.28 and 2.52-2.68 THz (any FSR above 2.92 THz puts no other order in the span).
+      [corrected at the re-freeze of 2026-10-09: 07 4.5 lists 1.32-1.48 THz as one window, which holds only for the
+      first order. Below about 1.46 THz the second order 2 x FSR falls inside the 2.8 THz span of the 8 TX lines: at
+      1.40 THz the second order of the ring on line 0 sits exactly on line 7, and from 1.34 to 1.46 THz it is closer
+      than 2 FWHM to a line.] Examples (recomputed): 1.8 THz -> 200 GHz = 3.3 FWHM; 8.8 nm (1.537 THz) -> 63 GHz =
+      1.0 FWHM; R = 7.5 um at n_g 3.9 to 4.04 (1.63 to 1.57 THz) -> 25 to 31 GHz = 0.4 to 0.5 FWHM. The interleaver's
+      finite isolation also lets the counter-propagating comb (offset 200 GHz) reach the bus; at FSR = 1.8 THz the
+      aliases sit exactly on it (01 D10).
+    replica: adjacent_order_penalty
+    replica_args: {output: min_distance_fwhm, all_rings: true, lines: tx_bank, orders: all_within_span_plus_2_fwhm}
+    tolerance: {kind: inequality, op: ">=", value: 2.0, hard_value: 1.0}
+    tolerance_basis: >-
+      Below 1.0 FWHM the penalty (>= 1 dB IL and about -5 dB crosstalk on every lane) is inconsistent with a link that
+      closed at BER < 1e-9 with the published margins: hard failure. 1.0 to 2.0 FWHM is marginal: soft failure.
+    bounds: >-
+      The FSR hypothesis (07 P1-6) together with Q_L. It is why the "G25 cluster" (1.53 THz) and "PDK size" (1.60 THz)
+      FSRs are stress hypotheses, not defaults, and why only the edges of 07's window A (1.32-1.34 and 1.46-1.48 THz)
+      are consistent with a working link.
+    data_points: [g26_link/works_16_lanes]
+    uses: [CAL-1]
+    status: active
+
+  - id: BND-2
+    quantity: order_hop_margin_nm
+    description: >-
+      No order hop at the hot end, for the worst lane:
+      dlambda_blue(T0) - integral of dlambda/dT from T0 to 105 degC - dlambda_selfheat,lock - dlambda_bias -
+      delta_lock >= 0.
+    kind: inequality
+    value: 0.0
+    unit: nm
+    sigma: null
+    conditions:
+      t_c: [25.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 3.75]
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    conditions_note: >-
+      T0 = 25 degC is assumed for the 7.6 nm offset (its reference temperature is unknown). The hot end is the printed
+      loop-closed junction range, 105 degC; the soak trace reaches about 108 degC (read-off).
+    generation: G26
+    source: [LM26-P, LM26-S, HC]
+    locator: LM26-P Fig. 3(a) (TEC soak, all lanes BER < 1e-9); LM26-S slide 9 and HC slide 16 (loop closed over 0 to 105 degC)
+    provenance: derived
+    rechecked: true
+    verification: >-
+      Re-derived: with 7.6 nm and T0 = 25 degC, H86 leaves 7.6 - 0.086 x 80 = 0.72 nm for self-heating, bias and the
+      lock offset (0.73 nm with 85.86 pm/K); H_solver (66-69 pm/K at 25 degC rising linearly to 74-77 at 105 degC,
+      mean 70-73 pm/K) leaves about 1.8 to 2.0 nm [corrected at the re-freeze of 2026-10-09; first written 1.9 to
+      2.0 nm; 06's verifier correction to 73-76 pm/K at 105 degC also gives 1.8 to 2.0 nm]. The
+      lock-point self-heating estimate of 0.6 to 1.3 nm at +4 dBm (07 [PHY]) nearly uses up the H86 margin.
+    replica: order_hop_margin
+    replica_args: {t0_c: 25.0, t_hot_c: 105.0, lanes: worst, bias_v: 3.75}
+    tolerance: {kind: inequality, op: ">=", value: 0.0}
+    tolerance_basis: The inequality itself.
+    bounds: dlambda/dT, the self-heating gain and the power at the ring, jointly (07 4.5).
+    caveats: >-
+      7.6 nm is a G25 number; G26 may stagger its rings. A continuous BER below 1e-9 over the soak suggests no hop, but
+      the 2 s BER sampling could hide one, and Lightmatter's own patent allows a barrel-shift remap when heater power is
+      excessive (PAT-1), which would be a legal alternative to "no hop".
+    data_points: [g26_soak/all_lanes_ber_lt_1e9, g26_slide9_closed/locked_0_to_105c]
+    uses: [CAL-7, CAL-6, CAL-1, CAL-5]
+    status: active
+
+  - id: BND-3a
+    quantity: aggressor_slide10_drop_error_band_pct
+    description: >-
+      Aggressor feasibility on the slide-10 waveform: some causal controller, at a plausible update rate and latency,
+      holds the slide-10 aggressor with the drop-monitor signed error inside the band Lightmatter's loop achieved
+      (spikes of +3.0 and -1.9 % at the cusps).
+    kind: band
+    value: [-1.9, 3.0]
+    unit: pct
+    sigma: 0.3
+    conditions:
+      t_c: [25.0, 113.6]
+      t_reference: aggressor_trajectory
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    generation: G26
+    source: LM26-S
+    locator: >-
+      LM26-S slide 10, embedded image (PDF object 184), third panel "MRM Drop-Port PD Error Signal" (axis "Signed %
+      Error", one trace per lane), cropped out of the visible slide
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md verification log item 7", image: "LM26-S slide 10 embedded image, PDF object 184", method: "extremes and ramp offsets of the per-lane signed error traces, +-0.3 %", crop: "the third (error) panel of the embedded image, outside the visible slide"}
+    rechecked: true
+    verification: >-
+      Added by the 01 checker (verification log item 7): signed error about -0.3 % while heating and +0.4 % while
+      cooling, spikes to about +3.0 / -1.9 % at the cusps (+-0.3 % read-off). [re-frozen 2026-10-09: split from the
+      first BND-3, which applied this band to the 808 degC/s run as well; the slide's definition of the error sign is
+      unpublished, so the band is accepted in either orientation (either_sign).]
+    replica: aggressor_feasibility
+    replica_args:
+      aggressor: CAL-13a
+      setpoint_ua: CAL-8
+      output: signed_error_pct_min_max
+      controllers: [drop_setpoint_pi, bias_dither_lockin, dual_actuator_midrange]
+      max_update_rate_hz: 1.0e6
+      min_total_latency_s: 2.0e-6
+    replica_args_note: >-
+      The rate and latency limits are assumptions (PAT-2: 1 to 10 us integration windows, calibration vectors every
+      10 us to 1 ms). The bound passes if ANY listed controller meets it. The error is (I_monitor - I_setpoint) /
+      I_setpoint in percent, as seen through the replica's monitor ADC model, in periodic steady state.
+    tolerance: {kind: band, lo: -1.9, hi: 3.0, slack: 0.3, either_sign: true}
+    tolerance_basis: The published band plus its read-off uncertainty; either sign, because the slide's sign convention is unpublished.
+    bounds: tau_fast and the aggressor thermal path together (07 4.5); a plant world in which no causal controller can do this is too slow or its aggressor too strong.
+    data_points: [g26_slide10_error/band_at_cusps]
+    uses: [CAL-13a, CAL-8]
+    status: active
+
+  - id: BND-3b
+    quantity: aggressor_808_monitor_deviation_ua
+    description: >-
+      Aggressor feasibility on the peer-reviewed 808 degC/s run: some causal controller holds the drop-monitor current
+      within about +-0.5 uA of its set-point ("monitor photocurrent ... remained stable"), 07 4.5's quiet band.
+    kind: band
+    value: [-0.5, 0.5]
+    unit: ua
+    sigma: null
+    conditions:
+      t_c: [25.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+      period_s: 0.1
+    generation: G26
+    source: LM26-P
+    locator: OFC 2026 M4B.3 Fig. 3(b), green trace, and section 3.2 text ("remained stable")
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md verification log item 2", image: "LM26-P Fig. 3(b) rendered at 300 dpi", method: "flatness of the trace by eye against the 15 uA tick", crop: "not recorded (both panels of Fig. 3(b) inspected)"}
+    rechecked: true
+    verification: >-
+      [re-frozen 2026-10-09: split from the first BND-3.] The trace sits flat at about 15.5 uA; +-0.5 uA is the read-off
+      resolution of its level (01 section 2.6), so the band is generous. Caveat: the Fig. 3(b) time axis is
+      plot-sampled and aliased (excluded.yaml EXC-3), so excursions shorter than the plot's sample spacing may be
+      invisible in the figure; a replica that fails only by such short spikes is weak evidence against the plant.
+      +-0.5 uA on 15.5 uA is +-3.2 %, consistent with BND-3a.
+    replica: aggressor_feasibility
+    replica_args:
+      aggressor: CAL-13b
+      setpoint_ua: CAL-8
+      output: monitor_deviation_ua_min_max
+      interpretation: [delta_t_per_period, one_sided_sawtooth]
+      controllers: [drop_setpoint_pi, bias_dither_lockin, dual_actuator_midrange]
+      max_update_rate_hz: 1.0e6
+      min_total_latency_s: 2.0e-6
+    replica_args_note: >-
+      As BND-3a. The deviation is I_monitor - I_setpoint in uA through the replica's monitor ADC model; the result
+      records which CAL-13b interpretation was used, and the bound passes if ANY listed controller meets it.
+    tolerance: {kind: band, lo: -0.5, hi: 0.5, slack: 0.0}
+    tolerance_basis: 07 4.5 ("about +-0.5 uA, read-off"); symmetric, so the sign convention does not matter.
+    bounds: As BND-3a, for the slower but differently shaped 808 degC/s run.
+    data_points: [g26_fig3b/monitor_flatness]
+    uses: [CAL-13b, CAL-8]
+    status: active
+
+  - id: BND-4
+    quantity: oracle_reloma_variation_over_t_db
+    description: The oracle relOMA at a fixed bias varies by less than 1 dB over 0 to 105 degC, at every bias on the 1.0 to 3.75 V axis.
+    kind: inequality
+    value: 1.0
+    unit: db
+    sigma: null
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: oracle
+      bias_v: [1.0, 3.75]
+      p_in_dbm: 0.0
+      port: through
+      loop: closed
+    generation: G26
+    source: [LM26-S, HC]
+    locator: OFC 2026 deck slide 9 and HC slide 16, loop-closed map ("< 1 dB" spread)
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Same printed fact as VAL-4c (shared between a bound and a validation target, never with calibration). It is
+      one-sided and controller-free: if even the oracle cannot stay within 1 dB, no controller can.
+    replica: relOMA_map
+    replica_args: {mode: oracle, output: max_variation_over_t_at_fixed_bias_db}
+    tolerance: {kind: inequality, op: "<=", value: 1.0}
+    tolerance_basis: The printed bound.
+    bounds: >-
+      `dln_alpha_dT_heater_per_k`: only a heater-temperature loss mechanism produces a closed-loop ER drift with
+      ambient (07 P1-5, 4.5).
+    data_points: [g26_slide9_closed/spread_db]
+    uses: [CAL-14]
+    status: active

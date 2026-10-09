@@ -1,0 +1,250 @@
+# mini: a small 4-ring, 4-line test preset for the params machinery (tests/verification/test_params_*.py,
+# tests/closure/test_relations.py). It follows the numbers of docs/research/01..07 but it is NOT a release preset:
+# the real presets (g26, corners, teaching_*) live in mrm/params/presets/ and are written by the content agent.
+meta:
+  name: mini
+  kind: test
+  description: 4 rings x 4 lines; interim thermal model; analytic junction; dlambda/dT hypotheses as alternatives.
+  sources:
+    LM26-P: "Anand et al., OFC 2026 M4B.3 (G26 paper)"
+    LM-T: "Baghdadi et al., OFC 2025 Tu3J.6, talk slides (G25)"
+    R01: "docs/research/01_lightmatter_public.md"
+    R02: "docs/research/02_materials.md"
+    R03: "docs/research/03_mrm_compact_models.md"
+    R04: "docs/research/04_thermal_and_control.md"
+    R06: "docs/research/06_textbook_audit.md"
+    D07: "docs/research/07_design_critique.md"
+    PAT-2: "US11409045 / US11686902 (integrating ADC; 8-bit DAC + 8-bit PWM heater drive)"
+    TEST: "test-only value, no physical claim"
+
+fidelity:
+  self_heating: "on"
+  thermo_optic_order: 2
+  thermal_model: interim
+  junction_model: analytic
+  heater_anchor: lock_slope
+
+sim:
+  dt_plant_s: 1.0e-6
+
+channel_plan:
+  center_thz: {value: 228.849, provenance: printed, generation: G26, source: LM26-P,
+               note: "400 GHz grid centered at 1310 nm (c/1310 nm = 228.849 THz)"}
+  spacing_ghz: {value: 400.0, provenance: printed, generation: G26, source: LM26-P}
+  n_lines: {value: 4, provenance: assumed, generation: none, source: TEST, note: "G26 has 8 per direction"}
+
+laser:
+  power_per_line_dbm: {value: 10.0, provenance: printed, generation: G26, source: R01,
+                       note: "10 dBm per line into the TX at the laser-module output (07 P0-1 item 4)"}
+  line_offset_ghz: {value: 0.0, provenance: assumed, generation: none, source: TEST, range: [-20.0, 20.0],
+                    note: "static error; the spec is +-20 GHz (G26)"}
+
+optical_path:
+  chip_input_loss_db: {value: 6.0, provenance: inferred, generation: G25, source: R01,
+                       note: "chosen so that 10 dBm at the laser gives the G25 +4 dBm at the ring"}
+
+ring:
+  geometry:
+    radius_um: {value: null, provenance: derived, note: "R3: from the FSR hypothesis and n_g"}
+    jacobian:
+      value:
+        d: [width_nm, gap_drop_nm]
+        of:
+          lambda_res_nm_per_nm: [1.0, 0.0]
+          ln_kappa2_drop_per_nm: [0.0, -0.02]
+      provenance: inferred
+      generation: none
+      source: R06
+      note: "about 1 nm of resonance per nm of width; d ln K^2/d gap ~ -2 %/nm (07 P1-9)"
+  optics:
+    resonance_offset_nm: {value: 7.6, provenance: inferred, generation: G25, source: LM-T,
+                          note: "1309.5 - 1301.90 nm at 0 V (07 CAL-7)", range: [0.0, 15.0]}
+    resonance_offset_ref_temp_c: {value: 25.0, provenance: assumed, generation: G25, source: D07}
+    resonance_offset_ref_bias_v: {value: 0.0, provenance: printed, generation: G25, source: LM-T}
+    n_eff: {value: 2.55, provenance: inferred, generation: none, source: R06}
+    n_g: {value: 4.0, provenance: inferred, generation: none, source: R01, range: [3.9, 4.16]}
+    fsr_thz:
+      value: 1.8
+      provenance: printed
+      generation: G25
+      source: LM-T
+      range: [1.3, 2.0]
+      note: "design target, window B of 07 P1-6"
+      alternatives:
+        window_a: {value: 1.40, provenance: inferred, source: D07}
+        g25_cluster: {value: 1.53, provenance: read-off, source: R06}
+    q_loaded:
+      value: 3800
+      provenance: read-off
+      generation: G25
+      source: LM-T
+      range: [2600, 4200]
+      alternatives:
+        talk: {value: 3500, provenance: printed}
+    q_drop: {value: 190000, provenance: assumed, generation: none, source: D07, range: [20000, 1.0e6],
+             note: "kappa_d/kappa ~ 2 % at Q_L 3800"}
+    dln_kappa2_through_dlambda_per_nm: {value: 0.014, provenance: solver(assumed-geometry), generation: none,
+                                        source: R06}
+    loss_budget:
+      alpha_fca_db_per_cm: {value: 85.0, provenance: assumed, generation: none, source: D07}
+      alpha_other_abs_db_per_cm: {value: 8.0, provenance: assumed, generation: none, source: D07}
+      alpha_scatter_db_per_cm: {value: 10.0, provenance: assumed, generation: none, source: D07}
+      alpha_bend_radiation_db_per_cm: {value: 2.0, provenance: assumed, generation: none, source: D07}
+    alpha_l_per_k: {value: 2.6e-6, provenance: literature, generation: none, source: R02,
+                    note: "Okada and Tokumaru 1984 at 300 K, substrate-clamped"}
+    alpha_l_slope_per_k2: {value: 6.8e-9, provenance: literature, generation: none, source: R02}
+  thermal:
+    dlambda_dt_pm_per_k:
+      value: 67.5
+      provenance: inferred
+      generation: none
+      source: R06
+      range: [50.0, 90.0]
+      note: "H_solver at 25 C (66 to 69 pm/K, expansion included)"
+      textbook: REF.dLambdaDT_pmK
+      disagrees: "the textbook uses the printed 86 pm/K, which exceeds the materials ceiling (07 D2)"
+      alternatives:
+        H86: {value: 86.0, provenance: printed, generation: G26, source: LM26-P}
+        bench: {value: 62.5, provenance: inferred, generation: G26, source: R01}
+    dlambda_dt_ref_ring_temp_c: {value: 25.0, provenance: inferred, generation: none, source: R06}
+    dlambda_dt_beta_per_k:
+      value: 1.4e-3
+      provenance: inferred
+      generation: none
+      source: R06
+      alternatives:
+        const: {value: 0.0, provenance: printed, generation: G26, source: LM26-P,
+                note: "H86 is a constant at the ring"}
+    z_ratio_opt_heater: {value: 1.5, provenance: assumed, generation: none, source: D07, range: [1.0, 2.0]}
+    tau_fast_s: {value: 3.2e-6, provenance: inferred, generation: none, source: R04}
+    share_fast_frac: {value: 0.41, provenance: inferred, generation: none, source: R04}
+    tau_slow_s: {value: 13.0e-6, provenance: inferred, generation: none, source: R04}
+    tail_tau_s: {value: 3.0e-3, provenance: assumed, generation: none, source: R04}
+    tail_share_frac: {value: 0.05, provenance: assumed, generation: none, source: R04}
+    selfheat_tau_s: {value: 0.4e-6, provenance: literature, generation: none, source: R03}
+    xt_nearest_frac: {value: 0.03, provenance: literature, generation: none, source: R04}
+    xt_floor_frac: {value: 0.015, provenance: literature, generation: none, source: R04}
+    xt_tau_ref_s: {value: 4.1e-3, provenance: literature, generation: none, source: R04}
+    xt_dist_ref_um: {value: 60.0, provenance: literature, generation: none, source: R04}
+    xt_tau_min_s: {value: 1.0e-4, provenance: assumed, generation: none, source: R04}
+    xt_tau_far_s: {value: 6.0e-3, provenance: literature, generation: none, source: R04}
+    xt_far_um: {value: 100.0, provenance: literature, generation: none, source: R04}
+  heater:
+    p_fsr_mw: {value: 25.45, provenance: printed, generation: G25, source: LM-T, range: [24.9, 34.1]}
+    r_cold_ohm: {value: 45.4, provenance: inferred, generation: G25, source: R01}
+    r_ref_temp_c: {value: 25.0, provenance: printed, generation: G25, source: LM-T}
+    tcr_per_k: {value: 1.0e-3, provenance: literature, generation: none, source: R02, range: [5.0e-4, 4.5e-3]}
+    driver_mode: voltage
+    full_scale_v: {value: 1.6, provenance: assumed, generation: none, source: TEST}
+    full_scale_a: {value: 0.03, provenance: assumed, generation: none, source: TEST}
+    dac_bits: {value: 16, provenance: printed, generation: G26, source: LM26-P}
+    latency_s: {value: 1.0e-6, provenance: assumed, generation: none, source: TEST}
+  junction:
+    fill_fraction: {value: 0.8, provenance: assumed, generation: none, source: D07}
+    eff_at_0v_pm_per_v: {value: 72.5, provenance: inferred, generation: G25, source: R03}
+    v_bi_v: {value: 0.9, provenance: literature, generation: none, source: R03}
+    depletion_exponent: {value: 0.5, provenance: literature, generation: none, source: R03}
+    capacitance_at_0v_ff: {value: 15.0, provenance: assumed, generation: none, source: R03}
+    series_resistance_ohm: {value: 100.0, provenance: assumed, generation: none, source: R03}
+  monitor:
+    responsivity_a_per_w: {value: 0.95, provenance: printed, generation: G25, source: LM-T, range: [0.88, 1.04]}
+    gain_scale: {value: 1.0, provenance: assumed, generation: none, source: D07, range: [0.5, 2.0]}
+    dark_i0_na: {value: 5.0, provenance: assumed, generation: GF, source: R01, range: [1.0, 30.0]}
+    dark_t0_c: {value: 25.0, provenance: printed, generation: GF, source: R01}
+    dark_activation_ev: {value: 0.36, provenance: literature, generation: none, source: R02}
+    afe_type: integrate_dump
+    integration_window_s: {value: 2.0e-6, provenance: inferred, generation: PAT, source: PAT-2}
+    adc_rate_hz: {value: 250000.0, provenance: assumed, generation: none, source: TEST}
+    adc_latency_s: {value: 2.0e-6, provenance: assumed, generation: none, source: TEST}
+    adc_bits: {value: 16, provenance: printed, generation: G26, source: LM26-P}
+    adc_full_scale_ua: {value: 40.0, provenance: assumed, generation: none, source: TEST}
+  bias_dac:
+    bits: {value: 12, provenance: assumed, generation: none, source: TEST}
+    v_min_v: {value: 1.0, provenance: printed, generation: G26, source: LM26-P}
+    v_max_v: {value: 3.75, provenance: printed, generation: G26, source: LM26-P}
+    update_rate_hz: {value: 1.0e6, provenance: assumed, generation: none, source: TEST}
+    latency_s: {value: 1.0e-6, provenance: assumed, generation: none, source: TEST}
+
+temp_sensors:
+  value:
+    - {name: die0, attach: die, type: diode, sample_rate_hz: 1000.0, latency_s: 1.0e-3, noise_rms_k: 0.1,
+       resolution_k: 0.0625, offset_sigma_k: 2.0, gain_error_sigma_frac: 0.01, self_heating_k: 0.0}
+  provenance: assumed
+  generation: none
+  source: R04
+
+layout:
+  ring_pitch_um: {value: 30.0, provenance: assumed, generation: none, source: TEST}
+
+array:
+  n_rings: {value: 4, provenance: assumed, generation: none, source: TEST}
+
+datapath:
+  bitrate_gbps: {value: 50.0, provenance: printed, generation: G26, source: LM26-P}
+
+controller_interface:
+  update_rate_hz: 100000.0
+
+uncertainty:
+  thermo_optic:
+    kind: hypothesis
+    choices:
+      H_solver: {ring.thermal.dlambda_dt_pm_per_k: default, ring.thermal.dlambda_dt_beta_per_k: default}
+      H86: {ring.thermal.dlambda_dt_pm_per_k: H86, ring.thermal.dlambda_dt_beta_per_k: const}
+      bench: {ring.thermal.dlambda_dt_pm_per_k: bench, ring.thermal.dlambda_dt_beta_per_k: default}
+    nominal: H_solver
+    weights: {H_solver: 2, H86: 1, bench: 1}
+    provenance: assumed
+    generation: none
+    source: D07
+  fsr:
+    kind: hypothesis
+    target: ring.optics.fsr_thz
+    choices: [default, window_a]
+    nominal: default
+    provenance: assumed
+    generation: none
+    source: D07
+  q_loaded:
+    kind: interval
+    target: ring.optics.q_loaded
+    low: 3500
+    high: 4200
+    corners: {low_q: 2600}
+    provenance: read-off
+    generation: G25
+    source: LM-T
+  monitor:
+    gain_scale: {kind: interval, target: ring.monitor.gain_scale, low: 0.5, high: 2.0, dist: loguniform,
+                 provenance: assumed, generation: none, source: D07}
+  heater_driver:
+    kind: hypothesis
+    choices:
+      voltage: {ring.heater.driver_mode: voltage}
+      current: {ring.heater.driver_mode: current}
+    nominal: voltage
+    provenance: assumed
+    generation: none
+    source: D07
+  thermal:
+    time_scale_fast: {kind: interval, low: 0.5, high: 2.0, dist: loguniform, nominal: 1.0,
+                      provenance: assumed, generation: none, source: R04}
+    time_scale_slow: {kind: interval, low: 0.5, high: 2.0, dist: loguniform, nominal: 1.0,
+                      provenance: assumed, generation: none, source: R04}
+  timing:
+    latency_scale: {kind: interval, low: 0.5, high: 2.0, nominal: 1.0, provenance: assumed, generation: none,
+                    source: D07}
+
+variation:
+  ring.heater.r_cold_ohm: {level: ring, die_sigma: 2.0, ring_sigma: 0.5, provenance: inferred, generation: G25,
+                           source: R01, note: "52.8 to 70.5 ohm hot across 60 dies"}
+  ring.monitor.responsivity_a_per_w: {level: ring, rel_sigma: 0.03, provenance: printed, generation: G25,
+                                      source: LM-T}
+  laser.line_offset_ghz: {level: line, line_sigma: 5.0, provenance: assumed, generation: G26, source: LM26-P}
+  geometry:
+    width: {die_sigma_nm: 3.0, ring_sigma_nm: 1.0, corr_length_um: 500.0}
+    gap_drop: {ring_sigma_nm: 2.0}
+    jacobians: [ring.geometry.jacobian]
+    provenance: literature
+    generation: none
+    source: R06

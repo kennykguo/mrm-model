@@ -1,0 +1,855 @@
+# Calibration targets: the ONLY published numbers that mrm/calibration may fit (07 P0-5, section 4.3).
+#
+# Split frozen on 2026-10-09, before any fitting. Held-out targets are in validation.yaml and bounds.yaml
+# (frozen by sha256 in the header of docs/VALIDATION.md); numbers that are deliberately not used are in
+# excluded.yaml. Schema, units and tolerance semantics: README.md in this folder and mrm/validation/targets_io.py.
+#
+# Every value was re-checked against docs/research/01_lightmatter_public.md and 06_textbook_audit.md, including
+# their [verified] / [corrected] notes and verification logs. Where a value rests on a source the research could
+# not reach (the OFC 2025 talk, tag LM-T), the entry says `rechecked: false`.
+schema: mrm.validation.targets/1
+role: calibration
+frozen_on: "2026-10-09"
+conventions:
+  bias_v: >-
+    Reverse bias across the junction in volts, positive = reverse (junction LUT convention, ARCHITECTURE 5.4).
+    G25 documents print reverse bias as negative volts (for example "-1 V"); those are stored here as +1.0.
+  t_c: Temperature in degC as printed; t_reference says which thermometer (stage, tec, ring, unknown).
+  p_in_dbm: Optical power at the ring input plane; null when not printed.
+  sigma: One standard deviation in the entry's unit, including read-off (digitization) error.
+  tolerance: >-
+    Fixed before any comparison. For a calibration target it is the largest fit residual accepted before the
+    fit is reported as a model-form failure; a residual inside it says nothing about predictive accuracy.
+  data_points: >-
+    Identifiers of the underlying published data. A data point may appear in only one of calibration.yaml,
+    validation.yaml/bounds.yaml (tested data) or excluded.yaml. `uses` lists calibration ids taken as inputs.
+rules:
+  - >-
+    A leaf may be tagged `calibrated` only when its 95 % profile interval (scipy.optimize.least_squares plus a
+    profile likelihood) is at most half of its prior range; otherwise it keeps `assumed` with a range (07 4.3).
+  - Each calibrated leaf records its target ids, its fit residual and whether the fit is unique (07 P0-5).
+  - Read-off targets carry their digitization sigma and record the digitizer and the crop (07 4.3).
+  - >-
+    Do not take priors or preset defaults from research-report fits that used held-out data. Known cases are
+    listed under "Contamination warnings" in README.md (03's coupling-dispersion fit used the VAL-2 points;
+    06's relOMA secant matching used the VAL-5 contours; 06 M6's swing inversion used the VAL-4 level).
+targets:
+
+  - id: CAL-1
+    quantity: loaded_q
+    description: Loaded Q of the G25 MRM, fitted as an interval that spans the printed value and the linewidth read-off.
+    kind: interval
+    value: [3500, 4200]
+    unit: "1"
+    sigma: null
+    components:
+      printed_talk: 3500
+      readoff_linewidth: [3900, 4200]
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    conditions_note: >-
+      07 4.3 lists "low power, cold, 0 V". None of these is printed in a source the research reached. The replica
+      assumes P_in -> 0, heater 0 V and bias 0 V and must state that assumption in its output.
+    generation: G25
+    source: LM-T
+    locator: OFC 2025 Tu3J.6 talk (Q = 3500 printed; 3900-4200 from the plotted -3 dB linewidth), via the textbook REF.Q and REF.qFromLinewidth
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Not re-checked: the talk was not reached (01 section 5, rows "Q, qFromLinewidth"). Weak support: 06 V5 finds
+      the G26 loop-open relOMA map consistent with Q 3600-4400 at 86 pm/K, but that inference uses held-out
+      VAL-5 data and must not be used as a prior.
+    replica: loaded_q_from_3db_width
+    replica_args: {p_in_dbm: null, heater_v: 0.0, bias_v: 0.0}
+    tolerance: {kind: interval, lo: 3500, hi: 4200}
+    tolerance_basis: The two published readings define the interval; any fitted Q_L outside it is a failure.
+    fit: true
+    identifies: >-
+      Q_L only. Through-port magnitude cannot separate Q_i from the coupling Q (07 P1-5); with CAL-2 it constrains
+      the coupling branch (both under- and over-coupled branches must be returned).
+    data_points: [g25_talk/q_printed, g25_talk/q_linewidth_readoff]
+    status: active
+
+  - id: CAL-2
+    quantity: notch_depth_db
+    description: Through-port notch depth against heater voltage, G25 swept device, 0 to 1.2 V only (1.4 and 1.5 V are held out as VAL-2).
+    kind: curve
+    value:
+      x_name: heater_v
+      x_unit: v
+      x: [0.0, 0.2, 0.5, 0.8, 1.0, 1.2]
+      y: [27.9, 29.8, 29.8, 24.4, 22.1, 19.8]
+    unit: db
+    sigma: 0.5
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: [0.0, 1.2]
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    conditions_note: >-
+      A low-power laser sweep at each heater voltage is assumed (not printed). The paper text calls the axis
+      "applied bias voltage on the modulation junction" but the caption says heater voltage; the 13 nm shift
+      settles it as heater voltage (01 D18). The G25 TX topology is ambiguous (all-pass symbol in the paper,
+      input/thru/drop micrograph on later slides, 01 D14), so the replica supports both.
+    generation: G25
+    source: [LM26-S, LM-P]
+    locator: LM26-S slide 8 embedded image (1000 x 700 px), the same data as LM-P Fig. 1(e)
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8", image: "LM26-S slide 8 embedded raster, native resolution (pdfimages)", method: "axis calibration from gridlines; dip = deepest pixel per tab10 colour cluster", crop: "the whole 1000 x 700 px embedded image (no crop)"}
+    rechecked: true
+    verification: >-
+      01 section 2.2 read-off (+-0.5 dB); 01 verification log item 12 confirms the dips by eye. The textbook REF reads
+      the third point at 0.6 V (30 dB) and 01 section 5 reports 28.8 dB at 0.6 V: the third point here is the
+      0.5 V trace (29.8 dB) as in 01 section 2.2 and 07 4.3; the 0.6 V reading is not used. Near 30 dB a notch
+      depth is also sensitive to the instrument floor, so the deepest points are the least certain.
+    replica: notch_er_vs_heater_v
+    replica_args: {topology: [all_pass, add_drop], p_in_dbm: null}
+    tolerance: {kind: abs, value: 1.5}
+    tolerance_basis: 3 sigma per point.
+    fit: true
+    identifies: >-
+      The coupling branch (with CAL-1) and the mixture of extinction mechanisms (coupler dispersion, ring-T loss,
+      heater-T loss; 07 P1-5). Fit on 0 to 1.2 V only (07 D8).
+    data_points:
+      - g25_heater_sweep/notch_db@0.0v
+      - g25_heater_sweep/notch_db@0.2v
+      - g25_heater_sweep/notch_db@0.5v
+      - g25_heater_sweep/notch_db@0.8v
+      - g25_heater_sweep/notch_db@1.0v
+      - g25_heater_sweep/notch_db@1.2v
+    status: active
+
+  - id: CAL-3a
+    quantity: heater_power_per_fsr_mw
+    description: Heater electrical power that tunes the resonance by one FSR, G25 wafer median over 60 dies at 25 degC.
+    kind: scalar
+    value: 25.45
+    unit: mw
+    sigma: 0.05
+    population: {statistic: median, n: 60, min: 24.9, max: 34.1}
+    conditions:
+      t_c: 25.0
+      t_reference: stage
+      heater_v: null
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: LM-T
+    locator: OFC 2025 Tu3J.6 talk, wafer maps (60 dies, 25 degC), via textbook REF.heaterPFsrMw and heaterPFsrMwRange
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Not re-checked (talk not reached, 01 section 5). 01 verification log item 12 adds that the swept G25 device
+      reaches 10.3 nm near 1.30 V, not at the median V_FSR of 1.195 V: a different device or definition (06 E4).
+    replica: heater_power_per_fsr
+    replica_args: {statistic: median}
+    tolerance: {kind: rel, value: 0.02}
+    tolerance_basis: The relation solver anchors P_FSR exactly (07 P0-3 R2); 2 % covers rounding of the printed median.
+    fit: true
+    identifies: >-
+      The heater efficiency in FSR per mW (07 D16, P0-3 R2). In pm/mW it inherits the FSR hypothesis (06 N7). The
+      population range feeds the variation model, not the nominal fit. The printed 0.44 nm/mW is a closure check
+      (it implies FSR = 11.2 nm), not a target (excluded.yaml EXC-12).
+    data_points: [g25_wafer_maps/p_fsr_median, g25_wafer_maps/p_fsr_range]
+    status: active
+
+  - id: CAL-3b
+    quantity: heater_voltage_per_fsr_v
+    description: Heater voltage that tunes the resonance by one FSR, G25 wafer median over 60 dies at 25 degC.
+    kind: scalar
+    value: 1.195
+    unit: v
+    sigma: 0.005
+    population: {statistic: median, n: 60, min: 1.16, max: 1.55}
+    conditions:
+      t_c: 25.0
+      t_reference: stage
+      heater_v: null
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: LM-T
+    locator: OFC 2025 Tu3J.6 talk, wafer maps, via textbook REF.heaterVFsr and heaterVFsrRange
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Not re-checked (talk not reached). Arithmetic check: 1.195^2 V^2 / 25.45 mW = 56.1 ohm, consistent with the
+      textbook's inferred 55.9 ohm hot resistance and 21.4 mA (06 E3: correct as inferred).
+    replica: heater_power_per_fsr
+    replica_args: {statistic: median, output: voltage}
+    tolerance: {kind: rel, value: 0.02}
+    tolerance_basis: Rounding of the printed median plus the medians of two maps not being the same die.
+    fit: true
+    identifies: The hot heater resistance R = V_FSR^2 / P_FSR (inferred about 56 ohm) under the assumed driver law.
+    data_points: [g25_wafer_maps/v_fsr_median, g25_wafer_maps/v_fsr_range]
+    status: active
+
+  - id: CAL-4
+    quantity: resonance_shift_vs_heater_v_nm
+    description: >-
+      Resonance shift relative to the 0 V position against heater voltage, G25 swept device, 0.1 to 1.4 V (the
+      1.5 V point is held out as VAL-1). The absolute 0 V position belongs to CAL-7.
+    kind: curve
+    value:
+      x_name: heater_v
+      x_unit: v
+      x: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
+      y: [0.08, 0.29, 0.66, 1.16, 1.80, 2.55, 3.41, 4.37, 5.40, 6.52, 7.70, 8.96, 10.24, 11.59]
+    unit: nm
+    sigma: [0.04, 0.04, 0.06, 0.04, 0.04, 0.04, 0.06, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
+    absolute_positions_nm: [1301.89, 1301.97, 1302.18, 1302.55, 1303.05, 1303.69, 1304.44, 1305.3, 1306.26, 1307.29, 1308.41, 1309.59, 1310.85, 1312.13, 1313.48]
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: [0.0, 1.4]
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    generation: G25
+    source: [LM26-S, LM-P]
+    locator: LM26-S slide 8 embedded image, the same data as LM-P Fig. 1(e)
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8", image: "LM26-S slide 8 embedded raster", method: "dip position per trace, +-0.03 nm; points marked '~' in 01 (0.3 and 0.7 V) carry +-0.05 nm", crop: "the whole 1000 x 700 px embedded image (no crop)"}
+    rechecked: true
+    verification: >-
+      01 section 2.2 read-off (absolute positions +-0.03 nm, two '~' points); 01 verification log item 12 confirms by eye.
+      The textbook's HEATER_V_LAMBDA is an independent read that agrees within 0.03 nm. Shifts are differences of two
+      read-offs, so sigma = sqrt(2) x 0.03 (or 0.05). Re-derived: dlambda/V^2 falls from 7.33 nm/V^2 at 0.3 V to
+      5.91 at 1.4 V, a droop of 19 % on this read-off (22 % on the textbook's); the read-off error of the 0.3 V point
+      alone moves it by 6 to 9 %. 07's "20 to 30 %" overlaps both reads; this curve is the only evidence for it.
+    replica: resonance_vs_heater_v
+    replica_args: {relative_to_v: 0.0}
+    tolerance: {kind: abs, value: 0.12}
+    tolerance_basis: 3 sigma of a differenced read-off.
+    fit: true
+    identifies: >-
+      Only y = alpha * R_th,H (the TCR self-heating droop) and the driver-law shape (06 E1). alpha and R_th,H are not
+      separately identifiable. This swept device is not the wafer-median device of CAL-3 (0.348 against 0.405 nm/mW,
+      06 E4); the fit must allow a device-specific efficiency.
+    data_points:
+      - g25_heater_sweep/resonance_nm@0.1v
+      - g25_heater_sweep/resonance_nm@0.2v
+      - g25_heater_sweep/resonance_nm@0.3v
+      - g25_heater_sweep/resonance_nm@0.4v
+      - g25_heater_sweep/resonance_nm@0.5v
+      - g25_heater_sweep/resonance_nm@0.6v
+      - g25_heater_sweep/resonance_nm@0.7v
+      - g25_heater_sweep/resonance_nm@0.8v
+      - g25_heater_sweep/resonance_nm@0.9v
+      - g25_heater_sweep/resonance_nm@1.0v
+      - g25_heater_sweep/resonance_nm@1.1v
+      - g25_heater_sweep/resonance_nm@1.2v
+      - g25_heater_sweep/resonance_nm@1.3v
+      - g25_heater_sweep/resonance_nm@1.4v
+    uses: [CAL-7]
+    status: active
+
+  - id: CAL-5
+    quantity: resonance_shift_vs_reverse_bias_pm
+    description: DC resonance shift against reverse bias, G25, 0 to 1.6 V reverse (printed as 0 to -1.6 V); average 52.8 pm/V.
+    kind: curve
+    value:
+      x_name: bias_v
+      x_unit: v
+      x: [0.8, 1.2, 1.6]
+      y: [56.4, 66.8, 84.4]
+    unit: pm
+    sigma: 5.0
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: [0.0, 1.6]
+      p_in_dbm: null
+      port: through
+      loop: open
+    conditions_note: >-
+      Measured at an unstated optical power. 07 P1-7 asks the fit to remove the self-heating relief at the
+      measurement power; with p_in unknown, the replica must carry p_in as a nuisance (P_in -> 0 and +4 dBm, the
+      G25 printed input) and report both fits.
+    generation: G25
+    source: LM-T
+    locator: OFC 2025 Tu3J.6 talk, bias ladder, via textbook MOD_SHIFT_PM and REF.modEffMeasuredAvgPmPerV
+    provenance: read-off
+    readoff: {by: "the textbook (MOD_SHIFT_PM in src/physics/index.ts)", image: "OFC 2025 Tu3J.6 talk, bias-ladder slide (not reached by the research)", method: "not recorded", crop: "not recorded"}
+    rechecked: false
+    verification: >-
+      Not re-checked (talk not reached, 01 section 5 row modEffPmPerV). Average 84.4 / 1.6 = 52.75 pm/V agrees with
+      the printed 52.8. sigma = 5 pm from the 4.1 pm rms of the monotone depletion fit
+      137.6 * (sqrt(0.9 + V) - sqrt(0.9)) pm (03 key finding 6); the 70 -> 26 -> 44 pm/V local slopes are read-off
+      noise (06 M2), not physics.
+    replica: resonance_shift_vs_bias
+    replica_args: {p_in_dbm: [null, 4.0]}
+    tolerance: {kind: abs, value: 12.0}
+    tolerance_basis: 2.4 sigma; a monotone depletion law cannot follow the read-off scatter.
+    fit: true
+    identifies: >-
+      `ring.junction.fill_fraction` and the junction LUT shape (07 P1-7). The DC pm/V under optical power is not the
+      RF pm/V.
+    data_points: [g25_bias_ladder/shift_pm@0.8v, g25_bias_ladder/shift_pm@1.2v, g25_bias_ladder/shift_pm@1.6v, g25_bias_ladder/avg_pm_per_v]
+    status: active
+
+  - id: CAL-6
+    quantity: dlambda_dt_printed_pm_per_k
+    description: The printed "~15 GHz/degC" thermal sensitivity of Lightmatter MRMs, converted at 1310 nm.
+    kind: scalar
+    value: 85.86
+    unit: pm_per_k
+    sigma: null
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: null
+      p_in_dbm: null
+      port: none
+      loop: none
+    conditions_note: >-
+      An aside in the introduction, with no method, thermometer or reference temperature (06 headline 4; 01 verification log item 1).
+    generation: G26
+    source: LM26-P
+    locator: OFC 2026 M4B.3, section 1, "intrinsic thermal sensitivity of MRMs (~15 GHz/degC)"
+    provenance: printed
+    rechecked: true
+    verification: >-
+      Printed verbatim (01 verification log item 1, 06 V10). 15e9 Hz x (1310 nm)^2 / c = 85.86 pm/K (recomputed).
+      Evidence against it as the ring's own dlambda/dT, all derived and thermo-optic only unless stated: at
+      dn_Si/dT = 1.94e-4 /K (Frey 2006, 1.3 um, 295 K) the 400 x 200 nm strip gives 64.3 pm/K (06 section 2.5, femwell
+      and tidy3d) to 64.4 pm/K (05 section 4 [corrected], femwell index weight 1.086); a 500 x 220 nm strip gives 66.3 pm/K (06); 01's
+      semi-vectorial FD gives about 64 pm/K for a 400 x 160 nm strip. The rigorous thermo-optic ceiling
+      lambda*(dn_Si/dT)/n_g,Si is 66.3 pm/K at the C-band 1.86e-4 /K but 69.1 pm/K at the 1310 nm 1.94e-4 /K (06
+      section 2.5 last row): 66.3 pm/K is the ceiling only for the C-band input. With substrate expansion the ceiling
+      is 71.1 pm/K at 300 K and 77.8 pm/K at 375 K (02 section 3). With expansion, real cross-sections give 66-69 pm/K
+      at 22 degC and 74-77 pm/K at 105 degC (06 section 2.7; 73-76 after its verifier's dn/dT(T) correction). The
+      64.4 pm/K strip value is only 3 % above the 62.5 pm/K bench equivalence, but that equivalence comes from the
+      optically emulated test, so the agreement is weak evidence (05 section 5).
+    replica: apparent_shift_fixed_code
+    replica_args: {hypotheses: [H_solver, H86, H86_sensor], t_grid_c: [25.0, 105.0]}
+    tolerance: {kind: none}
+    tolerance_basis: Not fitted. It is the value of the H86 hypothesis on the dlambda/dT leaf (07 D2, P0-3).
+    fit: false
+    identifies: >-
+      Nothing. It defines the H86 robustness corner and the default resonance-unit scale of the aggressor targets
+      (07 P1-4). The replica reports what each hypothesis would show if "GHz/degC" were measured as an apparent shift
+      at a fixed heater code (TCR feedback included).
+    data_points: [g26_paper/intro_15ghz_per_c]
+    status: active
+
+  - id: CAL-7
+    quantity: resonance_blue_offset_nm
+    description: Cold resonance blue offset from the operating line (G25), 1301.89 nm at 0 V heater against an operating point near 1309.5 nm.
+    kind: scalar
+    value: 7.6
+    unit: nm
+    sigma: 0.1
+    components:
+      resonance_0v_nm: 1301.89
+      operating_line_nm: 1309.5
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: 0.0
+      bias_v: null
+      p_in_dbm: null
+      port: through
+      loop: open
+    conditions_note: >-
+      The reference temperature is unknown, and G26 may stagger its rings (lane offsets of 7.5 to 9.5 k codes,
+      CAL-9b). If the 0 V spectrum was taken at power, convert to the cold cavity (07 P1-6).
+    generation: G25
+    source: [LM26-S, LM-T, HC]
+    locator: 0 V resonance from the LM26-S slide 8 image (read-off); operating point "near 1309.5 nm" from the talk and HC slides via the textbook (REF.blueBiasMeasuredNm)
+    provenance: inferred
+    rechecked: false
+    verification: >-
+      The 0 V position 1301.89 +- 0.03 nm is re-read (01 section 2.2). The 1309.5 nm operating point was not
+      re-checked (talk not reached); 01 section 5 rates 7.6 nm "consistent". sigma 0.1 nm covers the rounding of
+      "near 1309.5".
+    replica: cold_resonance_offset
+    replica_args: {p_in_dbm: null, heater_v: 0.0}
+    tolerance: {kind: abs, value: 0.3}
+    tolerance_basis: 3 sigma.
+    fit: true
+    identifies: >-
+      `resonance_offset_nm` at the cold cavity (07 P1-6). It is also the starting margin of BND-2 (an input there, not
+      a tested datum).
+    data_points: [g25_heater_sweep/resonance_nm@0.0v, g25_talk/operating_line_nm]
+    status: active
+
+  - id: CAL-8
+    quantity: drop_monitor_current_at_lock_ua
+    description: Drop-port monitor photocurrent held by the G26 loop during the 808 degC/s on-chip aggressor.
+    kind: scalar
+    value: 15.5
+    unit: ua
+    sigma: 0.5
+    conditions:
+      t_c: [25.0, 113.0]
+      t_reference: aggressor_trajectory
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    conditions_note: >-
+      Laser power at the ring, lock set-point (peak, fraction of peak or edge), drop coupling and responsivity are
+      all unpublished; the G26 hardware budget is 10 dBm per line at the laser module (QDSOA), not at the ring.
+    generation: G26
+    source: LM26-P
+    locator: OFC 2026 M4B.3 Fig. 3(b), green trace ("monitor photocurrent at the MRM drop port ... remained stable")
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md verification log item 2", image: "LM26-P Fig. 3(b) rendered at 300 dpi", method: "trace level against the 15 uA tick, by eye", crop: "not recorded (both panels of Fig. 3(b) inspected)"}
+    rechecked: true
+    verification: 01 verification log item 2 (about 15.5 uA, just above the 15 uA tick in both panels).
+    replica: monitor_current_at_lock
+    replica_args: {setpoint: hypothesis}
+    tolerance: {kind: abs, value: 1.0}
+    tolerance_basis: 2 sigma.
+    fit: true
+    identifies: >-
+      Only the lumped product monitor_codes_per_uw x P_line x lock factor (07 D7, P1-9). Line power, drop coupling,
+      responsivity, TIA gain and ADC LSB stay nuisance parameters (uncertainty.monitor.gain_scale 0.5 to 2).
+    data_points: [g26_fig3b/monitor_current_ua]
+    status: active
+
+  - id: CAL-9a
+    quantity: heater_code_swing_per_lane
+    description: Per-lane heater DAC code swing ("MRM Stabilizer Value (DAC)") over one cycle of the slide-10 aggressor (about 88 K).
+    kind: interval
+    value: [19700, 22300]
+    unit: codes
+    sigma: 300
+    components:
+      top_lane: [19700, 20000]
+      bottom_lane: [22200, 22300]
+    conditions:
+      t_c: [25.0, 113.6]
+      t_reference: aggressor_trajectory
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 10 ("On Chip Thermal Aggressor"), DAC panel
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8 and verification log item 6", image: "LM26-S slide 10", method: "lowest saturated-colour pixel per column (bottom lane), 9 px smoothing; top lane by the checker", crop: "the DAC panel of slide 10 (exact pixel crop not recorded)"}
+    rechecked: true
+    verification: >-
+      01 section 2.4 (20 k top lane to 22.3 k bottom lane) and 01 verification log item 6 (bottom lane 19.6 k -> 41.8 k
+      = 22.2 k; top lane about 29.5 k -> 49.2 k = 19.7 k). sigma covers the two reads. Derived only: 227 to 253
+      codes per degC on average, about 320 near the cusp; mean slew about 340 codes/ms per lane, peak about
+      700 codes/ms (a lower estimate after smoothing). The slew is the demand of Lightmatter's controller and must
+      not set an actuator limit (07 P1-11; excluded.yaml EXC-13).
+    replica: stabilizer_code_vs_T
+    replica_args: {aggressor: CAL-13a, driver_mode: hypothesis, dac_full_scale: hypothesis}
+    tolerance: {kind: abs, value: 900}
+    tolerance_basis: 3 sigma.
+    fit: true
+    identifies: >-
+      The DAC LSB in heater power, only under an assumed driver law and full scale (07 4.3; 06 E2: the same code range
+      implies 71 to 88 pm/K as V_FS goes from 1.40 to 1.60 V, so it cannot confirm dlambda/dT).
+    data_points: [g26_slide10_dac/swing_top_lane, g26_slide10_dac/swing_bottom_lane]
+    uses: [CAL-13a]
+    status: active
+
+  - id: CAL-9b
+    quantity: heater_code_lane_offset
+    description: Lane-to-lane heater code offset on one die under the same aggressor, at the code maxima (cold) and at the code minima (hot).
+    kind: set
+    value: {at_code_maxima: 7500, at_code_minima: 9500}
+    unit: codes
+    sigma: {at_code_maxima: 200, at_code_minima: 400}
+    conditions:
+      t_c: [25.0, 113.6]
+      t_reference: aggressor_trajectory
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 10, DAC panel, 8 lanes
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8 and verification log item 6", image: "LM26-S slide 10", method: "lane-to-lane code difference at the code maxima and minima", crop: "the DAC panel of slide 10 (exact pixel crop not recorded)"}
+    rechecked: true
+    verification: >-
+      01 section 2.4 (7.5 k at maxima, 9.5 k at minima); 01 verification log item 6 (7.4 k at maxima, 9.4 to 10 k at
+      minima). The offset in codes grows at low codes, which is what P proportional to code^2 predicts for a fixed
+      power offset (inferred; the trajectory shape alone does not decide the law, 01 section 3.3).
+    replica: stabilizer_code_vs_T
+    replica_args: {aggressor: CAL-13a, output: lane_offsets, driver_mode: hypothesis}
+    tolerance: {kind: abs, value: 1200}
+    tolerance_basis: 3 sigma of the larger component.
+    fit: true
+    identifies: >-
+      The per-ring resonance-offset variation in codes (07 P1-16: a calibration target for the 6 nm / 2 nm Berkeley
+      fabrication offsets), again only under an assumed driver law and full scale.
+    data_points: [g26_slide10_dac/lane_offset_at_code_max, g26_slide10_dac/lane_offset_at_code_min]
+    uses: [CAL-13a]
+    status: active
+
+  - id: CAL-9c
+    quantity: heater_code_range_all_lanes
+    description: Lowest and highest heater code over all 8 lanes during the slide-10 aggressor.
+    kind: interval
+    value: [19400, 49250]
+    unit: codes
+    sigma: 200
+    conditions:
+      t_c: [25.0, 113.6]
+      t_reference: aggressor_trajectory
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 10, DAC panel
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md section 8 and verification log item 6", image: "LM26-S slide 10", method: "lowest and highest saturated-colour pixel over all lanes", crop: "the DAC panel of slide 10 (exact pixel crop not recorded)"}
+    rechecked: true
+    verification: 01 section 2.4 (19.2 k to 49.3 k) and verification log item 6 (19.6 k to 49.2 k); the value is the mean of the two reads.
+    replica: stabilizer_code_vs_T
+    replica_args: {aggressor: CAL-13a, output: code_range, driver_mode: hypothesis, dac_full_scale: hypothesis}
+    tolerance: {kind: abs, value: 600}
+    tolerance_basis: 3 sigma.
+    fit: true
+    identifies: >-
+      With CAL-3 and CAL-7, the absolute heater power at lock across the aggressor, under an assumed driver law and
+      full scale. It shows the code range one test used, not the hardware code limits (07 P1-11).
+    data_points: [g26_slide10_dac/code_min_all_lanes, g26_slide10_dac/code_max_all_lanes]
+    uses: [CAL-13a]
+    status: active
+
+  - id: CAL-10
+    quantity: eo_bandwidth_3db_ghz
+    description: Electro-optic 3 dB bandwidth at 1 V reverse bias (printed "-1 V"), G25 population figure.
+    kind: scalar
+    value: 30.9
+    unit: ghz
+    sigma: 2.0
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: 1.0
+      p_in_dbm: null
+      port: through
+      loop: open
+      detuning: null
+    conditions_note: The laser detuning is not printed; whether +-2 GHz is one sigma or a range is not stated.
+    generation: G25
+    source: LM-P
+    locator: OFC 2025 Tu3J.6 submission, section 3.1 ("30.9 +- 2 GHz for a bias voltage of -1V")
+    provenance: printed
+    rechecked: true
+    verification: 01 verification log item 11 (printed). The plotted device in Fig. 1(f) shows 31.8 GHz at -1 V; that device is used in VAL-3b, not here.
+    replica: eo_bandwidth_at_bias
+    replica_args: {bias_v: 1.0, detuning: hypothesis}
+    tolerance: {kind: abs, value: 4.0}
+    tolerance_basis: 2 sigma.
+    fit: true
+    identifies: R_s * C at 1 V reverse together with the photon-lifetime limit (waveform mode, 07 P1-7).
+    data_points: [g25_paper/eo_bw_population_1v]
+    status: active
+
+  - id: CAL-11
+    quantity: pd_responsivity_a_per_w
+    description: Ge photodiode responsivity at 1310 nm, G25 distribution over 500 parts.
+    kind: interval
+    value: [0.88, 1.04]
+    unit: a_per_w
+    sigma: null
+    components:
+      worst_case_printed: 0.9
+      typical: 0.95
+    population: {statistic: range, n: 500, min: 0.88, max: 1.04}
+    conditions:
+      t_c: null
+      t_reference: unknown
+      heater_v: null
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: none
+    generation: G25
+    source: LM-T
+    locator: OFC 2025 Tu3J.6 talk, via textbook REF.responsivityRange (0.9 worst case printed on the talk)
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Not re-checked (talk not reached). GF prints > 0.95 A/W for its angled Ge PD (GF-BIAN). The physical ceiling at
+      1310 nm is 1.0566 A/W at unit quantum efficiency (02 section 10, derived), so 1.04 A/W is 98 % QE: plausible only
+      as the top of a distribution.
+    replica: pd_responsivity
+    replica_args: {}
+    tolerance: {kind: interval, lo: 0.88, hi: 1.04}
+    tolerance_basis: The sampled responsivity range must stay inside the published population.
+    fit: true
+    identifies: The variation range of responsivity, a nuisance folded into the lumped monitor gain (CAL-8).
+    data_points: [g25_talk/responsivity_population]
+    status: active
+
+  - id: CAL-12a
+    quantity: laser_line_accuracy_ghz
+    description: Absolute laser-line accuracy the interleaved grid requires, stated as achieved in the G26 laser system.
+    kind: scalar
+    value: 20.0
+    unit: ghz
+    sigma: null
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none}
+    generation: G26
+    source: LM26-P
+    locator: OFC 2026 M4B.3 section 4 ("+-20 GHz", "achieved in our laser system")
+    provenance: printed
+    rechecked: true
+    verification: 01 verification log item 27.
+    replica: laser_line_statistics
+    replica_args: {output: max_abs_static_error_ghz}
+    tolerance: {kind: inequality, op: "<=", value: 20.0}
+    tolerance_basis: The sampled static line error must not exceed the requirement.
+    fit: true
+    identifies: Scenario parameter (static line error bound), not a plant parameter.
+    data_points: [g26_paper/laser_accuracy_20ghz]
+    status: active
+
+  - id: CAL-12b
+    quantity: laser_line_error_population_guide_ghz
+    description: >-
+      Static line-error population of the Guide VLSP laser module, which was tested against a printed +-15 GHz yield
+      limit: median and quartiles of the plotted population. The +-15 GHz is a yield criterion, not a hard bound on
+      |error| (outliers reach -21 GHz) and not a standard deviation.
+    kind: set
+    value: {median: -2.0, q25: -5.5, q75: 1.5}
+    unit: ghz
+    sigma: {median: 1.0, q25: 1.0, q75: 1.0}
+    components: {yield_limit_printed_ghz: 15.0, whiskers_ghz: [-15.0, 11.5], outliers_to_ghz: -21.0}
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none}
+    generation: Guide
+    source: YOLE
+    locator: >-
+      Yole briefing at OFC 2026, Guide VLSP accuracy slide ("ACCURACY OF +/- 15 GHZ" printed; box plot of the measured
+      population read off by the textbook, Ch16 table and docs/AUTHORING_BRIEF.md)
+    provenance: read-off
+    readoff: {by: "the textbook (Ch16 accuracy table)", image: "Yole OFC 2026 briefing, Guide VLSP accuracy slide", method: "not recorded", crop: "not recorded"}
+    rechecked: false
+    verification: >-
+      The +-15 GHz claim is printed (01 verification log item 27, without the word "demonstrated"). The quartiles are
+      the textbook's read-off of the same slide (median -2 GHz, interquartile -5.5 to +1.5 GHz, whiskers +11.5 and
+      -15 GHz, outliers to -21 GHz) and were not re-checked by 01. [corrected at the review of 2026-10-09] This entry
+      first bounded the sampled standard deviation by 15 GHz, which reads a yield limit as a sigma and accepts a
+      spread about 3 times wider than the plotted population (interquartile 7 GHz, sigma about 5 GHz if normal).
+      sigma 1 GHz per quartile is an assumed read-off error. The 3 GHz HotI 2026 figure is a roadmap claim
+      (excluded.yaml EXC-15).
+    replica: laser_line_statistics
+    replica_args: {output: static_error_quartiles_ghz, generation: Guide, sign: measured_minus_grid}
+    tolerance: {kind: abs, value: 2.0}
+    tolerance_basis: 2 sigma of the assumed read-off error, per quartile.
+    fit: true
+    identifies: >-
+      Scenario parameters (centre and spread of the Guide static line error). The sampler must also produce a small
+      fraction of lines outside +-15 GHz, as the plotted outliers do.
+    data_points: [yole/guide_accuracy_15ghz, yole/guide_error_population]
+    status: active
+
+  - id: CAL-12c
+    quantity: laser_wavelength_drift_24h_nm
+    description: Laser wavelength drift limit over 24 h after burn-in (+-0.02 nm).
+    kind: scalar
+    value: 0.02
+    unit: nm
+    sigma: null
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none, window_s: 86400}
+    generation: Guide
+    source: YOLE
+    locator: Yole briefing at OFC 2026, via textbook REF.laserDriftNm24h and Ch16 ("24-hour wavelength drift limit after burn-in")
+    provenance: printed
+    rechecked: false
+    verification: Not re-checked in 01 (the Yole deck was read for the 15 GHz claim only).
+    replica: laser_line_statistics
+    replica_args: {output: max_abs_drift_24h_nm}
+    tolerance: {kind: inequality, op: "<=", value: 0.02}
+    tolerance_basis: Scenario sampling bound.
+    fit: true
+    identifies: Scenario parameter (slow line drift).
+    data_points: [yole/guide_drift_24h]
+    status: active
+
+  - id: CAL-12d
+    quantity: laser_power_drift_24h_pct
+    description: Laser power drift limit over 24 h after burn-in (+-2.5 %).
+    kind: scalar
+    value: 2.5
+    unit: pct
+    sigma: null
+    conditions: {t_c: null, t_reference: unknown, heater_v: null, bias_v: null, p_in_dbm: null, port: none, loop: none, window_s: 86400}
+    generation: Guide
+    source: YOLE
+    locator: >-
+      Yole briefing at OFC 2026, Guide drift limits after burn-in, as cited by the textbook (docs/AUTHORING_BRIEF.md:
+      "+-0.02 nm over 24 h ... and +-2.5 % of power [YOLE]"); REF.laserPowerDrift24hPct itself carries no tag
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Not re-checked: 01 read the Yole deck for the 15 GHz claim only, and 04 D17 took the value "as in textbook".
+      [corrected at the review of 2026-10-09] This entry was first marked `unverified` with "no source identified";
+      the textbook's authoring brief attributes both 24 h drift limits (0.02 nm and 2.5 % power) to [YOLE], so it
+      has the same standing as CAL-12c.
+    replica: laser_line_statistics
+    replica_args: {output: max_abs_power_drift_24h_pct}
+    tolerance: {kind: inequality, op: "<=", value: 2.5}
+    tolerance_basis: Scenario sampling bound (the printed limit).
+    fit: true
+    identifies: Scenario parameter (power drift, a wavelength disturbance through self-heating, 07 P0-1).
+    data_points: [yole/guide_power_drift_24h]
+    status: active
+
+  - id: CAL-13a
+    quantity: aggressor_trajectory_slide10
+    description: >-
+      Temperature trajectory of the G26 slide-10 on-chip aggressor, fitted as a rectified sine
+      T(t) = T_max - dT * |sin(pi * (t - t0) / P)| (cusp at T_max, rounded minimum).
+    kind: parametric
+    value:
+      form: rectified_sine
+      params: {t_max_c: 113.6, delta_t_k: 88.5, period_s: 0.1307}
+      fit_rms_c: 0.34
+      derived: {t_min_c: 25.1, peak_rate_k_per_s: 2127.0, mean_rate_k_per_s: 1354.0}
+    unit: c
+    sigma: {t_max_c: 1.0, delta_t_k: 1.0, period_s: 0.001}
+    conditions:
+      t_c: [25.0, 113.6]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+    conditions_note: >-
+      Which thermometer the plotted degC comes from is not published (07 Q5). Default referencing is `resonance`:
+      the target is the resonance trajectory 85.86 pm/K x T(t) (07 D6, P1-4); `temperature` is the alternative.
+    generation: G26
+    source: LM26-S
+    locator: OFC 2026 deck slide 10 ("On Chip Thermal Aggressor"), temperature panel
+    provenance: read-off
+    readoff: {by: "docs/research/01_lightmatter_public.md verification log items 4 and 5", image: "LM26-S slide 10", method: "re-digitized T trace and red dT/dt trace; least-squares fit of the rectified sine", crop: "the temperature panel of slide 10, four periods (peaks at 65.1 to 456.6 ms; exact pixel crop not recorded)"}
+    rechecked: true
+    verification: >-
+      [corrected after 07 was written] 07 P1-4 describes a parabolic segment with a +-2200 degC/s linear sawtooth
+      rate. 01 D7 and verification log item 5 correct this: a linear 0 -> 2200 degC/s ramp over 65 ms gives only 72 K, not
+      the plotted 88 K; the rectified sine fits to 0.34 degC rms (parabola 1.6 degC rms, implying a 2780 degC/s peak).
+      Re-derived here: peak |dT/dt| = pi*dT/P = 2127 degC/s, mean = 2*dT/P = 1354 degC/s, T_min = 25.1 degC. Raw
+      read-off: T 24.6 -> 112.6 degC, peaks every 130.2-131.1 ms (mean spacing 130.5 ms), red trace -2130 ... +2170
+      degC/s.
+    replica: aggressor_trajectory
+    replica_args: {referencing: resonance, dlambda_dt_pm_per_k: 85.86, waveform: rectified_sine, t0: cusp_at_t_zero, window: one_period_in_periodic_steady_state}
+    tolerance: {kind: rms_abs, value: 1.0}
+    tolerance_basis: >-
+      RMS of (model ring temperature equivalent - T(t)) over one period in periodic steady state (not the start-up
+      transient), in K, with t_s = 0 at a cusp (T = T_max); the temperature equivalent is the model resonance shift /
+      85.86 pm/K under `resonance` referencing. 1.0 K is about 3x the fit rms.
+    fit: true
+    identifies: >-
+      The aggressor power waveform through the thermal ROM (a scenario calibration, not a plant one). The result is
+      tagged `calibrated` and records the assumed thermal poles (07 P1-4).
+    data_points: [g26_slide10_temperature/trajectory, g26_slide10_temperature/rate_trace]
+    status: active
+
+  - id: CAL-13b
+    quantity: aggressor_rate_808
+    description: >-
+      The peer-reviewed on-chip aggressor: "808 degC/s within the MRM", ramped up and down between 25 degC and
+      >105 degC with a period of 100 ms, one MRM, local resistive heater adjacent to it.
+    kind: scalar
+    value: 808.0
+    unit: k_per_s
+    sigma: null
+    conditions:
+      t_c: [25.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: null
+      p_in_dbm: null
+      port: drop
+      loop: closed
+      period_s: 0.1
+    conditions_note: >-
+      The caption says "between 25 degC and 105 degC"; the text says ">105 degC". The Fig. 3(b) inset is
+      under-sampled (excluded.yaml EXC-3), so the waveform shape is not known.
+    generation: G26
+    source: LM26-P
+    locator: OFC 2026 M4B.3 section 3.2 and Fig. 3 caption
+    provenance: printed
+    rechecked: true
+    verification: >-
+      01 verification log items 2 and 3; 06 V17. 808 x 0.1 s = 80.8 K, so 808 is most likely dT per period; with both ramps
+      in one period the mean edge rate is at least 1600 degC/s. If the slide-10 shape applies with dT = 80 K and
+      P = 100 ms, the mean is 1600 and the peak about 2510 degC/s (01 D7, derived). If the waveform were a one-sided
+      sawtooth, 808 would be the true ramp slope (hedge in 01 D7). It may be the same heater as CAL-13a (07 P1-4 A2).
+    replica: aggressor_trajectory
+    replica_args: {referencing: resonance, dlambda_dt_pm_per_k: 85.86, interpretation: [delta_t_per_period, one_sided_sawtooth], waveform: [rectified_sine, symmetric_triangle]}
+    tolerance: {kind: abs, value: 80.0}
+    tolerance_basis: 10 % of the printed rate, under the chosen interpretation (the result records which).
+    fit: true
+    identifies: The amplitude of aggressor scenario A2, conditional on the interpretation hypothesis (uncertainty aggressor.waveform).
+    data_points: [g26_paper/aggressor_808]
+    status: active
+
+  - id: CAL-14
+    quantity: reloma_stabilized_low_bias_db
+    description: Stabilized relOMA at the low-bias end of the G26 map (about 1.0 to 1.15 V), relOMA = OMA / 1 mW of laser into the MRM.
+    kind: scalar
+    value: -2.1
+    unit: db
+    sigma: 0.1
+    conditions:
+      t_c: [0.0, 105.0]
+      t_reference: unknown
+      heater_code: closed_loop
+      bias_v: [1.0, 1.15]
+      p_in_dbm: 0.0
+      port: through
+      loop: closed
+    conditions_note: >-
+      relOMA reference: "1 mW of laser into the MRM" (HC slide 16 note, printed; 07 D9). The junction swing and the
+      actual line power are unpublished (07 Q4). The second reading, "OMA in dBm at the actual input power", is kept
+      only as a question.
+    generation: G26
+    source: [LM26-S, HC]
+    locator: OFC 2026 deck slide 9 (loop-closed relOMA map, contour labels); HC slide 16 (same map and the 1 mW note)
+    provenance: printed
+    rechecked: false
+    verification: >-
+      Contour level printed; its bias position is read-off (about 1.0-1.15 V, 01 section 2.7). The 01 verifier did not
+      re-check the slide-9 read-offs (01 verification log, "Not re-checked"). Context (06 M6, V6): at Q 3500 the
+      printed -2.1 dB needs a 227 pm swing (-3.0 dB needs 169 pm); a G25-like 65 pm swing gives -6.65 dB.
+    replica: relOMA_map
+    replica_args: {mode: oracle, bias_v: [1.0, 1.15], t_c: [0.0, 105.0], alternative_mode: setpoint_lock}
+    tolerance: {kind: abs, value: 0.3}
+    tolerance_basis: Same band as the held-out relOMA targets (07 4.4).
+    fit: true
+    identifies: >-
+      One lumped modulation depth (swing x efficiency / FWHM), 07 D9. The oracle mode gives the best achievable
+      relOMA, so a depth fitted in oracle mode is a lower bound if G26 locks off-optimum; the result records the mode.
+      The swing prior must come from this -2.1 dB level only, never from a range that includes the held-out -3.0 dB
+      (VAL-4).
+    data_points: [g26_slide9_closed/level_low_bias]
+    status: active

@@ -1,0 +1,1350 @@
+# g26: the default preset. The G26 transmit MRM bank of Lightmatter's OFC 2026 M4B.3 link (Passage EVK50): 8
+# add-drop depletion MRMs on one bus, a drop-port monitor PD per ring, an in-ring resistive heater, 8 lines on a
+# 400 GHz grid, 50 Gb/s NRZ. Where G26 is silent the G25 test vehicle (OFC 2025 Tu3J.6, same GF 45SPCLO platform)
+# supplies the device physics; meta.generation_mix says which block comes from where.
+#
+# Format: docs/PARAMETERS_FORMAT.md. Every physical number is a leaf {value, provenance, generation, source, ...}; a
+# solver-derived leaf takes its value from an extraction artefact ({from: "extracted/<file>:<key>"}) and carries a
+# 'fallback' alternative with a literature or inferred value (see docs/handoff/params_content.md: until an artefact
+# exists the loader uses that fallback with a warning). Disputed values are alternatives on the leaf; epistemic
+# unknowns are uncertainty entries (one draw per world, 07 4.8); per-device spread is variation (07 P1-16).
+# Numbers and their reasoning: docs/research/01..06 (corrected notes win) and 07 (decisions D1-D22, 4.3, 4.8).
+# Generated documentation: docs/PARAMETERS.md (mrm params table g26 --out docs/PARAMETERS.md).
+meta:
+  name: g26
+  kind: preset
+  description: >-
+    G26 transmit MRM bank (OFC 2026 M4B.3, Passage EVK50): 8 add-drop depletion MRMs with in-ring heaters and drop-port
+    monitors on one bus, 8 lines on a 400 GHz grid near 1310 nm, 50 Gb/s NRZ. Interim three-pole thermal model (07
+    P1-2), analytic junction, self-heating on, epistemic worlds of 07 section 4.8.
+  generation_mix: >-
+    G26 (LM26-P, LM26-S, QDSOA): channel plan, laser power at the module, 8 rings per bus, drop-port monitor topology,
+    16-bit heater DAC, bias axis 1.0-3.75 V, 50 Gb/s NRZ, 2 s BER interval, the ~15 GHz/degC aside (H86).
+    G25 (LM-P, LM-T via the textbook): Q_L, notch depths, blue offset 7.6 nm, heater P_FSR/R/V, droop fit, junction
+    efficiency ladder, responsivity, +4 dBm at the ring, 1.3 Vpp driver. GF 45SPCLO (GF-IMAPS, GF-BIAN, GF-ECIO): 160 nm
+    film, 2 um BOX, passive loss, Ge PD dark current. Literature (imec CO22/CO24): thermal poles and crosstalk.
+    Solver (mrm/data/extracted, assumed geometry): bent-mode indices, dlambda/dT(T), Jacobian, bend radiation, coupler
+    dispersion. PAT-2: integrating ADC and DAC+PWM heater drive. Everything else is assumed and says so.
+  inventory:
+    # docs/research/00_prior_notes_checklist.md: every item is a key, excluded with a reason, or unknown.
+    # status key: modelled through the listed keys (schema paths, uncertainty.<entry>, variation.<path>);
+    # excluded: deliberately not modelled, with the reason; unknown: no public number, with what stands in for it.
+    A:
+      "ring radius / round-trip length": {status: key, keys: [ring.geometry.radius_um, ring.optics.fsr_thz], reason: "R3 derives the radius from the FSR hypothesis and n_g; L = 2 pi R"}
+      "bus-ring gap": {status: key, keys: [ring.optics.kappa_d_over_kappa, ring.optics.q_through, variation.ring.optics.kappa_d_over_kappa, variation.ring.optics.q_loaded], reason: "gaps live in coupling_<xsec>.json; at runtime the couplers are Q_t (derived from Q_L) and kappa_d/kappa; the drop-gap spread is rel_sigma 0.1 on kappa_d/kappa and the through-gap spread rel_sigma 0.015 on Q_L (Q_t moves, Q_i stays)"}
+      "coupling length and coupler geometry": {status: key, keys: [ring.optics.dln_kappa2_through_dlambda_per_nm, ring.optics.dln_kappa2_drop_dlambda_per_nm], reason: "curved-gap coupler solved in coupling_<xsec>.json (07 P1-5); its K^2 at the gap enters through Q_t/kappa_d, its dispersion through these keys"}
+      "waveguide width, height, cross-section type (rib/strip/slab)": {status: key, keys: [ring.geometry.width_nm, ring.geometry.film_nm, ring.geometry.slab_nm, ring.geometry.xsec, uncertainty.film_thickness]}
+      "bend geometry": {status: key, keys: [ring.geometry.radius_um, ring.optics.n_eff, ring.optics.loss_budget.alpha_bend_radiation_db_per_cm], reason: "bent-mode solve at r_ref (07 P1-6)"}
+      "Si index vs wavelength": {status: key, keys: [ring.optics.n_g, ring.optics.dn_g_dlambda_per_nm], reason: "mrm.materials (Li 1980 shape on the Frey level) inside the modes artefact"}
+      "Si thermo-optic coefficient": {status: key, keys: [ring.thermal.dlambda_dt_pm_per_k, ring.thermal.dlambda_dt_beta_per_k], reason: "mrm.materials dn/dT(lambda, T) inside the modes artefact; R1 enforces one anchor"}
+      "cladding and BOX geometry and indices": {status: key, keys: [ring.optics.index_weight_oxide], reason: "2 um BOX (GF-IMAPS printed) and oxide indices are inputs of the modes and thermal artefacts; the oxide index weight is the runtime trace"}
+      "metal/heater geometry": {status: unknown, keys: [uncertainty.thermal.family, ring.thermal.pd_offset_um, ring.thermal.driver_offset_um], reason: "heater type and position are unpublished (07 Q1); carried as the heater-family hypothesis (in-ring, GF-PDK silicide undercut, metal above)"}
+      "doped junction geometry": {status: unknown, keys: [ring.junction.fill_fraction, ring.junction.eff_at_0v_pm_per_v], reason: "doping and junction position unpublished; the junction artefact sweeps assumed profiles; fill_fraction is calibrated to CAL-5 later"}
+      "fabrication width/thickness variation": {status: key, keys: [variation.geometry], reason: "correlated geometry draws through the Jacobian (07 P1-16), sized to the Berkeley 6 nm / 2 nm resonance spreads"}
+      "sidewall roughness": {status: key, keys: [ring.optics.loss_budget.alpha_scatter_db_per_cm, ring.optics.backscatter_splitting_ghz]}
+      "layer alignment/process variation": {status: key, keys: [variation.geometry], reason: "width and film die and ring components sized to the total Berkeley resonance spread, so slab-depth and implant misalignment are folded in (the latter moves fill_fraction and the junction LUT, both calibrated)"}
+      "thermal expansion": {status: key, keys: [ring.optics.alpha_l_per_k, ring.optics.alpha_l_slope_per_k2]}
+      "stress-optic effects": {status: excluded, reason: "below 2 pm/K (06 section 2.7), inside the dlambda/dT anchor uncertainty; R1 takes the measured-or-solved total"}
+    B:
+      "reference resonance frequency": {status: key, keys: [ring.optics.resonance_offset_nm, ring.optics.resonance_offset_ref_temp_c, channel_plan.center_thz]}
+      "n_eff": {status: key, keys: [ring.optics.n_eff]}
+      "n_g": {status: key, keys: [ring.optics.n_g]}
+      "FSR": {status: key, keys: [ring.optics.fsr_thz, uncertainty.fsr]}
+      "intrinsic loss": {status: key, keys: [ring.optics.loss_budget.alpha_fca_db_per_cm, ring.optics.loss_budget.alpha_other_abs_db_per_cm, ring.optics.loss_budget.alpha_scatter_db_per_cm, ring.optics.loss_budget.alpha_bend_radiation_db_per_cm], reason: "07 P0-2 loss budget; Q_i and eta are derived"}
+      "bus coupling": {status: key, keys: [ring.optics.q_through, ring.optics.kappa_d_over_kappa, uncertainty.coupling_regime]}
+      "loaded/intrinsic Q": {status: key, keys: [ring.optics.q_loaded, ring.optics.q_intrinsic, uncertainty.q_loaded]}
+      "coupler phase and wavelength dependence": {status: key, keys: [ring.optics.dln_kappa2_through_dlambda_per_nm, ring.optics.dln_kappa2_drop_dlambda_per_nm], reason: "wavelength dependence modelled per line (07 P1-5); the constant coupler phase is absorbed by the measured resonance offset (it shifts every order equally), so it has no key"}
+      "linewidth": {status: key, keys: [ring.optics.q_loaded], reason: "FWHM = c/(lambda Q_L), derived"}
+      "extinction/notch depth": {status: key, keys: [ring.optics.q_loaded, ring.optics.loss_budget.alpha_other_abs_db_per_cm, uncertainty.coupling_regime, uncertainty.er_mechanism], reason: "follows from the Q split of the exact add-drop ring; set to the G25 27.9 dB at 0 V and the nominal Q_L"}
+      "through- and monitor-port transfer functions": {status: key, keys: [fidelity.optics_model], reason: "exact add-drop ring per line and order (mrm.plant.optics)"}
+      "group delay": {status: key, keys: [fidelity.optics_model], reason: "contained in the exact ring response; not a separate parameter"}
+      "backreflection/backscattering": {status: key, keys: [fidelity.backscatter, ring.optics.backscatter_splitting_ghz]}
+      "mode splitting": {status: key, keys: [ring.optics.backscatter_splitting_ghz]}
+      "polarization dependence (TE/TM)": {status: excluded, reason: "TE only (channel_plan line pol te); the TM0 mode is not guided in the bend of the solved strip (modes artefact mode_families) and parasitic families are 07 P2-3, deferred"}
+      "higher-order transverse modes": {status: excluded, reason: "TE1 is not guided in the solved cross-section (modes artefact mode_families); parasitic mode families are 07 P2-3, deferred"}
+      "coupling between adjacent resonators": {status: excluded, reason: "rings on one bus are tens of um apart, so they couple only through the bus field, which the bus cascade of mrm.plant.optics models exactly; no evanescent ring-ring coupling"}
+      "intracavity energy": {status: key, keys: [fidelity.optics_model], reason: "an output of the exact ring (drives absorption and the monitor)"}
+    C:
+      "thermal resistance": {status: key, keys: [ring.thermal.z_heater_ring_k_per_mw, ring.thermal.z_ratio_opt_heater, uncertainty.self_heating.z_ratio], reason: "Z_heater->ring is derived (R2) from P_FSR and dlambda/dT; Z_opt/Z_heater is an interval"}
+      "capacitance": {status: key, keys: [ring.thermal.tau_fast_s, ring.thermal.tau_slow_s], reason: "implicit in the Foster poles tau_k = R_k C_k"}
+      "time constants": {status: key, keys: [ring.thermal.tau_fast_s, ring.thermal.tau_slow_s, ring.thermal.tail_tau_s, ring.thermal.selfheat_tau_s, uncertainty.thermal.time_scale_fast, uncertainty.thermal.time_scale_slow]}
+      "resonance shift per kelvin": {status: key, keys: [ring.thermal.dlambda_dt_pm_per_k, uncertainty.thermo_optic]}
+      "reference temperature": {status: key, keys: [ring.thermal.dlambda_dt_ref_ring_temp_c, ring.optics.resonance_offset_ref_temp_c, ring.heater.r_ref_temp_c]}
+      "heater power to resonance shift": {status: key, keys: [ring.heater.p_fsr_mw, ring.heater.efficiency_nm_per_mw], reason: "P_FSR is the anchor (07 D16); the efficiency is derived"}
+      "heater-to-ring delay": {status: key, keys: [uncertainty.thermal.transport_delay_s, ring.thermal.tau_fast_s]}
+      "inter-ring thermal coupling": {status: key, keys: [ring.thermal.xt_nearest_frac, ring.thermal.xt_next_frac, ring.thermal.xt_floor_frac, ring.thermal.xt_tau_ref_s, uncertainty.thermal.crosstalk_scale]}
+      "multiple thermal modes": {status: key, keys: [ring.thermal.tau_fast_s, ring.thermal.tau_slow_s, ring.thermal.tail_tau_s, ring.thermal.selfheat_tau_s, fidelity.thermal_model], reason: "three heater poles plus a sub-us self-heating pole (interim) or the FEM Foster ROM"}
+      "spatial gradients across the ring": {status: excluded, reason: "the ring is one mode-weighted temperature (the ROM observer ring_mode_weighted); a gradient shifts the resonance only through its mode-weighted mean to first order"}
+      "package boundary conditions": {status: key, keys: [ring.thermal.tail_tau_s, ring.thermal.tail_share_frac, uncertainty.thermal.package_tail_tau_s, uncertainty.thermal.package_tail_share_frac], reason: "the package enters as a 1-10 ms tail carrying 2-10 % (07 P1-2); package thermal resistance itself is unpublished"}
+      "T-dependent thermal conductivity and heat capacity": {status: excluded, reason: "not wired yet although 07 P2-5 is in the v1 scope (ARCHITECTURE 0): mrm.plant.thermal.k_temp_residue_scale and the FEM sidecar k_temp_scaling exist, but no schema switch or realize path reaches them (requested in docs/handoff/params_content.md). Meanwhile the dn/dT(T) rise is in dlambda_dt_beta_per_k, and the oxide-dominated R_th changes only a few % (06 N8)"}
+      "optical absorption heating": {status: key, keys: [fidelity.self_heating, ring.optics.heat_fraction, uncertainty.self_heating.eta]}
+      "data-driver heating": {status: key, keys: [driver.static_power_mw, driver.energy_per_transition_fj, ring.junction.capacitance_at_0v_ff, ring.thermal.driver_offset_um]}
+      "external chip/package heat sources": {status: key, keys: [scenario.aggressor, layout.sites], reason: "on-die aggressor as power into the thermal model at a site (07 P1-4); XPU and package events are scenario signals"}
+      "heat sink/cooling response": {status: key, keys: [ring.thermal.tail_tau_s, uncertainty.thermal.package_tail_tau_s], reason: "the slowest pole; the cold plate itself is a scenario base temperature"}
+      "TEC dynamics": {status: unknown, keys: [scenario.stack], reason: "no TEC data; the TEC or package temperature is a scenario base-temperature signal (35-105 degC soak), filtered by the scenario if wanted"}
+      "device-to-device thermal variation": {status: key, keys: [variation.ring.heater.p_fsr_mw, variation.ring.heater.r_cold_ohm], reason: "per-ring heater efficiency spread; the time scales are die-level world draws (07 D15)"}
+    D:
+      "resistance or I-V curve": {status: key, keys: [ring.heater.r_cold_ohm, ring.heater.tcr_per_k, ring.thermal.heater_self_ratio]}
+      "resistance vs temperature": {status: key, keys: [ring.heater.tcr_per_k, ring.heater.r_ref_temp_c, uncertainty.thermal.family]}
+      "driver output limits": {status: key, keys: [ring.heater.full_scale_v, ring.heater.full_scale_a, ring.heater.full_scale_w, ring.heater.code_max]}
+      "DAC resolution": {status: key, keys: [ring.heater.dac_bits, ring.heater.pwm_bits]}
+      "DAC gain/offset error": {status: key, keys: [ring.heater.dac_inl_lsb, ring.heater.dac_dnl_lsb], reason: "INL/DNL drawn per device; a static gain error is equivalent to a full-scale error and is inside the driver-law hypothesis"}
+      "output noise": {status: excluded, reason: "no key: one LSB of the 16-bit voltage DAC is 0.2-0.5 pm of resonance at the G26 lock codes (derive heater_pm_per_code) and the >= 1 us thermal poles filter it further; the bias DAC noise is keyed (ring.bias_dac.noise_rms_codes)"}
+      "command latency": {status: key, keys: [ring.heater.latency_s, uncertainty.timing.latency_scale]}
+      "settling time": {status: key, keys: [ring.heater.settle_tau_s]}
+      "update rate": {status: key, keys: [ring.heater.dac_max_update_hz, controller_interface.update_rate_hz]}
+      "slew limit": {status: key, keys: [ring.heater.slew_codes_per_s], reason: "absent = unlimited on purpose (07 P1-11: the 460 codes/ms of the textbook is measured demand, not hardware); the metrics report the demanded peak slew"}
+      "supply voltage and ripple": {status: unknown, keys: [ring.heater.driver_compliance_v, array.heater_supply_current_max_a], reason: "supply voltage taken from the GF IO rail (1.8 V printed); ripple is unpublished and not modelled (it would act like DAC noise, filtered by the thermal poles)"}
+      "PWM frequency/duty/ripple (if PWM)": {status: key, keys: [ring.heater.pwm_period_s, ring.heater.pwm_bits, fidelity.heater_pwm_ripple]}
+      "compliance and safety limits": {status: key, keys: [ring.heater.driver_compliance_v, array.heater_total_power_max_w, array.heater_supply_current_max_a]}
+      "electrical crosstalk": {status: excluded, reason: "heater-to-heater supply coupling is modelled only as the array supply limit droop (07 P1-12); no shared-ground or IR-drop model (no data)"}
+      "heater aging/drift": {status: unknown, reason: "no data; heater electromigration is reported for imec W heaters (CO-EM) but nothing for Lightmatter; not modelled"}
+      "shutdown/fallback behaviour": {status: key, keys: [scenario.params], reason: "controller behaviour, not plant; fault masks such as controller_reset_at are scenario-bound (07 P1-10)"}
+      "whether the command is voltage, current, power or a DAC code": {status: key, keys: [ring.heater.driver_mode, uncertainty.heater.driver_mode]}
+    E:
+      "mechanism (depletion/injection)": {status: key, keys: [fidelity.junction_model], reason: "depletion PN (LM26-S slide 7, printed)"}
+      "drive levels": {status: key, keys: [driver.swing_pp_v, driver.level_convention, uncertainty.driver.levels]}
+      "bias and polarity": {status: key, keys: [ring.bias_dac.v_min_v, ring.bias_dac.v_max_v, scenario.bias_v, ring.optics.resonance_offset_ref_bias_v]}
+      "junction C(V)": {status: key, keys: [ring.junction.capacitance_at_0v_ff, ring.junction.v_bi_v, ring.junction.depletion_exponent]}
+      "junction resistance and parasitics": {status: key, keys: [ring.junction.series_resistance_ohm]}
+      "carrier concentration vs bias": {status: key, keys: [fidelity.junction_model], reason: "carriers live in the junction artefact (devsim, junction_<xsec>.json); the analytic law is the runtime fallback"}
+      "dn_eff/dV": {status: key, keys: [ring.junction.eff_at_0v_pm_per_v, ring.junction.fill_fraction]}
+      "dalpha/dV": {status: key, keys: [ring.junction.loss_ratio_q]}
+      "modulation bandwidth": {status: key, keys: [ring.junction.capacitance_at_0v_ff, ring.junction.series_resistance_ohm, driver.output_resistance_ohm], reason: "RC x optical response, waveform mode only; CAL-10 calibrates it"}
+      "driver output impedance": {status: key, keys: [driver.output_resistance_ohm]}
+      "package RLC": {status: excluded, reason: "the driver is monolithic (LM26-P: monolithically integrated CMOS drivers), so no package interconnect sits between driver and junction"}
+      "data pattern and transition density": {status: key, keys: [datapath.transition_density, fidelity.pattern_noise]}
+      "rise/fall times": {status: excluded, reason: "bit-level shape; the control plant averages over mark density (07 P2-6); the waveform module handles it"}
+      "driver jitter and noise": {status: excluded, reason: "bit-level timing does not reach the thermal loop (20 ps UI against >= 1 us thermal poles); it affects only the eye, which is not a plant output"}
+      "self-heating from data activity": {status: key, keys: [driver.swing_pp_v, ring.junction.capacitance_at_0v_ff, datapath.transition_density, driver.energy_per_transition_fj]}
+    F:
+      "centre wavelength": {status: key, keys: [channel_plan.center_thz, channel_plan.spacing_ghz]}
+      "power": {status: key, keys: [laser.power_per_line_dbm, uncertainty.chip_input_loss]}
+      "frequency drift": {status: key, keys: [scenario.stack], reason: "slow drift (0.02 nm / 24 h) is a scenario signal (CAL-12)"}
+      "absolute accuracy": {status: key, keys: [laser.line_offset_ghz, variation.laser.line_offset_ghz]}
+      "RIN": {status: key, keys: [laser.rin_db_per_hz]}
+      "linewidth/phase noise": {status: key, keys: [laser.linewidth_mhz]}
+      "power noise": {status: key, keys: [laser.rin_db_per_hz], reason: "fast power noise is RIN; slow power drift (2.5 % / 24 h) is a scenario signal"}
+      "polarization state": {status: unknown, keys: [channel_plan.center_thz], reason: "whether the TX feed is polarization maintaining is unpublished (06 S7); lines are TE"}
+      "tuning rate (if controllable)": {status: key, keys: [laser.tune.present, laser.tune.lsb_hz]}
+      "laser thermal/electrical dynamics": {status: unknown, reason: "the Guide wavelength servo is unpublished (PAT-7 titles only); laser lines move only through scenario signals"}
+      "input coupling loss": {status: key, keys: [optical_path.chip_input_loss_db]}
+      "reflections into the laser": {status: excluded, reason: "external reflection (07 P2-2 scenario.external_reflection) is not built (plant_optics handoff 5.5); no laser feedback model"}
+      "multiple WDM carriers": {status: key, keys: [channel_plan.n_lines, channel_plan.ring_to_line]}
+    G:
+      "monitor placement/topology": {status: key, keys: [ring.thermal.pd_offset_um, ring.optics.kappa_d_over_kappa], reason: "drop-port PD per ring (LM26-P printed)"}
+      "responsivity": {status: key, keys: [ring.monitor.responsivity_a_per_w, variation.ring.monitor.responsivity_a_per_w]}
+      "dark current": {status: key, keys: [ring.monitor.dark_i0_na, ring.monitor.dark_activation_ev, uncertainty.monitor.dark_i0]}
+      "shot noise": {status: key, keys: [fidelity.shot_noise]}
+      "electronic noise": {status: key, keys: [ring.monitor.input_noise_pa_per_rt_hz, ring.monitor.flicker_corner_hz]}
+      "monitor bandwidth": {status: key, keys: [ring.monitor.afe_type, ring.monitor.integration_window_s]}
+      "ADC resolution": {status: key, keys: [ring.monitor.adc_bits]}
+      "ADC reference/gain/offset": {status: key, keys: [ring.monitor.adc_offset_codes, ring.monitor.adc_gain_error_frac, ring.monitor.adc_ref_tempco_ppm_per_k, ring.monitor.adc_full_scale_ua]}
+      "ADC sample rate": {status: key, keys: [ring.monitor.adc_rate_hz]}
+      "measurement latency": {status: key, keys: [ring.monitor.adc_latency_s]}
+      "analog filtering": {status: key, keys: [ring.monitor.afe_type, ring.monitor.integration_window_s]}
+      "saturation/clipping": {status: key, keys: [ring.monitor.adc_full_scale_ua, ring.monitor.pga_gains]}
+      "temperature-dependent monitor response": {status: key, keys: [ring.monitor.dark_activation_ev, ring.monitor.adc_ref_tempco_ppm_per_k], reason: "dark current follows the PD temperature (Arrhenius); responsivity is held constant (02 section 10: no 1310 nm data, assumed +-3 %)"}
+      "monitor crosstalk": {status: key, keys: [ring.monitor.background_fraction, fidelity.optics_model], reason: "neighbour lines and other orders reach the drop port through the exact bus cascade; stray light is background_fraction"}
+      "dropped samples": {status: key, keys: [scenario.params], reason: "fault masks adc_drop_mask, adc_stuck, adc_saturate (07 P1-10) are scenario-bound"}
+      "calibration tones and dither": {status: excluded, reason: "a dither is a controller action on tx.heater or tx.bias (07 P0-7 fast_kernel), not a plant parameter"}
+      "sensor synchronization": {status: key, keys: [ring.monitor.adc_mux.channels_per_adc, ring.monitor.adc_mux.order, sim.dt_plant_s]}
+    H:
+      "linear absorption heating": {status: key, keys: [fidelity.self_heating, ring.optics.heat_fraction]}
+      "TPA": {status: excluded, reason: "07 P2-1: TPA loss < 0.2 dB/cm against ~110 dB/cm intrinsic at +9 dBm and Q 4200 (bound test); fidelity.nonlinear_optics stays off"}
+      "free-carrier generation": {status: excluded, reason: "07 P2-1: TPA-generated carriers shift < 5 pm at 1 ns lifetime, < 0.5 pm with junction sweep-out"}
+      "FCA": {status: excluded, reason: "TPA-generated FCA is excluded with the 07 P2-1 bound; the doping FCA is the alpha_fca_db_per_cm term of the loss budget"}
+      "free-carrier dispersion": {status: excluded, reason: "TPA-carrier dispersion excluded by the 07 P2-1 bound; bias-driven carrier dispersion is the junction model"}
+      "carrier lifetime": {status: excluded, reason: "only matters for TPA carriers (07 P2-1 bound, 10-100 ps in reverse bias)"}
+      "Kerr": {status: excluded, reason: "07 P2-1: Kerr shift < 1 pm at +9 dBm"}
+      "thermo-optic bistability": {status: key, keys: [fidelity.self_heating, sim.reset_protocol]}
+      "resonance hysteresis": {status: key, keys: [fidelity.self_heating, sim.reset_protocol]}
+      "backscatter/counter-propagating modes": {status: key, keys: [fidelity.backscatter, ring.optics.backscatter_splitting_ghz]}
+      "operating-point dependent resonance shape": {status: key, keys: [fidelity.self_heating, fidelity.optics_model], reason: "self-heating distorts the swept line shape; the exact ring is solved at each temperature"}
+    I:
+      "number and order of rings": {status: key, keys: [array.n_rings, array.bus_order]}
+      "ring-to-wavelength assignment": {status: key, keys: [channel_plan.ring_to_line, controller_interface.bind.tx.assignment]}
+      "per-ring spectra": {status: key, keys: [fidelity.optics_model, variation.geometry]}
+      "per-ring heaters and offsets": {status: key, keys: [ring.optics.resonance_offset_nm, variation.geometry, variation.ring.heater.p_fsr_mw]}
+      "common-bus loss and phase": {status: key, keys: [optical_path.bus_loss_db_per_mm, optical_path.ring_spacing_on_bus_um], reason: "loss modelled; the bus phase between rings matters only with reflections (07 P2-10 netlist, deferred)"}
+      "inter-ring thermal and optical coupling": {status: key, keys: [ring.thermal.xt_nearest_frac, fidelity.optics_model]}
+      "wavelength-dependent couplers": {status: key, keys: [ring.optics.dln_kappa2_through_dlambda_per_nm, ring.optics.dln_kappa2_drop_dlambda_per_nm]}
+      "reflections between components": {status: excluded, reason: "single-pass bus (plant_optics bound L_BOUND < 1e-3 in normal operation); multi-element reflections need the 07 P2-10 S-matrix netlist, deferred"}
+      "RX add-drop filters": {status: excluded, reason: "the plant is the TX bank; the RX path has no controller-relevant loop in this model"}
+      "interleaver transfer functions": {status: excluded, reason: "no interleaver element yet (07 P2-10 deferred); its leakage onto the TX bus is not modelled"}
+      "TX/RX grid offsets": {status: key, keys: [channel_plan.lines, channel_plan.center_thz], reason: "the 200 GHz-offset RX comb can be added as lines with direction rx; the TX set centre is 100 GHz below the composite centre"}
+      "interleaver IL, isolation, dispersion": {status: excluded, reason: "no interleaver element (07 P2-10 deferred); values unpublished (textbook SOURCES section 5)"}
+      "RX photodiodes and TIAs": {status: excluded, reason: "RX path not modelled; the BER uses an OMA-to-BER law in the datapath module"}
+      "polarization rotation/PDL": {status: excluded, reason: "TX bus only; the polarization scramble acts on the RX-path monitors (07 D14)"}
+      "bidirectional interference/backscatter": {status: key, keys: [fidelity.backscatter, ring.optics.backscatter_splitting_ghz], reason: "backscatter per order modelled (07 P2-2); external reflection not built"}
+      "fibre/connector loss and reflections": {status: key, keys: [optical_path.chip_input_loss_db, scenario.stack], reason: "loss in chip_input_loss_db; connector re-mates are scenario loss steps (A6); reflections excluded (see reflections into the laser)"}
+      "channel crosstalk": {status: key, keys: [fidelity.optics_model, channel_plan.spacing_ghz]}
+      "laser source correlation and drift": {status: key, keys: [variation.laser.line_offset_ghz], reason: "die_sigma is the common-mode error of one laser module, line_sigma the per-line error"}
+      "die thermal variation": {status: key, keys: [layout.sites, scenario.aggressor, temp_sensors]}
+      "multi-controller synchronization and sequencing": {status: key, keys: [controller_interface.schedule, array.heater_total_power_max_w]}
+    J:
+      "modulation format": {status: key, keys: [datapath.bitrate_gbps], reason: "NRZ (LM26-P)"}
+      "OMA": {status: key, keys: [metrics.reloma_definition, driver.swing_pp_v]}
+      "ER": {status: key, keys: [ring.optics.q_loaded, uncertainty.er_mechanism]}
+      "IL": {status: key, keys: [fidelity.optics_model, optical_path.bus_loss_db_per_mm]}
+      "eye height/width": {status: excluded, reason: "waveform-mode output only (07 P2-6); not a plant parameter"}
+      "rise/fall": {status: excluded, reason: "waveform mode (see E rise/fall times)"}
+      "received power": {status: excluded, reason: "RX link budget not modelled; 07 4.7 uses BER only for feasibility"}
+      "receiver noise and sensitivity": {status: excluded, reason: "RX path not modelled; the datapath BER law carries the G26 sensitivity read-off"}
+      "jitter": {status: excluded, reason: "bit-level timing, no thermal-loop path"}
+      "ISI": {status: excluded, reason: "waveform mode (07 P2-6)"}
+      "crosstalk penalty": {status: key, keys: [ring.optics.fsr_thz, channel_plan.spacing_ghz], reason: "BND-1 diagnostic next_order_distance_* from derive()"}
+      "pre-FEC BER": {status: key, keys: [datapath.bitrate_gbps], reason: "rx.error_count drawn as Poisson(sum BER(OMA) bits) (07 P0-11)"}
+      "BER observation interval": {status: key, keys: [datapath.error_count_period_s, metrics.ber_sample_period_s]}
+      "error-counter latency": {status: key, keys: [datapath.error_count_latency_s]}
+    K:
+      "initial temperatures and heater codes": {status: key, keys: [sim.reset_protocol, ring.heater.code_min]}
+      "initial optical/electrical states": {status: key, keys: [sim.reset_protocol, sim.reset_ramp_s]}
+      "initial resonance offsets and lock status": {status: key, keys: [ring.optics.resonance_offset_nm, sim.reset_protocol]}
+      "ambient temperature vs time": {status: key, keys: [scenario.ambient_c, scenario.stack]}
+      "package/board temperature vs time": {status: key, keys: [scenario.stack]}
+      "spatial external heating": {status: key, keys: [scenario.aggressor, layout.sites]}
+      "laser drift vs time": {status: key, keys: [scenario.stack]}
+      "supply disturbances": {status: unknown, reason: "no data on heater or driver supply disturbances; scenario.bias_offset_v carries bias ripple or droop"}
+      "device-to-device variation": {status: key, keys: [variation.geometry, variation.ring.heater.p_fsr_mw]}
+      "process corners and correlated errors": {status: key, keys: [variation.geometry], reason: "die and ring components; corners are the thin corner presets"}
+      "noise distributions": {status: key, keys: [fidelity.shot_noise, ring.monitor.input_noise_pa_per_rt_hz, laser.rin_db_per_hz]}
+      "sample rates and event timing": {status: key, keys: [sim.dt_plant_s, ring.monitor.adc_rate_hz, controller_interface.update_rate_hz]}
+      "integration step and tolerances": {status: key, keys: [sim.dt_plant_s, sim.substep_policy, sim.max_detuning_step_pm]}
+      "random seeds": {status: key, keys: [experiment.seeds.device, experiment.seeds.uncertainty]}
+      "fault injection (lost samples, saturation)": {status: key, keys: [scenario.params], reason: "07 P1-10 scenario-bound masks"}
+      "parameter validity ranges": {status: key, keys: [ring.optics.q_loaded], reason: "every leaf carries a range where one is known; the schema holds hard bounds"}
+      "uncertainty and extrapolation warnings": {status: key, keys: [uncertainty.thermo_optic], reason: "the uncertainty section; mrm.materials warns outside its model ranges"}
+      "test configurations and expected reference outputs": {status: key, keys: [experiment.kind], reason: "mrm/validation/targets (frozen) and tests/golden"}
+    OFC2026_not_given:
+      "heater resistance": {status: key, keys: [ring.heater.r_cold_ohm], reason: "taken from G25 (LM-T wafer maps via the textbook)"}
+      "limits": {status: unknown, keys: [ring.heater.full_scale_v, ring.heater.code_max], reason: "assumed hardware limits (07 P1-11)"}
+      "time constants": {status: unknown, keys: [ring.thermal.tau_fast_s, uncertainty.thermal.time_scale_fast], reason: "no Lightmatter value; imec literature and a 0.5-2x world scale (07 Q1)"}
+      "geometry": {status: unknown, keys: [ring.geometry.film_nm, uncertainty.film_thickness], reason: "GF 45SPCLO 160 nm film printed; width, slab and radius assumed or derived"}
+      "indices": {status: key, keys: [ring.optics.n_eff, ring.optics.n_g], reason: "solved for the assumed cross-section"}
+      "coupling": {status: unknown, keys: [ring.optics.kappa_d_over_kappa, uncertainty.coupling_regime], reason: "only Q_L and the G25 notch are measured; the split is a hypothesis"}
+      "spectra": {status: key, keys: [ring.optics.q_loaded], reason: "G25 heater-sweep spectra (read-off) via CAL-1, CAL-2, CAL-4"}
+      "junction": {status: key, keys: [ring.junction.eff_at_0v_pm_per_v], reason: "G25 bias ladder (read-off) fit; doping unknown"}
+      "monitor ADC details": {status: unknown, keys: [ring.monitor.adc_bits, ring.monitor.adc_rate_hz], reason: "PAT-2 integrating ADC inferred; width, rate, latency assumed"}
+      "controller": {status: unknown, keys: [controller.name], reason: "the entire control loop is unpublished; that is the capstone"}
+      "crosstalk": {status: unknown, keys: [ring.thermal.xt_nearest_frac], reason: "imec literature (1-10 %); PAT-1 calls it negligible"}
+      "production distributions": {status: unknown, keys: [variation.geometry, variation.ring.heater.p_fsr_mw], reason: "G25 60-die wafer maps (P_FSR, R) and 500-part responsivity only; geometry spread from Berkeley literature"}
+
+fidelity:
+  self_heating: "on"                 # 07 P0-1 item 1: on in every preset except teaching_*
+  thermo_optic_order: 2              # 07 P0-3: s(T) = s0 (1 + beta (T - T0))
+  thermal_model: interim             # ARCHITECTURE 5.3 / 07 P1-2: interim until the FEM ROM passes the calibration split
+  junction_model: analytic           # the junction LUT artefact is not extracted yet (ARCHITECTURE 5.4)
+  optics_model: exact
+  backscatter: "off"                 # schema default; turn on for BiDi and reflection studies (cost, plant_optics 2)
+  shot_noise: "on"
+  pattern_noise: "off"
+  data_modulation: mean
+  nonlinear_optics: "off"            # 07 P2-1: excluded with a computed bound
+  heater_anchor: fsr_integral       # R2: Z = dT_FSR/P_FSR, the exact inversion of the P_FSR anchor (07 D16); 07 P0-3
+                                   # lock_slope is 4-5 % low and offset-dependent (integrator decision,
+                                   # docs/handoff/integrator.md; lock_slope stays selectable with --set)
+  heater_pwm_ripple: "off"
+  plasma_dispersion: nedeljkovic2011
+
+sim:
+  dt_plant_s: 1.0e-6                 # 07 P0-1 item 3 keeps 1 us (implicit self-heating solve)
+  substep_policy: fixed
+  reset_protocol: laser_ramp         # 07 P0-1 item 6
+  # 07 P0-1 item 6: lasers ramp over >= 10 tau_slow. tau_slow x time_scale_slow is at most 2 x 45.7 us (undercut
+  # family) in the drawn worlds and 300 us in the textbook corner (time scales pinned at 1), so 3 ms covers every
+  # preset (the textbook family with a drawn x2 slow scale would need 6 ms). MODEL choice.
+  reset_ramp_s: 3.0e-3
+
+channel_plan:
+  center_thz:
+    value: 228.749
+    provenance: inferred
+    generation: G26
+    source: LM26-P
+    textbook: REF.lambdaNm
+    note: >-
+      Printed: two sets of 8 lines on a 400 GHz grid, centred at 1310 nm (c/1310 nm = 228.849 THz), offset by 200 GHz.
+      So each direction's set sits 100 GHz from the composite centre; which set is TX is not printed (assumed: the
+      lower one). Lines 227.349-230.149 THz = 1318.6-1302.6 nm.
+  spacing_ghz: {value: 400.0, provenance: printed, generation: G26, source: LM26-P, textbook: REF.perDirectionGridGHz,
+                note: "spacing seen by one ring bank (the composite fibre grid is 200 GHz)"}
+  n_lines: {value: 8, provenance: printed, generation: G26, source: LM26-P, textbook: REF.nChannels}
+  ring_to_line: {value: [0, 1, 2, 3, 4, 5, 6, 7], provenance: assumed, generation: none, source: MODEL,
+                 note: "identity assignment (07 P1-12: the controller may remap through tx.assignment)"}
+
+laser:
+  power_per_line_dbm:
+    value: 10.0
+    provenance: printed
+    generation: G26
+    source: QDSOA
+    range: [8.0, 11.0]
+    textbook: REF.laserPerLambdaDbmM1000
+    disagrees: "the textbook's 14 dBm per line for M1000 was not found in any public source (01 D16); the G26 hardware budget prints 10 dBm/line into the TX, and 100 mW/fibre over 16 lines is 8 dBm"
+    note: "at the laser-module output (07 P0-1 item 4); the power at the first ring is this minus optical_path.chip_input_loss_db"
+    alternatives:
+      guide_16_lines: {value: 8.0, provenance: inferred, generation: Guide, source: HC, note: "100 mW per fibre shared by 16 lines"}
+  line_offset_ghz:
+    value: 0.0
+    provenance: assumed
+    generation: G26
+    source: MODEL
+    range: [-20.0, 20.0]
+    textbook: REF.laserAccuracyGhz
+    note: "static error of each line from the grid; the spread is variation.laser.line_offset_ghz; +-20 GHz is the printed requirement (LM26-P section 4)"
+  rin_db_per_hz:
+    value: -145.0
+    provenance: assumed
+    generation: none
+    source: MODEL
+    range: [-155.0, -135.0]
+    note: "no Lightmatter or Guide RIN is published; a typical DFB value, unknown (inventory F)"
+  linewidth_mhz:
+    value: 1.0
+    provenance: printed
+    generation: Guide
+    source: WPW
+    range: [0.1, 1.0]
+    textbook: REF.laserLinewidthMhz
+    note: "ELS linewidth <= 1 MHz (WPW, a requirement); the textbook lists 0.5 MHz measured"
+    alternatives:
+      measured: {value: 0.5, provenance: printed, generation: Guide, source: textbook-REF}
+  tune:
+    present: false
+
+optical_path:
+  chip_input_loss_db:
+    value: 6.0
+    provenance: inferred
+    generation: G25
+    source: LM-P
+    range: [2.0, 10.0]
+    textbook: REF.inputPowerDbm
+    note: "chosen so that the G26 10 dBm per line gives the G25 '~4 dBm' input at the ring (LM-P section 3.2); the uncertainty spans 0 to +8 dBm at the ring (07 4.8)"
+  bus_loss_db_per_mm:
+    value: 0.073
+    provenance: printed
+    generation: GF
+    source: GF-BIAN
+    range: [0.073, 0.1]
+    note: "GF 45SPCLO SOI rib 0.73 dB/cm (ridge 1.0 dB/cm)"
+  ring_spacing_on_bus_um: {value: 50.0, provenance: assumed, generation: none, source: MODEL,
+                           note: "equal to layout.ring_pitch_um (unpublished)"}
+
+ring:
+  geometry:
+    radius_um:
+      value: null
+      provenance: derived
+      textbook: REF.radiusUm
+      note: "R3: r_ref = c/(2 pi n_g FSR), about 6.6 um for window B at n_g 4.0; the printed '~15 um diameter' (LM26-S, HC) fits 1.8 THz only if it is an outer dimension (01 section 4.4)"
+    width_nm: {value: 400.0, provenance: assumed, generation: none, source: SMTAI, range: [360.0, 450.0],
+               note: "rib width at mid-height: the SMTAI render (400) and the BU 45CLO rib (410); informational (sets the artefact)",
+               alternatives: {strip400x200: {value: 400.0, provenance: printed, source: SMTAI}}}
+    film_nm:
+      value: 160.0
+      provenance: printed
+      generation: GF
+      source: GF-IMAPS
+      range: [150.0, 210.0]
+      textbook: REF.waveguideLmNm
+      disagrees: "the textbook uses the 400 x 200 nm SMTAI render; GF 45SPCLO prints a 160 nm photonics film and G25 is printed as 45SPCLO (01 D1, 07 D21); 200 nm stays a hypothesis"
+      alternatives:
+        strip400x200: {value: 200.0, provenance: printed, generation: none, source: SMTAI}
+    slab_nm:
+      value: 60.0
+      provenance: assumed
+      generation: none
+      source: MODEL
+      range: [0.0, 100.0]
+      note: "partial-etch depth is not public; 60 nm on 160 nm (slab/film 0.375, typical foundry ribs; mrm.extraction.common XSECS rib160)"
+      alternatives:
+        strip400x200: {value: 0.0, provenance: printed, generation: none, source: SMTAI}
+    xsec: rib160
+    jacobian:
+      value: {from: "extracted/modes_rib160.json:jacobian"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      note: "d(lambda_res, n_eff, n_g, dlambda/dT, alpha_rad)/d(width, film[, slab]) at fixed r_ref and order (07 P1-16)"
+      alternatives:
+        fallback:
+          value:
+            d: [width_nm, film_nm]
+            of:
+              lambda_res_nm_per_nm: [0.652, 1.19]
+              n_eff_per_nm: [0.00216, 0.00395]
+              n_g_per_nm: [-0.00236, 0.00058]
+              dlambda_dt_pm_per_k_per_nm: [0.026, 0.038]
+          provenance: inferred
+          generation: none
+          source: X-MODES
+          note: "the 400 x 200 nm strip Jacobian (modes_strip400x200.json) applied to the 160 nm rib until modes_rib160 exists"
+        strip400x200: {from: "extracted/modes_strip400x200.json:jacobian", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+  optics:
+    resonance_offset_nm:
+      value: 7.6
+      provenance: inferred
+      generation: G25
+      source: LM-T
+      range: [5.0, 10.0]
+      textbook: REF.blueBiasMeasuredNm
+      note: "cold-cavity blue offset of each ring from its own line: 1309.5 nm line minus the 1301.90 nm resonance at 0 V heater (CAL-7; G25 read-off 1301.89 nm, 01 section 2.2); a scalar means every ring is designed 7.6 nm blue of its line (designed stagger)"
+    resonance_offset_ref_temp_c: {value: 25.0, provenance: assumed, generation: G25, source: D07,
+                                  note: "the G25 sweep temperature is not printed (BND-2 caveat); 25 degC is the wafer-map temperature"}
+    resonance_offset_ref_bias_v: {value: 0.0, provenance: printed, generation: G25, source: LM-T,
+                                  note: "the G25 heater sweep was taken at 0 V junction bias"}
+    n_eff:
+      value: {from: "extracted/modes_rib160.json:n_eff"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      range: [2.2, 2.7]
+      textbook: REF.neff
+      note: "bent-mode n_eff at r_ref, 1310 nm, 25 degC; R3 absorbs the order rounding in n_eff (|correction| < lambda/(2L))"
+      alternatives:
+        fallback: {value: 2.40, provenance: inferred, generation: none, source: R01, note: "400 x 160 nm strip FD 2.36 (01 section 2.2) plus a slab"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:n_eff", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+    n_g:
+      value: {from: "extracted/modes_rib160.json:n_g"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      range: [3.8, 4.4]
+      textbook: REF.ng
+      note: "group index of the bent mode at 1310 nm, 25 degC; with the FSR hypothesis it sets the radius (R3)"
+      disagrees: "4.2 is assumed in the textbook and leans high for a 160 nm film (01 REF check: BU 45CLO rib 3.91-3.98, 400 x 160 strip 4.04-4.07)"
+      alternatives:
+        fallback: {value: 4.0, provenance: inferred, generation: none, source: BU-45CLO, note: "between the BU 45CLO rib ring (3.91-3.98, inferred from its FSR) and the 400 x 160 nm strip FD (4.07, 01)"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:n_g", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+    dn_g_dlambda_per_nm:
+      value: {from: "extracted/modes_rib160.json:dn_g_dlambda_per_nm"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      note: "group-index dispersion of the bent mode (n_g at each line)"
+      alternatives:
+        fallback: {value: 1.4e-4, provenance: inferred, generation: none, source: X-MODES, note: "value of the 400 x 200 nm strip artefact"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:dn_g_dlambda_per_nm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+    fsr_thz:
+      value: 1.8
+      provenance: printed
+      generation: G25
+      source: LM-P
+      range: [1.4, 1.9]
+      textbook: REF.fsrTHz
+      disagrees: "the textbook's measured bound FSR >= 14.1 nm is unsupported: the G25 traces are ~1 nm windows (01 D2, 07 D17)"
+      note: "G25 design target (never measured); window B of 07 P1-6 = 1.72-1.88 THz; the patent claims FSR < 11.44 nm (PAT-4). The range spans every FSR hypothesis"
+      alternatives:
+        window_a: {value: 1.47, provenance: inferred, generation: none, source: VAL-TARGETS, note: "07 window A (1.32-1.48 THz) restricted to 1.46-1.48 THz: its interior puts a second order within 2 FWHM of a TX line (validation_targets review, BND-1)"}
+        g25_cluster: {value: 1.53, provenance: read-off, generation: G25, source: R06, note: "stress: 8.7-8.8 nm from the wafer maps and the 15 um diameter (06 O8); next order 1.0-1.3 FWHM from another lane"}
+        pdk_size: {value: 1.60, provenance: inferred, generation: GF, source: GF-ECIO, note: "stress: R = 7.5 um (GF PDK, '~15 um diameter') at n_g 3.9-4.04; next order on a line (BND-1)"}
+        window_b_low: {value: 1.72, provenance: inferred, generation: none, source: D07, note: "edge of window B (exactly 2 FWHM, BND-1)"}
+        window_b_high: {value: 1.88, provenance: inferred, generation: none, source: D07}
+    q_loaded:
+      value: 3850
+      provenance: inferred
+      generation: G25
+      source: LM-T
+      range: [2600, 4200]
+      textbook: REF.Q
+      disagrees: "the textbook uses the printed 3500 (talk) and lists the linewidth read-off 3900-4200 separately; we take the CAL-1 interval 3500-4200 with its midpoint as nominal (07 4.3, 4.8)"
+      note: "anchor of R4 (q_through is derived); CAL-1 calibrates it; the coupling agent uses the same 3850 (coupling.Q_L_NOMINAL). Plausible 3500-4200 (the uncertainty interval); the range reaches the 2600 stress corner"
+      alternatives:
+        talk: {value: 3500, provenance: printed, source: LM-T}
+        linewidth_low: {value: 3900, provenance: read-off, source: LM-T}
+        linewidth_high: {value: 4200, provenance: read-off, source: LM-T}
+        low_q: {value: 2600, provenance: assumed, source: R06, note: "stress corner (06 O6)"}
+    kappa_d_over_kappa:
+      value: 0.007
+      provenance: inferred
+      generation: G26
+      source: D07
+      range: [0.004, 0.18]
+      note: >-
+        drop decay rate over total (q_drop = q_loaded/x). 0.7 % is the log-centre of the [PHY] back-calculation 0.4-1.2 %
+        from the ~15.5 uA G26 monitor current (07 D7; LM26-P Fig. 3b). In this preset's nominal world (+4 dBm at the
+        ring, 0.95 A/W, the 27.9 dB G25 notch) it gives a drop peak of 0.0134 x P_in = 32 uA and 16 uA at a half-maximum
+        lock (CAL-8 15-16 uA); a max-slope lock would need 0.45 %, a peak lock 0.34 %. (1 % would put the drop peak at
+        46 uA, above the 40 uA ADC full scale.) The GF PDK '~5 % drop coupling' reading gives ~18 % (07 P1-9). Only the
+        lumped monitor gain is calibrated (CAL-8); uncertainty.monitor.gain_scale carries the rest
+      alternatives:
+        phy_low: {value: 0.004, provenance: inferred, source: D07, note: "low end of the [PHY] back-calculation (07 D7)"}
+        phy_high: {value: 0.012, provenance: inferred, source: D07, note: "high end of the [PHY] back-calculation (07 D7)"}
+        gf_pdk: {value: 0.18, provenance: inferred, generation: GF, source: GF-ECIO, note: "5 % per-pass drop coupling on a near-critical ring. The drop decay then removes ~18 % of the energy, so the 27.9 dB G25 notch at Q_L 3850 needs Q_i ~12,000 (alpha_i ~70 dB/cm): selecting this alone gives an ~8.3 dB notch; rebalance the loss budget with it"}
+        coupling_design: {value: 0.03, provenance: assumed, generation: none, source: X-COUPLING, note: "log-centre of the prior used for the coupling artefact's design drop gap (mrm.extraction.coupling KD_OVER_K_NOMINAL); rebalance the loss budget with it (the notch moves)"}
+    dln_kappa2_through_dlambda_per_nm:
+      value: {from: "extracted/coupling_rib160.json:through.dln_kappa2_dlambda_per_nm"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-COUPLING
+      textbook: REF.erVsHeaterV
+      disagrees: "the textbook interpolates the notch depth against heater voltage; under lock the heater moves while the resonance stays at the line, so the extinction is modelled from the coupler dispersion at each line and loss against temperature (06 O5, 07 P1-5)"
+      note: "through-coupler dispersion at the design gap, evaluated at each line (07 P1-5). Do not use the 1.48 %/nm fit of 03: it used the held-out VAL-2 points (validation_targets contamination warning)"
+      alternatives:
+        fallback: {value: 0.014, provenance: inferred, generation: none, source: R05, note: "femwell coupled strips 1.3-1.5 %/nm (05 t02, 07 P1-5)"}
+    dln_kappa2_drop_dlambda_per_nm:
+      value: {from: "extracted/coupling_rib160.json:drop.dln_kappa2_dlambda_per_nm"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-COUPLING
+      note: "drop coupler at its own larger gap (07 P1-9): sets the monitor-gain slope across the comb"
+      alternatives:
+        fallback: {value: 0.015, provenance: inferred, generation: none, source: R05, note: "same femwell range; a larger gap is slightly more dispersive"}
+    dln_alpha_dt_ring_per_k:
+      value: 0.0
+      provenance: assumed
+      generation: none
+      source: D07
+      range: [0.0, 0.005]
+      note: "loss change with ring temperature; 0 under the dispersion ER mechanism (07 P1-5)"
+      alternatives:
+        ring_t_loss: {value: 2.0e-3, provenance: inferred, generation: G25, source: R01, note: "with the solver dispersion and an under-coupled start, makes the G25 notch fall from 27.9 dB (0 V) to ~20 dB at 1.2 V (CAL-2 points only, ring +~128 K); not fitted on VAL-2"}
+    dln_alpha_dt_heater_per_k:
+      value: 0.0
+      provenance: assumed
+      generation: none
+      source: D07
+      range: [0.0, 0.005]
+      note: "loss change with heater temperature (heater doping overlapping the mode); the only mechanism with closed-loop ER drift (BND-4 bounds it)"
+      alternatives:
+        heater_t_loss: {value: 1.6e-3, provenance: inferred, generation: G25, source: R01, note: "the ring_t_loss value scaled by the heater/ring temperature-rise ratio (~1.25): same G25 notch at 1.2 V"}
+    loss_budget:
+      alpha_fca_db_per_cm:
+        value: 80.0
+        provenance: inferred
+        generation: none
+        source: NSM11
+        range: [15.0, 135.0]
+        textbook: "Ch17 eq. 17.7 eta_abs (0.3, assumed)"
+        disagrees: "the textbook assumes an absorbed fraction of 0.3 (Ch10, Ch17 eq. 17.7); 07 D1/P0-2 derive eta ~0.85 from this budget"
+        note: "junction free-carrier absorption at 0 V: NSM 2011 gives 1948 /m = 84.6 dB/cm for 2e18/2e18 cm^-3 at full overlap (mrm.materials), 8.7-31 /cm for 1e18-3e18 (03 section 6.2). The junction artefact will report the absolute alpha_FCA (07 P0-2). The eta_* alternatives keep alpha_fca + alpha_scatter = 96 dB/cm, so alpha_i (and Q_i, the notch and the coupling regime) is the same in every eta world"
+        alternatives:
+          eta_0p5: {value: 41.13, provenance: assumed, source: D07, note: "eta = 0.5 at the same alpha_i 111.74 dB/cm (07 D1 low end)"}
+          eta_0p65: {value: 57.89, provenance: assumed, source: D07, note: "eta = 0.65 at the same alpha_i"}
+          eta_0p75: {value: 69.07, provenance: assumed, source: D07, note: "eta = 0.75 at the same alpha_i"}
+          eta_0p95: {value: 91.41, provenance: assumed, source: D07, note: "eta = 0.95 at the same alpha_i"}
+          eta_0p3: {value: 18.78, provenance: assumed, source: D07, note: "eta = 0.3 stress corner (textbook value, 07 D1)"}
+      alpha_other_abs_db_per_cm:
+        value: 14.74
+        provenance: assumed
+        generation: none
+        source: D07
+        range: [0.0, 30.0]
+        note: "heat-producing loss besides the junction: in-ring heater doping and contacts overlapping the mode, surface states. 14.74 sets alpha_i = 111.74 dB/cm (Q_i 7503 at 1301.9 nm, n_g 4.0) so the exact G25 ring at Q_L 3850 and kappa_d/kappa 0.007 is under-coupled with the CAL-2 27.9 dB notch at 0 V"
+        alternatives:
+          over: {value: 5.97, provenance: inferred, source: D07, note: "lowers alpha_i to 102.97 dB/cm (Q_i 8142) so the exact G25 ring is over-coupled with the same 27.9 dB notch at Q_L 3850 (07 P1-5)"}
+      alpha_scatter_db_per_cm:
+        value: 16.0
+        provenance: assumed
+        generation: none
+        source: D07
+        range: [2.0, 80.0]
+        note: "non-heating loss: bend-enhanced sidewall scattering (straight rib 0.73 dB/cm, GF-BIAN) plus coupler excess loss (~1 % per pass is ~11 dB/cm equivalent at L ~ 41 um)"
+        alternatives:
+          eta_0p5: {value: 54.87, provenance: assumed, source: D07}
+          eta_0p65: {value: 38.11, provenance: assumed, source: D07}
+          eta_0p75: {value: 26.93, provenance: assumed, source: D07}
+          eta_0p95: {value: 4.59, provenance: assumed, source: D07}
+          eta_0p3: {value: 77.22, provenance: assumed, source: D07}
+      alpha_bend_radiation_db_per_cm:
+        value: {from: "extracted/modes_rib160.json:alpha_rad_db_per_cm"}
+        provenance: solver(assumed-geometry)
+        generation: none
+        source: X-MODES
+        note: "bend and slab radiation at r_ref (07 P0-2). If the rib solve gives more than ~5 dB/cm, rebalance alpha_scatter so alpha_i stays ~112 dB/cm (Q_i fixed by Q_L and the notch)"
+        alternatives:
+          fallback: {value: 1.0, provenance: assumed, generation: none, source: X-MODES, note: "strip bends radiate ~1e-13 dB/cm at r_ref (modes_strip400x200) and 2e-4 dB/cm at 7.5 um (05 t01); the 60 nm slab may leak more"}
+          strip400x200: {from: "extracted/modes_strip400x200.json:alpha_rad_db_per_cm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+          strip400x200_q_anchor:
+            value: 10.37
+            provenance: inferred
+            generation: G25
+            source: LM-T
+            note: >-
+              selected by uncertainty.film_thickness '200'. The measured G25 Q_L and 0 V notch (CAL-1, CAL-2) pin Q_i,
+              not alpha_i, and Q_i = 2 pi n_g/(lambda alpha_i): with the strip's n_g 4.349 the budget must total
+              (96 + other + 1) x 4.349/4.0 dB/cm to keep Q_i. The strip's own radiation is ~1e-13 dB/cm, so this term is
+              the strip radiation plus the non-heating loss that keeps Q_i (10.75 dB/cm for under, 9.99 for over; 10.37
+              splits the difference: notch 27.9 +- 0.7 dB in both regimes). Which component carries it is unknown; a
+              non-heating term lowers eta by 0.92x in the 200 nm worlds. Recompute when n_g of modes_rib160 or
+              modes_rib200 lands: (97 + other) x n_g,200/n_g,160 - 96 - other
+    heat_fraction: {value: null, provenance: derived, note: "eta = (fca + other)/alpha_i = 0.848 nominal (07 D1: ~0.85; range 0.5-0.95 by uncertainty.self_heating.eta)"}
+    q_intrinsic: {value: null, provenance: derived, note: "R4_loss_budget: Q_i = 2 pi n_g/(lambda alpha_i) ~ 7500 at the G25 line (near-critical, 07 D1)"}
+    q_through: {value: null, provenance: derived, note: "R4_q: 1/Q_t = 1/Q_L - 1/Q_i - 1/Q_d; the through-gap Jacobian cannot move it (anchor choice, params_machinery handoff 3)"}
+    q_drop: {value: null, provenance: derived, note: "R4_q: Q_d = Q_L / kappa_d_over_kappa"}
+    index_weight_oxide:
+      value: 0.25
+      provenance: inferred
+      generation: none
+      source: R06
+      range: [0.1, 0.4]
+      textbook: REF.confinement
+      disagrees: "the textbook weights Si and oxide by 0.85 and 0.15 (summing to 1); 0.85 is the Poynting power fraction, while the exact index weights are 1.04-1.09 for Si and 0.12-0.23 for the oxide (06 T2)"
+      note: "dn_eff/dn_SiO2 (BOX + cladding): 0.234 for the 400 x 200 strip (06, modes_strip400x200 box 0.068 + clad 0.167); a thinner film raises it. Diagnostic only (implied_index_weight). The modes artefact stores box and clad separately, so this is not a from-form"
+    alpha_l_per_k: {value: 2.55e-6, provenance: literature, generation: none, source: OKA84,
+                    note: "Si expansion at 298 K, substrate-clamped (mrm.materials.alpha_l_si_per_k = 2.553e-6)"}
+    alpha_l_slope_per_k2: {value: 8.4e-9, provenance: literature, generation: none, source: OKA84,
+                           note: "d alpha_L/dT at 298 K (mrm.materials: 8.42e-9 /K^2)"}
+    backscatter_splitting_ghz:
+      value: 7.0
+      provenance: inferred
+      generation: none
+      source: BAH18
+      range: [1.0, 10.0]
+      note: "CW/CCW splitting 2|beta|/2pi: r_bs = 0.0124 per round trip (AIM ring, Bahadori 2018) gives ~7 GHz at FSR 1.8 THz (03 key finding 7); 07 P2-2 range 1-10 GHz. Used only with fidelity.backscatter on"
+    backscatter_orders: 5
+    tcmt_orders: 3
+  thermal:
+    dlambda_dt_pm_per_k:
+      value: {from: "extracted/modes_rib160.json:dlambda_dt_pm_per_k", at: {t_c: 25.0}}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      range: [50.0, 90.0]
+      textbook: REF.dLambdaDT_pmK
+      disagrees: "the textbook's design value is the printed ~15 GHz/degC = 86 pm/K, an aside in the G26 introduction above the materials ceiling (71 pm/K at 300 K); 07 D2 makes the solver value the default and 86 the H86 hypothesis. Its derived 50 pm/K used the power fraction instead of the index weight (06 T3)"
+      note: "H_solver: s0 = (lambda/n_g)(dn_eff/dT + n_eff alpha_L) of the bent mode at 25 degC (07 D2, P0-3); select other hypotheses through uncertainty.thermo_optic"
+      alternatives:
+        fallback: {value: 66.0, provenance: inferred, generation: none, source: R06, note: "400 x 160 nm strip ~64 pm/K thermo-optic at 1.94e-4 /K (01 verification 1) + ~2 pm/K expansion; 06 FEM 66-69 pm/K for 200-220 nm strips and ribs"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:dlambda_dt_pm_per_k", at: {t_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        H86: {value: 86.0, provenance: printed, generation: G26, source: LM26-P, note: "~15 GHz/degC, introduction aside; a constant at the ring (07 D2)"}
+        bench: {value: 62.5, provenance: inferred, generation: G26, source: SIB, note: "50 nm/s / 800 degC/s (Lightmatter bench equivalence)"}
+        imec: {value: 62.54, provenance: literature, generation: none, source: CO24-JOM, note: "printed for imec O-band rings, method not stated (04 V9)"}
+        ocp: {value: 80.0, provenance: printed, generation: OCP, source: OCP}
+        textbook_derived: {value: 50.0, provenance: assumed, generation: none, source: textbook-REF, note: "refuted: the power fraction 0.85 in place of the index weight 1.086 (06 T3); kept for comparison only"}
+    dlambda_dt_ref_ring_temp_c: {value: 25.0, provenance: inferred, generation: none, source: X-MODES,
+                                 note: "T0 of s0: the at: of dlambda_dt_pm_per_k (the modes artefact t_ref)"}
+    dlambda_dt_beta_per_k:
+      value: {from: "extracted/modes_rib160.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-MODES
+      range: [0.0, 0.002]
+      textbook: REF.dnSi_dT
+      disagrees: "the textbook holds dn_Si/dT at the C-band 300 K value 1.86e-4 /K; at 1310 nm it is 1.94e-4 /K at 300 K and rises ~14 % per 100 K (06 T6, 02 headline 1)"
+      note: "beta of s(T) = s0 (1 + beta (T - T0)), quadratic fit of the solver table"
+      alternatives:
+        fallback: {value: 1.4e-3, provenance: inferred, generation: none, source: R06, note: "Si dn/dT +14 %/100 K (Souza 2018 via 06 section 2.6), 07 P0-3"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        const: {value: 0.0, provenance: printed, generation: G26, source: LM26-P, note: "H86 is a constant at the ring"}
+    z_heater_ring_k_per_mw: {value: null, provenance: derived, textbook: REF.RthKPerMw,
+                             note: "R2 fsr_integral: dT_FSR/P_FSR with the integral of s(T) over the sweep from p_fsr_ref_temp_c equal to one FSR (5.58 K/mW at the G25 line; lock_slope gives 5.33); the textbook's 4.7 K/mW = 0.405 nm/mW / 86 pm/K"}
+    z_ratio_opt_heater:
+      value: 1.76
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-THERMAL
+      range: [1.0, 2.0]
+      textbook: "Ch17 eq. 17.9a (one K for heater and absorbed power)"
+      disagrees: "the textbook heats the ring with the heater's R_th for absorbed light too (ratio 1, Ch17 eq. 17.9a); by reciprocity Z_opt >= Z_heater for a heater outside the mode (06 H2)"
+      note: "Z_opt->ring/Z_heater->ring of the FEM ROM for the in-ring family, 160 nm film (thermal_rom_inring_noundercut_160.json summary.z_ratio_opt_heater = 1.762); 07 4.8 interval 1-2"
+    reference_rise_frac:
+      value: 1.0
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "1: Lightmatter's degC are ring degC. H86_sensor (07 D2) reads them at a node that sees 0.77-0.86 of the ring's rise"
+      alternatives:
+        sensor: {value: 0.8, provenance: inferred, generation: G26, source: R06, note: "s_solver/86 pm/K = 66-74/86 = 0.77-0.86 over 25-105 degC (06 section 2.7)"}
+    family: inring_noundercut          # 07 P1-3 default; "heater and PN inside the ring" (LM26-S slide 7 schematic)
+    stack: side_by_side                # 07 P1-3: G26 SerDes beside the PIC
+    scaling_hypothesis: resistance     # 07 P1-2: tau scales with its residue (tau = RC)
+    xt_tau_law: capped                 # plant_thermal handoff 6.1: the literal 07 law is not monotone
+    crosstalk_dynamics: imec
+    tau_fast_s:
+      value: 3.18e-6
+      provenance: literature
+      generation: none
+      source: CO22-TCPMT
+      range: [1.0e-6, 3.0e-5]
+      textbook: REF.tauThUs
+      disagrees: "the textbook assumes 10 us + 300 us (25 %) with no source; the only measured-calibrated multi-pole set is imec's 3.2 us (43 %) + 13.0 us (57 %) (07 D22). Its 63 % point is 7.3 us (04 V5), close to the textbook's 10 us"
+      note: "interim self path, fast pole (07 P1-2): imec FE fit calibrated on measurement, metal heater above, no undercut; tau = R x C of Table I"
+      alternatives:
+        undercut: {value: 6.08e-6, provenance: inferred, source: CO22-TCPMT, note: "2-pole fit (1.2 % max error) of the imec undercut 4-pole set 2.51/25.6/54.5/124 us; t63 38.7 us vs 37.7 us"}
+        textbook: {value: 1.0e-5, provenance: assumed, source: textbook-REF}
+    share_fast_frac:
+      value: 0.4057
+      provenance: literature
+      generation: none
+      source: CO22-TCPMT
+      range: [0.1, 0.8]
+      textbook: REF.slowShare
+      note: "0.427 x (1 - tail share 0.05): keeps imec's 42.7:57.3 split of the self path (plant_thermal handoff 6.3)"
+      alternatives:
+        undercut: {value: 0.1348, provenance: inferred, source: CO22-TCPMT, note: "0.1419 x 0.95"}
+        textbook: {value: 0.75, provenance: assumed, source: textbook-REF}
+    tau_slow_s:
+      value: 1.301e-5
+      provenance: literature
+      generation: none
+      source: CO22-TCPMT
+      range: [5.0e-6, 3.0e-4]
+      textbook: REF.tauSlowUs
+      alternatives:
+        undercut: {value: 4.567e-5, provenance: inferred, source: CO22-TCPMT}
+        textbook: {value: 3.0e-4, provenance: assumed, source: textbook-REF}
+    tail_tau_s:
+      value: 3.0e-3
+      provenance: assumed
+      generation: none
+      source: R04
+      range: [1.0e-3, 1.0e-2]
+      note: "die and package tail (07 P1-2: 1-10 ms carrying 2-10 %); circuit-level start-up ~4 ms (CO22-TCPMT)"
+    tail_share_frac:
+      value: 0.05
+      provenance: assumed
+      generation: none
+      source: R04
+      range: [0.0, 0.1]
+      alternatives:
+        textbook: {value: 0.0, provenance: assumed, source: textbook-REF, note: "the textbook network has no package tail"}
+    selfheat_tau_s:
+      value: 4.0e-7
+      provenance: literature
+      generation: none
+      source: DEC19
+      range: [5.0e-8, 1.0e-6]
+      note: "waveguide-core self-heating pole (07 P0-1 item 3): de Cea 2019 0.42-0.5 us; the in-ring FEM ROM puts 65 % of Z_opt below 1 us (t63 1.7 us). Share = (z - 1)/z (plant_thermal 6.5)"
+    heater_self_ratio:
+      value: 1.158
+      provenance: inferred
+      generation: G25
+      source: textbook-REF
+      range: [1.0, 4.0]
+      textbook: REF.heaterSelfHeatPerMw
+      note: "R_th,H/Z_heater->ring chosen so y = TCR R_th,H stays at the G25 droop fit 0.00904 /mW (textbook heaterSelfHeatPerMw, CAL-4) for TCR 1.4e-3 and the nominal Z = 5.576 K/mW (R2 fsr_integral at the G25 line; 1.21 under lock_slope, Z 5.33); the FEM in-ring ROM gives 2.65 (with that TCR it would double the droop). LIMITATION: the interim model takes a RATIO, so y follows Z across worlds although the measured droop does not: y = 0.0075 /mW under fsr window_a (Z 4.63), 0.0076 under H86 (Z 4.70), 0.0078 under g25_cluster (Z 4.80); an absolute R_th,H key would hold it (handoff)"
+      alternatives:
+        tin: {value: 3.243, provenance: inferred, source: textbook-REF, note: "same y with a TiN heater (TCR 0.5e-3)"}
+        silicide: {value: 1.0, provenance: inferred, source: textbook-REF, note: "lower bound: R_th,H >= Z; with TCR 2e-3 y is 0.0112 /mW, 23 % above the droop fit (a silicide heater is in tension with the G25 droop, 06 E1)"}
+        textbook: {value: 1.621, provenance: inferred, source: textbook-REF, note: "same y with the textbook's TCR 1e-3"}
+    heater_node_tau_s:
+      value: 1.5e-6
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-THERMAL
+      range: [5.0e-7, 2.0e-5]
+      note: "heater-resistor observer pole: t63 of heater->heater_resistor in the in-ring FEM ROM (1.47 us)"
+      alternatives:
+        metal: {value: 5.0e-6, provenance: literature, source: CO22-JLT, note: "imec W heater node, measured"}
+        undercut: {value: 1.81e-5, provenance: literature, source: CO22-JLT, note: "imec heater node with full undercut (simulated)"}
+    xt_nearest_frac:
+      value: 0.03
+      provenance: literature
+      generation: none
+      source: CO24-JOM
+      range: [0.01, 0.1]
+      textbook: REF.crosstalkNearest
+      disagrees: "the textbook assumes 10 % to the nearest and 3 % to the next ring with the self-path dynamics; imec measures 1.3-2.6 % out to 300 um arriving with 4-9 ms poles (07 D22, 04 X1-X2); 10 % stays as the pessimistic corner"
+      note: "fraction of the self DC (07 P1-2); 1.0 % at 50 um in the in-ring FEM ROM"
+      alternatives:
+        stacked_eic: {value: 0.0432, provenance: literature, source: CO24-JOM, note: "+44 % with an EIC stacked on the PIC (simulated, 04 V8)"}
+        textbook: {value: 0.1, provenance: assumed, source: textbook-REF}
+    xt_next_frac:
+      value: 0.015
+      provenance: literature
+      generation: none
+      source: CO24-JOM
+      range: [0.005, 0.03]
+      textbook: REF.crosstalkNext
+      note: "second rank of neighbours: the floor value (imec 'quasi-constant beyond ~200 um')"
+      alternatives:
+        stacked_eic: {value: 0.0216, provenance: literature, source: CO24-JOM}
+        textbook: {value: 0.03, provenance: assumed, source: textbook-REF}
+    xt_floor_frac:
+      value: 0.015
+      provenance: literature
+      generation: none
+      source: CO24-JOM
+      range: [0.0, 0.026]
+      note: "every other ring: imec 1.3-2.6 % at 100-300 um with an EIC, quasi-constant beyond 200 um (04 X1)"
+      alternatives:
+        stacked_eic: {value: 0.0216, provenance: literature, source: CO24-JOM}
+        textbook: {value: 0.0, provenance: assumed, source: textbook-REF, note: "the textbook couples only the nearest two"}
+    xt_tau_ref_s:
+      value: 4.1e-3
+      provenance: literature
+      generation: none
+      source: CO22-TCPMT
+      range: [1.0e-5, 1.0e-2]
+      note: "tau_xt = max(min, ref (d/dist_ref)^2), capped by the printed X2 table beyond (07 P1-2, plant_thermal 6.1)"
+      alternatives:
+        textbook: {value: 2.5e-5, provenance: assumed, source: textbook-REF, note: "stands in for the textbook's 'same dynamics as the self path' (10 us 75 % + 300 us 25 %) with one 25 us pole: the minimax single pole (within 0.16 of the DC at every time), and it keeps the 07 P0-1 lag bound at dt = 1 us with margin (max 0.044 over 5 x 512 sampled worlds; a 20 us pole reached 0.050 and failed realize, a 10 us pole 0.08; crosstalk_dynamics self is a global setting a corner cannot select, see handoff)"}
+    xt_dist_ref_um:
+      value: 60.0
+      provenance: literature
+      generation: none
+      source: CO22-TCPMT
+      alternatives:
+        textbook: {value: 1000.0, provenance: assumed, source: textbook-REF, note: "puts every pair on the 25 us floor"}
+    xt_tau_min_s:
+      value: 1.0e-4
+      provenance: inferred
+      generation: none
+      source: R04
+      range: [1.0e-5, 3.0e-4]
+      note: "0.1-0.3 ms at 15 um from the d^2 law (04 section 2.4)"
+      alternatives:
+        textbook: {value: 2.5e-5, provenance: assumed, source: textbook-REF, note: "see xt_tau_ref_s textbook"}
+    site_ref_um: {value: 60.0, provenance: assumed, generation: none, source: R04,
+                  note: "interim site coupling equals xt_nearest_frac at 60 um (plant_thermal default); placeholders until the FEM site residues are used"}
+    pd_offset_um: {value: [0.0, 25.0], provenance: assumed, generation: none, source: MODEL,
+                   note: "monitor PD 25 um from the ring centre (FEM ROM site offset); unpublished"}
+    temp_sensor_offset_um: {value: [40.0, 0.0], provenance: assumed, generation: none, source: MODEL}
+    driver_offset_um: {value: [0.0, -30.0], provenance: assumed, generation: none, source: MODEL,
+                       note: "monolithic driver next to each ring (LM26-P: monolithically integrated CMOS drivers); position unpublished"}
+  heater:
+    p_fsr_mw:
+      value: 25.45
+      provenance: printed
+      generation: G25
+      source: LM-T
+      range: [24.9, 37.0]
+      textbook: REF.heaterPFsrMw
+      note: "60-die wafer median at 25 degC, range 24.9-34.1 mW (CAL-3; 07 D16 anchor); printed per die on the talk, not re-checked (01 section 5). Implies 0.405 nm/mW at 10.3 nm; the printed 0.44 nm/mW implies FSR 11.2 nm (a closure check). The range reaches the stacked-EIC hypothesis"
+      alternatives:
+        stacked_eic: {value: 36.9, provenance: inferred, generation: M1000, source: CO24-JOM, note: "25.45/(1 - 0.31): imec measured 20.6-42.4 % efficiency loss with an EIC on top (04 V8)"}
+    p_fsr_ref_temp_c: {value: 25.0, provenance: printed, generation: G25, source: LM-T,
+                       note: "used only by fidelity.heater_anchor fsr_integral"}
+    r_cold_ohm:
+      value: 45.41
+      provenance: inferred
+      generation: G25
+      source: textbook-REF
+      range: [42.0, 58.0]
+      textbook: REF.heaterOhm
+      note: "cold resistance at 25 degC: the hot 55.9 ohm at 1.195 V (21.4 mA, wafer maps) divided by 1 + y P with y = 0.00904 /mW (textbook HEATER_OHM_COLD); 60-die hot range 52.8-70.5 ohm"
+    r_ref_temp_c: {value: 25.0, provenance: printed, generation: G25, source: LM-T}
+    tcr_per_k:
+      value: 1.4e-3
+      provenance: literature
+      generation: none
+      source: ARO82
+      range: [5.0e-4, 4.5e-3]
+      textbook: REF.heaterTcrPerK
+      disagrees: "the textbook's 1e-3 /K is assumed (only y = TCR R_th,H is fitted to the droop); doped Si is 1.0-1.8e-3 /K (02 section 9) and 07 P1-11 ties the TCR to the heater family"
+      note: "in-ring doped-Si heater (mrm.materials.heater_tcr_per_k('inring_noundercut')); per family in uncertainty.thermal.family"
+      alternatives:
+        silicide: {value: 2.0e-3, provenance: assumed, source: R02, note: "low end of silicides (2-4e-3, assumed in 02); higher values contradict the G25 droop"}
+        tin: {value: 5.0e-4, provenance: literature, source: R02, note: "TiN"}
+        textbook: {value: 1.0e-3, provenance: assumed, source: textbook-REF}
+    driver_mode: voltage               # 07 P1-11 hypothesis; textbook Ch11 voltage DAC
+    full_scale_v:
+      value: 1.6
+      provenance: assumed
+      generation: none
+      source: textbook
+      range: [1.4, 1.8]
+      note: "voltage-DAC full scale (textbook Ch11; Ch17 derives 1.44 V); ~41 mW at R0 45.4 ohm with the TCR droop, ~1.6 FSR. The G26 code range implies 71-88 pm/K across 1.40-1.60 V, so it does not pin dlambda/dT (06 E2)"
+    full_scale_a: {value: 0.025, provenance: assumed, generation: none, source: MODEL, range: [0.02, 0.03],
+                   note: "current drive: ~38 mW at full scale with the TCR feedback (runaway margin y I^2 R0 = 0.26)"}
+    full_scale_w: {value: 0.04, provenance: assumed, generation: none, source: MODEL, range: [0.03, 0.05],
+                   note: "power-linear drive (PWM or sigma-delta), ~1.6 P_FSR"}
+    dac_bits:
+      value: 16
+      provenance: inferred
+      generation: G26
+      source: LM26-S
+      textbook: REF.heaterDacBits
+      note: "G26 'MRM Stabilizer Value (DAC)' codes reach ~49.3 k > 2^15 (slide 10); PAT-2 '8-bit DAC + 8-bit PWM, ~16 bits'"
+    code_min:
+      value: 0
+      provenance: assumed
+      generation: none
+      source: D07
+      textbook: REF.heaterDacCodeRange
+      disagrees: "the textbook's 19,500-49,300 is the range one test used, i.e. demand, not hardware (07 P1-11)"
+    code_max: {value: 65535, provenance: assumed, generation: none, source: D07}
+    settle_tau_s: {value: 0.0, provenance: assumed, generation: none, source: MODEL,
+                   note: "no analog settle filter (unpublished); the >= 1 us thermal poles dominate"}
+    latency_s: {value: 1.0e-6, provenance: assumed, generation: none, source: MODEL, range: [0.0, 1.0e-5],
+                note: "one tick from register latch to the DAC output (07 P0-6 owner); unpublished"}
+    dac_inl_lsb: {value: 2.0, provenance: assumed, generation: none, source: MODEL, range: [0.0, 16.0],
+                  note: "typical 16-bit DAC; for dac_pwm the coarse 8-bit DAC dominates"}
+    dac_dnl_lsb: {value: 0.5, provenance: assumed, generation: none, source: MODEL, range: [0.0, 4.0]}
+    dac_max_update_hz: {value: 1.0e6, provenance: assumed, generation: none, source: MODEL,
+                        note: "one update per plant tick; PAT-2 calibration vectors every 10 us-1 ms"}
+    driver_compliance_v: {value: 1.8, provenance: inferred, generation: GF, source: EUPR,
+                          note: "the 1.8 V IO rail of 45SPCLO (printed); current drive clips above R I = 1.8 V"}
+    pwm_period_s: {value: 2.56e-6, provenance: printed, generation: PAT, source: PAT-2,
+                   note: "1/256 steps over 2.56 us (10 ns clock); a whole number of 1 us ticks is not needed"}
+    pwm_bits: {value: 8, provenance: printed, generation: PAT, source: PAT-2}
+    readback:
+      present: false
+      adc_bits: {value: 12, provenance: assumed, generation: none, source: MODEL}
+      v_full_scale_v: {value: 2.0, provenance: assumed, generation: none, source: MODEL}
+      i_full_scale_a: {value: 0.03, provenance: assumed, generation: none, source: MODEL}
+      rate_hz: {value: 10000.0, provenance: assumed, generation: none, source: MODEL}
+      latency_s: {value: 1.0e-5, provenance: assumed, generation: none, source: MODEL}
+  junction:
+    fill_fraction:
+      value: 0.8
+      provenance: assumed
+      generation: none
+      source: D07
+      range: [0.5, 0.95]
+      note: "share of the circumference with the PN junction (heater and contacts take the rest); CAL-5 calibrates it with the junction LUT (07 P1-7)"
+    eff_at_0v_pm_per_v:
+      value: 72.5
+      provenance: inferred
+      generation: G25
+      source: R03
+      range: [50.0, 95.0]
+      textbook: REF.modEffPmPerV
+      disagrees: "the textbook's flat 50 pm/V (talk) matches only near 1 V; a depletion law falls from 72.5 pm/V at 0 V to 32 pm/V at 3.75 V and reproduces the 52.8 pm/V average over 0-1.6 V (03 section 5.3, 06 M2)"
+      note: "ring-level dlambda/dV at 0 V of the charge-control fit A = 137.6 pm/V^0.5 (V_bi 0.9 V, rms 4.1 pm) to the G25 bias ladder 56.4/66.8/84.4 pm at 0.8/1.2/1.6 V (read-off, at measurement power)"
+    v_bi_v: {value: 0.9, provenance: inferred, generation: none, source: R03, range: [0.8, 1.0],
+             note: "fixed in the 03 fit; mrm.materials gives 0.95-0.99 V for 1-2e18 cm^-3 at 298 K"}
+    depletion_exponent: {value: 0.5, provenance: inferred, generation: none, source: R03, range: [0.33, 0.67],
+                         note: "abrupt junction: dlambda ~ removed charge ~ (V + Vbi)^(1/2) (03 section 5.3)"}
+    loss_ratio_q:
+      value: 0.06
+      provenance: inferred
+      generation: none
+      source: R03
+      range: [0.03, 0.15]
+      note: "q = lambda d_alpha/(4 pi d_n) of NSM 2011 at 1e18 cm^-3, electrons and holes together (03 section 5.4); Mueller fitted 0.13 (MUL14)"
+    capacitance_at_0v_ff: {value: 15.0, provenance: assumed, generation: none, source: R03, range: [6.0, 30.0],
+                           note: "published MRMs 6-20 fF (HUA26), 17 fF (MUL14); CAL-10 (30.9 GHz at -1 V) calibrates R C"}
+    series_resistance_ohm: {value: 100.0, provenance: assumed, generation: none, source: R03, range: [15.0, 390.0]}
+  monitor:
+    responsivity_a_per_w:
+      value: 0.95
+      provenance: printed
+      generation: G25
+      source: LM-T
+      range: [0.88, 1.04]
+      textbook: REF.responsivityTypical
+      note: "G25 typical; 0.88-1.04 A/W over 500 parts (CAL-11); 0.9 is the printed worst case; constant in T (02 section 10)"
+    gain_scale: {value: 1.0, provenance: assumed, generation: none, source: D07, range: [0.5, 2.0],
+                 note: "lumped nuisance on the monitor gain (line power at the ring, drop coupling, TIA, LSB); CAL-8 calibrates the product (07 D7, P1-9)"}
+    dark_i0_na: {value: 5.0, provenance: assumed, generation: GF, source: GF-BIAN, range: [1.0, 30.0],
+                 note: "GF Ge PD < 30 nA; a few nA typical (07 D20)"}
+    dark_t0_c: {value: 25.0, provenance: printed, generation: GF, source: GF-BIAN}
+    dark_activation_ev: {value: 0.37, provenance: literature, generation: none, source: COL08, range: [0.35, 0.5],
+                         note: "x1.6 per 10 degC near room temperature (mrm.materials.ge_pd_dark_ea_ev); 0.5 eV stress"}
+    background_fraction: {value: 0.0, provenance: assumed, generation: none, source: D07, range: [0.0, 0.01],
+                          note: "stray or substrate light at the PD (07 P1-9)"}
+    afe_type: integrate_dump           # 07 P0-7 default (PAT-2 dual-slope integrating ADC)
+    integration_window_s: {value: 2.0e-6, provenance: inferred, generation: PAT, source: PAT-2, range: [1.0e-6, 1.0e-5],
+                           note: "T_int 1-10 us, example 2 us = 400 x 5 ns"}
+    adc_rate_hz: {value: 250000.0, provenance: inferred, generation: PAT, source: PAT-2,
+                  note: "per ring: 2 us integration + <= 2 us de-integration (D <= N = 400 clocks) caps one dual-slope converter at 250 kHz"}
+    adc_latency_s: {value: 2.0e-6, provenance: assumed, generation: PAT, source: PAT-2,
+                    note: "de-integration takes up to one window"}
+    adc_bits:
+      value: 16
+      provenance: inferred
+      generation: G26
+      source: LM26-P
+      textbook: REF.monitorAdcBits
+      note: "inferred only from the RX polarization-monitor codes (<= 54 k, 01 D17); the MRM monitor width is unpublished. adc_bits is a global int, so it cannot vary per world: select pat2 with alts"
+      alternatives:
+        pat2: {value: 10, provenance: inferred, generation: PAT, source: PAT-2, note: "one dual-slope conversion resolves ~400 counts (about 9 bits); core_control_api handoff"}
+    adc_full_scale_ua:
+      value: 40.0
+      provenance: assumed
+      generation: none
+      source: MODEL
+      range: [20.0, 80.0]
+      note: "about 2.6x the 15.5 uA lock current (LM26-P Fig. 3b read-off), so a peak search does not clip"
+      alternatives:
+        textbook: {value: 20.0, provenance: assumed, source: textbook}
+    adc_offset_codes: {value: 0.0, provenance: assumed, generation: none, source: PAT-2,
+                       note: "after the analog baseline subtraction of PAT-2; per-ring spread in variation"}
+    adc_gain_error_frac: {value: 0.0, provenance: assumed, generation: none, source: MODEL}
+    adc_inl_lsb: {value: 1.0, provenance: assumed, generation: none, source: MODEL}
+    adc_dnl_lsb: {value: 0.5, provenance: assumed, generation: none, source: MODEL}
+    input_noise_pa_per_rt_hz:
+      value: 1.0
+      provenance: assumed
+      generation: none
+      source: R06
+      range: [0.3, 6.4]
+      textbook: REF.afeNoisePaRtHz
+      disagrees: "the textbook applies the data-path AFE's 6.4 pA/rtHz (16 GHz RX TIA) to the monitor; a ~100 kOhm monitor TIA has ~0.4 pA/rtHz (06 S3)"
+    flicker_corner_hz: {value: 1000.0, provenance: assumed, generation: none, source: MODEL}
+    adc_ref_tempco_ppm_per_k: {value: 20.0, provenance: assumed, generation: none, source: MODEL}
+    pga_gains: {value: [1.0, 2.0, 4.0, 8.0], provenance: assumed, generation: none, source: D07,
+                note: "07 P1-10 PGA steps (for connector re-mates and laser power steps)"}
+    adc_mux:
+      channels_per_adc: {value: 1, provenance: assumed, generation: none, source: MODEL}
+      order: round_robin
+  bias_dac:
+    bits: {value: 12, provenance: assumed, generation: none, source: D07}
+    v_min_v: {value: 1.0, provenance: printed, generation: G26, source: LM26-S, textbook: REF.biasRangeV,
+              note: "bias axis of the controlled relOMA maps (slide 9)"}
+    v_max_v: {value: 3.75, provenance: printed, generation: G26, source: LM26-S}
+    update_rate_hz: {value: 1.0e6, provenance: assumed, generation: none, source: MODEL}
+    latency_s: {value: 1.0e-6, provenance: assumed, generation: none, source: MODEL}
+    settle_tau_s: {value: 0.0, provenance: assumed, generation: none, source: MODEL,
+                   note: "no settle filter (an on-chip DAC settles in ns, far below the 1 us tick)"}
+    noise_rms_codes: {value: 0.5, provenance: assumed, generation: none, source: MODEL,
+                      note: "0.34 mV rms, ~0.02 pm"}
+
+driver:
+  output_resistance_ohm: {value: 50.0, provenance: assumed, generation: G25, source: LM-P, range: [20.0, 200.0],
+                          note: "CMOS inverter-chain output (LM-P section 2); value unpublished"}
+  static_power_mw: {value: 2.0, provenance: assumed, generation: none, source: MODEL, range: [0.0, 20.0],
+                    note: "unpublished; G25 TX+RX is 84.4 mW at 56 Gb/s in total (LM-P)"}
+  energy_per_transition_fj: {value: 100.0, provenance: assumed, generation: none, source: MODEL, range: [0.0, 500.0]}
+  swing_pp_v:
+    value: 1.3
+    provenance: printed
+    generation: G25
+    source: LM-P
+    range: [0.9, 2.6]
+    textbook: REF.swingVpp
+    disagrees: "the textbook's 0.9 Vpp 'measured' is the pattern-generator swing into the 50-ohm-terminated driver, not the junction swing (01 D3)"
+    note: "simulated rail-to-rail output at a 1.3 V supply (G25); the G26 drive is unknown and the printed relOMA needs 170-230 pm of swing (07 D9, CAL-14)"
+  level_convention: centered
+
+temp_sensors:
+  value:
+    - {name: die0, attach: die, type: diode, sample_rate_hz: 1000.0, latency_s: 1.0e-3, noise_rms_k: 0.1,
+       flicker_corner_hz: 1.0, resolution_k: 0.0625, offset_sigma_k: 2.0, gain_error_sigma_frac: 0.01,
+       self_heating_k: 0.0, adc_bits: 12, code_zero_c: -40.0}
+  provenance: assumed
+  generation: none
+  source: R04
+  note: "one on-die diode: ms conversion, a few K uncalibrated offset (07 P1-10); no Lightmatter sensor is published"
+
+layout:
+  ring_pitch_um: {value: 50.0, provenance: assumed, generation: G25, source: LM-P,
+                  note: "unpublished; the G25 TX occupies 0.0028 mm^2 (~53 um square, printed) and the FEM ROM verifies at 50 um"}
+  sites:
+    value:
+      aggressor: {x_um: 0.0, y_um: 30.0, kind: aggressor}   # the default site name of mrm.scenarios.library (a1, a2)
+    provenance: assumed
+    generation: G26
+    source: LM26-P
+    note: "on-chip resistive aggressor heater 'adjacent to a MRM' (LM26-P section 3.2) beside ring 0; position unpublished"
+
+array:
+  n_rings: {value: 8, provenance: printed, generation: G26, source: LM26-P, note: "8 MRMs coupled to a single bus waveguide"}
+  bus_order: {value: [0, 1, 2, 3, 4, 5, 6, 7], provenance: assumed, generation: none, source: MODEL}
+  heater_total_power_max_w: {value: 0.2, provenance: assumed, generation: none, source: D07,
+                             note: "die heater supply limit; 8 heaters at 25-34 mW each can exceed it (07 P1-12)"}
+  heater_supply_current_max_a: {value: 0.15, provenance: assumed, generation: none, source: D07}
+
+datapath:
+  bitrate_gbps:
+    value: 50.0
+    provenance: printed
+    generation: G26
+    source: LM26-P
+    alternatives:
+      line_rate: {value: 53.125, provenance: printed, generation: G26, source: WPW, note: "53.125 Gbaud line rate of a nominal 50 Gb/s lane (01 D15)"}
+  bitstat_window_bits: {value: 64, provenance: literature, generation: none, source: SUN15, note: "16-128 bits in Sun et al."}
+  error_count_period_s: {value: 2.0, provenance: printed, generation: G26, source: LM26-P, note: "BER sampled every 2 s"}
+  error_count_latency_s: {value: 1.0e-3, provenance: assumed, generation: none, source: MODEL}
+  transition_density: {value: 0.5, provenance: inferred, generation: G26, source: LM26-P, note: "PRBS (random NRZ)"}
+
+controller_interface:
+  update_rate_hz: 100000.0             # PAT-2 calibration vectors every 10 us (fastest of 10 us / 100 us / 1 ms)
+  bind:
+    tx:
+      heater: controller
+      bias: scenario
+      assignment: scenario
+    laser:
+      tune: scenario
+  knowledge: [line_grid, ring_to_line]  # 07 P1-12: the spec gives the bus order and the nominal grid only
+  schedule: simultaneous
+  on_out_of_range: clip
+
+scenario:
+  ambient_c: 25.0
+  bias_v: 1.05                          # best stabilized relOMA (-2.1 dB) sits near 1.05 V (LM26-S slide 9, 07 D9)
+  time_compression: 1.0
+
+metrics:
+  reloma_definition: oma_over_pin
+  ber_sample_period_s: 2.0
+  lock_threshold_pm: 5.0                # the textbook's 5 pm lock budget
+  hysteresis_pm: 1.0
+  allowed_assignments: fixed
+
+uncertainty:
+  # ----- 07 section 4.8: one draw per world, shared by every ring. Entries are applied in sorted name order, so an
+  # entry later in the alphabet overrides a leaf an earlier one set (film_thickness < thermo_optic).
+  thermo_optic:
+    kind: hypothesis
+    choices:
+      H_solver: {}                                          # the solver s0 and beta of the drawn film thickness
+      H86: {ring.thermal.dlambda_dt_pm_per_k: H86, ring.thermal.dlambda_dt_beta_per_k: const}
+      H86_sensor: {ring.thermal.reference_rise_frac: sensor}  # plant = H_solver; Lightmatter's degC read 0.8 of the rise
+      bench: {ring.thermal.dlambda_dt_pm_per_k: bench}
+      imec: {ring.thermal.dlambda_dt_pm_per_k: imec}
+      ocp: {ring.thermal.dlambda_dt_pm_per_k: ocp}
+      textbook_derived: {ring.thermal.dlambda_dt_pm_per_k: textbook_derived}
+    nominal: H_solver
+    weights: {H_solver: 2, H86: 1, H86_sensor: 1, bench: 0, imec: 0, ocp: 0, textbook_derived: 0}
+    provenance: assumed
+    generation: none
+    source: D07
+    note: "07 D2: H_solver default, H86 required robustness corner, H86_sensor the most plausible reconciliation; the other values are plain alternatives (weight 0, select with --alt uncertainty.thermo_optic=<name>)"
+  film_thickness:
+    kind: hypothesis
+    choices:
+      "160": {}
+      "200":
+        ring.geometry.film_nm: strip400x200
+        ring.geometry.slab_nm: strip400x200
+        ring.geometry.width_nm: strip400x200
+        ring.optics.n_eff: strip400x200
+        ring.optics.n_g: strip400x200
+        ring.optics.dn_g_dlambda_per_nm: strip400x200
+        ring.thermal.dlambda_dt_pm_per_k: strip400x200
+        ring.thermal.dlambda_dt_beta_per_k: strip400x200
+        ring.optics.loss_budget.alpha_bend_radiation_db_per_cm: strip400x200_q_anchor
+        ring.geometry.jacobian: strip400x200
+    nominal: "160"
+    weights: {"160": 3, "200": 1}
+    provenance: assumed
+    generation: none
+    source: D07
+    note: >-
+      07 D21 waveguide_thickness_nm (renamed so it applies before thermo_optic): 160 nm GF 45SPCLO (printed, single
+      source) or the 400 x 200 nm SMTAI render, represented by the strip400x200 artefact until modes_rib200 exists.
+      The 200 nm world keeps the measured G25 Q_i (so the CAL-2 notch and the coupling regime) through the
+      strip400x200_q_anchor loss term: with the budget fixed in dB/cm, the strip's n_g 4.349 would raise Q_i 8.7 % and
+      make both regime choices over-coupled (27.5 and 18.6 dB). Couplers and the thermal ROM keep the 160 nm values
+  thermal:
+    family:
+      kind: hypothesis
+      choices:
+        inring_noundercut: {ring.thermal.family: inring_noundercut}
+        silicide_undercut:
+          ring.thermal.family: silicide_undercut
+          ring.thermal.tau_fast_s: undercut
+          ring.thermal.share_fast_frac: undercut
+          ring.thermal.tau_slow_s: undercut
+          ring.thermal.heater_node_tau_s: undercut
+          ring.heater.tcr_per_k: silicide
+          ring.thermal.heater_self_ratio: silicide
+        metal_above:
+          ring.thermal.family: metal_above
+          ring.thermal.heater_node_tau_s: metal
+          ring.heater.tcr_per_k: tin
+          ring.thermal.heater_self_ratio: tin
+        textbook:
+          ring.thermal.family: inring_noundercut
+          ring.thermal.tau_fast_s: textbook
+          ring.thermal.share_fast_frac: textbook
+          ring.thermal.tau_slow_s: textbook
+          ring.thermal.tail_share_frac: textbook
+          ring.thermal.xt_nearest_frac: textbook
+          ring.thermal.xt_next_frac: textbook
+          ring.thermal.xt_floor_frac: textbook
+          ring.thermal.xt_tau_ref_s: textbook
+          ring.thermal.xt_dist_ref_um: textbook
+          ring.thermal.xt_tau_min_s: textbook
+          ring.heater.tcr_per_k: textbook
+          ring.thermal.heater_self_ratio: textbook
+      nominal: inring_noundercut
+      weights: {inring_noundercut: 2, silicide_undercut: 1, metal_above: 1, textbook: 0}
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "07 P1-3 heater family, with the TCR tied to it (07 4.8 heater.tcr): in-ring doped Si (default), GF-PDK silicide with undercut (GF-ECIO), metal above (imec). The interim poles of the in-ring family are imec's measured-calibrated set (07 P1-2). textbook (weight 0) is the 07 D22 pessimistic corner"
+    stack:
+      kind: hypothesis
+      choices:
+        side_by_side: {ring.thermal.stack: side_by_side}
+        stacked_eic:
+          ring.thermal.stack: stacked_eic
+          ring.heater.p_fsr_mw: stacked_eic
+          ring.thermal.xt_nearest_frac: stacked_eic
+          ring.thermal.xt_next_frac: stacked_eic
+          ring.thermal.xt_floor_frac: stacked_eic
+      nominal: side_by_side
+      weights: {side_by_side: 3, stacked_eic: 1}
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "07 P1-3: G26 has the SerDes beside the PIC; an EIC stacked on the PIC (M1000-like) costs 20-42 % heater efficiency (measured) and +44 % crosstalk (simulated) (CO24-JOM, 04 V8)"
+    scaling:
+      kind: hypothesis
+      choices:
+        resistance: {ring.thermal.scaling_hypothesis: resistance}
+        capacitance: {ring.thermal.scaling_hypothesis: capacitance}
+      nominal: resistance
+      weights: {resistance: 2, capacitance: 1}
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "07 P1-2 scaling_hypothesis; 'independent' coincides numerically with 'capacitance' (plant_thermal handoff 6.2), so it is not sampled twice"
+    time_scale_fast: {kind: interval, low: 0.5, high: 2.0, dist: loguniform, nominal: 1.0, provenance: assumed,
+                      generation: none, source: R04, note: "07 4.8, D15: die-level, on top of the family"}
+    time_scale_slow: {kind: interval, low: 0.5, high: 2.0, dist: loguniform, nominal: 1.0, provenance: assumed,
+                      generation: none, source: R04}
+    package_tail_tau_s: {kind: interval, low: 1.0e-3, high: 1.0e-2, dist: loguniform, nominal: 3.0e-3,
+                         provenance: assumed, generation: none, source: R04, note: "07 4.8 thermal.package_tail (absolute tau)"}
+    package_tail_share_frac: {kind: interval, low: 0.02, high: 0.10, nominal: 0.05, corners: {textbook: 0.0},
+                              provenance: assumed, generation: none, source: R04}
+    transport_delay_s: {kind: interval, low: 0.0, high: 2.0e-6, nominal: 0.0, provenance: assumed, generation: none,
+                        source: D07, note: "07 4.8 [VAL]; applied by the heater FIFO (plant_thermal 6.7)"}
+    crosstalk_scale: {kind: interval, low: 0.33, high: 1.73, dist: loguniform, nominal: 1.0,
+                      corners: {nearest_10pct: 3.33}, provenance: literature, generation: none, source: CO24-JOM,
+                      note: "scales every ring-to-ring residue: nearest 1-5.2 %, floor 0.5-2.6 % (07 4.8; the floor range fully, nearest up to 10 % in the corner)"}
+  self_heating:
+    eta:
+      kind: hypothesis
+      choices:
+        nominal: {}
+        low: {ring.optics.loss_budget.alpha_fca_db_per_cm: eta_0p5, ring.optics.loss_budget.alpha_scatter_db_per_cm: eta_0p5}
+        mid_low: {ring.optics.loss_budget.alpha_fca_db_per_cm: eta_0p65, ring.optics.loss_budget.alpha_scatter_db_per_cm: eta_0p65}
+        mid: {ring.optics.loss_budget.alpha_fca_db_per_cm: eta_0p75, ring.optics.loss_budget.alpha_scatter_db_per_cm: eta_0p75}
+        high: {ring.optics.loss_budget.alpha_fca_db_per_cm: eta_0p95, ring.optics.loss_budget.alpha_scatter_db_per_cm: eta_0p95}
+        stress_0p3: {ring.optics.loss_budget.alpha_fca_db_per_cm: eta_0p3, ring.optics.loss_budget.alpha_scatter_db_per_cm: eta_0p3}
+      nominal: nominal
+      weights: {low: 1, mid_low: 6, mid: 9, nominal: 10, high: 2, stress_0p3: 0}
+      provenance: assumed
+      generation: none
+      source: D07
+      note: >-
+        07 D1/4.8 self_heating.eta 0.5-0.95 (nominal ~0.85) via the loss budget, discretized to 0.5 / 0.65 / 0.75 /
+        0.848 / 0.95 at a fixed alpha_i (a continuous draw would move Q_i and the coupling regime: the machinery has no
+        tied draw, see handoff). The weights are the masses of a triangular density on [0.5, 0.95] with its mode at the
+        nominal, binned at the midpoints between the points (1 : 6 : 9 : 10 : 2). stress_0p3 (weight 0) is the 07 D1
+        stress corner. Values are for the under-coupled 160 nm world; the over-coupled choice lowers alpha_other, so
+        each point sits ~0.01-0.04 lower there, and the 200 nm world scales them by 0.92 (strip400x200_q_anchor)
+    z_ratio: {kind: interval, target: ring.thermal.z_ratio_opt_heater, low: 1.0, high: 2.0, provenance: assumed,
+              generation: none, source: D07, note: "07 4.8 [PHY], 06 H2"}
+  chip_input_loss:
+    kind: interval
+    target: optical_path.chip_input_loss_db
+    low: 2.0
+    high: 10.0
+    corners: {ring_plus8dbm: 2.0, ring_0dbm: 10.0, ocp_ring_plus9dbm: 1.0}
+    provenance: inferred
+    generation: G25
+    source: LM-P
+    note: "07 4.8 power_at_ring_dbm 0 to +8 dBm (nominal +4) with 10 dBm per line at the laser: a loss of 10 to 2 dB (low loss = high power)"
+  q_loaded:
+    kind: interval
+    target: ring.optics.q_loaded
+    low: 3500
+    high: 4200
+    corners: {low_q: 2600}
+    provenance: read-off
+    generation: G25
+    source: LM-T
+    note: >-
+      CAL-1 (07 4.3, 4.8). KNOWN LIMITATION: Q_L is drawn alone while Q_i stays at the loss budget (the machinery has no
+      tied draw, see handoff), so the G25 0 V notch is 27.9 dB only at 3850. The coupling regime is then exact only
+      near the nominal: the exact ring at 1301.9 nm is critically coupled at Q_L = (1 - 2 kappa_d/kappa) Q_i/2 = 3699
+      (under choice) and 4014 (over choice), so an 'under' world is in fact over-coupled for Q_L < 3699 (28 % of the
+      interval) and an 'over' world under-coupled above 4014 (27 %). At the ends: under 25.5 dB (over-coupled) at 3500
+      and 17.5 dB at 4200; over 18.0 dB at 3500 and 26.8 dB (under-coupled) at 4200. Pin q_loaded at nominal (as
+      g26_overcoupled does) when the regime must hold
+  coupling_regime:
+    kind: hypothesis
+    choices:
+      under: {}
+      over: {ring.optics.loss_budget.alpha_other_abs_db_per_cm: over}
+    nominal: under
+    provenance: assumed
+    generation: none
+    source: D07
+    note: "07 P1-5 under | over coupled at the same 27.9 dB G25 notch (exact ring, 1301.9 nm, Q_L 3850; the 200 nm world within 0.7 dB); the fit of CAL-1/CAL-2 returns both branches. The label holds only for Q_L near its nominal (see uncertainty.q_loaded)"
+  er_mechanism:
+    kind: hypothesis
+    choices:
+      dispersion: {}
+      ring_t_loss: {ring.optics.dln_alpha_dt_ring_per_k: ring_t_loss}
+      heater_t_loss: {ring.optics.dln_alpha_dt_heater_per_k: heater_t_loss}
+    nominal: dispersion
+    provenance: assumed
+    generation: none
+    source: D07
+    note: "07 P1-5: what makes the G25 notch fall with heater drive; only heater_t_loss drifts under lock"
+  fsr:
+    kind: hypothesis
+    target: ring.optics.fsr_thz
+    choices: [default, window_a, g25_cluster, pdk_size, window_b_low, window_b_high]
+    nominal: default
+    weights: {default: 2, window_a: 1, g25_cluster: 0, pdk_size: 0, window_b_low: 0, window_b_high: 0}
+    provenance: assumed
+    generation: none
+    source: D07
+    note: "07 P1-6 / D17: window B (1.8 THz design) default, window A (restricted to 1.46-1.48 THz by the BND-1 review); G25 cluster 1.53 and PDK size 1.60 THz are stress hypotheses (weight 0)"
+  heater:
+    driver_mode:
+      kind: hypothesis
+      choices:
+        voltage: {ring.heater.driver_mode: voltage}
+        current: {ring.heater.driver_mode: current}
+        power: {ring.heater.driver_mode: power}
+        dac_pwm: {ring.heater.driver_mode: dac_pwm}
+      nominal: voltage
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "07 P1-11; dac_pwm is the PAT-2 8-bit DAC + 8-bit PWM"
+  driver:
+    levels:
+      kind: hypothesis
+      choices:
+        centered: {driver.level_convention: centered}
+        one_sided: {driver.level_convention: one_sided}
+      nominal: centered
+      provenance: assumed
+      generation: none
+      source: MODEL
+      note: "which terminal the G26 bias axis drives is unpublished (plant_electrical note 4); not in 07 4.8"
+  monitor:
+    gain_scale: {kind: interval, target: ring.monitor.gain_scale, low: 0.5, high: 2.0, dist: loguniform,
+                 provenance: assumed, generation: none, source: D07, note: "07 D7, P1-9"}
+    dark_i0: {kind: interval, target: ring.monitor.dark_i0_na, low: 1.0, high: 30.0, dist: loguniform,
+              provenance: assumed, generation: GF, source: GF-BIAN, note: "07 D20: 1-30 nA at 25 degC"}
+  timing:
+    latency_scale: {kind: interval, low: 0.5, high: 2.0, dist: loguniform, nominal: 1.0, provenance: assumed,
+                    generation: none, source: D07, note: "07 4.8 loop latency 0.5-2x the declared total"}
+  aggressor:
+    referencing:
+      kind: hypothesis
+      choices: {resonance: {}, temperature: {}}
+      nominal: resonance
+      provenance: assumed
+      generation: none
+      source: D07
+      note: "07 D6: a world variable for the scenario (PlantParams.world): aggressor targets in resonance units (default) or degC"
+    waveform:
+      kind: hypothesis
+      choices: {rectified_sine: {}, symmetric_triangle: {}}
+      nominal: rectified_sine
+      provenance: read-off
+      generation: G26
+      source: LM26-S
+      note: "07 4.8 lists 'slide-10 parabolic'; the re-digitized slide-10 trace is a rectified sine (01 D7 correction, CAL-13a)"
+
+variation:
+  # ----- 07 P1-16: per device, separate stream from the worlds
+  geometry:
+    width: {die_sigma_nm: 5.0, ring_sigma_nm: 2.0}
+    thickness: {die_sigma_nm: 4.2, ring_sigma_nm: 1.3}
+    jacobians: [ring.geometry.jacobian]
+    provenance: assumed
+    generation: none
+    source: BER-FAB
+    note: "split between width and film chosen so the strip Jacobian (0.65 and 1.19 nm/nm) reproduces the Berkeley 6 nm die and 2 nm local resonance spreads (textbook fabOffset*); CAL-9 (G26 lane offsets 7.5-9.5 k codes) calibrates it later"
+  ring.heater.p_fsr_mw: {level: ring, dist: lognormal, die_sigma: 0.05, ring_sigma: 0.02, truncate: false,
+                         provenance: inferred, generation: G25, source: LM-T,
+                         note: "G25 60-die maps: median 25.45, range 24.9-34.1 mW, strongly right-skewed (-2 % / +34 % of the median). The machinery has only symmetric (log-)normal and uniform draws, so this is a compromise: a 60-die sample of it spans ~22.7-28.9 mW, i.e. ~1/3 of the rings fall below the observed minimum and the +34 % tail is missing (the stacked_eic alternative 36.9 mW is the high-P_FSR corner). Not truncated (clipping at 24.9 would pile 1/3 of the rings on it). Ring-to-ring within a die assumed"}
+  ring.optics.q_loaded: {level: ring, rel_sigma: 0.015, truncate: false, provenance: assumed, generation: none, source: R05,
+                         note: "stands in for the through-gap spread of 07 P1-16 (gap_through cannot move Q_t when Q_L is the R4 anchor, PARAMETERS_FORMAT 7.1): d ln K^2/d gap ~ -2 %/nm (05 t02, 07 P1-9) x ~1.5 nm local gap sigma (assumed) gives K_t^2 +-3 %, Q_L +-1.5 % at a fixed Q_i, so the per-ring notch varies around 27.9 dB as it does near critical coupling. Not truncated: the leaf range is the world-level plausible range"}
+  ring.heater.r_cold_ohm: {level: ring, dist: lognormal, die_sigma: 0.06, ring_sigma: 0.01, truncate: false,
+                           provenance: inferred, generation: G25, source: LM-T,
+                           note: "G25 60-die hot resistance 52.8-70.5 ohm around 55.9 (-6 % / +26 %, right-skewed like P_FSR); the symmetric lognormal is a compromise (its lower tail goes below the observed minimum, the upper tail is short). Not truncated"}
+  ring.monitor.responsivity_a_per_w: {level: ring, rel_sigma: 0.03, provenance: printed, generation: G25, source: LM-T,
+                                      note: "0.88-1.04 A/W over 500 parts (CAL-11), truncated to that range"}
+  ring.optics.kappa_d_over_kappa: {level: ring, rel_sigma: 0.1, provenance: inferred, generation: none, source: R05,
+                                   note: "drop-gap spread: d ln K^2/d gap ~ -2 %/nm, +-5 nm gives +-10 % (07 P1-9)"}
+  laser.line_offset_ghz: {level: line, die_sigma: 4.0, line_sigma: 6.0, provenance: inferred, generation: Guide,
+                          source: YOLE, note: "+-15 GHz demonstrated (~2 sigma of the total) with a common-mode part per laser module (04 section 3.2); clipped to the +-20 GHz requirement"}
+  ring.monitor.adc_offset_codes: {level: ring, ring_sigma: 5.0, provenance: assumed, generation: none, source: MODEL}
+  ring.monitor.adc_gain_error_frac: {level: ring, ring_sigma: 0.01, provenance: assumed, generation: none, source: MODEL}

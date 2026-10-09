@@ -1,0 +1,9 @@
+# Corner (07 section 4.8, D15): both die-level thermal time scales at x0.5 (fast end of 0.5-2x).
+extends: g26
+meta:
+  name: g26_fast_thermal
+  kind: corner
+  description: "g26 with uncertainty.thermal.time_scale_fast and time_scale_slow pinned low (x0.5)"
+alts:
+  uncertainty.thermal.time_scale_fast: low
+  uncertainty.thermal.time_scale_slow: low

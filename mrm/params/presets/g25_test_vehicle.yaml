@@ -1,0 +1,82 @@
+# g25_test_vehicle: the OFC 2025 Tu3J.6 single-wavelength test vehicle (LM-P, LM-T): one MRM and one laser line near
+# 1309.5 nm, about +4 dBm at the ring, a bench voltage source on the heater, 56 Gb/s NRZ characterization. Its device
+# physics is the g26 device physics (g26 takes it from G25), so this preset extends g26 and changes only what the G25
+# bench changes. It is the plant the calibration replicas of 07 section 4.3 (CAL-1..CAL-5, CAL-7, CAL-10, CAL-11) run
+# on. The G25 paper draws the TX ring as all-pass while later slides show an input/thru/drop micrograph (01 D14); the
+# ring here keeps the g26 drop coupler and its monitor keys (the replicas support both readings).
+extends: g26
+alts:
+  # the G25 heater sweep (CAL-3, CAL-4) is printed against the voltage of a bench source, so the driver law is known
+  # here: voltage drive in every world (g26 keeps uncertainty.heater.driver_mode open, 07 P1-11)
+  uncertainty.heater.driver_mode: voltage
+meta:
+  name: g25_test_vehicle
+  kind: preset
+  description: >-
+    G25 test vehicle (OFC 2025 Tu3J.6): one add-drop MRM, one line near 1309.5 nm, ~+4 dBm at the ring, voltage-driven
+    heater; the device physics of g26.
+  generation_mix: >-
+    G25 (LM-P, LM-T): line 1309.5 nm, +4 dBm at the ring, 56 Gb/s, Q_L, notch, P_FSR, heater R and droop, junction
+    ladder, responsivity. Everything else as in g26 (solver, literature, assumed).
+
+channel_plan:
+  center_thz:
+    value: 228.936
+    provenance: inferred
+    generation: G25
+    source: LM-T
+    note: "c/1309.5 nm: the G25 operating line, 7.6 nm red of the 1301.90 nm cold resonance (07 CAL-7)"
+  n_lines: {value: 1, provenance: printed, generation: G25, source: LM-P, note: "single-wavelength test vehicle"}
+  ring_to_line: {value: [0], provenance: assumed, generation: none, source: MODEL}
+
+laser:
+  power_per_line_dbm:
+    value: 4.0
+    provenance: printed
+    generation: G25
+    source: LM-P
+    range: [2.0, 5.0]
+    textbook: REF.inputPowerDbm
+    disagrees: null
+    note: "'about 4 dBm' input power at the ring (LM-P section 3.2); the reference plane is the ring, so chip_input_loss_db is 0"
+  line_offset_ghz: {value: 0.0, provenance: assumed, generation: G25, source: MODEL, range: [-20.0, 20.0],
+                    note: "a bench tunable laser: no grid error"}
+
+optical_path:
+  chip_input_loss_db: {value: 0.0, provenance: assumed, generation: G25, source: LM-P, range: [0.0, 2.0],
+                       note: "the laser power above is quoted at the ring"}
+
+array:
+  n_rings: {value: 1, provenance: printed, generation: G25, source: LM-P}
+  bus_order: {value: [0], provenance: assumed, generation: none, source: MODEL}
+
+datapath:
+  bitrate_gbps:
+    value: 56.0
+    provenance: printed
+    generation: G25
+    source: LM-P
+    note: "56 Gb/s NRZ characterization (1.51 pJ/bit at 84.4 mW)"
+
+ring:
+  heater:
+    full_scale_v:
+      value: 1.6
+      provenance: assumed
+      generation: G25
+      source: LM-T
+      range: [1.5, 1.8]
+      note: "the G25 heater sweep runs 0-1.5 V from a bench source (01 section 2.2); 1.6 V covers it"
+
+uncertainty:
+  chip_input_loss:
+    kind: interval
+    low: 0.0
+    high: 2.0
+    corners: {}
+    generation: G25
+    note: "the printed input is 'about 4 dBm' at the ring: 2-4 dBm"
+
+variation:
+  laser.line_offset_ghz: {die_sigma: 0.0, line_sigma: 0.0, provenance: assumed, generation: G25, source: MODEL,
+                          note: "bench laser on its line"}
