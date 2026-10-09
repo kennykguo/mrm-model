@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>MRM control lab</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <div class="eyebrow"><span class="brand-mark" aria-hidden="true"></span> PHOTONICS / CONTROL LAB</div>
+        <h1>One ring. One feedback rule.</h1>
+        <p class="intro">Tune a step controller against a fixed microring model. Compare it with a heater held at the same initial code.</p>
+      </div>
+      <div class="header-actions">
+        <span class="local-label"><span aria-hidden="true"></span> Local simulation</span>
+        <button id="download" class="button secondary" type="button" disabled>Download run <span aria-hidden="true">↓</span></button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="setup" aria-label="Model and experiment setup">
+        <section class="model-section">
+          <div class="section-heading"><h2>Fixed model</h2><span class="read-only">READ ONLY</span></div>
+          <p id="model-id" class="model-name">Loading model…</p>
+          <p id="model-short-hash" class="short-hash">SHA-256 pending</p>
+          <p class="model-description">Synthetic single-ring reference. Physical parameters stay fixed when you change the controller.</p>
+          <details id="model-details">
+            <summary>Resolved parameters &amp; provenance</summary>
+            <dl class="hashes"><dt>Physical model SHA-256</dt><dd id="model-hash">—</dd><dt>Implementation SHA-256</dt><dd id="implementation-hash">—</dd></dl>
+            <div id="resolved-model"></div>
+          </details>
+        </section>
+
+        <form id="run-form">
+          <section class="controller-section">
+            <div class="section-heading"><h2>Controller</h2><span class="editable-label">WHAT YOU SOLVE</span></div>
+            <div class="field-grid">
+              <label for="target-code"><span class="field-label">Target ADC <span class="unit">code</span></span><input id="target-code" name="target_code" type="number" min="1" max="4094" step="1" value="260" required></label>
+              <label for="initial-code"><span class="field-label">Initial heater DAC <span class="unit">code</span></span><input id="initial-code" name="initial_code" type="number" min="0" max="4095" step="1" value="2660" required></label>
+              <label for="step-codes"><span class="field-label">Step size <span class="unit">codes</span></span><input id="step-codes" name="step_codes" type="number" min="1" max="64" step="1" value="4" required></label>
+              <label for="deadband-codes"><span class="field-label">Deadband <span class="unit">± codes</span></span><input id="deadband-codes" name="deadband_codes" type="number" min="0" max="50" step="1" value="2" required></label>
+            </div>
+            <div class="rule"><span class="rule-label">THE FEEDBACK RULE</span><p>above band → +step heat<br>below band → −step<br>within deadband → hold</p></div>
+            <p class="assumption"><strong>Known red-side assumption.</strong> The initial heater code must place the ring on the intended side of resonance. This controller does not acquire resonance.</p>
+          </section>
+          <section class="experiment-section">
+            <div class="section-heading"><h2>Experiment</h2><span class="read-only">4 ms</span></div>
+            <div class="field-grid">
+              <label for="warmup-ms"><span class="field-label">Warmup <span class="unit">ms</span></span><input id="warmup-ms" name="warmup_ms" type="number" min="0.1" max="1" step="0.001" value="0.5" required></label>
+              <label for="ambient-step"><span class="field-label">Ambient step <span class="unit">K</span></span><input id="ambient-step" name="ambient_step_k" type="number" min="-1" max="1" step="0.01" value="0.25" required></label>
+            </div>
+            <p id="experiment-description" class="section-note">Hold the initial code for 0.5 ms, then enable feedback. The ambient temperature steps at 2 ms.</p>
+          </section>
+          <button id="run-button" class="button primary run-button" type="submit" disabled><span id="run-button-label">Loading model…</span><span aria-hidden="true">↗</span></button>
+          <p id="form-state" class="form-state" aria-live="polite">Preparing the fixed model.</p>
+        </form>
+        <div id="error-message" class="error-message" role="alert" hidden></div>
+      </aside>
+
+      <div class="results" id="results" aria-busy="true">
+        <section class="device-section" aria-labelledby="device-heading">
+          <div class="device-topline">
+            <div><span class="section-kicker">LUMPED THERMAL MODEL</span><h2 id="device-heading">Inside the ring</h2></div>
+            <label class="run-selector" for="device-run">View temperatures<select id="device-run"><option value="step">Step control</option><option value="hold">Fixed heater hold</option></select></label>
+          </div>
+          <div class="device-view">
+            <canvas id="device-canvas" role="img" aria-label="Rotatable schematic of a microring, heater, waveguides and package. Colors represent recorded node temperatures.">A microring and heater above a package substrate. Recorded temperatures are listed below.</canvas>
+            <div class="device-caption">Schematic geometry · lumped thermal states · not a 3D field solver</div>
+            <div class="view-options">
+              <label><input id="explode" type="checkbox" checked> Exploded view</label>
+              <details class="layers"><summary>Layers</summary><div><label><input id="show-heater" type="checkbox" checked> Heater</label><label><input id="show-waveguides" type="checkbox" checked> Waveguides</label><label><input id="show-package" type="checkbox" checked> Package</label></div></details>
+            </div>
+            <div class="orbit-controls" role="group" aria-label="Schematic camera controls">
+              <button type="button" data-camera="left" aria-label="Rotate left">↶</button><button type="button" data-camera="right" aria-label="Rotate right">↷</button><button type="button" data-camera="up" aria-label="Tilt up">↑</button><button type="button" data-camera="down" aria-label="Tilt down">↓</button><span class="control-divider"></span><button type="button" data-camera="in" aria-label="Zoom in">+</button><button type="button" data-camera="out" aria-label="Zoom out">−</button><button type="button" data-camera="reset" aria-label="Reset camera">Reset</button>
+            </div>
+            <span class="drag-hint">Drag to orbit · scroll to zoom</span>
+            <div class="temperature-scale" aria-label="Temperature color scale"><span id="temperature-min">— K</span><span class="temperature-gradient" aria-hidden="true"></span><span id="temperature-max">— K</span></div>
+          </div>
+          <div class="node-readouts" aria-label="Exact recorded lumped temperatures">
+            <div><span class="node-dot" id="ring-dot"></span><span>Ring <small>node</small></span><output id="ring-temperature">— K</output></div>
+            <div><span class="node-dot" id="heater-dot"></span><span>Heater <small>node</small></span><output id="heater-temperature">— K</output></div>
+            <div><span class="node-dot" id="package-dot"></span><span>Package <small>node</small></span><output id="package-temperature">— K</output></div>
+          </div>
+          <div class="playback">
+            <button id="play" type="button" class="button secondary play-button" disabled aria-label="Play recorded simulation">Play</button>
+            <div class="time-slider"><label for="time-index">Recorded time <output id="time-value">0.000 ms</output></label><input id="time-index" type="range" min="0" max="200" value="0" step="1" disabled></div>
+            <span id="phase-label" class="phase-label">Waiting for simulation</span>
+          </div>
+        </section>
+
+        <section class="trace-section" aria-labelledby="traces-heading">
+          <div class="traces-topline"><div><span class="section-kicker">SAME MODEL · SAME DISTURBANCE</span><h2 id="traces-heading">Control, then compare.</h2></div><div class="legend"><span><i class="line step-line"></i>Step control</span><span><i class="line hold-line"></i>Fixed heater hold</span></div></div>
+          <p class="trace-note">Feedback uses the delayed monitor ADC and I/O timing. Detuning and OMA are evaluator outputs, unavailable to the controller.</p>
+          <div class="trace-controls"><label><input id="focus-warmup" type="checkbox" checked><span>Focus after warmup <small>(uncheck for full history)</small></span></label><span id="sample-time">ADC sample time: —</span></div>
+          <div class="chart-grid">
+            <figure class="chart-panel" data-chart="monitor_code"><figcaption><span>Monitor ADC <small>code</small></span><span class="signal-tag measured">MEASURED</span></figcaption><canvas id="chart-monitor" role="img" aria-label="Recorded monitor ADC versus time, compared with target band">Monitor ADC trace.</canvas><div class="chart-values"><span>Step <output id="value-monitor-step">—</output></span><span>Hold <output id="value-monitor-hold">—</output></span><span id="target-caption">Target 260 ± 2</span></div></figure>
+            <figure class="chart-panel" data-chart="heater_code"><figcaption><span>Applied heater DAC <small>code</small></span><span class="signal-tag measured">APPLIED</span></figcaption><canvas id="chart-heater" role="img" aria-label="Recorded applied heater DAC versus time">Applied heater DAC trace.</canvas><div class="chart-values"><span>Step <output id="value-heater-step">—</output></span><span>Hold <output id="value-heater-hold">—</output></span></div></figure>
+            <figure class="chart-panel" data-chart="detuning_hz"><figcaption><span>Resonance − laser <small>GHz</small></span><span class="signal-tag evaluator">EVALUATOR ONLY</span></figcaption><canvas id="chart-detuning" role="img" aria-label="Recorded resonance minus laser detuning versus time, evaluator only">Detuning trace.</canvas><div class="chart-values"><span>Step <output id="value-detuning-step">—</output></span><span>Hold <output id="value-detuning-hold">—</output></span></div></figure>
+            <figure class="chart-panel" data-chart="oma_w"><figcaption><span>Optical modulation amplitude <small>µW</small></span><span class="signal-tag evaluator">EVALUATOR ONLY</span></figcaption><canvas id="chart-oma" role="img" aria-label="Recorded optical modulation amplitude versus time, evaluator only">Optical modulation amplitude trace.</canvas><div class="chart-values"><span>Step <output id="value-oma-step">—</output></span><span>Hold <output id="value-oma-hold">—</output></span></div></figure>
+          </div>
+          <div class="chart-key"><span><i class="warmup-key"></i>Warmup ends</span><span><i class="step-key"></i>Ambient step at 2 ms</span><span>Hover or touch a plot to inspect its recorded sample. Records are 20 µs apart; switching between records is not shown.</span></div>
+          <div id="run-assessment" class="run-assessment" aria-live="polite">The recorded response will appear after the simulation finishes.</div>
+          <details class="run-details"><summary>Run diagnostics &amp; assumptions</summary><div id="run-diagnostics"></div></details>
+        </section>
+      </div>
+    </main>
+    <footer class="app-footer"><span>MRM control lab</span><span>Simulation traces, not device measurements. Geometry is illustrative.</span></footer>
+  </div>
+</body>
+</html>

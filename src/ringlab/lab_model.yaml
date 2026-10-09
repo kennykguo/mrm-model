@@ -1,0 +1,133 @@
+# Fixed, fully resolved teaching profile for the local control lab.
+# Physical values are the synthetic reference, not an identified private device.
+# The browser cannot modify this file or any physical parameter.
+version: 1
+name: synthetic-single-ring-v1
+array:
+  count: 1
+  spacing_hz: 400000000000.0
+  cold_offset_hz: 300000000000.0
+  bus_loss_db: 0.0
+  resonance_errors_hz: []
+ring:
+  reference_wavelength_m: 1.31e-06
+  roundtrip_length_m: 6.283185307179587e-05
+  group_index: 4.0
+  intrinsic_loss_per_m: 250.0
+  input_coupling_power: 0.025
+  drop_coupling_power: 0.005
+  absorption_fraction: 0.8
+  reference_temperature_k: 300.0
+  thermal_frequency_slope_hz_per_k: -15000000000.0
+  thermal_frequency_curvature_hz_per_k2: 0.0
+  beta2_s2_per_m: 0.0
+thermal:
+  waveguide_capacity_j_per_k: 1.2e-10
+  heater_capacity_j_per_k: 3.0e-10
+  package_capacity_j_per_k: 4.0e-08
+  heater_waveguide_conductance_w_per_k: 3.0e-05
+  waveguide_package_conductance_w_per_k: 2.0e-05
+  heater_package_conductance_w_per_k: 1.0e-05
+  neighbor_conductance_w_per_k: 1.0e-06
+  package_boundary_conductance_w_per_k: 0.002
+  aggressor_package_fraction: 0.8
+junction:
+  built_in_voltage_v: 0.8
+  zero_bias_capacitance_f: 3.0e-14
+  parasitic_capacitance_f: 5.0e-15
+  series_resistance_ohm: 70.0
+  frequency_shift_scale_hz: -12000000000.0
+  loss_change_scale_per_m: -8.0
+  leakage_current_a: 1.0e-09
+  minimum_voltage_v: 0.0
+  maximum_voltage_v: 5.0
+  reference_voltage_v: 0.0
+heater:
+  resistance_ohm: 500.0
+  resistance_temperature_coefficient_per_k: 0.001
+  reference_temperature_k: 300.0
+  voltage_max_v: 0.6
+  current_max_a: 0.02
+  power_max_w: 0.002
+  bits: 12
+  settling_time_s: 1.0e-06
+  latency_s: 2.0e-06
+sensor:
+  responsivity_a_per_w: 0.8
+  collection_fraction: 1.0
+  dark_current_a: 5.0e-09
+  dark_activation_energy_ev: 0.35
+  reference_temperature_k: 300.0
+  filter_time_s: 2.0e-06
+  input_noise_a_per_sqrt_hz: 2.0e-12
+  full_scale_a: 0.0002
+  bits: 12
+  sample_period_s: 5.0e-06
+  latency_s: 2.0e-06
+  temperature_resolution_k: 0.05
+  noise_enabled: true
+laser:
+  power_per_line_w: 0.0005
+  power_fractional_noise_rms: 0.0
+  frequency_noise_rms_hz: 0.0
+data:
+  bias_v: 1.5
+  swing_v: 1.0
+  bit_rate_hz: 50000000000.0
+  mark_probability: 0.5
+  averaging: stationary_nrz
+  junction_heat_fraction: 1.0
+  driver_power_w: 0.0
+# Numerical settings, initialization, disturbance, and controller are separate
+# from the physical-model hash; all are returned with each downloaded result.
+simulation:
+  duration_s: 0.004
+  tick_s: 1.0e-06
+  control_period_s: 2.0e-05
+  compute_latency_s: 1.0e-06
+  record_period_s: 2.0e-05
+  max_step_s: 5.0e-06
+  rtol: 1.0e-06
+  temperature_atol_k: 1.0e-07
+  voltage_atol_v: 1.0e-08
+  current_atol_a: 1.0e-12
+  heater_energy_atol_j: 1.0e-15
+  oma_integral_atol_j: 1.0e-18
+  record_memory_limit_mb: 256.0
+  optical_evaluation: table
+  optical_table_tolerance: 1.0e-07
+  method: Radau
+  seed: 7
+  initial_temperature_k: 300.0
+  initial_heater_code: 2660
+scenario:
+  kind: ambient_step
+  ambient_temperature_k: 300.0
+  start_s: 0.002
+  ambient_step_k: 0.25
+  ambient_ramp_k_per_s: 0.0
+  aggressor_power_w: 0.0
+  aggressor_period_s: 0.2
+  aggressor_ring: 0
+  laser_drift_hz_per_s: 0.0
+  power_step_fraction: 0.0
+  dropout_start_s: -1.0
+  dropout_duration_s: 0.0
+controller:
+  name: step
+  parameters:
+    target_code: 260
+    initial_code: 2660
+    step_codes: 4
+    deadband_codes: 2
+    warmup_s: 0.0005
+evidence:
+  ring.reference_wavelength_m:
+    status: published_context
+    source: Anand et al., OFC 2026 M4B.3, sections 1–2; grid centered near 1310 nm
+  ring.thermal_frequency_slope_hz_per_k:
+    status: published_magnitude_with_inferred_sign
+    source: Anand et al., OFC 2026 M4B.3 introduction (~15 GHz/K); red-shift sign inferred for silicon
+  data.bit_rate_hz:
+    status: published_context
+    source: Anand et al., OFC 2026 M4B.3; 50 Gb/s NRZ per lane

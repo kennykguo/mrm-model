@@ -198,7 +198,7 @@ def dry_run(config):
     sample_events = int(np.ceil(c.simulation.duration_s/c.sensor.sample_period_s))
     records = int(np.ceil(c.simulation.duration_s/c.simulation.record_period_s))+1
     return {"rings": n, "duration_s": c.simulation.duration_s, "sample_events": sample_events,
-            "record_count": records, "estimated_trace_bytes": records*(10*n+2)*8,
+            "record_count": records, "estimated_trace_bytes": records*(11*n+4)*8,
             "wall_time": "not estimated; run a short benchmark with the same model and solver tolerances",
             "model": c.data.averaging, "config_sha256": c.digest(), "claim": DISCLAIMER}
 

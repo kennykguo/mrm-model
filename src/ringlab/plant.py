@@ -320,7 +320,7 @@ def simulate(configuration=None, controller=None, *, thermal_network=None, junct
     record_count = int(np.ceil(configuration.simulation.duration_s/configuration.simulation.record_period_s))+1
     # Python list/object overhead during recording is substantially larger than
     # final NumPy buffers. Reserve a conservative factor, before any allocation.
-    recording_bytes = record_count*(10*configuration.array.count+2)*8*5
+    recording_bytes = record_count*(11*configuration.array.count+4)*8*5
     if recording_bytes > configuration.simulation.record_memory_limit_mb*1e6:
         raise ValueError("estimated trace memory exceeds record_memory_limit_mb; increase record_period_s "
                          "or deliberately raise the limit after checking available RAM")
@@ -351,11 +351,13 @@ def simulate(configuration=None, controller=None, *, thermal_network=None, junct
     released = np.zeros(n, np.int64)
     saturated = np.zeros(n, bool)
     temp_code = 0
-    records = {key: [] for key in ("time_s", "ring_temperature_k", "heater_voltage_v", "heater_power_w",
+    records = {key: [] for key in ("time_s", "ring_temperature_k", "heater_temperature_k",
+                                  "package_temperature_k", "ambient_temperature_k", "heater_voltage_v", "heater_power_w",
                                   "heater_code", "monitor_code", "sample_time_s", "detuning_hz", "oma_w",
                                   "absorbed_power_w", "through_power_w", "nearest_line")}
     nt = plant.thermal.n_nodes
     event_count, command_count = 0, 0
+    clipped_sample_count = np.zeros(n, np.int64)
     wrong_line_s = np.zeros(n)
     saturation_s = np.zeros(n)
     maximum_metric_interval_s = 0.0
@@ -371,6 +373,7 @@ def simulate(configuration=None, controller=None, *, thermal_network=None, junct
             plant.action(code)
         if tick == next_sample:
             code, clip, temperature_code = plant.sample(tick)
+            clipped_sample_count += clip
             in_dropout = plant.dropout_start_tick >= 0 and plant.dropout_start_tick <= tick < plant.dropout_end_tick
             if not in_dropout:
                 seq += 1
@@ -402,6 +405,9 @@ def simulate(configuration=None, controller=None, *, thermal_network=None, junct
         max_abs_detuning = np.maximum(max_abs_detuning, abs(optical.detuning_hz))
         if tick == next_record or tick == end:
             values = {"time_s": tick*dt, "ring_temperature_k": plant.thermal.observe(plant.state[:nt])[plant.ring_observers],
+                      "heater_temperature_k": plant.state[plant.heater_nodes].copy(),
+                      "package_temperature_k": float(plant.state[plant.package_node]),
+                      "ambient_temperature_k": float(plant.environment(tick*dt)[0]),
                       "heater_voltage_v": plant.heater_terminal_voltage(plant.state[:nt], plant.state[nt:nt+n]),
                       "heater_power_w": plant.heater_power(plant.state[:nt], plant.state[nt:nt+n]),
                       "heater_code": plant.applied_code.copy(), "monitor_code": released.copy(),
@@ -441,6 +447,7 @@ def simulate(configuration=None, controller=None, *, thermal_network=None, junct
                "metric_note": "OMA and heater energy use adaptive continuous integrals. Detuning extrema use both event sides; wrong-line time uses interval-end identity and can miss intra-interval crossings. Temperature extrema use accepted solver states. Neither extrema nor occupancy are continuous safety bounds. Heater rail time means DAC code rails, not all analog current/power limits.",
                "ber": None, "ber_note": "No receiver/noise calibration: OMA is not a BER prediction."}
     diagnostics = {"wall_s": time.perf_counter()-started, "rhs_calls": plant.rhs_calls,
+                   "sensor_clipped_samples": clipped_sample_count,
                    "events": event_count, "commands": command_count, "config_sha256": c.digest(),
                    "numerical_method": c.simulation.method, "rtol": c.simulation.rtol,
                    "oma_integral_atol_j": c.simulation.oma_integral_atol_j,

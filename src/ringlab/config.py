@@ -305,10 +305,10 @@ class Configuration:
 
     def resolved(self):
         data = {name: asdict(getattr(self, name)) for name in (*SECTIONS, "ring", "junction", "thermal")}
-        data.update(version=1, name=self.name, controller=self.controller)
+        data.update(version=1, name=self.name, controller=copy.deepcopy(self.controller))
         evidence = {path: {"status": "assumed", "source": "synthetic reference; requires calibration"}
                     for path, _ in _flatten(data) if path not in ("name", "version")}
-        evidence.update(self.evidence)
+        evidence.update(copy.deepcopy(self.evidence))
         data["evidence"] = evidence
         return data
 

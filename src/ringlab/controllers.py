@@ -134,6 +134,58 @@ class PID:
         return self.action.copy()
 
 
+class StepLock:
+    """Fixed-size feedback steps on an externally chosen red-side fringe.
+
+    Increasing the heater must decrease the measured monitor signal near this
+    operating point. The controller neither identifies that fringe nor acquires
+    it: initial_code and the explicit prebias warmup are experiment inputs.
+    Warmup starts when the initial requested vector is first observed applied.
+
+    Applied codes describe now, not the delayed ADC sample. After each change,
+    wait for the requested vector to appear in applied_heater_code, then use
+    only a strictly later sample. This prevents repeated steps on pre-action
+    measurements; it does not assert analog or thermal settling after a step.
+    """
+    def __init__(self, target_code=260, initial_code=2660, step_codes=4,
+                 deadband_codes=2, warmup_s=0.0005):
+        self.target = _real(target_code, "target_code")
+        self.initial = _integer(initial_code, "initial_code")
+        self.step_codes = _integer(step_codes, "step_codes", 1)
+        self.deadband = _integer(deadband_codes, "deadband_codes")
+        self.warmup_s = _real(warmup_s, "warmup_s")
+
+    def reset(self, interface):
+        if self.target > interface.adc_max_code or self.initial > interface.heater_max_code:
+            raise ValueError("target_code or initial_code exceeds this ADC/DAC range")
+        self.interface = interface
+        self.action = np.full(interface.rings, self.initial, dtype=np.int64)
+        self._first_applied_s = None
+        self._warmup_end_s = None
+
+    def step(self, observation):
+        if not np.array_equal(self.action, observation.applied_heater_code):
+            self._first_applied_s = None
+            return self.action.copy()
+        if self._first_applied_s is None:
+            self._first_applied_s = observation.time_s
+        if self._warmup_end_s is None:
+            self._warmup_end_s = self._first_applied_s + self.warmup_s
+        if (not observation.fresh or observation.sample_time_s <= self._first_applied_s
+                or observation.sample_time_s < self._warmup_end_s):
+            return self.action.copy()
+        error = observation.monitor_code - self.target
+        direction = np.where(~observation.saturated & (np.abs(error) > self.deadband),
+                             np.sign(error), 0.)
+        # A step wider than the converter range simply reaches the same rail.
+        increment = min(self.step_codes, self.interface.heater_max_code) * direction
+        action = np.clip(self.action + increment, 0, self.interface.heater_max_code).astype(np.int64)
+        if not np.array_equal(action, self.action):
+            self.action = action
+            self._first_applied_s = None
+        return self.action.copy()
+
+
 class ScanPI:
     """Sequential full-range acquisition, then a red-side drop-port PI lock.
 
@@ -256,13 +308,14 @@ class DitherLock:
         return self.action.copy()
 
 
-REGISTRY = {"hold": Hold, "pid": PID, "scan_pi": ScanPI, "dither": DitherLock}
+REGISTRY = {"hold": Hold, "pid": PID, "step": StepLock, "scan_pi": ScanPI, "dither": DitherLock}
 
 # These map public constructor arguments to configuration attributes, never
 # runtime state such as a PID integral or the scan's acquired target vector.
 _PARAMETERS = {
     Hold: {"code": "code"},
     PID: {"target_code": "target", "initial_code": "initial", "kp": "kp", "ki_per_s": "ki", "kd_s": "kd", "sign": "sign"},
+    StepLock: {"target_code": "target", "initial_code": "initial", "step_codes": "step_codes", "deadband_codes": "deadband", "warmup_s": "warmup_s"},
     ScanPI: {"scan_steps": "steps", "settle_frames": "settle", "target_fraction": "fraction", "kp": "kp", "ki_per_s": "ki", "minimum_peak_code": "minimum"},
     DitherLock: {"initial_code": "initial", "amplitude_codes": "amplitude", "gain": "gain", "dwell_frames": "dwell"},
 }

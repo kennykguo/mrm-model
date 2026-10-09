@@ -26,6 +26,26 @@ uv run ringlab inspect examples/models/reference.yaml
 uv run pytest -q
 ```
 
+## Interactive control lab
+
+```bash
+uv run ringlab lab
+```
+
+Open <http://127.0.0.1:8765>. The local, offline lab compares a minimal
+heater-step controller with a constant-heater baseline on the **same fixed
+single-ring model**. It includes measured-signal and evaluator-only plots,
+time scrubbing, and a rotatable 3D schematic driven by the simulated lumped
+ring, heater, and package temperatures. No browser-side physics is substituted
+for the Python plant. The geometry is illustrative, not a measured chip layout
+or a spatial thermal solution.
+
+Controller settings, experiment settings, and the read-only physical model
+are displayed separately. The starting code and monitor target are explicit
+synthetic setup assumptions: this example solves **local stabilization**, not
+initial acquisition or wavelength identification. See the
+[lab contract and accuracy boundaries](docs/CONTROL_LAB.md).
+
 A run saves the complete resolved configuration and evidence labels, actual
 thermal and junction models, source and dependency fingerprints, metrics,
 compressed numerical traces, and a response plot under `runs/`. Replay uses
@@ -107,7 +127,8 @@ portability across hardware and numerical libraries.
   DAC quantization, latency, photodiode dark/shot noise, readout filtering,
   ADC clipping/quantization, sample latency, and dropped measurements.
 - Junction leakage and switching heat, plus explicit assumed driver heat.
-- Hold, PID, scan-and-PI, and dither baselines, sharing the same interface.
+- Hold, minimal heater-step, PID, scan-and-PI, and dither baselines, sharing
+  the same interface.
 
 The eight-lane example combines published architecture with assumed devices.
 Its FSR may put unwanted resonance orders close to other lanes. Such failures

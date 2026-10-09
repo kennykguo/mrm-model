@@ -31,7 +31,14 @@ def main(argv=None):
     p.add_argument("--output", default="runs")
     p.add_argument("--allow-changed-model", action="store_true")
     sub.add_parser("controllers")
+    p = sub.add_parser("lab", help="open the fixed-model local single-ring control lab")
+    p.add_argument("--port", type=int, default=8765, help="loopback HTTP port (default: 8765)")
     args = parser.parse_args(argv)
+    if args.command == "lab":
+        if not 1 <= args.port <= 65535:
+            parser.error("--port must be between 1 and 65535")
+        from .lab import serve
+        return serve(args.port)
     if args.command == "controllers":
         print("\n".join(sorted(REGISTRY)))
         return 0
