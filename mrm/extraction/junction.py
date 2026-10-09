@@ -27,8 +27,14 @@ Pipeline, per cross-section hypothesis (``rib160`` default, ``rib200``):
 Geometry and doping are ASSUMPTIONS (Lightmatter publishes neither); every one is swept and its Jacobian recorded.
 Units: SI in the artefact (m, F/m, ohm*m, 1/m); the solvers work in um (femwell) and cm (DEVSIM) internally.
 
-Run (always through the memory guard):
-    .venv/bin/python tools/memguard.py --limit-gb 3 --heavy -- .venv/bin/python -m mrm.extraction.junction [--quick]
+Run (always through the memory guard; a --heavy job defaults to a 6 GB cap and holds the machine-wide lock):
+    .venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction [--quick]
+No-solver helpers (cheap, any memory guard):
+    python -m mrm.extraction.junction --mesh-report [--scales ...]   DEVSIM mesh sizes and estimated peak memory
+    python -m mrm.extraction.junction --postprocess                  sidecar post-processing from stored data only
+The committed rib160 L-shape artefact was produced under a 2.7 GB self-limit (the former 3 GB rule); the settings it
+used are the defaults below, and docs/handoff/extract_junction.md ("Memory cap") gives the finer settings that fit
+under 6 GB with the exact command (--scale/--ladder/--study-scale/--direct-mode-res-floor).
 """
 from __future__ import annotations
 
@@ -101,7 +107,16 @@ XSECS = {
     "rib160": XSec("rib160", 400.0, 160.0, 60.0),
     "rib200": XSec("rib200", 400.0, 200.0, 80.0),
 }
-GEOMETRY_RANGES_NM = {"width_nm": (360.0, 450.0), "film_nm": (155.0, 205.0), "slab_nm": (40.0, 100.0)}
+# Assumed geometry ranges per cross-section: the same as the modes artefacts (mrm.extraction.common XSECS
+# ranges_nm), so that the runtime propagates one range per input. The committed rib160 artefact (2026-10-09) recorded
+# one shared range with film 155-205 nm, which spans both film hypotheses; its sidecar (inputs.range_notes) says so.
+GEOMETRY_RANGES_BY_XSEC = {
+    "rib160": {"width_nm": (360.0, 450.0), "film_nm": (150.0, 170.0), "slab_nm": (40.0, 100.0)},
+    "rib200": {"width_nm": (360.0, 450.0), "film_nm": (190.0, 210.0), "slab_nm": (50.0, 120.0)},
+}
+GEOMETRY_RANGES_NM = GEOMETRY_RANGES_BY_XSEC["rib160"]
+GEOMETRY_UNRANGED = {"sidewall_deg": "90 deg assumed (vertical sidewall); not swept, no range (as in the modes "
+                                     "artefacts); listed in uncertainty.model.not_modelled"}
 GEOMETRY_PROVENANCE = {
     "width_nm": "assumed: Lightmatter render 400 x 200 nm (SMTAI, 01 section 2.1); BU 45CLO rib 410 nm",
     "film_nm": "printed for 45SPCLO (160 nm, GF-IMAPS); 200 nm is the D21 alternative",
@@ -242,11 +257,27 @@ DOPING_RANGES = {
     "contact_gap_nm": (700.0, 1500.0), "contact_rho_ohm_cm2": (1e-8, 1e-6),
 }
 DOPING_PROVENANCE = (
-    "assumed. No 45SPCLO or Lightmatter doping is public. Body doping inside the 5e17-3e18 cm^-3 range quoted in "
-    "docs/research (05 C7c 5e17; 03 sections 5.1/6.2 1e17-1e18 and 3e18; 06 V15 1-3e18). Lateral: 2e18 (mid-range; "
-    "no level up to 5e18 reaches CAL-5 with fill <= 1, see reports.doping_sweep). L-shape: the symmetric level at "
-    "which CAL-5 needs fill = 0.85 (doping.selection). Implant offsets and contact levels are generic MRM values "
-    "(assumed, swept in the Jacobian).")
+    "assumed. No 45SPCLO or Lightmatter doping is public. docs/research quotes body doping of 5e17-3e18 cm^-3 (05 C7c "
+    "5e17; 03 sections 5.1/6.2 1e17-1e18 and 3e18; 06 V15 1-3e18); the assumed range here is 5e17-5e18. Lateral: "
+    "2e18 (mid-range; an earlier, unarchived sweep found no level up to 5e18 that reaches CAL-5 with fill <= 1; "
+    "reports.doping_sweep of the lateral artefact). L-shape: the symmetric level at which CAL-5 needs fill = 0.85 "
+    "(doping.selection); it can lie above 3e18, inside the assumed range. Implant offsets and contact levels are "
+    "generic MRM values (assumed; the ranged ones are swept in the Jacobian, the 'unranged' ones are fixed).")
+# Fixed doping inputs without an assumed range (not swept): recorded in the artefact as doping.unranged.
+DOPING_UNRANGED = ("n_pp_cm3", "plus_grading_nm", "contact_width_nm")
+
+
+def doping_ranges(xs: XSec, d: Doping) -> dict:
+    """Assumed ranges of the doping inputs for this junction. The junction offset is +-60 nm about the nominal
+    (lateral: the rib centre; L-shape: the vertical leg 100 nm inside the n-side rib edge). The L-shape adds the
+    depth of the shallow n layer, y_junction from the slab top to 60 nm above it, and both topologies the side of
+    the n body (outer_side, a two-valued choice; the Jacobian stores the difference)."""
+    r = dict(DOPING_RANGES)
+    r["junction_offset_nm"] = (d.junction_offset_nm - 60.0, d.junction_offset_nm + 60.0)
+    if d.topology == "lshape":
+        r["y_junction_nm"] = (xs.slab_nm, xs.slab_nm + 60.0)
+    r["outer_side"] = ("n", "p")
+    return r
 
 
 # ------------------------------------------------------------------------------------------------ utilities
@@ -296,7 +327,8 @@ def _quiet(enabled=True):
 def richardson(values, hs, order=None):
     """Richardson extrapolation of the last three (h, value) pairs. Returns dict(extrapolated, observed_order,
     error_estimate) where error_estimate = |finest - extrapolated|. ``order`` fixes p if the observed one is not
-    usable (oscillatory or non-monotone convergence: then the error estimate is the spread of the last three)."""
+    usable (flagged ``order_forced``); without ``order`` such a sequence gives the finest value and the spread of the
+    last three as the error estimate."""
     v = np.asarray(values, float)
     h = np.asarray(hs, float)
     out = {"values": _fl(v), "h": _fl(h)}
@@ -312,6 +344,8 @@ def richardson(values, hs, order=None):
         r = h1 / h2
         if abs(h2 / h3 - r) < 1e-6 * r:
             p = math.log(abs(d12 / d23)) / math.log(r)
+            if not 0.2 <= p <= 8.0:          # the same accepted range as the bracketed solve below
+                p = None
         else:
             from scipy.optimize import brentq
 
@@ -321,15 +355,20 @@ def richardson(values, hs, order=None):
                 p = brentq(g, 0.2, 8.0)
             except Exception:
                 p = None
+    forced = False
     if p is None and order is not None:
-        p = order
+        p, forced = order, True
     if p is None or p <= 0.2:
         spread = float(np.max(v[-3:]) - np.min(v[-3:]))
-        out.update(extrapolated=_f(v3), observed_order=None, error_estimate=_f(spread), note="non-monotone")
+        out.update(extrapolated=_f(v3), observed_order=None, error_estimate=_f(spread),
+                   note="no observed order in [0.2, 8] (non-monotone or non-asymptotic): finest value, error = "
+                        "spread of the last three")
         return out
     ext = v3 + (v3 - v2) / ((h2 / h3) ** p - 1.0)
     out.update(extrapolated=_f(ext), observed_order=_f(p, 4), error_estimate=_f(abs(v3 - ext)),
                rel_error_estimate=_f(abs(v3 - ext) / max(abs(ext), 1e-300), 4))
+    if forced:
+        out["order_forced"] = True      # 'observed_order' is then the assumed order, not an observation
     return out
 
 
@@ -1080,13 +1119,20 @@ def overlap(dv, w_nodes, model="nsm2011"):
     return ddn @ wa, alpha @ wa
 
 
-def direct_resolve_dneff(xs, d, dv, v_list, mode_res_um, radius_um, model="nsm2011"):
+# Memory: under the former 2.7 GB self-limit the 10 nm mode mesh of the direct re-solve was killed at 2.71 GB (rib160
+# lateral, 2026-10-09), so the re-solve runs on a mesh no finer than this. Under the 6 GB heavy cap 0.010 fits
+# (--direct-mode-res-floor 0.010); the committed artefact used 0.0141.
+DIRECT_MODE_RES_FLOOR_UM = 0.0141
+
+
+def direct_resolve_dneff(xs, d, dv, v_list, mode_res_um, radius_um, model="nsm2011",
+                         res_floor_um=DIRECT_MODE_RES_FLOOR_UM):
     """Direct femwell re-solve with the carrier-perturbed complex permittivity of the Si elements (element averages
     of the DEVSIM fields from a 7x7 sub-sampling of each triangle). Returns dn_eff(V) - dn_eff(0) and alpha (1/m)."""
     import gc
 
     import matplotlib.tri as mtri
-    mode_res_um = max(mode_res_um, 0.0141)    # memory: the 10 nm mode mesh plus the carrier fields exceed 2.7 GB
+    mode_res_um = max(mode_res_um, res_floor_um)
     m = _mode_mesh(xs, d, mode_res_um)
     from skfem import Basis, ElementTriP0
     b0 = Basis(m, ElementTriP0())
@@ -1174,10 +1220,12 @@ def tidy3d_check(xs: XSec, d: Doping, dls_nm=(20.0, 10.0, 20.0 / 3.0)):
                 data = ms.solve()
             res.append(float(data.n_eff.values[0, 0].real))
         rows.append({"dl_nm": dl_nm, "n_eff": res[0], "dneff_dnsi": (res[1] - res[0]) / 1e-3})
+    # Free-order extrapolation only: the committed rib160 run forced order 1 on a sequence that no power law fits
+    # (20 / 10 / 6.7 nm: 2.4596 / 2.4462 / 2.4372 -> 2.4192, 0.018 below the finest grid); see tidy3d_reassessment.
     return {"rows": rows, "seconds": round(time.time() - t0, 1), "tidy3d_version": td.__version__,
-            "n_eff_conv": richardson([r["n_eff"] for r in rows], [r["dl_nm"] for r in rows], order=1),
-            "dneff_dnsi_conv": richardson([r["dneff_dnsi"] for r in rows], [r["dl_nm"] for r in rows], order=1),
-            "note": "uniform grid without subpixel averaging: staircase error, first order in dl"}
+            "n_eff_conv": richardson([r["n_eff"] for r in rows], [r["dl_nm"] for r in rows]),
+            "dneff_dnsi_conv": richardson([r["dneff_dnsi"] for r in rows], [r["dl_nm"] for r in rows]),
+            "note": "uniform grid without subpixel averaging: staircase error, not a clean power law in dl"}
 
 
 # ---------------------------------------------------------------------------------------- analytic model
@@ -1455,6 +1503,23 @@ PROD = {"lshape": {"scale": 2.0, "ladder": [2.8284, 2.3784, 2.0], "study": 2.828
 V_SUBSET = np.array([-0.5, 0.0, 1.0, 1.6, 2.0, 4.0])
 
 
+def devsim_settings(topology, *, quick=False, prod=None, direct_res_floor_um=None):
+    """DEVSIM scales of a run: QUICK or PROD[topology], with the non-None keys of ``prod`` (scale, ladder, study)
+    overriding them, plus the direct re-solve mesh floor (um)."""
+    cfg = dict(QUICK if quick else PROD[topology])
+    for k, x in (prod or {}).items():
+        if x is None:
+            continue
+        if k not in ("scale", "ladder", "study"):
+            raise ValueError(f"unknown DEVSIM setting {k!r}")
+        cfg[k] = [float(y) for y in x] if k == "ladder" else float(x)
+    if len(cfg["ladder"]) != 3 or any(b >= a for a, b in zip(cfg["ladder"][:-1], cfg["ladder"][1:])):
+        raise ValueError("the ladder needs three scales, coarse to fine")
+    cfg["direct_mode_res_floor_um"] = (DIRECT_MODE_RES_FLOOR_UM if direct_res_floor_um is None
+                                       else float(direct_res_floor_um))
+    return cfg
+
+
 def jacobian(xs, d, wf_ref, n_g, *, quick, scale, mode_res_um, log=print, light=False):
     """Central-difference Jacobian of the summary numbers with respect to the geometry and doping assumptions.
     Geometry steps re-solve the mode (and n_g); doping steps reuse it. Densities are differentiated per decade."""
@@ -1513,11 +1578,13 @@ def jacobian(xs, d, wf_ref, n_g, *, quick, scale, mode_res_um, log=print, light=
 
 
 def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=print, doping=None,
-            do_crosschecks=True, light=False):
+            do_crosschecks=True, light=False, prod=None, direct_res_floor_um=None):
     """Run the extraction for one cross-section and junction topology. ``light`` (used for the non-default topology)
     keeps the production sweep, three-level DEVSIM and mode convergence, the direct re-solve and the depletion check,
     and drops the oxide-extent study, tidy3d (same mode as the default artefact), the temperature run and the
-    non-geometry/doping Jacobian rows. Returns (artefact dict, sidecar dict)."""
+    non-geometry/doping Jacobian rows. ``prod`` overrides keys of the DEVSIM settings (``scale``, ``ladder``,
+    ``study``); ``direct_res_floor_um`` the coarsest-allowed mode mesh of the direct re-solve (defaults: the settings
+    of the committed artefact, chosen under the former 2.7 GB self-limit). Returns (artefact dict, sidecar dict)."""
     t_start = time.time()
     d = doping or nominal_doping(xs_name, topology)
     xs0 = XSECS[xs_name]
@@ -1525,7 +1592,8 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
     xs = dataclasses.replace(xs0, r_ref_um=round(r_ref, 6))
     log(f"[{xs_name}] r_ref = {xs.r_ref_um:.5f} um ({r_ref_info['source']})")
     v = v_grid(quick)
-    cfg = QUICK if quick else PROD[d.topology]
+    cfg = devsim_settings(d.topology, quick=quick, prod=prod, direct_res_floor_um=direct_res_floor_um)
+    res_floor = cfg["direct_mode_res_floor_um"]
     scale = cfg["scale"]
     study = cfg["study"]
     mode_res = 0.03 if quick else 0.010
@@ -1671,7 +1739,8 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
         keep_rows = [int(np.argmin(np.abs(v - x))) for x in [0.0] + vd.tolist()]
         dv_red = {"x_um": dv["x_um"], "y_um": dv["y_um"], "v": dv["v"][keep_rows], "n": dv["n"][keep_rows],
                   "p": dv["p"][keep_rows], "vol_um2": dv["vol_um2"]}
-        dn_dir, a_dir, nel, n_base = _isolated(direct_resolve_dneff, xs, d, dv_red, vd, mode_res, xs.r_ref_um)
+        dn_dir, a_dir, nel, n_base = _isolated(direct_resolve_dneff, xs, d, dv_red, vd, mode_res, xs.r_ref_um,
+                                               res_floor_um=res_floor)
         dn_pert = np.interp(vd, v, r["dneff"])
         a_pert = np.interp(vd, v, r["alpha"])
         checks["perturbation_vs_direct_resolve"] = {
@@ -1687,10 +1756,14 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
             log(f"[{xs_name}] tidy3d cross-check (straight guide)")
             try:
                 t3 = _isolated(tidy3d_check, xs, d)
-                fw_conv = conv["mode_mesh"]
                 t3["femwell_straight"] = {"n_eff": mps["n_eff"], "dneff_dnsi": mps["index_weight"]["si"]}
                 t3["delta_n_eff"] = _f(t3["n_eff_conv"]["extrapolated"] - mps["n_eff"], 4)
                 t3["delta_dneff_dnsi"] = _f(t3["dneff_dnsi_conv"]["extrapolated"] - mps["index_weight"]["si"], 4)
+                mcc = None
+                if r_ref_info.get("source", "").startswith("modes_"):
+                    with contextlib.suppress(Exception):
+                        mcc = json.loads((OUT_DIR / r_ref_info["source"]).read_text()).get("crosscheck")
+                t3["reassessment"] = tidy3d_reassessment(t3, t3["femwell_straight"], mcc)
                 checks["tidy3d_vs_femwell"] = t3
                 log(f"  tidy3d n_eff {t3['n_eff_conv']['extrapolated']} (dneff/dnSi "
                     f"{t3['dneff_dnsi_conv']['extrapolated']}) vs femwell {mps['n_eff']:.6f} "
@@ -1811,10 +1884,12 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
     reports = build_reports(xs, d, v, r["dneff"], r["alpha"], c_grid, r_total, q_loss, mp, jac)
     art = {
         "schema": SCHEMA,
-        "xsec": dict(xs.as_dict(), provenance=GEOMETRY_PROVENANCE, ranges=GEOMETRY_RANGES_NM),
+        "xsec": dict(xs.as_dict(), provenance=GEOMETRY_PROVENANCE,
+                     ranges=GEOMETRY_RANGES_BY_XSEC.get(xs.name, GEOMETRY_RANGES_NM), unranged=GEOMETRY_UNRANGED),
         "lambda0_nm": LAMBDA0_M * 1e9, "t_ref_k": T_REF_K, "fill_fraction": 1.0, "full_circumference": True,
         "method": "devsim", "plasma_model": "nsm2011",
-        "doping": dict(d.as_dict(), ranges=DOPING_RANGES, provenance=DOPING_PROVENANCE,
+        "doping": dict(d.as_dict(), ranges=doping_ranges(xs, d), unranged=list(DOPING_UNRANGED),
+                       provenance=DOPING_PROVENANCE,
                        v_bi_v=float(M.vbi_v(d.na_cm3, d.nd_cm3, T_REF_K)), selection=selection,
                        junction_length_nm=junction_length_nm(xs, d)),
         "v_reverse_v": _fl(v),
@@ -1854,8 +1929,10 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
     }
     side = {
         "schema": SCHEMA, "artefact": artefact_name(xs_name, d.topology) + ".json", "created_utc": _now_utc(),
-        "command": "python -m mrm.extraction.junction --xsec %s --topology %s%s" % (
-            xs_name, d.topology, " --quick" if quick else ""),
+        "command": "python -m mrm.extraction.junction --xsec %s --topology %s%s%s" % (
+            xs_name, d.topology, " --quick" if quick else "",
+            "" if quick else " --scale %g --ladder %s --study-scale %g --direct-mode-res-floor %g" % (
+                scale, " ".join("%g" % x for x in cfg["ladder"]), study, res_floor)),
         "study_level": "quick" if quick else ("light" if light else "full"),
         "inputs": {
             "geometry": {**xs.as_dict(), "provenance": "assumed"},
@@ -1869,7 +1946,10 @@ def extract(xs_name="rib160", *, topology=DEFAULT_TOPOLOGY, quick=False, log=pri
         "mesh": {"devsim": dv["mesh"], "devsim_nodes_si": dv["nodes_si"],
                  "femwell": {"core_res_um": mode_res, "elements": mp["elements"], "order": 2,
                              "domain_um": [5.0, 2.2], "weight_grid_step_um": mp["weight_grid"]["step_um"]},
-                 "bias_grid_v": [V_MIN, V_MAX, V_STEP_QUICK if quick else V_STEP_FULL]},
+                 "bias_grid_v": [V_MIN, V_MAX, V_STEP_QUICK if quick else V_STEP_FULL],
+                 "settings": {"devsim_scale": scale, "devsim_ladder": list(cfg["ladder"]), "study_scale": study,
+                              "direct_mode_res_floor_um": res_floor, "ac_jobs": 4 if not quick else 2,
+                              "jacobian_mode_res_um": 0.06 if quick else 0.016}},
         "convergence": conv,
         "validation": checks,
         "uncertainty": uncertainty_budget(conv, checks, jac, plasma_alt, summary),
@@ -2103,41 +2183,634 @@ def doping_sweep(xs_name="rib160", topology=DEFAULT_TOPOLOGY, levels=(5e17, 1e18
                     "at Q_i = 7000; DEVSIM scale %.4g, mode res %.4g um" % (scale, mode_res)}
 
 
+# ---------------------------------------------------------------------------- post-processing (no solver)
+EXPECTED_ARTEFACTS = tuple((x, t) for x in XSECS for t in TOPOLOGIES)
+
+# What happened to the production runs (2026-10-09; logs of the interrupted session, summarized in
+# docs/handoff/extract_junction.md). They ran under a self-chosen --limit-gb 2.7 (the former 3 GB rule).
+RUN_HISTORY = (
+    {"time": "2026-10-09 11:04 EDT", "job": "rib160 lshape", "stage": "DEVSIM production DC sweep at scale 1.4142",
+     "nodes": 29868, "nodes_si": 14862, "outcome": "killed by memguard: RSS 2.86 GB > 2.7 GB"},
+    {"time": "2026-10-09 11:08 EDT", "job": "rib160 lateral",
+     "stage": "direct re-solve on the 10 nm femwell mesh with the carrier fields",
+     "outcome": "killed by memguard: RSS 2.71 GB > 2.7 GB",
+     "completed_before_the_kill": "production DC sweep (scale 1.0, 10606 Si nodes), AC, DEVSIM ladder 2.0/1.4142/1.0, "
+                                  "mode-mesh ladder 20/14.1/10 nm"},
+    {"time": "2026-10-09 11:17 EDT", "job": "rib200 lshape",
+     "stage": "DEVSIM ladder level 4.0 at N_A = N_D = 4.2e18 (the ladder was then 4.0/2.8284/2.0)",
+     "outcome": "DEVSIM convergence failure at 0.4639 V reverse (not memory; peak 2.39 GB)"},
+    {"time": "2026-10-09 11:24 EDT", "job": "rib200 lateral",
+     "stage": "DEVSIM small-signal AC, two jobs of five biases, scale 1.0 (13346 Si nodes)",
+     "outcome": "killed by memguard: RSS 2.73 GB > 2.7 GB"},
+    {"time": "2026-10-09 11:29 EDT", "job": "rib160 lshape (re-run)",
+     "stage": "complete: scale 2.0, ladder 2.8284/2.3784/2.0, study 2.8284, direct re-solve 14.1 nm, four AC jobs",
+     "outcome": "junction_rib160.json written; peak RSS 2.00 GB; 2865 s"},
+    {"time": "2026-10-09 11:30-12:28 EDT", "job": "rib160 lateral, rib200 lshape, rib200 lateral (re-runs)",
+     "stage": "queued (two re-run scripts, 11:30 and 12:28)",
+     "outcome": "never started before the session restart (empty logs)"},
+)
+# The command that produced the committed rib160 L-shape artefact (run script of 2026-10-09 11:29 EDT); the code
+# defaults of that run are the settings that mesh.settings records.
+LEGACY_RIB160_COMMAND_AS_RUN = (".venv/bin/python tools/memguard.py --limit-gb 2.7 -- .venv/bin/python -u -m "
+                                "mrm.extraction.junction --xsec rib160 --topology lshape --doping-sweep")
+
+
+def _apparent_order(vals, hs):
+    """log(d12/d23)/log(mean refinement ratio) of the last three levels, without any bracket (None when the two
+    increments differ in sign or one is zero). A diagnostic of how far the levels are from the asymptotic range."""
+    v1, v2, v3 = (float(x) for x in vals[-3:])
+    h1, _, h3 = (float(x) for x in hs[-3:])
+    d12, d23 = v1 - v2, v2 - v3
+    if d12 == 0 or d23 == 0 or (d12 > 0) != (d23 > 0):
+        return None
+    return math.log(d12 / d23) / math.log(math.sqrt(h1 / h3))
+
+
+def free_order_rows(block):
+    """Free-order view of a stored convergence block (no solver): for every {values, h} entry the observed order
+    without forcing, the apparent order, the pattern, the spread of the last three levels and of all levels, and
+    whether the stored entry forced its order. Marks forced stored entries with ``order_forced`` (the stored dicts are
+    updated in place; a stored entry that predates that flag forced its order when no free order exists)."""
+    rows = {}
+    for k, e in block.items():
+        if not (isinstance(e, dict) and "values" in e and "h" in e) or len(e["values"]) < 3:
+            continue
+        vals = np.asarray(e["values"], float)
+        fr = richardson(vals, e["h"])
+        d12, d23 = vals[-3] - vals[-2], vals[-2] - vals[-1]
+        if d12 == 0 or d23 == 0 or (d12 > 0) != (d23 > 0):
+            pattern = "non-monotone"
+        elif abs(d23) >= abs(d12):
+            pattern = "increments grow under refinement (no convergence visible at these levels)"
+        elif fr["observed_order"] is None:
+            pattern = "apparent order above 8 (the first increment dominates; not in the asymptotic range)"
+        else:
+            pattern = "monotone, order observed"
+        forced = bool(e.get("order_forced", e.get("observed_order") is not None and fr["observed_order"] is None))
+        if forced:
+            e["order_forced"] = True
+        ref = abs(vals[-1])
+        rows[k] = {"observed_order": fr["observed_order"], "apparent_order": _apparent_order(vals, e["h"]),
+                   "pattern": pattern, "order_forced_in_stored_entry": forced,
+                   "last3_spread_rel": float(np.ptp(vals[-3:]) / ref),
+                   "all_levels_spread_rel": float(np.ptp(vals) / ref),
+                   "finest_step_rel": float(abs(vals[-1] - vals[-2]) / ref)}
+        if fr["observed_order"] is not None:
+            rows[k]["free_rel_error_estimate"] = fr.get("rel_error_estimate")
+    return rows
+
+
+def _free_order_summary(rows, spread_key):
+    """One-line summary of free_order_rows: how many entries forced their order, and the spread range."""
+    forced = sorted(k for k, r in rows.items() if r["order_forced_in_stored_entry"])
+    sp = [r[spread_key] for r in rows.values()]
+    return {"entries": len(rows), "order_forced": forced, "observed": sorted(set(rows) - set(forced)),
+            f"{spread_key}_range": [min(sp), max(sp)] if sp else None}
+
+
+# Jacobian inputs whose central difference re-meshes DEVSIM (node counts of the +-step meshes differ: mesh_counts),
+# and those that also re-solve the mode. N_A, N_D, grading and outer_side reuse the nominal DEVSIM mesh.
+JACOBIAN_REMESHED = ("width_nm", "film_nm", "slab_nm", "junction_offset_nm", "y_junction_nm", "plus_gap_nm",
+                     "contact_gap_nm")
+JACOBIAN_MODE_RESOLVED = ("width_nm", "film_nm", "slab_nm")
+_JAC_LADDER_KEY = {"dneff_1v6": "dneff_1v6", "dneff_1v": "dneff_1v", "dneff_4v": "dneff_4v",
+                   "dneff_fwd0v5": "dneff_fwd0v5", "eff_avg_0_1v6_pm_per_v_fill1": "dneff_1v6",
+                   "alpha_fca_0v_per_m": "alpha_fca_0v_per_m", "alpha_fca_2v_per_m": "alpha_fca_2v_per_m",
+                   "c_1v_f_per_m": "c_1v_f_per_m", "c_2v_f_per_m": "c_2v_f_per_m",
+                   "r_series_1v_ohm_m": "r_series_1v_ohm_m"}
+_JAC_MODE_KEY = {"dneff_1v6": "dneff_1v6", "eff_avg_0_1v6_pm_per_v_fill1": "dneff_1v6",
+                 "alpha_fca_0v_per_m": "alpha_fca_0v_per_m"}
+
+
+def jacobian_remesh_noise(art, side):
+    """Upper estimate of the mesh noise in each Jacobian entry (no solver). A re-meshed central difference carries
+    the discretization difference of two meshes; its size is bounded here by the coarse-to-fine spread of the DEVSIM
+    ladder (plus the last-three spread of the mode-mesh ladder for steps that re-solve the mode), so the noise of
+    dF/dx is at most spread_rel |F| / h (h the half step). Entries on the nominal mesh (N_A, N_D, grading, outer_side)
+    have no such term. Returns {output: {input: noise / |J|}} and the entries above 0.2."""
+    jac = art.get("jacobian") or {}
+    conv = side.get("convergence") or {}
+    dm, mm = conv.get("devsim_mesh") or {}, conv.get("mode_mesh") or {}
+
+    def spread(block, key, last3):
+        e = block.get(key)
+        if not isinstance(e, dict) or "values" not in e:
+            return None
+        x = np.asarray(e["values"], float)
+        x = x[-3:] if last3 else x
+        return float(np.ptp(x) / abs(x[-1]))
+    # widths of the assumed input ranges (current-code ranges; densities in decades)
+    d_, xs_d = art["doping"], art["xsec"]
+    dop = Doping(**{k: d_[k] for k in Doping.__dataclass_fields__ if k in d_})
+    xs = dataclasses.replace(XSECS[xs_d["name"]], **{k: xs_d[k] for k in ("width_nm", "film_nm", "slab_nm")})
+    rng = {**GEOMETRY_RANGES_BY_XSEC.get(xs.name, GEOMETRY_RANGES_NM), **doping_ranges(xs, dop)}
+    widths = {}
+    for name in jac.get("d", []):
+        key = name[6:] if name.startswith("log10_") else name
+        lohi = rng.get(key)
+        if lohi and all(isinstance(x, (int, float)) for x in lohi):
+            widths[name] = math.log10(lohi[1] / lohi[0]) if name.startswith("log10_") else lohi[1] - lohi[0]
+    out, flagged = {}, []
+    for k, vals in (jac.get("of") or {}).items():
+        base = (jac.get("base") or {}).get(k)
+        if k == "f_rc_1v_ghz":
+            parts = [spread(dm, "c_1v_f_per_m", False), spread(dm, "r_series_1v_ohm_m", False)]
+            s_dev = sum(x for x in parts if x is not None) if any(x is not None for x in parts) else None
+        else:
+            s_dev = spread(dm, _JAC_LADDER_KEY.get(k, ""), False)
+        if base is None or s_dev is None:
+            continue
+        s_mode = spread(mm, _JAC_MODE_KEY.get(k, ""), True) or 0.0
+        row = {}
+        for name, jv in zip(jac["d"], vals):
+            h = (jac.get("step") or {}).get(name)
+            if name not in JACOBIAN_REMESHED or not h or jv is None:
+                row[name] = 0.0
+                continue
+            s = s_dev + (s_mode if name in JACOBIAN_MODE_RESOLVED else 0.0)
+            ratio = s * abs(base) / h / max(abs(jv), 1e-300)
+            row[name] = float(ratio)
+            width = widths.get(name)
+            effect = abs(jv) * width / abs(base) if width else None
+            if ratio > 0.2 and (effect is None or effect > 1e-3):
+                flagged.append({"of": k, "d": name, "noise_over_value": round(float(ratio), 3),
+                                "effect_over_range_rel": None if effect is None else round(float(effect), 5)})
+        out[k] = row
+    return {"noise_over_value": out, "above_0p2": flagged,
+            "note": "upper estimate (the ladder spread also holds the systematic part that cancels in a difference on "
+                    "similar meshes); doping-level, grading and outer_side steps reuse the nominal DEVSIM mesh "
+                    "(0 here). above_0p2 lists the entries whose noise may exceed 20 % of their value and whose "
+                    "effect over the assumed range exceeds 1e-3 of the output (entries with a smaller effect, such "
+                    "as the implant and contact gaps on dn_eff and C, are zero within noise and negligible)"}
+
+
+def range_notes(art, out_dir=OUT_DIR):
+    """Inconsistencies between the assumed values and the ranges recorded in a junction artefact (no solver), with
+    the ranges the current code writes (doping_ranges, GEOMETRY_RANGES_BY_XSEC) as the suggested reading."""
+    notes = []
+    d, xs_d = art["doping"], art["xsec"]
+    rec = d.get("ranges") or {}
+    dop = Doping(**{k: d[k] for k in Doping.__dataclass_fields__ if k in d})
+    xs = dataclasses.replace(XSECS[xs_d["name"]], **{k: xs_d[k] for k in ("width_nm", "film_nm", "slab_nm")})
+    sugg = {k: list(v) for k, v in doping_ranges(xs, dop).items()}
+    for k, lohi in rec.items():
+        if k in d and isinstance(d[k], (int, float)) and not lohi[0] <= d[k] <= lohi[1]:
+            notes.append(f"doping.{k} = {d[k]:g} lies outside its recorded range [{lohi[0]:g}, {lohi[1]:g}] (the "
+                         f"lateral range about the rib centre); read it as the nominal +-60 nm, {sugg[k]}, as the "
+                         f"handoff's Jacobian table does" if k == "junction_offset_nm" else
+                         f"doping.{k} = {d[k]:g} lies outside its recorded range [{lohi[0]:g}, {lohi[1]:g}]")
+    for k in ("y_junction_nm", "outer_side"):
+        if k in sugg and k not in rec:
+            notes.append(f"doping.{k} = {d[k]} has no recorded range; the current code writes {sugg[k]}"
+                         + (" (reviewer assumption: from the slab top to 60 nm above it)" if k == "y_junction_nm"
+                            else " (two-valued; jacobian stores the difference)"))
+    fixed = [k for k in DOPING_UNRANGED if k in d and k not in rec]
+    if fixed:
+        notes.append("fixed without a range and not swept: " + ", ".join(f"{k} = {d[k]:g}" for k in fixed))
+    if max(d["na_cm3"], d["nd_cm3"]) > 3e18:
+        notes.append(f"the body doping (N_A {d['na_cm3']:g}, N_D {d['nd_cm3']:g} cm^-3, selected by CAL-5) lies above "
+                     "the 5e17-3e18 cm^-3 research range that doping.provenance quotes as containing it; it is inside "
+                     "the recorded assumed range 5e17-5e18")
+    g = GEOMETRY_RANGES_BY_XSEC.get(xs_d["name"])
+    rg = xs_d.get("ranges") or {}
+    if g and rg.get("film_nm") and list(rg["film_nm"]) != list(g["film_nm"]):
+        notes.append(f"xsec.ranges.film_nm {list(rg['film_nm'])} spans both film hypotheses; the modes artefact of "
+                     f"{xs_d['name']} uses {list(g['film_nm'])} (the current code writes that)")
+    if "sidewall_deg" not in rg:
+        notes.append(f"xsec.sidewall_deg = {xs_d.get('sidewall_deg')} is assumed without a range or Jacobian (as in "
+                     "the modes artefacts); listed as not modelled")
+    return {"notes": notes, "suggested_ranges": {"doping": sugg, "xsec": {k: list(v) for k, v in (g or {}).items()}}}
+
+# Peak-memory model for DEVSIM jobs (tree RSS under tools/memguard.py, UMFPACK, 2-D meshes of this module):
+# baseline + slope * Si nodes, calibrated on the L-shape kill at 2.86 GB with 14862 Si nodes (a LOWER bound: the job
+# was killed at that sample). It reproduces the other records: L-shape scale 2.0 (7880 Si nodes) 1.66 GB against a
+# whole-run peak of 2.00 GB; lateral rib160 scale 1.0 (10606) 2.12 GB, not killed in DEVSIM stages under 2.7 GB;
+# lateral rib200 scale 1.0 (13346) 2.60 GB, killed at 2.73 GB in the AC stage. The superlinear variant (exponent
+# 1.2 about the calibration point) brackets direct-solver fill-in growth on finer meshes.
+MEM_BASE_GB = 0.30
+MEM_PER_SI_NODE_GB = (2.86 - MEM_BASE_GB) / 14862
+_MEM_CAL_NSI = 14862
+
+
+def estimate_peak_gb(n_si):
+    """(linear, superlinear) estimates of the peak tree RSS (GB) of a DEVSIM job with n_si silicon nodes."""
+    lin = MEM_BASE_GB + MEM_PER_SI_NODE_GB * n_si
+    sup = MEM_BASE_GB + MEM_PER_SI_NODE_GB * _MEM_CAL_NSI * (n_si / _MEM_CAL_NSI) ** 1.2
+    return lin, sup
+
+
+def mesh_counts(xs: XSec, d: Doping, scale):
+    """Node counts of the DEVSIM mesh at ``scale`` (no solve): all nodes used by triangles, and the Si nodes."""
+    coords, names, el, info = build_devsim_mesh(xs, d, scale)
+    ntri = info["triangles"]
+    tri = np.asarray(el[:5 * ntri], dtype=np.int64).reshape(ntri, 5)
+    si = tri[:, 1] == names.index("si")
+    return {"scale": float(scale), "h_junction_nm": 1.0 * scale, "triangles": int(ntri),
+            "nodes": int(np.unique(tri[:, 2:]).size), "nodes_si": int(np.unique(tri[si, 2:]).size)}
+
+
+def mesh_report(xs_names=tuple(XSECS), topologies=TOPOLOGIES, scales=None, log=print):
+    """DEVSIM mesh sizes and estimated peak memory per scale (no solve). Default scales: the ladder and production
+    scale in use (PROD) plus the finer levels intended before the memory cap."""
+    rows = []
+    for xs_name in xs_names:
+        for topo in topologies:
+            d = nominal_doping(xs_name, topo)
+            sc = scales or sorted({4.0, 2.8284, 2.3784, 2.0, 1.4142, 1.0}, reverse=True)
+            for s_ in sc:
+                c = mesh_counts(XSECS[xs_name], d, s_)
+                lin, sup = estimate_peak_gb(c["nodes_si"])
+                row = dict(xsec=xs_name, topology=topo, **c, est_peak_gb_linear=round(lin, 2),
+                           est_peak_gb_superlinear=round(sup, 2))
+                rows.append(row)
+                log(f"{xs_name:7s} {topo:8s} scale {s_:<7g} h_j {c['h_junction_nm']:.3g} nm: {c['nodes']:6d} nodes, "
+                    f"{c['nodes_si']:6d} Si nodes, est. peak {min(lin, sup):.2f}-{max(lin, sup):.2f} GB")
+    return rows
+
+
+def _modes_artefact(out_dir, xs_name):
+    """(data, sidecar) of modes_<xs_name>.json if it exists and passes its sha256, else (None, reason)."""
+    mp_, ms_ = out_dir / f"modes_{xs_name}.json", out_dir / f"modes_{xs_name}.sidecar.json"
+    if not (mp_.exists() and ms_.exists()):
+        return None, f"no modes artefact for {xs_name}"
+    msd = json.loads(ms_.read_text())
+    if msd.get("sha256") != _sha256(mp_):
+        return None, f"modes_{xs_name}.json fails its sha256"
+    return (json.loads(mp_.read_text()), msd), None
+
+
+def modes_consistency(art, ma, msd):
+    """Compare a junction artefact with the modes artefact of its cross-section (straight and bent)."""
+    ov = art["overlap"]
+    st = ma.get("straight") or {}
+    st_w = ((st.get("index_weights") or {}).get("fd") or {}).get("si")
+    comp = {"modes_sha256": msd["sha256"], "modes_r_ref_um": ma.get("r_ref_um"), "junction_r_ref_um": ov["r_ref_um"],
+            "delta_r_ref_um": ov["r_ref_um"] - ma["r_ref_um"],
+            "straight": {"modes_n_eff": st.get("n_eff"), "junction_n_eff": ov["n_eff_straight"],
+                         "modes_n_g": st.get("n_g"), "junction_n_g": ov["n_g_straight"],
+                         "modes_index_weight_si": st_w, "junction_index_weight_si": ov["dneff_dnsi_straight"]},
+            "modes_n_eff": ma.get("n_eff"), "junction_n_eff_bent": ov["n_eff_bent"],
+            "modes_n_g": ma.get("n_g"), "junction_n_g_bent": ov["n_g_bent"],
+            "modes_index_weight_si": (ma.get("index_weights") or {}).get("si"),
+            "junction_index_weight_si": ov["dneff_dnsi_bent"],
+            "note": "modes: exact anisotropic bend transform (mrm.extraction.common, formulation 'exact') on its own "
+                    "mesh; junction: femwell's isotropic conformal map. Same geometry, materials and r_ref. The "
+                    "straight rows compare two independent femwell meshes and domains; the bent rows differ by the "
+                    "bend formulation (see uncertainty.model.bend_formulation)."}
+    if st.get("n_eff"):
+        comp["straight"]["delta_n_eff"] = ov["n_eff_straight"] - st["n_eff"]
+        comp["straight"]["rel_diff_n_g"] = ov["n_g_straight"] / st["n_g"] - 1
+    if st_w:
+        comp["straight"]["rel_diff_index_weight_si"] = ov["dneff_dnsi_straight"] / st_w - 1
+    comp["delta_n_eff_bent"] = ov["n_eff_bent"] - ma["n_eff"]
+    comp["rel_diff_n_g"] = ov["n_g_bent"] / ma["n_g"] - 1
+    comp["rel_diff_index_weight_si"] = ov["dneff_dnsi_bent"] / ma["index_weights"]["si"] - 1
+    cc = ma.get("crosscheck") or {}
+    if "femwell_exact_bend_shift" in cc:
+        comp["bend_shift_n_eff"] = {"junction_isotropic": ov["n_eff_bent"] - ov["n_eff_straight"],
+                                    "modes_isotropic": cc.get("femwell_isotropic_bend_shift"),
+                                    "modes_exact": cc["femwell_exact_bend_shift"],
+                                    "tidy3d_finest": (cc.get("tidy3d_bend_shift") or [None])[-1]}
+    return comp
+
+
+def tidy3d_reassessment(t3, fem, modes_cc=None):
+    """Re-read a stored Tidy3D convergence series without a forced order (no solver). ``fem``: the femwell straight
+    n_eff and Si index weight; ``modes_cc``: the crosscheck block of the modes artefact (independent Tidy3D run)."""
+    rows = t3["rows"]
+    h = [float(r["dl_nm"]) for r in rows]
+    ne = [float(r["n_eff"]) for r in rows]
+    w = [float(r["dneff_dnsi"]) for r in rows]
+
+    def order_test(vals):
+        d12, d23 = vals[-3] - vals[-2], vals[-2] - vals[-1]
+        g0 = math.log(h[-3] / h[-2]) / math.log(h[-2] / h[-1])
+        return {"d12_over_d23": d12 / d23, "minimum_for_any_positive_order": g0,
+                "power_law_possible": bool(d12 / d23 > g0)}
+    out = {"finest_dl_nm": h[-1], "delta_n_eff_finest": ne[-1] - fem["n_eff"],
+           "delta_dneff_dnsi_finest": w[-1] - fem["dneff_dnsi"],
+           "free_order_n_eff": richardson(ne, h), "free_order_dneff_dnsi": richardson(w, h),
+           "order_test_n_eff": order_test(ne), "order_test_dneff_dnsi": order_test(w)}
+    valid = out["free_order_n_eff"]["observed_order"] is not None
+    out["stored_extrapolation_valid"] = bool(valid)
+    if modes_cc and "straight_extrapolated" in modes_cc:
+        se = modes_cc["straight_extrapolated"]
+        out["modes_artefact_tidy3d_straight"] = {
+            "dl_nm": se.get("h"), "n_eff": se.get("f"), "extrapolated": se["f0"], "observed_order": se.get("p"),
+            "error_estimate": se.get("err"), "delta_vs_junction_femwell_straight": se["f0"] - fem["n_eff"],
+            "within_error": bool(abs(se["f0"] - fem["n_eff"]) <= max(float(se.get("err") or 0.0), 2e-3)),
+            "source": "modes_<xsec>.json crosscheck (interface-aligned grids, +R/-R mean for the bend)"}
+    if valid:
+        out["verdict"] = "the free-order extrapolation is usable; delta = extrapolated - femwell"
+        out["status"] = "consistent" if abs(out["free_order_n_eff"]["extrapolated"] - fem["n_eff"]) < 2e-3 else \
+            "inconsistent"
+    else:
+        ot = out["order_test_n_eff"]
+        forced = (t3.get("n_eff_conv") or {}).get("observed_order") is not None
+        out["verdict"] = (
+            "no power law fits this Tidy3D series (d12/d23 = %.3f below %.3f, the minimum for any positive order with "
+            "these refinement ratios): %s. The finest grid (%.3g nm) is %.2e from femwell in n_eff and %.2e in "
+            "dn_eff/dn_Si. This stage alone neither confirms nor refutes femwell at the 2e-3 level." % (
+                ot["d12_over_d23"], ot["minimum_for_any_positive_order"],
+                "the forced first-order extrapolation stored as delta_n_eff is not valid" if forced else
+                "delta_n_eff is the finest grid, not an extrapolation", h[-1], out["delta_n_eff_finest"],
+                out["delta_dneff_dnsi_finest"]))
+        ms = out.get("modes_artefact_tidy3d_straight")
+        if ms:
+            out["verdict"] += (" The modes artefact's independent Tidy3D run of the same cross-section extrapolates "
+                               "to %.6f +- %.2g, %.2e from this femwell n_eff." % (
+                                   ms["extrapolated"], ms["error_estimate"], ms["delta_vs_junction_femwell_straight"]))
+            out["status"] = "consistent via the modes artefact's Tidy3D run" if ms["within_error"] else "inconsistent"
+        else:
+            out["status"] = "inconclusive"
+    return out
+
+
+def bend_formulation_bias(art, comp):
+    """Estimated bias of the bent-mode overlap from femwell's isotropic bend map (no solver).
+
+    The artefact stores the overlap with the bent mode (isotropic map) and with the straight mode (aux). The exact
+    transform (modes artefact; agrees with Tidy3D's bend shift to 1 %) has a smaller bend effect. With the exact
+    effect = k x the isotropic one, k is bracketed by the stored exact/isotropic ratios of the same rib at the same
+    r_ref: the n_eff bend shift (lower end) and the bend change of the Si index weight (upper end); k = 0 (straight)
+    and k = 1 (isotropic) are hard bounds. Returns relative biases of the stored values (stored/exact - 1)."""
+    v = np.asarray(art["v_reverse_v"], float)
+    dn, dn_s = np.asarray(art["dneff"], float), np.asarray(art["aux"]["dneff_straight"], float)
+    al, al_s = np.asarray(art["alpha_fca_per_m"], float), np.asarray(art["aux"]["alpha_fca_straight_per_m"], float)
+    st = comp["straight"]
+    bs = comp.get("bend_shift_n_eff") or {}
+    k_lo = bs["modes_exact"] / bs["modes_isotropic"]
+    k_hi = ((comp["modes_index_weight_si"] - st["modes_index_weight_si"])
+            / (comp["junction_index_weight_si"] - st["junction_index_weight_si"]))
+    k_ng = (comp["modes_n_g"] - st["modes_n_g"]) / (comp["junction_n_g_bent"] - st["junction_n_g"])
+
+    def bias(b, k):
+        return (1.0 + b) / (1.0 + k * b) - 1.0
+    b_dn16 = float(np.interp(1.6, v, dn) / np.interp(1.6, v, dn_s) - 1.0)
+    b_a0 = float(np.interp(0.0, v, al) / np.interp(0.0, v, al_s) - 1.0)
+    sel = np.abs(v) > 0.07
+    b_dn_v = dn[sel] / dn_s[sel] - 1.0
+    cal = art["reports"]["cal5"]["hypotheses"]["H_solver"]
+    ng_ratio = comp["modes_n_g"] / comp["junction_n_g_bent"]
+    out = {"k_range": [k_lo, k_hi], "k_from_n_g_bend_change": k_ng,
+           "k_basis": "exact/isotropic ratio of the bend effect on the same rib at the same r_ref: n_eff shift "
+                      "(lower), Si index weight (upper); n_g gives a value inside the range",
+           "stored_bend_effect": {"dneff_1v6": b_dn16, "alpha_fca_0v": b_a0,
+                                  "dneff_range_over_bias": [float(b_dn_v.min()), float(b_dn_v.max())]},
+           "bias_of_stored": {
+               "dneff_1v6_rel": sorted([bias(b_dn16, k_lo), bias(b_dn16, k_hi)]),
+               "alpha_fca_0v_rel": sorted([bias(b_a0, k_lo), bias(b_a0, k_hi)]),
+               "dneff_1v6_rel_hard_bound": sorted([b_dn16, 0.0]),
+               "alpha_fca_0v_rel_hard_bound": sorted([b_a0, 0.0]),
+               "dneff_shape_0_to_4v_rel": [float((1 - k) * (b_dn_v.max() - b_dn_v.min())) for k in (k_hi, k_lo)]},
+           "consequence_for_cal5": {}}
+    f0 = float(cal["fill_endpoint"])
+    a0 = float(np.interp(0.0, v, al))
+    # fill ~ n_g / dn_eff(1.6 V) (CAL-5 endpoint); the exact-transform estimates for k at both ends of its range
+    fill_k = {k: f0 * (1.0 + bias(b_dn16, k)) * ng_ratio for k in (k_lo, k_hi)}
+    fills = sorted(fill_k.values())
+    ring_alpha = sorted(fill_k[k] * a0 / (1.0 + bias(b_a0, k)) for k in (k_lo, k_hi))
+    out["consequence_for_cal5"] = {
+        "fill_endpoint_stored": f0, "fill_endpoint_exact_estimate": fills,
+        "n_g_ratio_modes_over_junction": ng_ratio,
+        "ring_alpha_fca_0v_per_m_stored": f0 * a0, "ring_alpha_fca_0v_per_m_exact_estimate": ring_alpha,
+        "note": "the runtime calibrates fill to CAL-5, so fill x dneff is fixed; what remains is the calibrated fill "
+                "(C_j, R_s and the ring-average alpha_FCA scale with it) and alpha_FCA per unit of shift (eta)"}
+    out["fix"] = ("solve the bent TE0 with mrm.extraction.common.FemProblem(...).solve(formulation='exact') and take "
+                  "the index-weight density of the transformed tensors (as mrm.extraction.modes.index_weight_block "
+                  "does) in place of femwell compute_modes(radius=...); then re-run the extraction")
+    return out
+
+
+def _cmd(xs_name, topo, extra=""):
+    return (".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction "
+            f"--xsec {xs_name} --topology {topo} --doping-sweep{extra}")
+
+
+def not_done_record(out_dir):
+    """What the original task asked for that the stored artefacts do not contain, with the command that would
+    produce it and the runtime fallback in the meantime."""
+    out_dir = pathlib.Path(out_dir)
+    missing = []
+    for xs_name, topo in EXPECTED_ARTEFACTS:
+        name = artefact_name(xs_name, topo) + ".json"
+        if (out_dir / name).exists():
+            continue
+        why = {("rib160", "lateral"): "killed at the direct re-solve (2.71 GB > 2.7 GB self-limit); the re-run "
+                                      "never started before the session restart",
+               ("rib200", "lshape"): "DEVSIM convergence failure on the coarse ladder level 4.0 (not memory); the "
+                                     "ladder and the DC tolerance fallback were fixed afterwards, the re-run never "
+                                     "started",
+               ("rib200", "lateral"): "killed in the AC stage (2.73 GB > 2.7 GB self-limit); the re-run never "
+                                      "started"}.get((xs_name, topo), "not run")
+        intended = " --direct-mode-res-floor 0.010" if topo == "lateral" else \
+            " --scale 1.4142 --ladder 2.8284 2.0 1.4142 --study-scale 2.0 --direct-mode-res-floor 0.010"
+        missing.append({"artefact": name, "why": why, "command_as_committed_settings": _cmd(xs_name, topo),
+                        "command_intended_settings_6gb": _cmd(xs_name, topo, intended),
+                        "runtime_fallback": ("fidelity.junction_model = analytic (the g26 default): the analytic "
+                                             "depletion law with the preset fill, eff_at_0v, V_bi, exponent, C0, R_s "
+                                             "and q") if topo == DEFAULT_TOPOLOGY else
+                        "none needed (alternative topology; the default L-shape artefact or the analytic law)"})
+    return missing
+
+
+def postprocess(out_dir=OUT_DIR, log=print):
+    """Sidecar post-processing from stored data only (no solver): modes-artefact consistency, the Tidy3D
+    reassessment, the bend-formulation bias, the free-order view of the DEVSIM ladder, the memory-cap record and the
+    list of what was not done. The data file and its sha256 are unchanged (checked)."""
+    out_dir = pathlib.Path(out_dir)
+    done = []
+    for p in sorted(out_dir.glob("junction_*.json")):
+        if p.name.endswith(".sidecar.json"):
+            continue
+        sc = p.with_name(p.stem + ".sidecar.json")
+        art, side = json.loads(p.read_text()), json.loads(sc.read_text())
+        digest = _sha256(p)
+        if side.get("sha256") != digest:
+            raise RuntimeError(f"{p.name}: sha256 does not match its sidecar; refusing to post-process")
+        steps = []
+        modes, why = _modes_artefact(out_dir, art["xsec"]["name"])
+        val = side.setdefault("validation", {})
+        unc = side.setdefault("uncertainty", {}).setdefault("model", {})
+        comp = None
+        if modes:
+            ma, msd = modes
+            comp = modes_consistency(art, ma, msd)
+            val["modes_artefact_consistency"] = comp
+            steps.append("validation.modes_artefact_consistency (straight and bent, bend shifts)")
+            if isinstance(val.get("tidy3d_vs_femwell"), dict) and "rows" in val["tidy3d_vs_femwell"]:
+                t3 = val["tidy3d_vs_femwell"]
+                t3["reassessment"] = tidy3d_reassessment(t3, t3["femwell_straight"], ma.get("crosscheck"))
+                if not t3["reassessment"]["stored_extrapolation_valid"] and \
+                        (t3.get("n_eff_conv") or {}).get("observed_order") is not None:
+                    t3["delta_n_eff_valid"] = False
+                    t3["delta_note"] = ("delta_n_eff and delta_dneff_dnsi come from a first-order extrapolation that "
+                                        "no power law supports (reassessment); do not use them")
+                steps.append("validation.tidy3d_vs_femwell.reassessment")
+            if comp.get("bend_shift_n_eff") and "aux" in art and "dneff_straight" in art["aux"]:
+                unc["bend_formulation"] = bend_formulation_bias(art, comp)
+                steps.append("uncertainty.model.bend_formulation")
+        else:
+            log(f"{p.name}: {why}")
+        conv = side.get("convergence") or {}
+        dm = conv.get("devsim_mesh") or {}
+        mm = conv.get("mode_mesh") or {}
+        if dm.get("scales"):
+            dm.pop("free_order_view", None)
+            free = free_order_rows(dm)
+            for row in free.values():               # name kept from the first post-processing
+                row["ladder_spread_rel"] = row["all_levels_spread_rel"]
+            dm["free_order_view"] = {
+                "rows": free,
+                "summary": _free_order_summary(free, "all_levels_spread_rel"),
+                "note": "where no order in [0.2, 8] is observed (see pattern) the stored entry forced order 2 "
+                        "(order_forced) and its error estimate rests on that assumption. The supported error scale is "
+                        "the coarse-to-fine spread (all_levels_spread_rel): for monotone convergence of order p the "
+                        "finest-level error is spread / ((h_coarse/h_fine)^p - 1), 1.0x the spread at p = 2 and 2.4x "
+                        "at p = 1 on a sqrt(2) ladder. A narrow ladder (ratio 2^0.25 per step) makes the increments "
+                        "comparable with mesh-to-mesh noise, so apparent orders far above 2 or growing increments "
+                        "mean 'not asymptotic', not 'converged'"}
+            steps.append("convergence.devsim_mesh.free_order_view (order_forced flags)")
+        if mm.get("res_um"):
+            mm.pop("free_order_view", None)
+            fm_rows = free_order_rows(mm)
+            mm["free_order_view"] = {
+                "rows": fm_rows, "summary": _free_order_summary(fm_rows, "last3_spread_rel"),
+                "note": "entries with order_forced_in_stored_entry: the stored order 4 was assumed on a sequence that "
+                        "shows no order (pattern), so the stored error estimate is not supported; use "
+                        "last3_spread_rel (spread of the three finest levels) as the error scale"}
+            steps.append("convergence.mode_mesh.free_order_view (order_forced flags)")
+        num = (side.get("uncertainty") or {}).get("numerical") or {}
+        if num and (dm.get("free_order_view") or mm.get("free_order_view")):
+            fd = (dm.get("free_order_view") or {}).get("rows", {})
+            fm = (mm.get("free_order_view") or {}).get("rows", {})
+            for k, row in num.items():
+                if not isinstance(row, dict):
+                    continue
+                if k in fd:
+                    row["devsim_mesh_order_forced"] = fd[k]["order_forced_in_stored_entry"]
+                    row["devsim_mesh_rel_spread"] = fd[k]["all_levels_spread_rel"]
+                if k in fm:
+                    row["mode_mesh_order_forced"] = fm[k]["order_forced_in_stored_entry"]
+                    row["mode_mesh_rel_spread_last3"] = fm[k]["last3_spread_rel"]
+            num["note"] = ("devsim_mesh_rel and mode_mesh_rel are Richardson estimates; where *_order_forced is true "
+                           "the order was assumed, not observed, and the *_rel_spread values (spread of the levels) "
+                           "are the supported error scale")
+            steps.append("uncertainty.numerical (spreads)")
+        if art.get("jacobian"):
+            side.setdefault("uncertainty", {})["jacobian_remesh_noise"] = jacobian_remesh_noise(art, side)
+            steps.append("uncertainty.jacobian_remesh_noise")
+        side.setdefault("inputs", {})["range_notes"] = range_notes(art, out_dir)
+        steps.append("inputs.range_notes")
+        mesh = side.setdefault("mesh", {})
+        settings = mesh.get("settings") or {}
+        if not settings and art["doping"]["topology"] == "lshape" and art["xsec"]["name"] == "rib160":
+            # the committed rib160 L-shape run predates mesh.settings; its settings (PROD and the run log)
+            settings = {"devsim_scale": 2.0, "devsim_ladder": [2.8284, 2.3784, 2.0], "study_scale": 2.8284,
+                        "direct_mode_res_floor_um": 0.0141, "ac_jobs": 4, "jacobian_mode_res_um": 0.016}
+            mesh["settings"] = settings
+        if (art["doping"]["topology"] == "lshape" and art["xsec"]["name"] == "rib160"
+                and settings.get("devsim_scale") == 2.0 and settings.get("direct_mode_res_floor_um") == 0.0141):
+            # the run predates the recorded --doping-sweep and settings in "command"
+            side["command"] = ("python -m mrm.extraction.junction --xsec rib160 --topology lshape --scale 2 --ladder "
+                               "2.8284 2.3784 2 --study-scale 2.8284 --direct-mode-res-floor 0.0141 --doping-sweep")
+            side["command_as_run"] = LEGACY_RIB160_COMMAND_AS_RUN
+            fin = mesh_counts(XSECS["rib160"], nominal_doping("rib160", "lshape"), 1.4142)
+            fin1 = mesh_counts(XSECS["rib160"], nominal_doping("rib160", "lshape"), 1.0)
+            mesh["memory"] = {
+                "self_limit_gb_at_run_time": 2.7, "rule_at_run_time": "3 GB per job (tools/memguard.py, --heavy was "
+                "not used); since 2026-10-09 a --heavy job defaults to 6 GB",
+                "run_history": list(RUN_HISTORY),
+                "reductions": [
+                    {"what": "L-shape DEVSIM production mesh, ladder and study level",
+                     "intended": {"devsim_scale": 1.4142, "devsim_ladder": [2.8284, 2.0, 1.4142], "study_scale": 2.0},
+                     "used": {k: settings[k] for k in ("devsim_scale", "devsim_ladder", "study_scale")},
+                     "trigger": RUN_HISTORY[0]["outcome"],
+                     "accuracy_consequence": "convergence.devsim_mesh: the forced-order-2 Richardson errors (2e-5 to "
+                                             "5e-4) are not supported (free_order_view); the coarse-to-fine spread "
+                                             "is 1.4e-4 to 1.3e-3, and the lateral junction moved by up to 1.3e-3 "
+                                             "between 2.0 and 1.0 nm (logged run), so the 2.0 nm values carry about "
+                                             "1e-3 of mesh error. The coarser ladder is the larger loss: it shows no "
+                                             "convergence order",
+                     "intended_mesh": fin, "intended_est_peak_gb": [round(x, 2) for x in estimate_peak_gb(
+                         fin["nodes_si"])],
+                     "scale_1_mesh": fin1, "scale_1_est_peak_gb": [round(x, 2) for x in estimate_peak_gb(
+                         fin1["nodes_si"])],
+                     "intended_est_peak_note": "the calibration point itself: the DC sweep at 1.4142 was killed "
+                                               "at 2.86 GB, so its peak is >= 2.86 GB; the AC jobs (2-3 small-signal "
+                                               "solves, about 75 MB each at this size) add about 0.2 GB: about 3.1 GB",
+                     "fits_6gb": "intended (1.4142) yes; scale 1.0 marginal (estimate 5.1-5.7 GB from a lower-bound "
+                                 "calibration), not recommended with UMFPACK"},
+                    {"what": "direct re-solve mode mesh floored at 14.1 nm (production mode mesh 10 nm)",
+                     "trigger": RUN_HISTORY[1]["outcome"],
+                     "accuracy_consequence": "the 14.1 -> 10 nm change of the perturbative dn_eff(1.6 V) is 1.1e-4 "
+                                             "relative and of alpha(0) 1.7e-4 (convergence.mode_mesh), so the stored "
+                                             "direct-vs-perturbative differences carry about 1e-4 of mesh mismatch "
+                                             "(tolerance 2e-2)",
+                     "fits_6gb": "yes (killed at 2.71 GB under a 2.7 GB limit)"},
+                    {"what": "AC small-signal solves split into four jobs instead of two",
+                     "trigger": RUN_HISTORY[3]["outcome"], "accuracy_consequence": "none (identical solutions; dn_eff "
+                     "of the AC runs equals the DC run to 5.5e-16)", "fits_6gb": "yes"}]}
+            steps.append("mesh.settings, mesh.memory (run history, reductions, mesh counts without solving)")
+        side["not_done"] = not_done_record(out_dir)
+        side["open_issues"] = [
+            "bent-mode overlap uses femwell's isotropic bend map: dn_eff low by 0.6-1.5 %, alpha_FCA high by "
+            "0.9-2.2 % (uncertainty.model.bend_formulation; fix described there)",
+            "the junction's own Tidy3D stage is inconclusive (no power law); the independent check is the modes "
+            "artefact's Tidy3D run (validation.tidy3d_vs_femwell.reassessment)",
+            "doping.provenance says the lateral junction cannot reach CAL-5 with fill <= 1 up to 5e18; the lateral "
+            "sweep that shows it (fill 1.46-3.46) is from an unarchived run of an earlier code version, recorded in "
+            "docs/handoff/extract_junction.md; junction_<xsec>_lateral.json does not exist yet",
+            "CAL-5 fill without the self-heating relief (the G25 measurement power is not published); "
+            "reports.cal5.selfheat_relief brackets it (fill 0.90-1.19)",
+            "not modelled: incomplete ionization, band-gap narrowing, implant profiles (box/erf assumed), sidewall "
+            "angle, pads and vias (uncertainty.model.not_modelled)"]
+        forced = sorted(set((dm.get("free_order_view") or {}).get("summary", {}).get("order_forced", []))
+                        | {"mode_mesh." + k for k in (mm.get("free_order_view") or {}).get("summary", {}).get(
+                            "order_forced", [])})
+        if forced:
+            side["open_issues"].append(
+                "convergence orders forced, not observed, for: " + ", ".join(forced) + "; their stored error "
+                "estimates rest on the assumed order; use the spreads in the free_order_view blocks (and "
+                "uncertainty.numerical *_rel_spread)")
+        rn = side["inputs"]["range_notes"]["notes"]
+        if rn:
+            side["open_issues"].append("assumption labels: " + "; ".join(rn) + " (inputs.range_notes)")
+        jn = (side.get("uncertainty") or {}).get("jacobian_remesh_noise", {}).get("above_0p2") or []
+        if jn:
+            side["open_issues"].append(
+                "Jacobian entries whose re-meshing noise may exceed 20 % of the value: " + ", ".join(
+                    f"d {x['of']}/d {x['d']} ({x['noise_over_value']:.2g})" for x in jn)
+                + " (uncertainty.jacobian_remesh_noise; upper estimate)")
+        steps.append("not_done, open_issues")
+        hist = side.setdefault("history", [])
+        hist[:] = [h for h in hist if not str(h.get("note", "")).startswith("postprocess (no solver)")]
+        hist.append({"sidecar_update_utc": _now_utc(),
+                     "note": "postprocess (no solver): " + "; ".join(steps) + ". Data file unchanged.",
+                     "command": "python -m mrm.extraction.junction --postprocess"})
+        side["sha256"] = digest
+        sc.write_text(json.dumps(side, indent=1, default=_json_default) + "\n")
+        if _sha256(p) != digest:
+            raise RuntimeError(f"{p.name} changed during post-processing")
+        log(f"{p.name}: " + "; ".join(steps))
+        done.append(p.name)
+    return done
+
+
 def recheck_modes(out_dir=OUT_DIR, log=print):
-    """Post-processing (no solver): compare every junction artefact with the modes artefact of its cross-section
-    (r_ref, n_eff, n_g, Si index weight) and store the comparison in the junction sidecar (the data file and its
-    sha256 are unchanged)."""
+    """Post-processing (no solver): store the modes-artefact comparison in every junction sidecar (kept for the
+    --recheck-modes flag; --postprocess does this and more)."""
     out_dir = pathlib.Path(out_dir)
     for p in sorted(out_dir.glob("junction_*.json")):
         if p.name.endswith(".sidecar.json"):
             continue
         sc = p.with_name(p.stem + ".sidecar.json")
-        art = json.loads(p.read_text())
-        side = json.loads(sc.read_text())
-        xs_name = art["xsec"]["name"]
-        mp_ = out_dir / f"modes_{xs_name}.json"
-        ms_ = out_dir / f"modes_{xs_name}.sidecar.json"
-        if not (mp_.exists() and ms_.exists()):
-            log(f"{p.name}: no modes artefact for {xs_name}")
+        art, side = json.loads(p.read_text()), json.loads(sc.read_text())
+        modes, why = _modes_artefact(out_dir, art["xsec"]["name"])
+        if not modes:
+            log(f"{p.name}: {why}")
             continue
-        ma, msd = json.loads(mp_.read_text()), json.loads(ms_.read_text())
-        if msd.get("sha256") != _sha256(mp_):
-            log(f"{p.name}: modes_{xs_name}.json fails its sha256; skipped")
-            continue
-        ov = art["overlap"]
-        comp = {"modes_sha256": msd["sha256"], "modes_r_ref_um": ma.get("r_ref_um"), "junction_r_ref_um": ov["r_ref_um"],
-                "modes_n_eff": ma.get("n_eff"), "junction_n_eff_bent": ov["n_eff_bent"],
-                "modes_n_g": ma.get("n_g"), "junction_n_g_bent": ov["n_g_bent"],
-                "modes_index_weight_si": (ma.get("index_weights") or {}).get("si"),
-                "junction_index_weight_si": ov["dneff_dnsi_bent"],
-                "note": "modes: exact anisotropic bend transform on its own mesh; junction: femwell isotropic conformal "
-                        "map; same geometry and materials (post-processed by recheck_modes, no solver re-run)"}
-        try:
-            comp["rel_diff_n_g"] = ov["n_g_bent"] / ma["n_g"] - 1
-            comp["rel_diff_index_weight_si"] = ov["dneff_dnsi_bent"] / ma["index_weights"]["si"] - 1
-            comp["delta_r_ref_um"] = ov["r_ref_um"] - ma["r_ref_um"]
-        except Exception:
-            pass
+        comp = modes_consistency(art, *modes)
         side.setdefault("validation", {})["modes_artefact_consistency"] = comp
         side["sha256"] = _sha256(p)
         sc.write_text(json.dumps(side, indent=1, default=_json_default) + "\n")
@@ -2156,19 +2829,38 @@ def main(argv=None):
     ap.add_argument("--no-crosschecks", action="store_true")
     ap.add_argument("--doping-sweep", action="store_true", help="also run the doping consistency sweep")
     ap.add_argument("--doping-sweep-only", action="store_true", help="only print the doping consistency sweep")
+    ap.add_argument("--scale", type=float, default=None, help="DEVSIM production scale (1 = 1 nm at the junction)")
+    ap.add_argument("--ladder", type=float, nargs=3, default=None, help="DEVSIM convergence scales, coarse to fine")
+    ap.add_argument("--study-scale", type=float, default=None,
+                    help="DEVSIM scale of the side studies (Jacobian, oxide extent, temperature, doping sweep)")
+    ap.add_argument("--direct-mode-res-floor", type=float, default=None,
+                    help="coarsest mode mesh (um) of the direct re-solve; default %g" % DIRECT_MODE_RES_FLOOR_UM)
     ap.add_argument("--recheck-modes", action="store_true",
                     help="no solver: compare the junction artefacts with the modes artefacts and update the sidecars")
+    ap.add_argument("--postprocess", action="store_true",
+                    help="no solver: sidecar post-processing from stored data (see postprocess())")
+    ap.add_argument("--mesh-report", action="store_true",
+                    help="no solver: DEVSIM mesh sizes and estimated peak memory (uses --scales)")
+    ap.add_argument("--scales", type=float, nargs="+", default=None, help="scales for --mesh-report")
     a = ap.parse_args(argv)
     out = pathlib.Path(a.out) if a.out else (pathlib.Path(tempfile.gettempdir()) / "mrm_junction_quick"
                                               if a.quick else OUT_DIR)
     log = lambda s: print(s, flush=True)  # noqa: E731
+    if a.mesh_report:
+        mesh_report(a.xsec, a.topology, a.scales, log=log)
+        return 0
+    if a.postprocess:
+        postprocess(out, log=log)
+        return 0
     if a.recheck_modes:
         recheck_modes(out, log=log)
         return 0
+    prod = {"scale": a.scale, "ladder": a.ladder, "study": a.study_scale}
     if a.doping_sweep_only:
         for name in a.xsec:
             for topo in a.topology:
-                log(json.dumps(doping_sweep(name, topo, log=log), indent=1, default=_json_default))
+                log(json.dumps(doping_sweep(name, topo, log=log, scale=a.study_scale), indent=1,
+                               default=_json_default))
         return 0
     status = 0
     for name in a.xsec:
@@ -2176,11 +2868,13 @@ def main(argv=None):
             light = topo != DEFAULT_TOPOLOGY
             try:
                 art, side = extract(name, topology=topo, quick=a.quick, log=log,
-                                    do_crosschecks=not a.no_crosschecks, light=light)
+                                    do_crosschecks=not a.no_crosschecks, light=light, prod=prod,
+                                    direct_res_floor_um=a.direct_mode_res_floor)
                 if a.doping_sweep and not a.quick:
                     log(f"[{name}/{topo}] doping sweep")
-                    art["reports"]["doping_sweep"] = doping_sweep(name, topo, log=log,
+                    art["reports"]["doping_sweep"] = doping_sweep(name, topo, log=log, scale=a.study_scale,
                                                                   r_ref_um=art["overlap"]["r_ref_um"])
+                    side["command"] += " --doping-sweep"     # the recorded command reproduces the whole artefact
                 p, s = write_artefact(art, side, out)
                 log(f"wrote {p} and {s.name} ({side['seconds']} s)")
             except Exception:            # keep going with the other artefacts; report at the end
