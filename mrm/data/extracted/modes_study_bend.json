@@ -1,0 +1,656 @@
+{
+ "schema": "modes_bend_study/1",
+ "question": "05 section 5.4: femwell's isotropic conformal map gives +0.0014 at R = 7.5 um, Tidy3D's exact transform +0.00038. Which is right?",
+ "assembled_from_existing_results": true,
+ "strip_bend_shift": [
+  {
+   "xsec": "strip400x200",
+   "R_um": 6.094834611049774,
+   "straight": 2.4914219359874017,
+   "exact": 2.491996527953492,
+   "isotropic": 2.4935687362432106,
+   "exact_shift": 0.000574591966090221,
+   "isotropic_shift": 0.002146800255808934,
+   "tidy3d_straight": 2.4916132728570726,
+   "tidy3d_mean": 2.492188819572452,
+   "tidy3d_shift": 0.0005804994512241812,
+   "tidy3d_shift_by_grid": {
+    "dl_nm": [
+     10.0,
+     5.0,
+     2.5
+    ],
+    "shift": [
+     0.0006009336174730429,
+     0.0005867918580411136,
+     0.0005804994512241812
+    ]
+   },
+   "tidy3d_shift_extrapolated": 0.0005755467153796268,
+   "source": "modes_strip400x200.json crosscheck: FEM production mesh (h_core 15 nm, Richardson error of n_eff 1.6e-05); Tidy3D local solver on interface-aligned 10/5/2.5 nm grids, +R/-R mean (tidy3d_shift = finest grid)"
+  },
+  {
+   "xsec": "strip400x200",
+   "R_um": 7.5,
+   "straight": 2.4914219359874017,
+   "exact": 2.4918011963978683,
+   "isotropic": 2.4928396861810223,
+   "exact_shift": 0.00037926041046665304,
+   "isotropic_shift": 0.0014177501936205594,
+   "tidy3d_shift": 0.00037754319102800693,
+   "tidy3d_shift_by_grid": {
+    "dl_nm": [
+     20.0,
+     10.0,
+     5.0
+    ],
+    "shift": [
+     0.000379535565726119,
+     0.00037794194948936877,
+     0.00037754319102800693
+    ]
+   },
+   "tidy3d_plus": 2.485658445563741,
+   "tidy3d_minus": 2.487129706603805,
+   "source": "FEM: modes_strip400x200.json straight and alt_radius (production mesh, materials indices); Tidy3D: 05 verification V1 (constant n_Si 3.50053 / n_ox 1.44680, 0.005 / 0.003 below the materials model; the shift is a difference and moves by < 2e-6 over the three grids)"
+  },
+  {
+   "R_um": 7.5,
+   "straight": 2.491426163934119,
+   "exact": 2.491832740442646,
+   "isotropic": 2.492870678835103,
+   "exact_shift": 0.00040657650852704563,
+   "isotropic_shift": 0.001444514900984295,
+   "xsec": "strip400x200",
+   "source": "--quick study (mesh h_core 30 nm): coarse-mesh repeat of the 7.5 um row, no Tidy3D"
+  }
+ ],
+ "rib_bend_shift": [
+  {
+   "xsec": "rib160",
+   "R_um": 6.726957098619907,
+   "straight": 2.436899990654657,
+   "exact": 2.4399315138864743,
+   "isotropic": 2.4432976122175223,
+   "exact_shift": 0.0030315232318174345,
+   "isotropic_shift": 0.006397621562865385,
+   "tidy3d_straight": 2.437057923595059,
+   "tidy3d_mean": 2.4400915915738977,
+   "tidy3d_shift": 0.0030199202658205415,
+   "tidy3d_shift_by_grid": {
+    "dl_nm": [
+     10.0,
+     5.0,
+     2.5
+    ],
+    "shift": [
+     0.0029812339763135576,
+     0.003006526365662676,
+     0.0030199202658205415
+    ]
+   },
+   "tidy3d_shift_extrapolated": 0.00303366797883875,
+   "source": "modes_rib160.json crosscheck: FEM production mesh (h_core 15 nm, Richardson error of n_eff 2.3e-05); Tidy3D local solver on interface-aligned 10/5/2.5 nm grids, +R/-R mean (tidy3d_shift = finest grid)"
+  },
+  {
+   "xsec": "rib200",
+   "R_um": 6.607632197861393,
+   "straight": 2.625785198801628,
+   "exact": 2.629681355475205,
+   "isotropic": 2.633670532066404,
+   "exact_shift": 0.0038961566735769004,
+   "isotropic_shift": 0.007885333264775696,
+   "tidy3d_straight": 2.625558024215566,
+   "tidy3d_mean": 2.629432150056777,
+   "tidy3d_shift": 0.0038768731089851016,
+   "tidy3d_shift_by_grid": {
+    "dl_nm": [
+     10.0,
+     5.0,
+     2.5
+    ],
+    "shift": [
+     0.0038228422072004165,
+     0.0038641385018092222,
+     0.0038768731089851016
+    ]
+   },
+   "tidy3d_shift_extrapolated": 0.0038741258412113844,
+   "source": "modes_rib200.json crosscheck: FEM production mesh (h_core 15 nm, Richardson error of n_eff 1.4e-05); Tidy3D local solver on interface-aligned 10/5/2.5 nm grids, +R/-R mean (tidy3d_shift = finest grid)"
+  }
+ ],
+ "bend_shift_scaling": {
+  "isotropic_excess_shift_r_ref": 0.0015722082897187128,
+  "isotropic_excess_shift_7p5": 0.0010384897831539064,
+  "ratio": 1.513937176101913,
+  "ratio_if_1_over_r2": 1.5142538150739446,
+  "isotropic_over_exact_shift_7p5": 3.7381971713739337
+ },
+ "bessel_2d": {
+  "geometry": {
+   "core_index": 2.9,
+   "clad_index": 1.45,
+   "width_um": 0.4,
+   "lambda_um": 1.31,
+   "pol_H": "H axial (E in the ring plane, our TE0)",
+   "pol_E": "E axial (our TM0)"
+  },
+  "method": "exact: Bessel J inside, J/Y in the core, Y outside (real order; radiation negligible), continuity of the axial field and (1/eps or 1) d/dr; FEM: y-uniform core with PMC (H-pol) or PEC (E-pol) top and bottom",
+  "rows": [
+   {
+    "R_um": 3.0,
+    "pol": "H",
+    "h_nm": 20.0,
+    "bessel": 2.51287481043901,
+    "fem_exact": 2.5128746899263197,
+    "fem_isotropic": 2.5164260666254163,
+    "err_exact": -1.2051269049351276e-07,
+    "err_isotropic": 0.003551256186406171
+   },
+   {
+    "R_um": 3.0,
+    "pol": "H",
+    "h_nm": 10.0,
+    "bessel": 2.51287481043901,
+    "fem_exact": 2.51287483777988,
+    "fem_isotropic": 2.5164262495671403,
+    "err_exact": 2.734087001243779e-08,
+    "err_isotropic": 0.0035514391281301627
+   },
+   {
+    "R_um": 3.0,
+    "pol": "E",
+    "h_nm": 20.0,
+    "bessel": 2.6745379497519006,
+    "fem_exact": 2.6745377514297775,
+    "fem_isotropic": 2.6789716552606926,
+    "err_exact": -1.983221231682819e-07,
+    "err_isotropic": 0.004433705508791963
+   },
+   {
+    "R_um": 3.0,
+    "pol": "E",
+    "h_nm": 10.0,
+    "bessel": 2.6745379497519006,
+    "fem_exact": 2.67453788577028,
+    "fem_isotropic": 2.6789717993293736,
+    "err_exact": -6.398162044618516e-08,
+    "err_isotropic": 0.004433849577472948
+   }
+  ],
+  "source": "--quick study (R = 3 um, h = 20 / 10 nm)"
+ },
+ "pml_hankel_2d": {
+  "model": {
+   "n_core": 2.761993042682593,
+   "n_clad": 1.9464472633050494,
+   "width_um": 0.4,
+   "note": "2-D effective-index model of rib160 (film and slab TE slab indices); TE (E in the ring plane)"
+  },
+  "rows": [
+   {
+    "R_um": 4.0,
+    "m": 48,
+    "lambda_um": 1.2997208229158637,
+    "q_exact": 27468.20870293325,
+    "fem": [
+     {
+      "extra_um": 0.5,
+      "pml_um": 1.0,
+      "strength": 2.0,
+      "n_eff": {
+       "re": 2.48228390523629,
+       "im": -5.240223294456771e-05
+      },
+      "q_fem": 27521.32506582558
+     },
+     {
+      "extra_um": 0.5,
+      "pml_um": 1.0,
+      "strength": 4.0,
+      "n_eff": {
+       "re": 2.482283936591517,
+       "im": -5.239136769554154e-05
+      },
+      "q_fem": 27527.03261009333
+     },
+     {
+      "extra_um": 1.0,
+      "pml_um": 1.5,
+      "strength": 2.0,
+      "n_eff": {
+       "re": 2.4822839364745883,
+       "im": -5.239135787156057e-05
+      },
+      "q_fem": 27527.03777172791
+     },
+     {
+      "extra_um": 1.5,
+      "pml_um": 2.0,
+      "strength": 3.0,
+      "n_eff": {
+       "re": 2.4822839365698908,
+       "im": -5.239135809060256e-05
+      },
+      "q_fem": 27527.037656640667
+     }
+    ],
+    "q_fem_median": 27527.035133366997,
+    "rel_err_median": 0.0021416187371352535,
+    "alpha_exact_db_per_cm": 22.04615687065817
+   }
+  ],
+  "validity": "the FEM-PML matches the exact Q within 0.2 % for Q_rad > ~2e4 (alpha below ~50 dB/cm); for strongly leaky modes (Q < 3e3) the PML spectrum is crowded and the result depends on the PML",
+  "source": "--quick study (R = 4 um only)"
+ },
+ "meep_cylindrical": {
+  "R_um": 3.0,
+  "m": 36,
+  "n_si": 3.5053459852983964,
+  "n_ox": 1.45003004407,
+  "geometry": "strip 400 x 200 nm, oxide all round, constant indices (materials values at 1310 nm, 25 C)",
+  "fem_pred_lambda_um": {
+   "exact": 1.3075,
+   "isotropic": 1.30954
+  },
+  "fem_pred_provenance": "recorded: meep_check() of the interrupted run (exact and isotropic maps, h_core 10 nm); the numbers are in docs/handoff/extract_modes.md, the output file was not kept. Not recomputed (the resumed task forbids FEM runs)",
+  "fem_pred_difference_nm": 2.0399999999998197,
+  "fem_pred_difference_consistency": {
+   "estimate_nm": 2.048633870283156,
+   "method": "the isotropic map's excess bend shift at 7.5 um (production artefact) scaled by (7.5/3)^2 (the 1/R^2 law checked between r_ref and 7.5 um), converted with d lambda = lambda dn_eff / n_g, n_g = 4.142 (05 t01, constant indices)",
+   "rel_diff_vs_recorded": 0.004232289354576979
+  },
+  "rows": [
+   {
+    "res": 30,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7526598206204165,
+      "Q": -26625135100.845093,
+      "amp": 24.49991467238905
+     }
+    ],
+    "lam_um": 1.3286214736103508,
+    "seconds": 27.6,
+    "wall_s": 29.3,
+    "eps_averaging": false,
+    "params": {
+     "res": 30,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3292916666666668,
+     "t_after": 200,
+     "avg": false
+    }
+   },
+   {
+    "res": 40,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7484831731483457,
+      "Q": -30521950197.381832,
+      "amp": 19.400443352847326
+     }
+    ],
+    "lam_um": 1.3360353791170734,
+    "seconds": 63.3,
+    "wall_s": 65.1,
+    "eps_averaging": false,
+    "params": {
+     "res": 40,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.32384375,
+     "t_after": 200,
+     "avg": false
+    }
+   },
+   {
+    "res": 60,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7584003558892009,
+      "Q": -21567391979.340645,
+      "amp": 25.962548316940975
+     }
+    ],
+    "lam_um": 1.3185647820899702,
+    "seconds": 195.1,
+    "wall_s": 197.0,
+    "eps_averaging": false,
+    "params": {
+     "res": 60,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3183958333333334,
+     "t_after": 200,
+     "avg": false
+    }
+   },
+   {
+    "res": 80,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7565908403005167,
+      "Q": -21205639799.184555,
+      "amp": 24.745074447553804
+     }
+    ],
+    "lam_um": 1.3217183538764512,
+    "seconds": 484.8,
+    "wall_s": 486.6,
+    "eps_averaging": false,
+    "params": {
+     "res": 80,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3156718750000003,
+     "t_after": 200,
+     "avg": false
+    }
+   },
+   {
+    "res": 30,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7426592828902322,
+      "Q": -59810431875.152306,
+      "amp": 24.41001776132844
+     }
+    ],
+    "lam_um": 1.3465124896954983,
+    "seconds": 29.1,
+    "wall_s": 31.0,
+    "eps_averaging": true,
+    "params": {
+     "res": 30,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3467250000000002,
+     "t_after": 200,
+     "avg": true
+    }
+   },
+   {
+    "res": 40,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7479399145945278,
+      "Q": -43684814894.901764,
+      "amp": 25.02024152444447
+     }
+    ],
+    "lam_um": 1.3370057948332905,
+    "seconds": 64.0,
+    "wall_s": 66.0,
+    "eps_averaging": true,
+    "params": {
+     "res": 40,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3369187500000002,
+     "t_after": 200,
+     "avg": true
+    }
+   },
+   {
+    "res": 60,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7532569762974688,
+      "Q": -32096849407.897453,
+      "amp": 25.86487865914598
+     }
+    ],
+    "lam_um": 1.3275681891661497,
+    "seconds": 211.6,
+    "wall_s": 213.3,
+    "eps_averaging": true,
+    "params": {
+     "res": 60,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3271125,
+     "t_after": 200,
+     "avg": true
+    }
+   },
+   {
+    "res": 80,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7560823643543843,
+      "Q": -27311613590.582207,
+      "amp": 26.3027524635772
+     }
+    ],
+    "lam_um": 1.3226072279227092,
+    "seconds": 490.9,
+    "wall_s": 492.7,
+    "eps_averaging": true,
+    "params": {
+     "res": 80,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3222093750000001,
+     "t_after": 200,
+     "avg": true
+    }
+   },
+   {
+    "res": 120,
+    "m": 36,
+    "modes": [
+     {
+      "freq": 0.7589544466460931,
+      "Q": -23964578640.108356,
+      "amp": 26.69964894854007
+     }
+    ],
+    "lam_um": 1.317602135963647,
+    "seconds": 1514.7,
+    "wall_s": 1516.6,
+    "eps_averaging": true,
+    "params": {
+     "res": 120,
+     "m": 36,
+     "R": 3.0,
+     "W": 0.4,
+     "H": 0.2,
+     "nsi": 3.5053459852983964,
+     "nox": 1.45003004407,
+     "lam_guess": 1.3173062500000001,
+     "t_after": 200,
+     "avg": true
+    }
+   }
+  ],
+  "series": {
+   "no_averaging": {
+    "res": [
+     80,
+     60,
+     40,
+     30
+    ],
+    "lam_um": [
+     1.3217183538764512,
+     1.3185647820899702,
+     1.3360353791170734,
+     1.3286214736103508
+    ],
+    "richardson_free_p_finest3": {
+     "h": [
+      0.0125,
+      0.016666666666666666,
+      0.025
+     ],
+     "f": [
+      1.3217183538764512,
+      1.3185647820899702,
+      1.3360353791170734
+     ],
+     "f0": 1.3217183538764512,
+     "p": null,
+     "err": 0.017470597027103185,
+     "monotone": false
+    },
+    "richardson_p1_finest2": {
+     "h": [
+      0.0125,
+      0.016666666666666666
+     ],
+     "f": [
+      1.3217183538764512,
+      1.3185647820899702
+     ],
+     "f0": 1.3311790692358942,
+     "p": 1.0,
+     "err": 0.00946071535944304,
+     "monotone": true
+    },
+    "richardson_p1_next2": {
+     "h": [
+      0.016666666666666666,
+      0.025
+     ],
+     "f": [
+      1.3185647820899702,
+      1.3360353791170734
+     ],
+     "f0": 1.2836235880357638,
+     "p": 1.0,
+     "err": 0.03494119405420637,
+     "monotone": true
+    }
+   },
+   "averaging": {
+    "res": [
+     120,
+     80,
+     60,
+     40,
+     30
+    ],
+    "lam_um": [
+     1.317602135963647,
+     1.3226072279227092,
+     1.3275681891661497,
+     1.3370057948332905,
+     1.3465124896954983
+    ],
+    "richardson_free_p_finest3": {
+     "h": [
+      0.008333333333333333,
+      0.0125,
+      0.016666666666666666
+     ],
+     "f": [
+      1.317602135963647,
+      1.3226072279227092,
+      1.3275681891661497
+     ],
+     "f0": 1.3072660737076187,
+     "p": 0.9739433977184013,
+     "err": 0.010336062256028233,
+     "monotone": true
+    },
+    "richardson_p1_finest2": {
+     "h": [
+      0.008333333333333333,
+      0.0125
+     ],
+     "f": [
+      1.317602135963647,
+      1.3226072279227092
+     ],
+     "f0": 1.3075919520455224,
+     "p": 1.0,
+     "err": 0.010010183918124582,
+     "monotone": true
+    },
+    "richardson_p1_next2": {
+     "h": [
+      0.0125,
+      0.016666666666666666
+     ],
+     "f": [
+      1.3226072279227092,
+      1.3275681891661497
+     ],
+     "f0": 1.3077243441923878,
+     "p": 1.0,
+     "err": 0.014882883730321428,
+     "monotone": true
+    }
+   }
+  },
+  "verdict": {
+   "meep_extrapolated_lambda_um": 1.3074952089500034,
+   "extrapolations_lambda_um": [
+    1.3072660737076187,
+    1.3075919520455224,
+    1.3077243441923878
+   ],
+   "observed_order": 0.9739433977184013,
+   "extrapolation_uncertainty_nm": 0.2291352423845483,
+   "distance_to_exact_nm": -0.004791049996732966,
+   "distance_to_isotropic_nm": -2.0447910499965527,
+   "exact_inside_extrapolation_range": true,
+   "isotropic_inside_extrapolation_range": false,
+   "finest_minus_estimate_nm": 10.106927013643574
+  },
+  "note": "subpixel averaging on: monotone, first order (p = 0.97); off: staircasing makes the series erratic (not used). No new Meep run was made for this artefact (Kenny, 2026-10-09)."
+ },
+ "verdict": {
+  "exact_transform_max_abs_error_vs_bessel": 6.398162044618516e-08,
+  "isotropic_map_max_abs_error_vs_bessel": 0.004433849577472948,
+  "exact_vs_tidy3d_max_rel_diff_of_shift": 0.010176555932141285,
+  "isotropic_vs_tidy3d_min_ratio_of_shift": 2.0339415408001167,
+  "meep_distance_to_exact_nm": -0.004791049996732966,
+  "meep_distance_to_isotropic_nm": -2.0447910499965527,
+  "meep_extrapolation_uncertainty_nm": 0.2291352423845483,
+  "pml_vs_hankel_max_rel_err_q": 0.0021416187371352535,
+  "conclusion": "the exact (anisotropic) transform is right: it reproduces the analytic Bessel eigenvalue of a 2-D ring to < 1e-7 for both polarizations, Tidy3D's +/-R mean bend shift in 3-D to within 2 % at r_ref and 7.5 um (three cross-sections), and the cylindrical Meep resonance within the extrapolation range. femwell's isotropic eps(1+x/R)^2 overestimates the bend shift (x3.7 at R = 7.5 um; the excess scales as 1/R^2), because it approximates the conformal coordinate ln(r/R) by x/R and drops the mu tensor. modes.py uses the exact transform."
+ }
+}

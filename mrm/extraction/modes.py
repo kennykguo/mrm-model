@@ -6,7 +6,8 @@ Run:  python -m mrm.extraction.modes [--quick] [--xsec rib160 rib200 strip400x20
 
 Writes ``modes_<xsec>.json`` (schema ``modes/1``) + ``modes_<xsec>.sidecar.json`` for every cross-section, and
 ``modes_study_bend.json`` (schema ``modes_bend_study/1``): the bend-formulation study that settles the femwell vs
-Tidy3D disagreement of 05 section 5.4.
+Tidy3D disagreement of 05 section 5.4. ``--assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON`` writes the study from
+stored results without any solver run (how the committed study was made; see :func:`assemble_bend_study`).
 
 Method (all numbers derived; materials only from mrm.materials):
 - primary solver: the full-vector FEM of :mod:`mrm.extraction.common` (femwell's formulation and meshing,
@@ -849,6 +850,23 @@ def meep_check(st: Settings, *, R: float = MEEP_CYL_R_UM, m_order: int | None = 
     if rows is None:
         rows = meep_cyl_runs(R=R, m_order=m_order, nsi=nsi, nox=nox, lam_guess_um=pred["exact"],
                              resolutions=resolutions)
+    series, verdict = meep_series_verdict(rows, pred)
+    return {"R_um": R, "m": m_order, "n_si": nsi, "n_ox": nox, "fem_pred_lambda_um": pred, "rows": rows,
+            "precomputed_source": src, "series": series, "verdict": verdict,
+            "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3,
+            "note": "Meep's cylindrical runs converge slowly (first order) and, without subpixel averaging, "
+                    "erratically (staircasing); the analytic Bessel benchmark is the decisive check (07 D10)"}
+
+
+def meep_series_verdict(rows: list, pred: dict) -> tuple[dict, dict | None]:
+    """Richardson analysis of the cylindrical Meep rows (pure arithmetic, no solver) and the verdict against the FEM
+    predictions ``pred = {"exact": lam_um, "isotropic": lam_um}`` of the same resonance.
+
+    For each series (with and without subpixel averaging) it extrapolates h = 1/res -> 0 three ways: free order on
+    the three finest, first order on the two finest, and first order on the next two. The verdict uses the averaged
+    series: the estimate is the mid-range of the three extrapolations and the uncertainty their half-range (the
+    observed order is ~1, so a first-order fit is the model; the half-range measures how far the series is from
+    that asymptote)."""
     series = {}
     for avg in (False, True):
         ok = sorted([r for r in rows if r.get("lam_um") and bool(r.get("eps_averaging")) == avg],
@@ -860,20 +878,26 @@ def meep_check(st: Settings, *, R: float = MEEP_CYL_R_UM, m_order: int | None = 
         series["averaging" if avg else "no_averaging"] = {
             "res": [r["res"] for r in ok], "lam_um": f,
             "richardson_free_p_finest3": C.richardson(h[:3], f[:3]) if len(ok) >= 3 else None,
-            "richardson_p1_finest2": C.richardson(h[:2], f[:2], p=1.0)}
+            "richardson_p1_finest2": C.richardson(h[:2], f[:2], p=1.0),
+            "richardson_p1_next2": C.richardson(h[1:3], f[1:3], p=1.0) if len(ok) >= 3 else None}
     verdict = None
     a = series.get("averaging", {})
     if a and a.get("richardson_free_p_finest3") and a["richardson_free_p_finest3"].get("p"):
-        f0 = a["richardson_free_p_finest3"]["f0"]
-        verdict = {"meep_extrapolated_lambda_um": f0,
+        ext = [a["richardson_free_p_finest3"]["f0"], a["richardson_p1_finest2"]["f0"]]
+        if a.get("richardson_p1_next2"):
+            ext.append(a["richardson_p1_next2"]["f0"])
+        lo, hi = min(ext), max(ext)
+        f0 = 0.5 * (lo + hi)
+        unc = 0.5 * (hi - lo)
+        verdict = {"meep_extrapolated_lambda_um": f0, "extrapolations_lambda_um": ext,
+                   "observed_order": a["richardson_free_p_finest3"]["p"],
+                   "extrapolation_uncertainty_nm": unc * 1e3,
                    "distance_to_exact_nm": (f0 - pred["exact"]) * 1e3,
                    "distance_to_isotropic_nm": (f0 - pred["isotropic"]) * 1e3,
-                   "extrapolation_uncertainty_nm": abs(f0 - a["lam_um"][0]) * 1e3 * 0.5}
-    return {"R_um": R, "m": m_order, "n_si": nsi, "n_ox": nox, "fem_pred_lambda_um": pred, "rows": rows,
-            "precomputed_source": src, "series": series, "verdict": verdict,
-            "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3,
-            "note": "Meep's cylindrical runs converge slowly (first order) and, without subpixel averaging, "
-                    "erratically (staircasing); the analytic Bessel benchmark is the decisive check (07 D10)"}
+                   "exact_inside_extrapolation_range": bool(lo <= pred["exact"] <= hi),
+                   "isotropic_inside_extrapolation_range": bool(lo <= pred["isotropic"] <= hi),
+                   "finest_minus_estimate_nm": (a["lam_um"][0] - f0) * 1e3}
+    return series, verdict
 
 
 def pml_benchmark_2d(st: Settings) -> dict:
@@ -1003,6 +1027,176 @@ def bend_study(st: Settings, out_dir: Path, *, meep: bool = True) -> dict:
     return out
 
 
+#: FEM predictions of the cylindrical-Meep resonance (strip 400 x 200 nm with the constant indices of meep_check:
+#: n_Si 3.50535, n_ox 1.45003; R = 3 um, m = 36) with the exact and the isotropic map. meep_check() computed them in
+#: the run of 2026-10-09 that a session restart interrupted; docs/handoff/extract_modes.md recorded them, but the
+#: output file was not kept. Only assemble_bend_study() uses them, because it may not run the FEM.
+MEEP_CYL_FEM_PRED_RECORDED_UM = {"exact": 1.30750, "isotropic": 1.30954}
+#: Tidy3D +R/-R mean bend shift of the 400 x 200 nm strip at R = 7.5 um (docs/research/05 verification log, V1) and
+#: the constant-index straight-strip Tidy3D run of 05 (its group index has no material dispersion, like the Meep runs).
+TIDY3D_V01_JSON = C.ROOT / "docs" / "research" / "05_tools_smoke" / "verify" / "v01_tidy3d_bend_asym.json"
+TIDY3D_T01_JSON = C.ROOT / "docs" / "research" / "05_tools_smoke" / "out" / "t01_tidy3d_mode.json"
+
+
+def assemble_bend_study(quick_study_json: str | Path, meep_cyl_json: str | Path, *,
+                        out_dir: Path | None = None) -> dict:
+    """Write ``modes_study_bend.json`` from results that already exist, WITHOUT any solver run.
+
+    The full study (``bend_study``: strip rows at R = 3, 5, 7.5 um with Tidy3D, Bessel at R = 3 and 6.5 um down to
+    h = 5 nm, PML-Hankel at R = 3, 4, 5 um, FEM predictions for the Meep resonance) was waiting for the heavy lock
+    when a session restart stopped it, and the resumed task forbids new solver runs. This assembles the same schema
+    from: the ``--quick`` study (Bessel at R = 3 um, h = 20/10 nm; PML-Hankel at R = 4 um; a coarse-mesh strip row at
+    7.5 um), the stored cylindrical Meep rows (``--meep-cyl-only``), the committed ``modes_<xsec>.json`` (production
+    FEM and Tidy3D at r_ref, the strip at 7.5 um), the Tidy3D +-R check of 05 (V1) and the recorded FEM predictions of
+    the Meep resonance (:data:`MEEP_CYL_FEM_PRED_RECORDED_UM`). Every block names its source; the sidecar lists the
+    sha256 of every input and what the full study would add."""
+    import mrm.materials as M
+    qpath, mpath = Path(quick_study_json), Path(meep_cyl_json)
+    quick = json.loads(qpath.read_text())
+    if quick.get("schema") != SCHEMA_STUDY:
+        raise ValueError(f"{qpath}: not a {SCHEMA_STUDY} file")
+    sources = {"quick_study": {"file": str(qpath), "sha256": C.sha256_file(qpath),
+                               "what": "python -m mrm.extraction.modes --quick --study only (2026-10-09): bessel_2d, "
+                                       "pml_hankel_2d and a coarse-mesh (h_core 30 nm) strip row at R = 7.5 um"},
+               "meep_cyl_runs": {"file": str(mpath), "sha256": C.sha256_file(mpath),
+                                 "what": "python -m mrm.extraction.modes --meep-cyl-only (2026-10-09; 9 runs, peak "
+                                         "RSS 0.23 GB)"},
+               "tidy3d_v01": {"file": str(TIDY3D_V01_JSON.relative_to(C.ROOT)), "sha256": C.sha256_file(TIDY3D_V01_JSON),
+                              "what": "Tidy3D local solver, strip 400 x 200 nm, constant n_Si 3.50053 / n_ox 1.44680, "
+                                      "uniform 20/10/5 nm grids, +R/-R at 7.5 um (05 verification V1)"},
+               "tidy3d_t01": {"file": str(TIDY3D_T01_JSON.relative_to(C.ROOT)), "sha256": C.sha256_file(TIDY3D_T01_JSON),
+                              "what": "Tidy3D straight strip, constant indices: waveguide-only group index"}}
+    arts = {}
+    for x in ("strip400x200", "rib160", "rib200"):
+        d, side = C.load_artefact(f"modes_{x}")
+        arts[x] = d
+        sources[f"modes_{x}"] = {"file": f"mrm/data/extracted/modes_{x}.json", "sha256": side["sha256"]}
+
+    # 1. 3-D bend shifts: FEM exact / isotropic against Tidy3D's exact transform (+R/-R mean)
+    def r_ref_row(x: str) -> dict:
+        d = arts[x]
+        cc = d["crosscheck"]
+        st0 = d["straight"]["n_eff"]
+        t3_ext = cc["bent_extrapolated"]["f0"] - cc["straight_extrapolated"]["f0"]
+        return {"xsec": x, "R_um": d["r_ref_um"], "straight": st0, "exact": d["n_eff"],
+                "isotropic": st0 + cc["femwell_isotropic_bend_shift"],
+                "exact_shift": cc["femwell_exact_bend_shift"], "isotropic_shift": cc["femwell_isotropic_bend_shift"],
+                "tidy3d_straight": cc["straight_extrapolated"]["f0"], "tidy3d_mean": cc["bent_extrapolated"]["f0"],
+                "tidy3d_shift": cc["tidy3d_bend_shift"][-1],
+                "tidy3d_shift_by_grid": {"dl_nm": [r["dl_nm"] for r in cc["rows"]], "shift": cc["tidy3d_bend_shift"]},
+                "tidy3d_shift_extrapolated": t3_ext,
+                "source": f"modes_{x}.json crosscheck: FEM production mesh (h_core 15 nm, Richardson error of n_eff "
+                          f"{d['discretization_error']['n_eff_bent']:.1e}); Tidy3D local solver on interface-aligned "
+                          f"10/5/2.5 nm grids, +R/-R mean (tidy3d_shift = finest grid)"}
+    strip = arts["strip400x200"]
+    v01 = json.loads(TIDY3D_V01_JSON.read_text())
+    t3_75 = {k: v["mean_shift7p5"] for k, v in v01.items()}
+    q75 = [r for r in quick["strip_bend_shift"] if abs(r["R_um"] - 7.5) < 1e-12]
+    rows = [r_ref_row("strip400x200"),
+            {"xsec": "strip400x200", "R_um": 7.5, "straight": strip["straight"]["n_eff"],
+             "exact": strip["alt_radius"]["n_eff"], "isotropic": strip["alt_radius"]["n_eff_isotropic"],
+             "exact_shift": strip["alt_radius"]["n_eff"] - strip["straight"]["n_eff"],
+             "isotropic_shift": strip["alt_radius"]["n_eff_isotropic"] - strip["straight"]["n_eff"],
+             "tidy3d_shift": t3_75[min(t3_75, key=float)],
+             "tidy3d_shift_by_grid": {"dl_nm": [float(k) * 1e3 for k in t3_75], "shift": list(t3_75.values())},
+             "tidy3d_plus": v01[min(v01, key=float)]["plus7p5"], "tidy3d_minus": v01[min(v01, key=float)]["minus7p5"],
+             "source": "FEM: modes_strip400x200.json straight and alt_radius (production mesh, materials indices); "
+                       "Tidy3D: 05 verification V1 (constant n_Si 3.50053 / n_ox 1.44680, 0.005 / 0.003 below the "
+                       "materials model; the shift is a difference and moves by < 2e-6 over the three grids)"}]
+    for r in q75:
+        rows.append(dict(r, xsec="strip400x200", source="--quick study (mesh h_core 30 nm): coarse-mesh repeat of "
+                                                        "the 7.5 um row, no Tidy3D"))
+    rib_rows = [r_ref_row("rib160"), r_ref_row("rib200")]
+    # the isotropic map's excess shift scales as 1/R^2 (05 V1 found the same for Tidy3D's mean shift)
+    ex_ref, ex_75 = rows[0]["isotropic_shift"] - rows[0]["exact_shift"], rows[1]["isotropic_shift"] - rows[1]["exact_shift"]
+    scaling = {"isotropic_excess_shift_r_ref": ex_ref, "isotropic_excess_shift_7p5": ex_75,
+               "ratio": ex_ref / ex_75, "ratio_if_1_over_r2": (7.5 / rows[0]["R_um"]) ** 2,
+               "isotropic_over_exact_shift_7p5": rows[1]["isotropic_shift"] / rows[1]["exact_shift"]}
+
+    # 2. cylindrical Meep (3-D vectorial ring, one azimuthal order) against the recorded FEM predictions
+    n = C.indices(C.XSECS["strip400x200"], 1.31, C.T_REF_C + K0C)
+    nsi, nox = n["si"], n["clad"]
+    allrows = json.loads(mpath.read_text())
+    mrows = [r for r in allrows if r.get("params", {}).get("m") == MEEP_CYL_M
+             and abs(r["params"]["R"] - MEEP_CYL_R_UM) < 1e-12
+             and abs(r["params"]["nsi"] - nsi) < 1e-9 and abs(r["params"]["nox"] - nox) < 1e-9]
+    if len(mrows) != len(allrows):
+        raise ValueError(f"{mpath}: {len(allrows) - len(mrows)} Meep rows do not match R, m and the indices")
+    pred = dict(MEEP_CYL_FEM_PRED_RECORDED_UM)
+    series, mverdict = meep_series_verdict(mrows, pred)
+    t01 = json.loads(TIDY3D_T01_JSON.read_text())
+    ng_const = t01["straight"]["n_g"]
+    pred_diff_scaled_nm = ex_75 * (7.5 / MEEP_CYL_R_UM) ** 2 * 1.3075 / ng_const * 1e3
+    meep = {"R_um": MEEP_CYL_R_UM, "m": MEEP_CYL_M, "n_si": nsi, "n_ox": nox, "geometry": "strip 400 x 200 nm, "
+            "oxide all round, constant indices (materials values at 1310 nm, 25 C)",
+            "fem_pred_lambda_um": pred,
+            "fem_pred_provenance": "recorded: meep_check() of the interrupted run (exact and isotropic maps, h_core "
+                                   "10 nm); the numbers are in docs/handoff/extract_modes.md, the output file was not "
+                                   "kept. Not recomputed (the resumed task forbids FEM runs)",
+            "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3,
+            "fem_pred_difference_consistency": {
+                "estimate_nm": pred_diff_scaled_nm,
+                "method": "the isotropic map's excess bend shift at 7.5 um (production artefact) scaled by "
+                          "(7.5/3)^2 (the 1/R^2 law checked between r_ref and 7.5 um), converted with "
+                          "d lambda = lambda dn_eff / n_g, n_g = 4.142 (05 t01, constant indices)",
+                "rel_diff_vs_recorded": pred_diff_scaled_nm / ((pred["isotropic"] - pred["exact"]) * 1e3) - 1.0},
+            "rows": mrows, "series": series, "verdict": mverdict,
+            "note": "subpixel averaging on: monotone, first order (p = 0.97); off: staircasing makes the series "
+                    "erratic (not used). No new Meep run was made for this artefact (Kenny, 2026-10-09)."}
+
+    # 3. verdict (the same quantities as bend_study)
+    b = quick["bessel_2d"]["rows"]
+    fin = [r for r in b if r["h_nm"] == min(rr["h_nm"] for rr in b)]
+    t3 = [r for r in rows + rib_rows if "tidy3d_shift" in r]
+    verdict = {
+        "exact_transform_max_abs_error_vs_bessel": max(abs(r["err_exact"]) for r in fin),
+        "isotropic_map_max_abs_error_vs_bessel": max(abs(r["err_isotropic"]) for r in fin),
+        "exact_vs_tidy3d_max_rel_diff_of_shift": max(abs(r["exact_shift"] / r["tidy3d_shift"] - 1) for r in t3),
+        "isotropic_vs_tidy3d_min_ratio_of_shift": min(r["isotropic_shift"] / r["tidy3d_shift"] for r in t3),
+        "meep_distance_to_exact_nm": mverdict["distance_to_exact_nm"] if mverdict else None,
+        "meep_distance_to_isotropic_nm": mverdict["distance_to_isotropic_nm"] if mverdict else None,
+        "meep_extrapolation_uncertainty_nm": mverdict["extrapolation_uncertainty_nm"] if mverdict else None,
+        "pml_vs_hankel_max_rel_err_q": max(abs(r["rel_err_median"]) for r in quick["pml_hankel_2d"]["rows"]),
+        "conclusion": "the exact (anisotropic) transform is right: it reproduces the analytic Bessel eigenvalue of "
+                      "a 2-D ring to < 1e-7 for both polarizations, Tidy3D's +/-R mean bend shift in 3-D to "
+                      "within 2 % at r_ref and 7.5 um (three cross-sections), and the cylindrical Meep resonance "
+                      "within the extrapolation range. femwell's isotropic eps(1+x/R)^2 overestimates the bend shift "
+                      "(x3.7 at R = 7.5 um; the excess scales as 1/R^2), because it approximates the conformal "
+                      "coordinate ln(r/R) by x/R and drops the mu tensor. modes.py uses the exact transform."}
+    out = {"schema": SCHEMA_STUDY,
+           "question": "05 section 5.4: femwell's isotropic conformal map gives +0.0014 at R = 7.5 um, Tidy3D's "
+                       "exact transform +0.00038. Which is right?",
+           "assembled_from_existing_results": True,
+           "strip_bend_shift": rows, "rib_bend_shift": rib_rows, "bend_shift_scaling": scaling,
+           "bessel_2d": dict(quick["bessel_2d"], source="--quick study (R = 3 um, h = 20 / 10 nm)"),
+           "pml_hankel_2d": dict(quick["pml_hankel_2d"], source="--quick study (R = 4 um only)"),
+           "meep_cylindrical": meep, "verdict": verdict}
+    not_done = [
+        "strip rows at R = 3 and 5 um with Tidy3D (full study); replaced by r_ref and 7.5 um rows from the committed "
+        "artefacts and 05 V1",
+        "Bessel benchmark at R = 6.5 um and h = 5 nm; R = 3 um at h = 20 / 10 nm is already at the 1e-7 level",
+        "PML-Hankel benchmark at R = 3 and 5 um; R = 4 um (Q_rad 2.7e4) is stored",
+        "FEM predictions of the Meep resonance re-run and stored (recorded values used)",
+        "a finer Meep resolution (160 px/um) to tighten the first-order extrapolation (Meep not run, per Kenny)"]
+    side = {"schema": SCHEMA_STUDY,
+            "inputs": {"materials": M.materials_provenance(), "geometry": C.XSECS["strip400x200"].as_dict(),
+                       "sources": sources},
+            "mesh": {"bessel_2d_h_nm": sorted({r["h_nm"] for r in b}),
+                     "pml_hankel_2d": "core h 10 nm, outside 30 nm; four PML/window settings",
+                     "strip_rows": "production FEM mesh h_core 15 nm (modes_<xsec>.json); quick row h_core 30 nm",
+                     "tidy3d_grids_nm": {"r_ref": [10.0, 5.0, 2.5], "7.5um": [20.0, 10.0, 5.0]},
+                     "meep_resolution_px_per_um": sorted({r["res"] for r in mrows})},
+            "validation": verdict,
+            "assembly": {"method": "assemble_bend_study(): no solver run; arithmetic on stored results",
+                         "command": "python -m mrm.extraction.modes --assemble-study QUICK_STUDY_JSON MEEP_CYL_JSON",
+                         "full_study_command": "MRM_MEEP_CYL_JSON=<meep rows> .venv/bin/python tools/memguard.py "
+                                               "--limit-gb 3 --heavy -- .venv/bin/python -m mrm.extraction.modes "
+                                               "--study only",
+                         "not_done": not_done}}
+    C.write_artefact("modes_study_bend", out, side, out_dir=out_dir)
+    return out
+
+
 # --------------------------------------------------------------------------------------------- CLI
 
 
@@ -1016,7 +1210,15 @@ def main(argv=None):
     ap.add_argument("--no-tidy3d", action="store_true")
     ap.add_argument("--meep-cyl-only", default=None, metavar="JSON",
                     help="run only the (light) cylindrical Meep runs of the bend study and write them to JSON")
+    ap.add_argument("--assemble-study", nargs=2, default=None, metavar=("QUICK_STUDY_JSON", "MEEP_CYL_JSON"),
+                    help="write modes_study_bend.json from stored results (a --quick study and the --meep-cyl-only "
+                         "rows) and the committed modes artefacts, without any solver run")
     a = ap.parse_args(argv)
+    if a.assemble_study:
+        out_dir = Path(a.out) if a.out else C.DATA_DIR
+        assemble_bend_study(*a.assemble_study, out_dir=out_dir)
+        C.log(f"assembled modes_study_bend -> {out_dir}")
+        return out_dir
     if a.meep_cyl_only:
         xs = C.XSECS["strip400x200"]
         n = C.indices(xs, 1.31, C.T_REF_C + K0C)

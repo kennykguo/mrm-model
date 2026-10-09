@@ -1,10 +1,13 @@
 """Run a command under a memory watchdog and a machine-wide lock for heavy solver jobs.
 
-Usage:  .venv/bin/python tools/memguard.py [--limit-gb 5] [--heavy] -- <command> [args...]
+Usage:  .venv/bin/python tools/memguard.py [--limit-gb N] [--heavy] -- <command> [args...]
 
 The machine has 16 GB of RAM and several agents may run solvers at once. --heavy takes an exclusive
 lock (a directory under /tmp) so that only one heavy solver job runs at a time; light jobs skip the
-lock. Every job is killed (whole process group) if its total resident memory exceeds --limit-gb.
+lock. Every job is killed (whole process group) if its total resident memory exceeds the limit.
+
+Default limit: 6 GB for --heavy jobs (the lock guarantees only one runs at a time) and 3 GB otherwise.
+An explicit --limit-gb always wins.
 """
 import argparse, os, signal, subprocess, sys, time
 
@@ -28,11 +31,13 @@ def tree_rss_bytes(root_pid):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--limit-gb", type=float, default=5.0)
+    ap.add_argument("--limit-gb", type=float, default=None)
     ap.add_argument("--heavy", action="store_true")
     ap.add_argument("cmd", nargs=argparse.REMAINDER)
     a = ap.parse_args()
     cmd = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
+    if a.limit_gb is None:
+        a.limit_gb = 6.0 if a.heavy else 3.0
     if a.heavy:
         waited = 0
         while True:
