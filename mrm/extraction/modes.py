@@ -787,7 +787,7 @@ def meep_cyl_runs(*, R: float, m_order: int, nsi: float, nox: float, lam_guess_u
     with tempfile.TemporaryDirectory() as td:
         sp = Path(td) / "meep_cyl.py"
         sp.write_text(MEEP_SCRIPT)
-        runs = [(r, False) for r in resolutions] + [(r, True) for r in resolutions[:2]]
+        runs = [(r, False) for r in resolutions] + [(r, True) for r in tuple(resolutions) + (120,)]
         for res, avg in runs:
             par = {"res": res, "m": m_order, "R": R, "W": 0.4, "H": 0.2, "nsi": nsi, "nox": nox,
                    "lam_guess": lam_guess_um * (1 + (0.9 if avg else 0.5) / res), "t_after": 200, "avg": avg}
@@ -849,14 +849,31 @@ def meep_check(st: Settings, *, R: float = MEEP_CYL_R_UM, m_order: int | None = 
     if rows is None:
         rows = meep_cyl_runs(R=R, m_order=m_order, nsi=nsi, nox=nox, lam_guess_um=pred["exact"],
                              resolutions=resolutions)
-    ok = sorted([r for r in rows if r.get("lam_um") and not r.get("eps_averaging")], key=lambda r: r["res"])
-    rich = C.richardson([1.0 / r["res"] for r in ok], [r["lam_um"] for r in ok]) if len(ok) >= 3 else None
-    rich_p1 = C.richardson([1.0 / r["res"] for r in ok[-2:]], [r["lam_um"] for r in ok[-2:]], p=1.0) if len(ok) >= 2 else None
-    rich_p2 = C.richardson([1.0 / r["res"] for r in ok[-2:]], [r["lam_um"] for r in ok[-2:]], p=2.0) if len(ok) >= 2 else None
+    series = {}
+    for avg in (False, True):
+        ok = sorted([r for r in rows if r.get("lam_um") and bool(r.get("eps_averaging")) == avg],
+                    key=lambda r: -r["res"])
+        if len(ok) < 2:
+            continue
+        h = [1.0 / r["res"] for r in ok]
+        f = [r["lam_um"] for r in ok]
+        series["averaging" if avg else "no_averaging"] = {
+            "res": [r["res"] for r in ok], "lam_um": f,
+            "richardson_free_p_finest3": C.richardson(h[:3], f[:3]) if len(ok) >= 3 else None,
+            "richardson_p1_finest2": C.richardson(h[:2], f[:2], p=1.0)}
+    verdict = None
+    a = series.get("averaging", {})
+    if a and a.get("richardson_free_p_finest3") and a["richardson_free_p_finest3"].get("p"):
+        f0 = a["richardson_free_p_finest3"]["f0"]
+        verdict = {"meep_extrapolated_lambda_um": f0,
+                   "distance_to_exact_nm": (f0 - pred["exact"]) * 1e3,
+                   "distance_to_isotropic_nm": (f0 - pred["isotropic"]) * 1e3,
+                   "extrapolation_uncertainty_nm": abs(f0 - a["lam_um"][0]) * 1e3 * 0.5}
     return {"R_um": R, "m": m_order, "n_si": nsi, "n_ox": nox, "fem_pred_lambda_um": pred, "rows": rows,
-            "precomputed_source": src,
-            "richardson_free_p": rich, "richardson_p1_finest2": rich_p1, "richardson_p2_finest2": rich_p2,
-            "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3}
+            "precomputed_source": src, "series": series, "verdict": verdict,
+            "fem_pred_difference_nm": (pred["isotropic"] - pred["exact"]) * 1e3,
+            "note": "Meep's cylindrical runs converge slowly (first order) and, without subpixel averaging, "
+                    "erratically (staircasing); the analytic Bessel benchmark is the decisive check (07 D10)"}
 
 
 def pml_benchmark_2d(st: Settings) -> dict:

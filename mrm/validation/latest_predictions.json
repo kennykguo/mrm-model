@@ -1,0 +1,6918 @@
+{
+ "schema": "mrm.validation.predictions/1",
+ "created_utc": "2026-10-09T13:34:43Z",
+ "git_commit": "0a9941e",
+ "python": "3.12.8",
+ "frozen_sha256": {
+  "validation": "49c8a7f182666f0824dfd00871da86653abeca7a8fc39809f7d99d69831a0f02",
+  "bounds": "187c9f9404f7be43292d91f3bbc474a0d54e4dc67cdc028d849cc4398386304b"
+ },
+ "note": "predictions of the replica protocols on the uncalibrated presets (no parameter was tuned to a target); 'evaluation' is targets_io.evaluate for information, the report scores",
+ "counts": {
+  "ok": 41,
+  "blocked": 3,
+  "error": 0
+ },
+ "records": [
+  {
+   "id": "CAL-1",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "loaded_q_from_3db_width",
+   "preset": "g25_test_vehicle",
+   "quantity": "loaded_q",
+   "unit": "1",
+   "value": [
+    3500,
+    4200
+   ],
+   "sigma": null,
+   "tolerance": {
+    "kind": "interval",
+    "lo": 3500,
+    "hi": 4200
+   },
+   "replica_status": "ok",
+   "predicted": 3856.2121494809226,
+   "predicted_nonfinite": false,
+   "variants": {
+    "topology=all_pass": 3883.3187386177287,
+    "width=3db_below_max": 3864.955788672599
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "topology": "add_drop",
+    "heater_v": 0.0,
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "t_base_c": 25.0,
+    "readout": "full width at half depth (linear) of the through notch; Q = lambda_min / FWHM",
+    "assumption": "P_in -> 0, heater 0 V, bias 0 V (not printed; 07 4.3 'low power, cold, 0 V')"
+   },
+   "notes": [],
+   "detail": {
+    "add_drop": {
+     "q": 3856.2121494809226,
+     "q_3db": 3864.955788672599,
+     "er_db": 26.45249361402921,
+     "fwhm_pm": 337.6119635867764,
+     "lam_min_nm": 1301.9033557934379
+    },
+    "all_pass": {
+     "q": 3883.3187386177287,
+     "q_3db": 3889.8063940412026,
+     "er_db": 27.775186947253818,
+     "fwhm_pm": 335.255342666022,
+     "lam_min_nm": 1301.903354396671
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-1",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "prediction range [3856, 3856] against [3500, 4200]"
+   },
+   "runtime_s": 0.74
+  },
+  {
+   "id": "CAL-2",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "notch_er_vs_heater_v",
+   "preset": "g25_test_vehicle",
+   "quantity": "notch_depth_db",
+   "unit": "db",
+   "value": {
+    "x_name": "heater_v",
+    "x_unit": "v",
+    "x": [
+     0.0,
+     0.2,
+     0.5,
+     0.8,
+     1.0,
+     1.2
+    ],
+    "y": [
+     27.9,
+     29.8,
+     29.8,
+     24.4,
+     22.1,
+     19.8
+    ]
+   },
+   "sigma": 0.5,
+   "tolerance": {
+    "kind": "abs",
+    "value": 1.5
+   },
+   "replica_status": "ok",
+   "predicted": [
+    26.45249361402921,
+    26.88811952649094,
+    29.546594721127928,
+    38.2730848545911,
+    43.89872844437383,
+    30.99502766207491
+   ],
+   "predicted_nonfinite": false,
+   "variants": {
+    "topology=all_pass": [
+     27.775186947253818,
+     28.29218767617998,
+     31.571163761420273,
+     46.090048901184424,
+     37.13780826167421,
+     28.86083531993403
+    ]
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "topology": "add_drop",
+    "heater_v": [
+     0.0,
+     0.2,
+     0.5,
+     0.8,
+     1.0,
+     1.2
+    ],
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "port": "through",
+    "heater_drive": "bench voltage source, TCR solved",
+    "t_base_c": 25.0,
+    "assumption": "P_in -> 0 (sweep power not printed)"
+   },
+   "notes": [],
+   "detail": {
+    "add_drop": [
+     {
+      "heater_v": 0.0,
+      "p_heater_mw": 0.0,
+      "t_ring_c": 25.0,
+      "er_db": 26.45249361402921,
+      "lam_min_nm": 1301.9033557934379
+     },
+     {
+      "heater_v": 0.2,
+      "p_heater_mw": 0.8738999289723967,
+      "t_ring_c": 29.914936010931285,
+      "er_db": 26.88811952649094,
+      "lam_min_nm": 1302.2243526058355
+     },
+     {
+      "heater_v": 0.5,
+      "p_heater_mw": 5.253727386689173,
+      "t_ring_c": 54.54770113646509,
+      "er_db": 29.546594721127928,
+      "lam_min_nm": 1303.867996609453
+     },
+     {
+      "heater_v": 0.8,
+      "p_heater_mw": 12.637607131682195,
+      "t_ring_c": 96.07567848934866,
+      "er_db": 38.2730848545911,
+      "lam_min_nm": 1306.7706059464108
+     },
+     {
+      "heater_v": 1.0,
+      "p_heater_mw": 18.799229908525636,
+      "t_ring_c": 130.72951088786198,
+      "er_db": 43.89872844437383,
+      "lam_min_nm": 1309.319210565863
+     },
+     {
+      "heater_v": 1.2,
+      "p_heater_mw": 25.692389787637453,
+      "t_ring_c": 169.49761075347425,
+      "er_db": 30.99502766207491,
+      "lam_min_nm": 1312.306752163683
+     }
+    ],
+    "all_pass": [
+     {
+      "heater_v": 0.0,
+      "p_heater_mw": 0.0,
+      "t_ring_c": 25.0,
+      "er_db": 27.775186947253818,
+      "lam_min_nm": 1301.903354396671
+     },
+     {
+      "heater_v": 0.2,
+      "p_heater_mw": 0.8738999289723967,
+      "t_ring_c": 29.914936010931285,
+      "er_db": 28.29218767617998,
+      "lam_min_nm": 1302.2243511957965
+     },
+     {
+      "heater_v": 0.5,
+      "p_heater_mw": 5.253727386689173,
+      "t_ring_c": 54.54770113646509,
+      "er_db": 31.571163761420273,
+      "lam_min_nm": 1303.8679951289428
+     },
+     {
+      "heater_v": 0.8,
+      "p_heater_mw": 12.637607131682195,
+      "t_ring_c": 96.07567848934866,
+      "er_db": 46.090048901184424,
+      "lam_min_nm": 1306.770604330459
+     },
+     {
+      "heater_v": 1.0,
+      "p_heater_mw": 18.799229908525636,
+      "t_ring_c": 130.72951088786198,
+      "er_db": 37.13780826167421,
+      "lam_min_nm": 1309.3192088183607
+     },
+     {
+      "heater_v": 1.2,
+      "p_heater_mw": 25.692389787637453,
+      "t_ring_c": 169.49761075347425,
+      "er_db": 28.86083531993403,
+      "lam_min_nm": 1312.3067502446588
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "CAL-2",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 21.79872844437383,
+    "z": 43.59745688874766,
+    "detail": "max |pred - value| = 21.8 db"
+   },
+   "runtime_s": 0.55
+  },
+  {
+   "id": "CAL-3a",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "heater_power_per_fsr",
+   "preset": "g25_test_vehicle",
+   "quantity": "heater_power_per_fsr_mw",
+   "unit": "mw",
+   "value": 25.45,
+   "sigma": 0.05,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.02
+   },
+   "replica_status": "ok",
+   "predicted": 25.394075684202825,
+   "predicted_nonfinite": false,
+   "variants": {
+    "voltage_v": 1.191697795515703
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "statistic": "median",
+    "rings": [
+     0
+    ],
+    "t_base_c": 25.0,
+    "p_in_w": 0.0,
+    "bias_v": 0.0,
+    "heater_drive": "bench voltage source, TCR solved",
+    "fsr_definition": "spacing of the cold order m and the next order red of it at the stage temperature (the spectrum repeats after this shift)"
+   },
+   "notes": [
+    "ring.heater.p_fsr_mw (25.45 mW) is anchored by R2 with the FSR at the LINE wavelength (mrm.params.relations derived.optics.fsr_m); this protocol measures the FSR between the cold order and the next order red of it, so the two differ by the lambda^2 scaling of the FSR (-0.22 % here)"
+   ],
+   "detail": {
+    "rows": [
+     {
+      "b": 0,
+      "n": 0,
+      "p_fsr_mw": 25.394075684202825,
+      "v_fsr_v": 1.191697795515703,
+      "fsr_nm": 10.271124050335992,
+      "preset_p_fsr_mw": 25.45
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "CAL-3a",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.05592431579717427,
+    "z": 1.1184863159434855,
+    "detail": "max |pred - value| = 0.05592 mw"
+   },
+   "runtime_s": 0.77
+  },
+  {
+   "id": "CAL-3b",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "heater_power_per_fsr",
+   "preset": "g25_test_vehicle",
+   "quantity": "heater_voltage_per_fsr_v",
+   "unit": "v",
+   "value": 1.195,
+   "sigma": 0.005,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.02
+   },
+   "replica_status": "ok",
+   "predicted": 1.191697795515703,
+   "predicted_nonfinite": false,
+   "variants": {
+    "power_mw": 25.394075684202825
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "statistic": "median",
+    "rings": [
+     0
+    ],
+    "t_base_c": 25.0,
+    "p_in_w": 0.0,
+    "bias_v": 0.0,
+    "heater_drive": "bench voltage source, TCR solved",
+    "fsr_definition": "spacing of the cold order m and the next order red of it at the stage temperature (the spectrum repeats after this shift)"
+   },
+   "notes": [
+    "ring.heater.p_fsr_mw (25.45 mW) is anchored by R2 with the FSR at the LINE wavelength (mrm.params.relations derived.optics.fsr_m); this protocol measures the FSR between the cold order and the next order red of it, so the two differ by the lambda^2 scaling of the FSR (-0.22 % here)"
+   ],
+   "detail": {
+    "rows": [
+     {
+      "b": 0,
+      "n": 0,
+      "p_fsr_mw": 25.394075684202825,
+      "v_fsr_v": 1.191697795515703,
+      "fsr_nm": 10.271124050335992,
+      "preset_p_fsr_mw": 25.45
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "CAL-3b",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0033022044842969667,
+    "z": 0.6604408968593933,
+    "detail": "max |pred - value| = 0.003302 v"
+   },
+   "runtime_s": 0.54
+  },
+  {
+   "id": "CAL-4",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "resonance_vs_heater_v",
+   "preset": "g25_test_vehicle",
+   "quantity": "resonance_shift_vs_heater_v_nm",
+   "unit": "nm",
+   "value": {
+    "x_name": "heater_v",
+    "x_unit": "v",
+    "x": [
+     0.1,
+     0.2,
+     0.3,
+     0.4,
+     0.5,
+     0.6,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.1,
+     1.2,
+     1.3,
+     1.4
+    ],
+    "y": [
+     0.08,
+     0.29,
+     0.66,
+     1.16,
+     1.8,
+     2.55,
+     3.41,
+     4.37,
+     5.4,
+     6.52,
+     7.7,
+     8.96,
+     10.24,
+     11.59
+    ]
+   },
+   "sigma": [
+    0.04,
+    0.04,
+    0.06,
+    0.04,
+    0.04,
+    0.04,
+    0.06,
+    0.04,
+    0.04,
+    0.04,
+    0.04,
+    0.04,
+    0.04,
+    0.04
+   ],
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.12
+   },
+   "replica_status": "ok",
+   "predicted": [
+    0.08050903720330652,
+    0.3209968123975107,
+    0.7184645656643873,
+    1.268281329803629,
+    1.9646408160150202,
+    2.801053282483483,
+    3.770792530464972,
+    4.8672501529728205,
+    6.084181934494325,
+    7.415854772425059,
+    8.857114333046898,
+    10.40339637024506,
+    12.050702087897838,
+    13.795553323473882
+   ],
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "heater_v": [
+     0.1,
+     0.2,
+     0.3,
+     0.4,
+     0.5,
+     0.6,
+     0.7,
+     0.8,
+     0.9,
+     1.0,
+     1.1,
+     1.2,
+     1.3,
+     1.4
+    ],
+    "relative_to_v": 0.0,
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "t_base_c": 25.0,
+    "heater_drive": "bench voltage source, TCR solved",
+    "readout": "through minimum of the swept spectrum"
+   },
+   "notes": [],
+   "detail": {
+    "rows": [
+     {
+      "heater_v": 0.1,
+      "lam_min_nm": 1301.9838648306413,
+      "shift_nm": 0.08050903720330652
+     },
+     {
+      "heater_v": 0.2,
+      "lam_min_nm": 1302.2243526058355,
+      "shift_nm": 0.3209968123975107
+     },
+     {
+      "heater_v": 0.3,
+      "lam_min_nm": 1302.6218203591025,
+      "shift_nm": 0.7184645656643873
+     },
+     {
+      "heater_v": 0.4,
+      "lam_min_nm": 1303.1716371232417,
+      "shift_nm": 1.268281329803629
+     },
+     {
+      "heater_v": 0.5,
+      "lam_min_nm": 1303.867996609453,
+      "shift_nm": 1.9646408160150202
+     },
+     {
+      "heater_v": 0.6,
+      "lam_min_nm": 1304.7044090759214,
+      "shift_nm": 2.801053282483483
+     },
+     {
+      "heater_v": 0.7,
+      "lam_min_nm": 1305.674148323903,
+      "shift_nm": 3.770792530464972
+     },
+     {
+      "heater_v": 0.8,
+      "lam_min_nm": 1306.7706059464108,
+      "shift_nm": 4.8672501529728205
+     },
+     {
+      "heater_v": 0.9,
+      "lam_min_nm": 1307.9875377279322,
+      "shift_nm": 6.084181934494325
+     },
+     {
+      "heater_v": 1.0,
+      "lam_min_nm": 1309.319210565863,
+      "shift_nm": 7.415854772425059
+     },
+     {
+      "heater_v": 1.1,
+      "lam_min_nm": 1310.760470126485,
+      "shift_nm": 8.857114333046898
+     },
+     {
+      "heater_v": 1.2,
+      "lam_min_nm": 1312.306752163683,
+      "shift_nm": 10.40339637024506
+     },
+     {
+      "heater_v": 1.3,
+      "lam_min_nm": 1313.9540578813358,
+      "shift_nm": 12.050702087897838
+     },
+     {
+      "heater_v": 1.4,
+      "lam_min_nm": 1315.6989091169119,
+      "shift_nm": 13.795553323473882
+     }
+    ],
+    "position_at_ref_v_nm": 1301.9033557934379
+   },
+   "evaluation": {
+    "target_id": "CAL-4",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 2.2055533234738824,
+    "z": 55.13883308684706,
+    "detail": "max |pred - value| = 2.206 nm"
+   },
+   "runtime_s": 0.65
+  },
+  {
+   "id": "CAL-5",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "resonance_shift_vs_bias",
+   "preset": "g25_test_vehicle",
+   "quantity": "resonance_shift_vs_reverse_bias_pm",
+   "unit": "pm",
+   "value": {
+    "x_name": "bias_v",
+    "x_unit": "v",
+    "x": [
+     0.8,
+     1.2,
+     1.6
+    ],
+    "y": [
+     56.4,
+     66.8,
+     84.4
+    ]
+   },
+   "sigma": 5.0,
+   "tolerance": {
+    "kind": "abs",
+    "value": 12.0
+   },
+   "replica_status": "ok",
+   "predicted": [
+    41.35509471436142,
+    57.9420427301794,
+    72.59999999950529
+   ],
+   "predicted_nonfinite": false,
+   "variants": {
+    "p_in_dbm=None": [
+     48.851317583216044,
+     68.83675719307217,
+     86.99336265116804
+    ]
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "bias_v": [
+     0.8,
+     1.2,
+     1.6
+    ],
+    "heater_v": 0.0,
+    "t_base_c": 25.0,
+    "p_in_dbm": 4.0,
+    "sweep_direction": "up",
+    "self_heating_relief": "included (measurement power)",
+    "junction_shift_only_pm": [
+     48.85509471436824,
+     68.84204273057905,
+     87.00000000000001
+    ]
+   },
+   "notes": [],
+   "detail": {
+    "None": {
+     "position_0v_nm": 1301.9033557934379,
+     "shift_pm": [
+      48.851317583216044,
+      68.83675719307217,
+      86.99336265116804
+     ]
+    },
+    "4.0": {
+     "position_0v_nm": 1303.2862190602955,
+     "shift_pm": [
+      41.35509471436142,
+      57.9420427301794,
+      72.59999999950529
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-5",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 15.044905285638578,
+    "z": 3.0089810571277154,
+    "detail": "max |pred - value| = 15.04 pm"
+   },
+   "runtime_s": 4.04
+  },
+  {
+   "id": "CAL-6",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": false,
+   "replica": "apparent_shift_fixed_code",
+   "preset": "g26",
+   "quantity": "dlambda_dt_printed_pm_per_k",
+   "unit": "pm_per_k",
+   "value": 85.86,
+   "sigma": null,
+   "tolerance": {
+    "kind": "none"
+   },
+   "replica_status": "ok",
+   "predicted": 66.49154396661584,
+   "predicted_nonfinite": false,
+   "variants": {
+    "plant/aggressor/voltage": 66.49154396661584,
+    "plant/ambient/current": 87.61572302454996,
+    "plant/aggressor/current": 87.61572302454996,
+    "plant/ambient/power": 75.03940705882086,
+    "plant/aggressor/power": 75.03940705882086,
+    "plant/ambient/dac_pwm": 66.49339549825135,
+    "plant/aggressor/dac_pwm": 66.49339549825135,
+    "H_solver/ambient/voltage": 66.49154396661584,
+    "H_solver/aggressor/voltage": 66.49154396661584,
+    "H_solver/ambient/current": 87.61572302454996,
+    "H_solver/aggressor/current": 87.61572302454996,
+    "H_solver/ambient/power": 75.03940705882086,
+    "H_solver/aggressor/power": 75.03940705882086,
+    "H_solver/ambient/dac_pwm": 66.49339549825135,
+    "H_solver/aggressor/dac_pwm": 66.49339549825135,
+    "H86/ambient/voltage": 74.2551445166723,
+    "H86/aggressor/voltage": 74.2551445166723,
+    "H86/ambient/current": 92.42470290210278,
+    "H86/aggressor/current": 92.42470290210278,
+    "H86/ambient/power": 81.85012623251959,
+    "H86/aggressor/power": 81.85012623251959,
+    "H86/ambient/dac_pwm": 74.25500519815692,
+    "H86/aggressor/dac_pwm": 74.25500519815692,
+    "H86_sensor/ambient/voltage": 66.49154396661584,
+    "H86_sensor/aggressor/voltage": 83.1144299582698,
+    "H86_sensor/ambient/current": 87.61572302454996,
+    "H86_sensor/aggressor/current": 109.51965378068745,
+    "H86_sensor/ambient/power": 75.03940705882086,
+    "H86_sensor/aggressor/power": 93.79925882352607,
+    "H86_sensor/ambient/dac_pwm": 66.49339549825135,
+    "H86_sensor/aggressor/dac_pwm": 83.11674437281418
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "t_grid_c": [
+     25.0,
+     105.0
+    ],
+    "primary": "plant/ambient/voltage",
+    "fixed_code": "cold resonance on the line at the first temperature (P_in -> 0)",
+    "p_in": "preset",
+    "laser": "parked at the ring's line",
+    "readout": "resonance of the ring state"
+   },
+   "notes": [],
+   "detail": {
+    "rows": [
+     {
+      "hypothesis": "plant",
+      "heating": "ambient",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 66.49154396661584,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "aggressor",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 66.49154396661584,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "ambient",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 87.61572302454996,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "aggressor",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 87.61572302454996,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "ambient",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 75.03940705882086,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "aggressor",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 75.03940705882086,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "ambient",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 66.49339549825135,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "plant",
+      "heating": "aggressor",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 66.49339549825135,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "ambient",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 66.49154396661584,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "aggressor",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 66.49154396661584,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "ambient",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 87.61572302454996,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "aggressor",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 87.61572302454996,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "ambient",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 75.03940705882086,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "aggressor",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 75.03940705882086,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "ambient",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 66.49339549825135,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H_solver",
+      "heating": "aggressor",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 66.49339549825135,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "ambient",
+      "driver_law": "voltage",
+      "code": 40171,
+      "apparent_pm_per_k": 74.2551445166723,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 69.07455303876344,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "aggressor",
+      "driver_law": "voltage",
+      "code": 40171,
+      "apparent_pm_per_k": 74.2551445166723,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 69.07455303876344,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "ambient",
+      "driver_law": "current",
+      "code": 49521,
+      "apparent_pm_per_k": 92.42470290210278,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 85.97646781590936,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "aggressor",
+      "driver_law": "current",
+      "code": 49521,
+      "apparent_pm_per_k": 92.42470290210278,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 85.97646781590936,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "ambient",
+      "driver_law": "power",
+      "code": 30355,
+      "apparent_pm_per_k": 81.85012623251959,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 76.13965230932098,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "aggressor",
+      "driver_law": "power",
+      "code": 30355,
+      "apparent_pm_per_k": 81.85012623251959,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 76.13965230932098,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "ambient",
+      "driver_law": "dac_pwm",
+      "code": 40484,
+      "apparent_pm_per_k": 74.25500519815692,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 69.0744234401468,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86",
+      "heating": "aggressor",
+      "driver_law": "dac_pwm",
+      "code": 40484,
+      "apparent_pm_per_k": 74.25500519815692,
+      "ring_mean_s_pm_per_k": 85.99999999999999,
+      "reference_rise_frac": 1.0,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 69.07442344014675,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "ambient",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 66.49154396661584,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "aggressor",
+      "driver_law": "voltage",
+      "code": 41239,
+      "apparent_pm_per_k": 83.1144299582698,
+      "ring_mean_s_pm_per_k": 79.0864385585797,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.2596163675945,
+      "reported_rise_k": 64.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "ambient",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 87.61572302454996,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "aggressor",
+      "driver_law": "current",
+      "code": 49449,
+      "apparent_pm_per_k": 109.51965378068745,
+      "ring_mean_s_pm_per_k": 80.0825099029195,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 87.52545156814983,
+      "reported_rise_k": 64.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "ambient",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 75.03940705882086,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "aggressor",
+      "driver_law": "power",
+      "code": 31117,
+      "apparent_pm_per_k": 93.79925882352607,
+      "ring_mean_s_pm_per_k": 79.49316796742458,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 75.51784283104121,
+      "reported_rise_k": 64.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "ambient",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 66.49339549825135,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 80.0
+     },
+     {
+      "hypothesis": "H86_sensor",
+      "heating": "aggressor",
+      "driver_law": "dac_pwm",
+      "code": 41565,
+      "apparent_pm_per_k": 83.11674437281418,
+      "ring_mean_s_pm_per_k": 79.08663495616443,
+      "reference_rise_frac": 0.8,
+      "p_in_w": 0.0025118864315095803,
+      "ring_rise_k": 67.26132225512595,
+      "reported_rise_k": 64.0
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "CAL-6",
+    "scored": false,
+    "passed": null,
+    "level": "not_scored",
+    "max_abs_residual": null,
+    "z": null,
+    "detail": "tolerance none"
+   },
+   "runtime_s": 11.43
+  },
+  {
+   "id": "CAL-7",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "cold_resonance_offset",
+   "preset": "g25_test_vehicle",
+   "quantity": "resonance_blue_offset_nm",
+   "unit": "nm",
+   "value": 7.6,
+   "sigma": 0.1,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": 7.599990119830286,
+   "predicted_nonfinite": false,
+   "variants": {
+    "at_preset_power_red_sweep": 6.217126852972887
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "heater_v": 0.0,
+    "p_in_w": 0.0,
+    "t_base_c": 25.0,
+    "line": 0,
+    "readout": "line minus through minimum"
+   },
+   "notes": [],
+   "detail": {
+    "line_nm": 1309.5033459132683,
+    "resonance_nm": 1301.9033557934379
+   },
+   "evaluation": {
+    "target_id": "CAL-7",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 9.880169713483156e-06,
+    "z": 9.880169713483156e-05,
+    "detail": "max |pred - value| = 9.88e-06 nm"
+   },
+   "runtime_s": 1.46
+  },
+  {
+   "id": "CAL-8",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "monitor_current_at_lock",
+   "preset": "g26",
+   "quantity": "drop_monitor_current_at_lock_ua",
+   "unit": "ua",
+   "value": 15.5,
+   "sigma": 0.5,
+   "tolerance": {
+    "kind": "abs",
+    "value": 1.0
+   },
+   "replica_status": "ok",
+   "predicted": 18.81786776210733,
+   "predicted_nonfinite": false,
+   "variants": {
+    "setpoint=peak": 37.62159120435854,
+    "setpoint=oracle": 28.875716022004667,
+    "lines=own": 17.841497112399686
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "method": "quasi_static",
+    "setpoint": "half_max",
+    "bias_v": 1.05,
+    "lines": "all",
+    "p_in_w": 0.0025118864315095803,
+    "t_base_c": 25.0,
+    "traffic": "random NRZ",
+    "port": "drop",
+    "monitor": "MonitorHw.photocurrent_a (gain_scale x responsivity x drop + dark at the PD temperature of the lock)"
+   },
+   "notes": [],
+   "detail": {
+    "half_max": {
+     "current_ua": 18.81786776210733,
+     "t_pd_c": 33.26308996256034,
+     "current_ua_at_base_105c": 18.935063174052818,
+     "drop_w": 1.9794605126636466e-05,
+     "drop_other_lines_w": 2.3428342408965225e-06,
+     "drop_peak_w": 3.95892102532729e-05,
+     "t_ring_c": 135.01143717196362,
+     "heater_mw": 16.864926924278105,
+     "p_abs_mw": 1.0923939390547648,
+     "stable": true,
+     "detuning_pm": -200.7373255190383
+    },
+    "peak": {
+     "current_ua": 37.62159120435854,
+     "t_pd_c": 32.74217728866972,
+     "current_ua_at_base_105c": 37.734907016084,
+     "drop_w": 3.958868681879324e-05,
+     "drop_other_lines_w": 2.043311636281632e-06,
+     "drop_peak_w": 3.95892102532729e-05,
+     "t_ring_c": 132.37206837177087,
+     "heater_mw": 14.533175291753516,
+     "p_abs_mw": 2.153972893573158,
+     "stable": true,
+     "detuning_pm": -1.4949323201849583
+    },
+    "oracle": {
+     "current_ua": 28.875716022004667,
+     "t_pd_c": 32.99843703578392,
+     "current_ua_at_base_105c": 28.990939068063984,
+     "drop_w": 3.0382165396979348e-05,
+     "drop_other_lines_w": 2.163028611967533e-06,
+     "drop_peak_w": 3.95892102532729e-05,
+     "t_ring_c": 133.81335030613906,
+     "heater_mw": 15.647264765275484,
+     "p_abs_mw": 1.66473696186685,
+     "stable": true,
+     "detuning_pm": -110.21264323236701
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-8",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 3.31786776210733,
+    "z": 6.63573552421466,
+    "detail": "max |pred - value| = 3.318 ua"
+   },
+   "runtime_s": 2.16
+  },
+  {
+   "id": "CAL-9a",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "stabilizer_code_vs_T",
+   "preset": "g26",
+   "quantity": "heater_code_swing_per_lane",
+   "unit": "codes",
+   "value": [
+    19700,
+    22300
+   ],
+   "sigma": 300,
+   "tolerance": {
+    "kind": "abs",
+    "value": 900
+   },
+   "replica_status": "ok",
+   "predicted": [
+    3625.591941211751,
+    22799.79411729914
+   ],
+   "predicted_nonfinite": false,
+   "variants": {
+    "driver_mode=current": [
+     4059.2255890083106,
+     25769.154284659875
+    ],
+    "driver_mode=power": [
+     4816.455170887456,
+     28080.986271779682
+    ],
+    "driver_mode=dac_pwm": [
+     3633.5772823650295,
+     22458.192234667986
+    ],
+    "ring.heater.full_scale_v=1.4": [
+     4143.568183802636,
+     26056.87536316776
+    ],
+    "ring.heater.full_scale_v=1.8": [
+     3222.773288938668,
+     20266.37262331067
+    ],
+    "aggressor_model=uniform": [
+     17342.107591979955,
+     36229.48425187065
+    ],
+    "variation=off (nominal die)": [
+     3953.835412802633,
+     35808.12645303516
+    ]
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "method": "quasi_static",
+    "output": "swing",
+    "n_dies": 8,
+    "variation": "sample (device seeds 0..n_dies-1)",
+    "uncertainty": "nominal",
+    "setpoint": "half_max",
+    "bias_v": 1.05,
+    "driver_law": "voltage",
+    "aggressor": "A1 slide-10 (rectified sine), calibrated on each die's ROM",
+    "referencing": "resonance",
+    "statistic": "median over dies",
+    "laser": "every TX line on at the preset chip-input power, filtered along the bus by the rings upstream (single forward pass); each ring locks its own line, the others heat it and leak into its drop monitor"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "per_die": [
+      {
+       "swing": [
+        3543.3326649999653,
+        17473.792911409757
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 29842.13150863126,
+        "at_code_minima": 25180.970613229398
+       },
+       "code_range": [
+        13685.494205755476,
+        56312.615275798846
+       ],
+       "per_lane_swing": [
+        17473.792911409757,
+        14711.804260401725,
+        5356.617672055185,
+        4043.3793101982883,
+        3580.6694021876683,
+        4573.773731242734,
+        5443.289295007722,
+        3543.3326649999653
+       ],
+       "per_lane_max": [
+        56312.615275798846,
+        28397.2984661572,
+        33228.39333462748,
+        37050.68594083904,
+        42447.13422117254,
+        30741.796950418546,
+        26470.483767167585,
+        42242.028619982746
+       ],
+       "per_lane_min": [
+        38838.82236438909,
+        13685.494205755476,
+        27871.775662572294,
+        33007.30663064075,
+        38866.464818984874,
+        26168.02321917581,
+        21027.194472159863,
+        38698.69595498278
+       ]
+      },
+      {
+       "swing": [
+        3667.214925236207,
+        22022.43676098112
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 26818.006216096426,
+        "at_code_minima": 43493.95670270678
+       },
+       "code_range": [
+        0.0,
+        47161.17162794299
+       ],
+       "per_lane_swing": [
+        22022.43676098112,
+        21022.805942365634,
+        3667.214925236207,
+        6977.264968421454,
+        5596.021215476099,
+        5617.155732997799,
+        5347.973064566813,
+        6453.430369192345
+       ],
+       "per_lane_max": [
+        42578.499779446734,
+        21022.805942365634,
+        47161.17162794299,
+        20343.165411846563,
+        25179.571689224835,
+        24057.389284441775,
+        25303.94589723803,
+        21904.952730303692
+       ],
+       "per_lane_min": [
+        20556.063018465615,
+        0.0,
+        43493.95670270678,
+        13365.90044342511,
+        19583.550473748735,
+        18440.233551443976,
+        19955.972832671217,
+        15451.522361111347
+       ]
+      },
+      {
+       "swing": [
+        5200.024342375789,
+        19658.983638312904
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 38353.14078152767,
+        "at_code_minima": 38615.774064308745
+       },
+       "code_range": [
+        0.0,
+        50635.25052806818
+       ],
+       "per_lane_swing": [
+        19658.983638312904,
+        8380.788809438767,
+        14059.003429786348,
+        6933.386000179931,
+        9084.145288215255,
+        11732.273315687133,
+        5200.024342375789,
+        12282.10974654051
+       ],
+       "per_lane_max": [
+        50635.25052806818,
+        46996.56287374751,
+        14059.003429786348,
+        22126.428922344498,
+        18421.675162600775,
+        16530.021246414126,
+        27194.46030658042,
+        12282.10974654051
+       ],
+       "per_lane_min": [
+        30976.266889755276,
+        38615.774064308745,
+        0.0,
+        15193.042922164566,
+        9337.52987438552,
+        4797.747930726992,
+        21994.43596420463,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3583.968957187295,
+        25865.313116641053
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 36413.313451761605,
+        "at_code_minima": 45341.703162197315
+       },
+       "code_range": [
+        0.0,
+        50709.55784661166
+       ],
+       "per_lane_swing": [
+        23103.390079456723,
+        25865.313116641053,
+        9805.128998490598,
+        4057.2054351201587,
+        14296.24439485005,
+        3888.4778109244144,
+        3741.8197990484477,
+        3583.968957187295
+       ],
+       "per_lane_max": [
+        50709.55784661166,
+        25865.313116641053,
+        22800.34699079736,
+        41820.527180620404,
+        14296.24439485005,
+        44973.58873282675,
+        44250.053920777355,
+        48925.67211938461
+       ],
+       "per_lane_min": [
+        27606.167767154933,
+        0.0,
+        12995.217992306762,
+        37763.321745500245,
+        0.0,
+        41085.110921902335,
+        40508.23412172891,
+        45341.703162197315
+       ]
+      },
+      {
+       "swing": [
+        3281.3488900654993,
+        18805.575638667833
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 34845.068252600744,
+        "at_code_minima": 37588.430134840215
+       },
+       "code_range": [
+        5787.320043607121,
+        51681.22093651738
+       ],
+       "per_lane_swing": [
+        18805.575638667833,
+        7692.770529420144,
+        10046.93026012217,
+        11139.653053652903,
+        3281.3488900654993,
+        8599.781674243004,
+        10356.003524335272,
+        5346.620928246481
+       ],
+       "per_lane_max": [
+        51681.22093651738,
+        50142.27586514915,
+        20363.1013816259,
+        16926.973097260023,
+        46657.099068512834,
+        18850.815982557837,
+        16836.15268391663,
+        26953.76598598172
+       ],
+       "per_lane_min": [
+        32875.64529784954,
+        42449.50533572901,
+        10316.17112150373,
+        5787.320043607121,
+        43375.750178447335,
+        10251.034308314833,
+        6480.149159581357,
+        21607.14505773524
+       ]
+      },
+      {
+       "swing": [
+        461.8463487939757,
+        23624.480492263312
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 46699.01469635368,
+        "at_code_minima": 43767.61312654957
+       },
+       "code_range": [
+        0.0,
+        47160.861045147656
+       ],
+       "per_lane_swing": [
+        23624.480492263312,
+        9096.331420242852,
+        4674.767496292297,
+        4284.232524948646,
+        3522.1203913961,
+        3450.652312917271,
+        3393.2479185980847,
+        461.8463487939757
+       ],
+       "per_lane_max": [
+        46143.61892339731,
+        43826.34368750702,
+        41116.29599441305,
+        37299.23643389112,
+        45850.20257413041,
+        45637.04301070341,
+        47160.861045147656,
+        461.8463487939757
+       ],
+       "per_lane_min": [
+        22519.138431134,
+        34730.01226726417,
+        36441.52849812075,
+        33015.003908942475,
+        42328.08218273431,
+        42186.39069778614,
+        43767.61312654957,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3762.626339611612,
+        24147.393146464954
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 27487.362939505907,
+        "at_code_minima": 29167.676112952566
+       },
+       "code_range": [
+        13130.340308677612,
+        48929.46316326139
+       ],
+       "per_lane_swing": [
+        24147.393146464954,
+        13762.027964342498,
+        5290.422946817947,
+        4604.711368707718,
+        8311.75991507787,
+        4817.851918333428,
+        3966.2483587236784,
+        3762.626339611612
+       ],
+       "per_lane_max": [
+        48929.46316326139,
+        33275.72160660248,
+        39583.09332667142,
+        36739.96639446124,
+        21442.100223755482,
+        34740.0592124668,
+        40863.64316542547,
+        46060.64276124179
+       ],
+       "per_lane_min": [
+        24782.070016796435,
+        19513.69364225998,
+        34292.67037985347,
+        32135.255025753522,
+        13130.340308677612,
+        29922.207294133368,
+        36897.39480670179,
+        42298.01642163018
+       ]
+      },
+      {
+       "swing": [
+        3730.4666431199585,
+        23577.15147361716
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 23850.99291798511,
+        "at_code_minima": 23935.55134194075
+       },
+       "code_range": [
+        16781.1898180246,
+        49019.466327505324
+       ],
+       "per_lane_swing": [
+        23577.15147361716,
+        11228.483968219312,
+        8387.283591495616,
+        4479.798602689836,
+        5675.204689699178,
+        4838.409532042038,
+        3730.4666431199585,
+        5066.650278164274
+       ],
+       "per_lane_max": [
+        49019.466327505324,
+        38306.63630611031,
+        25168.473409520215,
+        37271.80121790818,
+        28718.867956816666,
+        32874.94921348397,
+        44447.20780308531,
+        32011.11333109848
+       ],
+       "per_lane_min": [
+        25442.314853888165,
+        27078.152337891,
+        16781.1898180246,
+        32792.00261521834,
+        23043.66326711749,
+        28036.53968144193,
+        40716.74115996535,
+        26944.463052934207
+       ]
+      }
+     ],
+     "law": "voltage",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=current": {
+     "law": "current",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=power": {
+     "law": "power",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=dac_pwm": {
+     "law": "dac_pwm",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "variation=off (nominal die)": {
+     "law": "voltage",
+     "victim_rise_k": [
+      0.1138061658531365,
+      94.82056094893532
+     ],
+     "lane_rise_k": [
+      94.82056094893532,
+      45.98149069951798,
+      25.170836446223042,
+      21.547764998818714,
+      21.29823412430126,
+      21.064437738163548,
+      20.876194249755926,
+      20.69344497655926
+     ],
+     "infeasible_samples": 18,
+     "calibration_residual_rms_k": [
+      0.012353630868812429
+     ],
+     "peak_power_mw": [
+      283.73342383583577
+     ],
+     "t_base_c": 25.0,
+     "per_die": [
+      {
+       "swing": [
+        3953.835412802633,
+        35808.12645303516
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 1003.6500153033267,
+        "at_code_minima": 32510.839061447514
+       },
+       "code_range": [
+        0.0,
+        36464.67447425015
+       ],
+       "per_lane_swing": [
+        35808.12645303516,
+        10775.056940516402,
+        5011.147738122414,
+        4149.814246890972,
+        4087.2901144236057,
+        4028.358189422426,
+        3980.6601325756856,
+        3953.835412802633
+       ],
+       "per_lane_max": [
+        35808.12645303516,
+        35461.02445894682,
+        35545.81781480281,
+        35651.65400851316,
+        35819.018257181815,
+        35910.11455645264,
+        35991.03478864231,
+        36464.67447425015
+       ],
+       "per_lane_min": [
+        0.0,
+        24685.967518430418,
+        30534.670076680395,
+        31501.839761622185,
+        31731.72814275821,
+        31881.75636703021,
+        32010.374656066626,
+        32510.839061447514
+       ]
+      }
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-9a",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 16074.408058788249,
+    "z": 53.58136019596083,
+    "detail": "max |pred - value| = 1.607e+04 codes"
+   },
+   "runtime_s": 24.13
+  },
+  {
+   "id": "CAL-9b",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "stabilizer_code_vs_T",
+   "preset": "g26",
+   "quantity": "heater_code_lane_offset",
+   "unit": "codes",
+   "value": {
+    "at_code_maxima": 7500,
+    "at_code_minima": 9500
+   },
+   "sigma": {
+    "at_code_maxima": 200,
+    "at_code_minima": 400
+   },
+   "tolerance": {
+    "kind": "abs",
+    "value": 1200
+   },
+   "replica_status": "ok",
+   "predicted": {
+    "at_code_maxima": 32343.599880616002,
+    "at_code_minima": 38102.10209957448
+   },
+   "predicted_nonfinite": false,
+   "variants": {
+    "driver_mode=current": {
+     "at_code_maxima": 31468.476104008034,
+     "at_code_minima": 44545.09369222432
+    },
+    "driver_mode=power": {
+     "at_code_maxima": 36820.74292574117,
+     "at_code_minima": 30038.699139553893
+    },
+    "driver_mode=dac_pwm": {
+     "at_code_maxima": 32234.803462648102,
+     "at_code_minima": 38022.28981870074
+    },
+    "aggressor_model=uniform": {
+     "at_code_maxima": 15457.206802022836,
+     "at_code_minima": 35033.463209692316
+    },
+    "variation=off (nominal die)": {
+     "at_code_maxima": 1003.6500153033267,
+     "at_code_minima": 32510.839061447514
+    }
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "method": "quasi_static",
+    "output": "lane_offsets",
+    "n_dies": 8,
+    "variation": "sample (device seeds 0..n_dies-1)",
+    "uncertainty": "nominal",
+    "setpoint": "half_max",
+    "bias_v": 1.05,
+    "driver_law": "voltage",
+    "aggressor": "A1 slide-10 (rectified sine), calibrated on each die's ROM",
+    "referencing": "resonance",
+    "statistic": "median over dies",
+    "laser": "every TX line on at the preset chip-input power, filtered along the bus by the rings upstream (single forward pass); each ring locks its own line, the others heat it and leak into its drop monitor"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "per_die": [
+      {
+       "swing": [
+        3543.3326649999653,
+        17473.792911409757
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 29842.13150863126,
+        "at_code_minima": 25180.970613229398
+       },
+       "code_range": [
+        13685.494205755476,
+        56312.615275798846
+       ],
+       "per_lane_swing": [
+        17473.792911409757,
+        14711.804260401725,
+        5356.617672055185,
+        4043.3793101982883,
+        3580.6694021876683,
+        4573.773731242734,
+        5443.289295007722,
+        3543.3326649999653
+       ],
+       "per_lane_max": [
+        56312.615275798846,
+        28397.2984661572,
+        33228.39333462748,
+        37050.68594083904,
+        42447.13422117254,
+        30741.796950418546,
+        26470.483767167585,
+        42242.028619982746
+       ],
+       "per_lane_min": [
+        38838.82236438909,
+        13685.494205755476,
+        27871.775662572294,
+        33007.30663064075,
+        38866.464818984874,
+        26168.02321917581,
+        21027.194472159863,
+        38698.69595498278
+       ]
+      },
+      {
+       "swing": [
+        3667.214925236207,
+        22022.43676098112
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 26818.006216096426,
+        "at_code_minima": 43493.95670270678
+       },
+       "code_range": [
+        0.0,
+        47161.17162794299
+       ],
+       "per_lane_swing": [
+        22022.43676098112,
+        21022.805942365634,
+        3667.214925236207,
+        6977.264968421454,
+        5596.021215476099,
+        5617.155732997799,
+        5347.973064566813,
+        6453.430369192345
+       ],
+       "per_lane_max": [
+        42578.499779446734,
+        21022.805942365634,
+        47161.17162794299,
+        20343.165411846563,
+        25179.571689224835,
+        24057.389284441775,
+        25303.94589723803,
+        21904.952730303692
+       ],
+       "per_lane_min": [
+        20556.063018465615,
+        0.0,
+        43493.95670270678,
+        13365.90044342511,
+        19583.550473748735,
+        18440.233551443976,
+        19955.972832671217,
+        15451.522361111347
+       ]
+      },
+      {
+       "swing": [
+        5200.024342375789,
+        19658.983638312904
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 38353.14078152767,
+        "at_code_minima": 38615.774064308745
+       },
+       "code_range": [
+        0.0,
+        50635.25052806818
+       ],
+       "per_lane_swing": [
+        19658.983638312904,
+        8380.788809438767,
+        14059.003429786348,
+        6933.386000179931,
+        9084.145288215255,
+        11732.273315687133,
+        5200.024342375789,
+        12282.10974654051
+       ],
+       "per_lane_max": [
+        50635.25052806818,
+        46996.56287374751,
+        14059.003429786348,
+        22126.428922344498,
+        18421.675162600775,
+        16530.021246414126,
+        27194.46030658042,
+        12282.10974654051
+       ],
+       "per_lane_min": [
+        30976.266889755276,
+        38615.774064308745,
+        0.0,
+        15193.042922164566,
+        9337.52987438552,
+        4797.747930726992,
+        21994.43596420463,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3583.968957187295,
+        25865.313116641053
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 36413.313451761605,
+        "at_code_minima": 45341.703162197315
+       },
+       "code_range": [
+        0.0,
+        50709.55784661166
+       ],
+       "per_lane_swing": [
+        23103.390079456723,
+        25865.313116641053,
+        9805.128998490598,
+        4057.2054351201587,
+        14296.24439485005,
+        3888.4778109244144,
+        3741.8197990484477,
+        3583.968957187295
+       ],
+       "per_lane_max": [
+        50709.55784661166,
+        25865.313116641053,
+        22800.34699079736,
+        41820.527180620404,
+        14296.24439485005,
+        44973.58873282675,
+        44250.053920777355,
+        48925.67211938461
+       ],
+       "per_lane_min": [
+        27606.167767154933,
+        0.0,
+        12995.217992306762,
+        37763.321745500245,
+        0.0,
+        41085.110921902335,
+        40508.23412172891,
+        45341.703162197315
+       ]
+      },
+      {
+       "swing": [
+        3281.3488900654993,
+        18805.575638667833
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 34845.068252600744,
+        "at_code_minima": 37588.430134840215
+       },
+       "code_range": [
+        5787.320043607121,
+        51681.22093651738
+       ],
+       "per_lane_swing": [
+        18805.575638667833,
+        7692.770529420144,
+        10046.93026012217,
+        11139.653053652903,
+        3281.3488900654993,
+        8599.781674243004,
+        10356.003524335272,
+        5346.620928246481
+       ],
+       "per_lane_max": [
+        51681.22093651738,
+        50142.27586514915,
+        20363.1013816259,
+        16926.973097260023,
+        46657.099068512834,
+        18850.815982557837,
+        16836.15268391663,
+        26953.76598598172
+       ],
+       "per_lane_min": [
+        32875.64529784954,
+        42449.50533572901,
+        10316.17112150373,
+        5787.320043607121,
+        43375.750178447335,
+        10251.034308314833,
+        6480.149159581357,
+        21607.14505773524
+       ]
+      },
+      {
+       "swing": [
+        461.8463487939757,
+        23624.480492263312
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 46699.01469635368,
+        "at_code_minima": 43767.61312654957
+       },
+       "code_range": [
+        0.0,
+        47160.861045147656
+       ],
+       "per_lane_swing": [
+        23624.480492263312,
+        9096.331420242852,
+        4674.767496292297,
+        4284.232524948646,
+        3522.1203913961,
+        3450.652312917271,
+        3393.2479185980847,
+        461.8463487939757
+       ],
+       "per_lane_max": [
+        46143.61892339731,
+        43826.34368750702,
+        41116.29599441305,
+        37299.23643389112,
+        45850.20257413041,
+        45637.04301070341,
+        47160.861045147656,
+        461.8463487939757
+       ],
+       "per_lane_min": [
+        22519.138431134,
+        34730.01226726417,
+        36441.52849812075,
+        33015.003908942475,
+        42328.08218273431,
+        42186.39069778614,
+        43767.61312654957,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3762.626339611612,
+        24147.393146464954
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 27487.362939505907,
+        "at_code_minima": 29167.676112952566
+       },
+       "code_range": [
+        13130.340308677612,
+        48929.46316326139
+       ],
+       "per_lane_swing": [
+        24147.393146464954,
+        13762.027964342498,
+        5290.422946817947,
+        4604.711368707718,
+        8311.75991507787,
+        4817.851918333428,
+        3966.2483587236784,
+        3762.626339611612
+       ],
+       "per_lane_max": [
+        48929.46316326139,
+        33275.72160660248,
+        39583.09332667142,
+        36739.96639446124,
+        21442.100223755482,
+        34740.0592124668,
+        40863.64316542547,
+        46060.64276124179
+       ],
+       "per_lane_min": [
+        24782.070016796435,
+        19513.69364225998,
+        34292.67037985347,
+        32135.255025753522,
+        13130.340308677612,
+        29922.207294133368,
+        36897.39480670179,
+        42298.01642163018
+       ]
+      },
+      {
+       "swing": [
+        3730.4666431199585,
+        23577.15147361716
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 23850.99291798511,
+        "at_code_minima": 23935.55134194075
+       },
+       "code_range": [
+        16781.1898180246,
+        49019.466327505324
+       ],
+       "per_lane_swing": [
+        23577.15147361716,
+        11228.483968219312,
+        8387.283591495616,
+        4479.798602689836,
+        5675.204689699178,
+        4838.409532042038,
+        3730.4666431199585,
+        5066.650278164274
+       ],
+       "per_lane_max": [
+        49019.466327505324,
+        38306.63630611031,
+        25168.473409520215,
+        37271.80121790818,
+        28718.867956816666,
+        32874.94921348397,
+        44447.20780308531,
+        32011.11333109848
+       ],
+       "per_lane_min": [
+        25442.314853888165,
+        27078.152337891,
+        16781.1898180246,
+        32792.00261521834,
+        23043.66326711749,
+        28036.53968144193,
+        40716.74115996535,
+        26944.463052934207
+       ]
+      }
+     ],
+     "law": "voltage",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=current": {
+     "law": "current",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=power": {
+     "law": "power",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=dac_pwm": {
+     "law": "dac_pwm",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "variation=off (nominal die)": {
+     "law": "voltage",
+     "victim_rise_k": [
+      0.1138061658531365,
+      94.82056094893532
+     ],
+     "lane_rise_k": [
+      94.82056094893532,
+      45.98149069951798,
+      25.170836446223042,
+      21.547764998818714,
+      21.29823412430126,
+      21.064437738163548,
+      20.876194249755926,
+      20.69344497655926
+     ],
+     "infeasible_samples": 18,
+     "calibration_residual_rms_k": [
+      0.012353630868812429
+     ],
+     "peak_power_mw": [
+      283.73342383583577
+     ],
+     "t_base_c": 25.0,
+     "per_die": [
+      {
+       "swing": [
+        3953.835412802633,
+        35808.12645303516
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 1003.6500153033267,
+        "at_code_minima": 32510.839061447514
+       },
+       "code_range": [
+        0.0,
+        36464.67447425015
+       ],
+       "per_lane_swing": [
+        35808.12645303516,
+        10775.056940516402,
+        5011.147738122414,
+        4149.814246890972,
+        4087.2901144236057,
+        4028.358189422426,
+        3980.6601325756856,
+        3953.835412802633
+       ],
+       "per_lane_max": [
+        35808.12645303516,
+        35461.02445894682,
+        35545.81781480281,
+        35651.65400851316,
+        35819.018257181815,
+        35910.11455645264,
+        35991.03478864231,
+        36464.67447425015
+       ],
+       "per_lane_min": [
+        0.0,
+        24685.967518430418,
+        30534.670076680395,
+        31501.839761622185,
+        31731.72814275821,
+        31881.75636703021,
+        32010.374656066626,
+        32510.839061447514
+       ]
+      }
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-9b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 28602.102099574477,
+    "z": 124.21799940308001,
+    "detail": "max |pred - value| = 2.86e+04 codes"
+   },
+   "runtime_s": 17.22
+  },
+  {
+   "id": "CAL-9c",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "stabilizer_code_vs_T",
+   "preset": "g26",
+   "quantity": "heater_code_range_all_lanes",
+   "unit": "codes",
+   "value": [
+    19400,
+    49250
+   ],
+   "sigma": 200,
+   "tolerance": {
+    "kind": "abs",
+    "value": 600
+   },
+   "replica_status": "ok",
+   "predicted": [
+    2893.6600218035605,
+    49827.35842778675
+   ],
+   "predicted_nonfinite": false,
+   "variants": {
+    "driver_mode=current": [
+     3932.9056912253714,
+     56877.578243891694
+    ],
+    "driver_mode=power": [
+     347.3241260111161,
+     43218.224051274636
+    ],
+    "driver_mode=dac_pwm": [
+     2832.5756111603214,
+     49740.6076367567
+    ],
+    "ring.heater.full_scale_v=1.4": [
+     3307.112788013499,
+     56945.51886009584
+    ],
+    "ring.heater.full_scale_v=1.8": [
+     2572.1699593892104,
+     44291.120790778776
+    ],
+    "aggressor_model=uniform": [
+     0.0,
+     55198.10626103595
+    ],
+    "variation=off (nominal die)": [
+     0.0,
+     36464.67447425015
+    ]
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "method": "quasi_static",
+    "output": "code_range",
+    "n_dies": 8,
+    "variation": "sample (device seeds 0..n_dies-1)",
+    "uncertainty": "nominal",
+    "setpoint": "half_max",
+    "bias_v": 1.05,
+    "driver_law": "voltage",
+    "aggressor": "A1 slide-10 (rectified sine), calibrated on each die's ROM",
+    "referencing": "resonance",
+    "statistic": "median over dies",
+    "laser": "every TX line on at the preset chip-input power, filtered along the bus by the rings upstream (single forward pass); each ring locks its own line, the others heat it and leak into its drop monitor"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "per_die": [
+      {
+       "swing": [
+        3543.3326649999653,
+        17473.792911409757
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 29842.13150863126,
+        "at_code_minima": 25180.970613229398
+       },
+       "code_range": [
+        13685.494205755476,
+        56312.615275798846
+       ],
+       "per_lane_swing": [
+        17473.792911409757,
+        14711.804260401725,
+        5356.617672055185,
+        4043.3793101982883,
+        3580.6694021876683,
+        4573.773731242734,
+        5443.289295007722,
+        3543.3326649999653
+       ],
+       "per_lane_max": [
+        56312.615275798846,
+        28397.2984661572,
+        33228.39333462748,
+        37050.68594083904,
+        42447.13422117254,
+        30741.796950418546,
+        26470.483767167585,
+        42242.028619982746
+       ],
+       "per_lane_min": [
+        38838.82236438909,
+        13685.494205755476,
+        27871.775662572294,
+        33007.30663064075,
+        38866.464818984874,
+        26168.02321917581,
+        21027.194472159863,
+        38698.69595498278
+       ]
+      },
+      {
+       "swing": [
+        3667.214925236207,
+        22022.43676098112
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 26818.006216096426,
+        "at_code_minima": 43493.95670270678
+       },
+       "code_range": [
+        0.0,
+        47161.17162794299
+       ],
+       "per_lane_swing": [
+        22022.43676098112,
+        21022.805942365634,
+        3667.214925236207,
+        6977.264968421454,
+        5596.021215476099,
+        5617.155732997799,
+        5347.973064566813,
+        6453.430369192345
+       ],
+       "per_lane_max": [
+        42578.499779446734,
+        21022.805942365634,
+        47161.17162794299,
+        20343.165411846563,
+        25179.571689224835,
+        24057.389284441775,
+        25303.94589723803,
+        21904.952730303692
+       ],
+       "per_lane_min": [
+        20556.063018465615,
+        0.0,
+        43493.95670270678,
+        13365.90044342511,
+        19583.550473748735,
+        18440.233551443976,
+        19955.972832671217,
+        15451.522361111347
+       ]
+      },
+      {
+       "swing": [
+        5200.024342375789,
+        19658.983638312904
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 38353.14078152767,
+        "at_code_minima": 38615.774064308745
+       },
+       "code_range": [
+        0.0,
+        50635.25052806818
+       ],
+       "per_lane_swing": [
+        19658.983638312904,
+        8380.788809438767,
+        14059.003429786348,
+        6933.386000179931,
+        9084.145288215255,
+        11732.273315687133,
+        5200.024342375789,
+        12282.10974654051
+       ],
+       "per_lane_max": [
+        50635.25052806818,
+        46996.56287374751,
+        14059.003429786348,
+        22126.428922344498,
+        18421.675162600775,
+        16530.021246414126,
+        27194.46030658042,
+        12282.10974654051
+       ],
+       "per_lane_min": [
+        30976.266889755276,
+        38615.774064308745,
+        0.0,
+        15193.042922164566,
+        9337.52987438552,
+        4797.747930726992,
+        21994.43596420463,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3583.968957187295,
+        25865.313116641053
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 36413.313451761605,
+        "at_code_minima": 45341.703162197315
+       },
+       "code_range": [
+        0.0,
+        50709.55784661166
+       ],
+       "per_lane_swing": [
+        23103.390079456723,
+        25865.313116641053,
+        9805.128998490598,
+        4057.2054351201587,
+        14296.24439485005,
+        3888.4778109244144,
+        3741.8197990484477,
+        3583.968957187295
+       ],
+       "per_lane_max": [
+        50709.55784661166,
+        25865.313116641053,
+        22800.34699079736,
+        41820.527180620404,
+        14296.24439485005,
+        44973.58873282675,
+        44250.053920777355,
+        48925.67211938461
+       ],
+       "per_lane_min": [
+        27606.167767154933,
+        0.0,
+        12995.217992306762,
+        37763.321745500245,
+        0.0,
+        41085.110921902335,
+        40508.23412172891,
+        45341.703162197315
+       ]
+      },
+      {
+       "swing": [
+        3281.3488900654993,
+        18805.575638667833
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 34845.068252600744,
+        "at_code_minima": 37588.430134840215
+       },
+       "code_range": [
+        5787.320043607121,
+        51681.22093651738
+       ],
+       "per_lane_swing": [
+        18805.575638667833,
+        7692.770529420144,
+        10046.93026012217,
+        11139.653053652903,
+        3281.3488900654993,
+        8599.781674243004,
+        10356.003524335272,
+        5346.620928246481
+       ],
+       "per_lane_max": [
+        51681.22093651738,
+        50142.27586514915,
+        20363.1013816259,
+        16926.973097260023,
+        46657.099068512834,
+        18850.815982557837,
+        16836.15268391663,
+        26953.76598598172
+       ],
+       "per_lane_min": [
+        32875.64529784954,
+        42449.50533572901,
+        10316.17112150373,
+        5787.320043607121,
+        43375.750178447335,
+        10251.034308314833,
+        6480.149159581357,
+        21607.14505773524
+       ]
+      },
+      {
+       "swing": [
+        461.8463487939757,
+        23624.480492263312
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 46699.01469635368,
+        "at_code_minima": 43767.61312654957
+       },
+       "code_range": [
+        0.0,
+        47160.861045147656
+       ],
+       "per_lane_swing": [
+        23624.480492263312,
+        9096.331420242852,
+        4674.767496292297,
+        4284.232524948646,
+        3522.1203913961,
+        3450.652312917271,
+        3393.2479185980847,
+        461.8463487939757
+       ],
+       "per_lane_max": [
+        46143.61892339731,
+        43826.34368750702,
+        41116.29599441305,
+        37299.23643389112,
+        45850.20257413041,
+        45637.04301070341,
+        47160.861045147656,
+        461.8463487939757
+       ],
+       "per_lane_min": [
+        22519.138431134,
+        34730.01226726417,
+        36441.52849812075,
+        33015.003908942475,
+        42328.08218273431,
+        42186.39069778614,
+        43767.61312654957,
+        0.0
+       ]
+      },
+      {
+       "swing": [
+        3762.626339611612,
+        24147.393146464954
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 27487.362939505907,
+        "at_code_minima": 29167.676112952566
+       },
+       "code_range": [
+        13130.340308677612,
+        48929.46316326139
+       ],
+       "per_lane_swing": [
+        24147.393146464954,
+        13762.027964342498,
+        5290.422946817947,
+        4604.711368707718,
+        8311.75991507787,
+        4817.851918333428,
+        3966.2483587236784,
+        3762.626339611612
+       ],
+       "per_lane_max": [
+        48929.46316326139,
+        33275.72160660248,
+        39583.09332667142,
+        36739.96639446124,
+        21442.100223755482,
+        34740.0592124668,
+        40863.64316542547,
+        46060.64276124179
+       ],
+       "per_lane_min": [
+        24782.070016796435,
+        19513.69364225998,
+        34292.67037985347,
+        32135.255025753522,
+        13130.340308677612,
+        29922.207294133368,
+        36897.39480670179,
+        42298.01642163018
+       ]
+      },
+      {
+       "swing": [
+        3730.4666431199585,
+        23577.15147361716
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 23850.99291798511,
+        "at_code_minima": 23935.55134194075
+       },
+       "code_range": [
+        16781.1898180246,
+        49019.466327505324
+       ],
+       "per_lane_swing": [
+        23577.15147361716,
+        11228.483968219312,
+        8387.283591495616,
+        4479.798602689836,
+        5675.204689699178,
+        4838.409532042038,
+        3730.4666431199585,
+        5066.650278164274
+       ],
+       "per_lane_max": [
+        49019.466327505324,
+        38306.63630611031,
+        25168.473409520215,
+        37271.80121790818,
+        28718.867956816666,
+        32874.94921348397,
+        44447.20780308531,
+        32011.11333109848
+       ],
+       "per_lane_min": [
+        25442.314853888165,
+        27078.152337891,
+        16781.1898180246,
+        32792.00261521834,
+        23043.66326711749,
+        28036.53968144193,
+        40716.74115996535,
+        26944.463052934207
+       ]
+      }
+     ],
+     "law": "voltage",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=current": {
+     "law": "current",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=power": {
+     "law": "power",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "driver_mode=dac_pwm": {
+     "law": "dac_pwm",
+     "victim_rise_k": [
+      0.10840968587482827,
+      104.41288173525581
+     ],
+     "lane_rise_k": [
+      97.99390537783628,
+      47.00806510923704,
+      26.619085488518966,
+      22.238928053332913,
+      23.13125167323416,
+      21.236291502938506,
+      21.78542583778085,
+      21.905796863206994
+     ],
+     "infeasible_samples": 517,
+     "calibration_residual_rms_k": [
+      0.012719210668792053,
+      0.012092438010907227,
+      0.013223450221759615,
+      0.013260730729494916,
+      0.012983674490561679,
+      0.011874651814648952,
+      0.013440720194810015,
+      0.013445365211985359
+     ],
+     "peak_power_mw": [
+      304.207173295004,
+      258.7089885046661,
+      298.45000257868594,
+      306.13825316178566,
+      293.89296052422344,
+      287.11623389530655,
+      328.98022056250755,
+      349.3476273776731
+     ],
+     "t_base_c": 25.0
+    },
+    "variation=off (nominal die)": {
+     "law": "voltage",
+     "victim_rise_k": [
+      0.1138061658531365,
+      94.82056094893532
+     ],
+     "lane_rise_k": [
+      94.82056094893532,
+      45.98149069951798,
+      25.170836446223042,
+      21.547764998818714,
+      21.29823412430126,
+      21.064437738163548,
+      20.876194249755926,
+      20.69344497655926
+     ],
+     "infeasible_samples": 18,
+     "calibration_residual_rms_k": [
+      0.012353630868812429
+     ],
+     "peak_power_mw": [
+      283.73342383583577
+     ],
+     "t_base_c": 25.0,
+     "per_die": [
+      {
+       "swing": [
+        3953.835412802633,
+        35808.12645303516
+       ],
+       "lane_offsets": {
+        "at_code_maxima": 1003.6500153033267,
+        "at_code_minima": 32510.839061447514
+       },
+       "code_range": [
+        0.0,
+        36464.67447425015
+       ],
+       "per_lane_swing": [
+        35808.12645303516,
+        10775.056940516402,
+        5011.147738122414,
+        4149.814246890972,
+        4087.2901144236057,
+        4028.358189422426,
+        3980.6601325756856,
+        3953.835412802633
+       ],
+       "per_lane_max": [
+        35808.12645303516,
+        35461.02445894682,
+        35545.81781480281,
+        35651.65400851316,
+        35819.018257181815,
+        35910.11455645264,
+        35991.03478864231,
+        36464.67447425015
+       ],
+       "per_lane_min": [
+        0.0,
+        24685.967518430418,
+        30534.670076680395,
+        31501.839761622185,
+        31731.72814275821,
+        31881.75636703021,
+        32010.374656066626,
+        32510.839061447514
+       ]
+      }
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-9c",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 16506.33997819644,
+    "z": 82.5316998909822,
+    "detail": "max |pred - value| = 1.651e+04 codes"
+   },
+   "runtime_s": 23.74
+  },
+  {
+   "id": "CAL-10",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "eo_bandwidth_at_bias",
+   "preset": "g25_test_vehicle",
+   "quantity": "eo_bandwidth_3db_ghz",
+   "unit": "ghz",
+   "value": 30.9,
+   "sigma": 2.0,
+   "tolerance": {
+    "kind": "abs",
+    "value": 4.0
+   },
+   "replica_status": "ok",
+   "predicted": 45.50403881108638,
+   "predicted_nonfinite": false,
+   "variants": {
+    "detuning=hwhm": 71.51244162138428,
+    "r_drv_ohm=0": 48.547825451196225,
+    "loss_modulation=off": 46.907364953452436,
+    "method=linearized_index_only_r_source_0": 50.08615494874268
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "bias_v": 1.0,
+    "detuning": "max_slope",
+    "x_bias": 0.5773502691896258,
+    "method": "waveform",
+    "r_drv_ohm": 50.0,
+    "response": "mrm.waveform.eo_bandwidth: TCMT with index + loss modulation, C_j(V), R_s, driver output resistance",
+    "laser": "re-centred at each bias to the detuning rule (ring temperature set accordingly)"
+   },
+   "notes": [
+    "method changed at the 2026-10-09 review: the primary was the replica's own linearized index-only TCMT with R_source = 0 (variant 'method=linearized_index_only_r_source_0') while mrm.waveform did not exist; it is now the README's waveform mode with the plant's driver output resistance and the loss modulation. The change was made after the earlier predictions had been compared with CAL-10 / VAL-3 (50.1 GHz, 51.3 GHz, ratio 1.025: all failed); report both"
+   ],
+   "detail": {
+    "max_slope": {
+     "bw_hz": 45504038811.08638,
+     "peaking_db": 0.032948827212891614,
+     "fwhm_hz": 61987356542.08457,
+     "rc_pole_hz": 102776342711.48701,
+     "x_bias": 0.5773502691894923,
+     "r_s_ohm": 99.99999999999999,
+     "r_drv_ohm": 50.0,
+     "c_j_f": 1.032370802417528e-14
+    },
+    "hwhm": {
+     "bw_hz": 71512441621.38428,
+     "peaking_db": 1.5292265774200482,
+     "fwhm_hz": 61986129807.09293,
+     "rc_pole_hz": 102776342711.48701,
+     "x_bias": 0.9999999999997935,
+     "r_s_ohm": 99.99999999999999,
+     "r_drv_ohm": 50.0,
+     "c_j_f": 1.032370802417528e-14
+    },
+    "method=linearized_index_only_r_source_0": {
+     "bw_hz": 50086154948.74268,
+     "peaking_db": 0.10800790430860094,
+     "fwhm_hz": 61989032636.524536,
+     "rc_pole_hz": 154164514067.2308,
+     "x_bias": 0.5773517835236333,
+     "r_s_ohm": 99.99999999999999,
+     "c_j_f": 1.032370802417528e-14
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-10",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 14.604038811086383,
+    "z": 7.3020194055431915,
+    "detail": "max |pred - value| = 14.6 ghz"
+   },
+   "runtime_s": 0.64
+  },
+  {
+   "id": "CAL-11",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "pd_responsivity",
+   "preset": "g25_test_vehicle",
+   "quantity": "pd_responsivity_a_per_w",
+   "unit": "a_per_w",
+   "value": [
+    0.88,
+    1.04
+   ],
+   "sigma": null,
+   "tolerance": {
+    "kind": "interval",
+    "lo": 0.88,
+    "hi": 1.04
+   },
+   "replica_status": "ok",
+   "predicted": [
+    0.88,
+    1.0117309178656702
+   ],
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 256,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "uncertainty": "sample",
+    "variation": "sample",
+    "statistic": "range"
+   },
+   "notes": [],
+   "detail": {
+    "n": 256,
+    "quantiles": [
+     0.880487910487969,
+     0.9235198739610154,
+     0.9461312382190881,
+     0.9624826412690219,
+     1.0082553265771386
+    ]
+   },
+   "evaluation": {
+    "target_id": "CAL-11",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "prediction range [0.88, 1.012] against [0.88, 1.04]"
+   },
+   "runtime_s": 0.61
+  },
+  {
+   "id": "CAL-12a",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "laser_line_statistics",
+   "preset": "g26",
+   "quantity": "laser_line_accuracy_ghz",
+   "unit": "ghz",
+   "value": 20.0,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": "<=",
+    "value": 20.0
+   },
+   "replica_status": "ok",
+   "predicted": 20.0,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 256,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "sign": "line frequency minus grid",
+    "lines": "tx"
+   },
+   "notes": [],
+   "detail": {
+    "n": 2048,
+    "sigma_ghz": 7.250429369815545,
+    "fraction_outside_15ghz": 0.0390625
+   },
+   "evaluation": {
+    "target_id": "CAL-12a",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": -0.0,
+    "z": null,
+    "detail": "worst prediction 20 <= 20 (margin +0 ghz)"
+   },
+   "runtime_s": 0.66
+  },
+  {
+   "id": "CAL-12b",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "laser_line_statistics",
+   "preset": "g26",
+   "quantity": "laser_line_error_population_guide_ghz",
+   "unit": "ghz",
+   "value": {
+    "median": -2.0,
+    "q25": -5.5,
+    "q75": 1.5
+   },
+   "sigma": {
+    "median": 1.0,
+    "q25": 1.0,
+    "q75": 1.0
+   },
+   "tolerance": {
+    "kind": "abs",
+    "value": 2.0
+   },
+   "replica_status": "ok",
+   "predicted": {
+    "median": 0.2674298664375,
+    "q25": -4.635228411015625,
+    "q75": 5.0637686672265625
+   },
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 256,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "sign": "line frequency minus grid",
+    "lines": "tx"
+   },
+   "notes": [
+    "the model's line error population is variation.laser.line_offset_ghz of the preset (die and line sigma, clipped at the +-20 GHz requirement); no separate Guide model"
+   ],
+   "detail": {
+    "n": 2048,
+    "sigma_ghz": 7.250429369815545,
+    "fraction_outside_15ghz": 0.0390625
+   },
+   "evaluation": {
+    "target_id": "CAL-12b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 3.5637686672265625,
+    "z": 3.5637686672265625,
+    "detail": "max |pred - value| = 3.564 ghz"
+   },
+   "runtime_s": 0.48
+  },
+  {
+   "id": "CAL-12c",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "laser_line_statistics",
+   "preset": "g26",
+   "quantity": "laser_wavelength_drift_24h_nm",
+   "unit": "nm",
+   "value": 0.02,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": "<=",
+    "value": 0.02
+   },
+   "replica_status": "ok",
+   "predicted": 0.020264818278393,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "scenario": "laser_drift(linear)",
+    "window_s": 86400.0,
+    "render_step_s": 60.0,
+    "worlds": 1
+   },
+   "notes": [],
+   "detail": {},
+   "evaluation": {
+    "target_id": "CAL-12c",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 0.0002648182783929996,
+    "z": null,
+    "detail": "worst prediction 0.02026 <= 0.02 (margin -0.0002648 nm)"
+   },
+   "runtime_s": 0.45
+  },
+  {
+   "id": "CAL-12d",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "laser_line_statistics",
+   "preset": "g26",
+   "quantity": "laser_power_drift_24h_pct",
+   "unit": "pct",
+   "value": 2.5,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": "<=",
+    "value": 2.5
+   },
+   "replica_status": "ok",
+   "predicted": 2.4999999999999356,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "scenario": "laser_drift(linear)",
+    "window_s": 86400.0,
+    "render_step_s": 60.0,
+    "worlds": 1
+   },
+   "notes": [],
+   "detail": {},
+   "evaluation": {
+    "target_id": "CAL-12d",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "worst prediction 2.5 <= 2.5 (margin +6.439e-14 pct)"
+   },
+   "runtime_s": 0.6
+  },
+  {
+   "id": "CAL-13a",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "aggressor_trajectory",
+   "preset": "g26",
+   "quantity": "aggressor_trajectory_slide10",
+   "unit": "c",
+   "value": {
+    "form": "rectified_sine",
+    "params": {
+     "t_max_c": 113.6,
+     "delta_t_k": 88.5,
+     "period_s": 0.1307
+    },
+    "fit_rms_c": 0.34,
+    "derived": {
+     "t_min_c": 25.1,
+     "peak_rate_k_per_s": 2127.0,
+     "mean_rate_k_per_s": 1354.0
+    }
+   },
+   "sigma": {
+    "t_max_c": 1.0,
+    "delta_t_k": 1.0,
+    "period_s": 0.001
+   },
+   "tolerance": {
+    "kind": "rms_abs",
+    "value": 1.0
+   },
+   "replica_status": "ok",
+   "predicted": {
+    "t_s": [
+     0.0,
+     0.0002552734375000365,
+     0.0005105468750000175,
+     0.000765820312500054,
+     0.001021093750000035,
+     0.001276367187500016,
+     0.0015316406250000525,
+     0.0017869140625000335,
+     0.0020421875000000145,
+     0.002297460937500051,
+     0.002552734375000032,
+     0.002808007812500013,
+     0.0030632812500000495,
+     0.0033185546875000305,
+     0.0035738281250000115,
+     0.003829101562500048,
+     0.004084375000000029,
+     0.00433964843750001,
+     0.0045949218750000465,
+     0.0048501953125000274,
+     0.0051054687500000084,
+     0.005360742187500045,
+     0.005616015625000026,
+     0.005871289062500007,
+     0.006126562500000043,
+     0.006381835937500024,
+     0.006637109375000005,
+     0.006892382812500042,
+     0.007147656250000023,
+     0.007402929687500004,
+     0.00765820312500004,
+     0.007913476562500021,
+     0.008168750000000002,
+     0.008424023437500039,
+     0.00867929687500002,
+     0.008934570312500001,
+     0.009189843750000037,
+     0.009445117187500018,
+     0.009700390625000055,
+     0.009955664062500036,
+     0.010210937500000017,
+     0.010466210937500053,
+     0.010721484375000034,
+     0.010976757812500015,
+     0.011232031250000052,
+     0.011487304687500033,
+     0.011742578125000014,
+     0.01199785156250005,
+     0.012253125000000031,
+     0.012508398437500012,
+     0.012763671875000049,
+     0.01301894531250003,
+     0.01327421875000001,
+     0.013529492187500047,
+     0.013784765625000028,
+     0.01404003906250001,
+     0.014295312500000046,
+     0.014550585937500027,
+     0.014805859375000008,
+     0.015061132812500044,
+     0.015316406250000025,
+     0.015571679687500006,
+     0.015826953125000043,
+     0.016082226562500024,
+     0.016337500000000005,
+     0.01659277343750004,
+     0.016848046875000022,
+     0.017103320312500003,
+     0.01735859375000004,
+     0.01761386718750002,
+     0.017869140625000002,
+     0.01812441406250004,
+     0.01837968750000002,
+     0.018634960937500056,
+     0.018890234375000037,
+     0.019145507812500018,
+     0.019400781250000054,
+     0.019656054687500035,
+     0.019911328125000016,
+     0.020166601562500053,
+     0.020421875000000034,
+     0.020677148437500015,
+     0.02093242187500005,
+     0.021187695312500032,
+     0.021442968750000013,
+     0.02169824218750005,
+     0.02195351562500003,
+     0.02220878906250001,
+     0.022464062500000048,
+     0.02271933593750003,
+     0.02297460937500001,
+     0.023229882812500047,
+     0.023485156250000028,
+     0.02374042968750001,
+     0.023995703125000045,
+     0.024250976562500026,
+     0.024506250000000007,
+     0.024761523437500044,
+     0.025016796875000025,
+     0.025272070312500006,
+     0.025527343750000042,
+     0.025782617187500023,
+     0.026037890625000004,
+     0.02629316406250004,
+     0.02654843750000002,
+     0.026803710937500003,
+     0.02705898437500004,
+     0.02731425781250002,
+     0.027569531250000057,
+     0.027824804687500038,
+     0.02808007812500002,
+     0.028335351562500055,
+     0.028590625000000036,
+     0.028845898437500017,
+     0.029101171875000054,
+     0.029356445312500035,
+     0.029611718750000016,
+     0.029866992187500052,
+     0.030122265625000033,
+     0.030377539062500014,
+     0.03063281250000005,
+     0.03088808593750003,
+     0.031143359375000013,
+     0.03139863281250005,
+     0.03165390625000003,
+     0.03190917968750001,
+     0.03216445312500005,
+     0.03241972656250003,
+     0.03267500000000001,
+     0.032930273437500046,
+     0.03318554687500003,
+     0.03344082031250001,
+     0.033696093750000045,
+     0.033951367187500026,
+     0.03420664062500001,
+     0.03446191406250004,
+     0.034717187500000024,
+     0.034972460937500005,
+     0.03522773437500004,
+     0.03548300781250002,
+     0.035738281250000004,
+     0.03599355468750004,
+     0.03624882812500002,
+     0.03650410156250006,
+     0.03675937500000004,
+     0.03701464843750002,
+     0.037269921875000056,
+     0.03752519531250004,
+     0.03778046875000002,
+     0.038035742187500055,
+     0.038291015625000036,
+     0.038546289062500017,
+     0.03880156250000005,
+     0.039056835937500034,
+     0.039312109375000015,
+     0.03956738281250005,
+     0.03982265625000003,
+     0.040077929687500014,
+     0.04033320312500005,
+     0.04058847656250003,
+     0.04084375000000001,
+     0.04109902343750005,
+     0.04135429687500003,
+     0.04160957031250001,
+     0.04186484375000005,
+     0.04212011718750003,
+     0.04237539062500001,
+     0.042630664062500045,
+     0.042885937500000026,
+     0.04314121093750001,
+     0.043396484375000044,
+     0.043651757812500025,
+     0.043907031250000006,
+     0.04416230468750004,
+     0.04441757812500002,
+     0.044672851562500004,
+     0.04492812500000004,
+     0.04518339843750002,
+     0.04543867187500006,
+     0.04569394531250004,
+     0.04594921875000002,
+     0.04620449218750006,
+     0.04645976562500004,
+     0.04671503906250002,
+     0.046970312500000055,
+     0.047225585937500036,
+     0.04748085937500002,
+     0.047736132812500054,
+     0.047991406250000035,
+     0.048246679687500016,
+     0.04850195312500005,
+     0.04875722656250003,
+     0.049012500000000014,
+     0.04926777343750005,
+     0.04952304687500003,
+     0.04977832031250001,
+     0.05003359375000005,
+     0.05028886718750003,
+     0.05054414062500001,
+     0.05079941406250005,
+     0.05105468750000003,
+     0.05130996093750001,
+     0.051565234375000046,
+     0.05182050781250003,
+     0.05207578125000001,
+     0.052331054687500045,
+     0.052586328125000026,
+     0.05284160156250001,
+     0.05309687500000004,
+     0.053352148437500024,
+     0.053607421875000005,
+     0.05386269531250004,
+     0.05411796875000002,
+     0.05437324218750006,
+     0.05462851562500004,
+     0.05488378906250002,
+     0.05513906250000006,
+     0.05539433593750004,
+     0.05564960937500002,
+     0.055904882812500056,
+     0.05616015625000004,
+     0.05641542968750002,
+     0.056670703125000055,
+     0.056925976562500036,
+     0.05718125000000002,
+     0.05743652343750005,
+     0.057691796875000034,
+     0.057947070312500015,
+     0.05820234375000005,
+     0.05845761718750003,
+     0.058712890625000014,
+     0.05896816406250005,
+     0.05922343750000003,
+     0.05947871093750001,
+     0.05973398437500005,
+     0.05998925781250003,
+     0.06024453125000001,
+     0.06049980468750005,
+     0.06075507812500003,
+     0.06101035156250001,
+     0.061265625000000046,
+     0.06152089843750003,
+     0.06177617187500001,
+     0.062031445312500044,
+     0.062286718750000025,
+     0.0625419921875,
+     0.06279726562500004,
+     0.06305253906250002,
+     0.06330781250000006,
+     0.06356308593750004,
+     0.06381835937500002,
+     0.06407363281250006,
+     0.06432890625000004,
+     0.06458417968750002,
+     0.06483945312500006,
+     0.06509472656250004,
+     0.06535000000000002,
+     0.06560527343750006,
+     0.06586054687500004,
+     0.06611582031250002,
+     0.06637109375000005,
+     0.06662636718750004,
+     0.06688164062500002,
+     0.06713691406250005,
+     0.06739218750000003,
+     0.06764746093750001,
+     0.06790273437500005,
+     0.06815800781250003,
+     0.06841328125000001,
+     0.06866855468750005,
+     0.06892382812500003,
+     0.06917910156250001,
+     0.06943437500000005,
+     0.06968964843750003,
+     0.06994492187500001,
+     0.07020019531250005,
+     0.07045546875000003,
+     0.07071074218750001,
+     0.07096601562500005,
+     0.07122128906250003,
+     0.07147656250000001,
+     0.07173183593750004,
+     0.07198710937500002,
+     0.07224238281250006,
+     0.07249765625000004,
+     0.07275292968750002,
+     0.07300820312500006,
+     0.07326347656250004,
+     0.07351875000000002,
+     0.07377402343750006,
+     0.07402929687500004,
+     0.07428457031250002,
+     0.07453984375000006,
+     0.07479511718750004,
+     0.07505039062500002,
+     0.07530566406250006,
+     0.07556093750000004,
+     0.07581621093750002,
+     0.07607148437500005,
+     0.07632675781250003,
+     0.07658203125000002,
+     0.07683730468750005,
+     0.07709257812500003,
+     0.07734785156250001,
+     0.07760312500000005,
+     0.07785839843750003,
+     0.07811367187500001,
+     0.07836894531250005,
+     0.07862421875000003,
+     0.07887949218750001,
+     0.07913476562500005,
+     0.07939003906250003,
+     0.07964531250000001,
+     0.07990058593750005,
+     0.08015585937500003,
+     0.08041113281250001,
+     0.08066640625000004,
+     0.08092167968750003,
+     0.08117695312500006,
+     0.08143222656250004,
+     0.08168750000000002,
+     0.08194277343750006,
+     0.08219804687500004,
+     0.08245332031250002,
+     0.08270859375000006,
+     0.08296386718750004,
+     0.08321914062500002,
+     0.08347441406250006,
+     0.08372968750000004,
+     0.08398496093750002,
+     0.08424023437500006,
+     0.08449550781250004,
+     0.08475078125000002,
+     0.08500605468750005,
+     0.08526132812500004,
+     0.08551660156250002,
+     0.08577187500000005,
+     0.08602714843750003,
+     0.08628242187500001,
+     0.08653769531250005,
+     0.08679296875000003,
+     0.08704824218750001,
+     0.08730351562500005,
+     0.08755878906250003,
+     0.08781406250000001,
+     0.08806933593750005,
+     0.08832460937500003,
+     0.08857988281250001,
+     0.08883515625000005,
+     0.08909042968750003,
+     0.08934570312500001,
+     0.08960097656250005,
+     0.08985625000000003,
+     0.09011152343750001,
+     0.09036679687500004,
+     0.09062207031250002,
+     0.09087734375000006,
+     0.09113261718750004,
+     0.09138789062500002,
+     0.09164316406250006,
+     0.09189843750000004,
+     0.09215371093750002,
+     0.09240898437500006,
+     0.09266425781250004,
+     0.09291953125000002,
+     0.09317480468750006,
+     0.09343007812500004,
+     0.09368535156250002,
+     0.09394062500000006,
+     0.09419589843750004,
+     0.09445117187500002,
+     0.09470644531250005,
+     0.09496171875000003,
+     0.09521699218750002,
+     0.09547226562500005,
+     0.09572753906250003,
+     0.09598281250000001,
+     0.09623808593750005,
+     0.09649335937500003,
+     0.09674863281250001,
+     0.09700390625000005,
+     0.09725917968750003,
+     0.09751445312500001,
+     0.09776972656250005,
+     0.09802500000000003,
+     0.09828027343750001,
+     0.09853554687500005,
+     0.09879082031250003,
+     0.09904609375000001,
+     0.09930136718750004,
+     0.09955664062500003,
+     0.09981191406250006,
+     0.10006718750000004,
+     0.10032246093750002,
+     0.10057773437500006,
+     0.10083300781250004,
+     0.10108828125000002,
+     0.10134355468750006,
+     0.10159882812500004,
+     0.10185410156250002,
+     0.10210937500000006,
+     0.10236464843750004,
+     0.10261992187500002,
+     0.10287519531250006,
+     0.10313046875000004,
+     0.10338574218750002,
+     0.10364101562500005,
+     0.10389628906250004,
+     0.10415156250000002,
+     0.10440683593750005,
+     0.10466210937500003,
+     0.10491738281250002,
+     0.10517265625000005,
+     0.10542792968750003,
+     0.10568320312500001,
+     0.10593847656250005,
+     0.10619375000000003,
+     0.10644902343750001,
+     0.10670429687500005,
+     0.10695957031250003,
+     0.10721484375000001,
+     0.10747011718750005,
+     0.10772539062500003,
+     0.10798066406250006,
+     0.10823593750000005,
+     0.10849121093750003,
+     0.10874648437500001,
+     0.10900175781249999,
+     0.10925703125000008,
+     0.10951230468750006,
+     0.10976757812500004,
+     0.11002285156250002,
+     0.110278125,
+     0.11053339843749999,
+     0.11078867187500008,
+     0.11104394531250006,
+     0.11129921875000004,
+     0.11155449218750002,
+     0.111809765625,
+     0.11206503906249998,
+     0.11232031250000007,
+     0.11257558593750006,
+     0.11283085937500004,
+     0.11308613281250002,
+     0.11334140625,
+     0.11359667968750009,
+     0.11385195312500007,
+     0.11410722656250005,
+     0.11436250000000003,
+     0.11461777343750001,
+     0.114873046875,
+     0.11512832031250009,
+     0.11538359375000007,
+     0.11563886718750005,
+     0.11589414062500003,
+     0.11614941406250001,
+     0.11640468749999999,
+     0.11665996093750008,
+     0.11691523437500007,
+     0.11717050781250005,
+     0.11742578125000003,
+     0.11768105468750001,
+     0.11793632812499999,
+     0.11819160156250008,
+     0.11844687500000006,
+     0.11870214843750004,
+     0.11895742187500002,
+     0.1192126953125,
+     0.11946796874999999,
+     0.11972324218750008,
+     0.11997851562500006,
+     0.12023378906250004,
+     0.12048906250000002,
+     0.1207443359375,
+     0.12099960937499998,
+     0.12125488281250008,
+     0.12151015625000006,
+     0.12176542968750004,
+     0.12202070312500002,
+     0.1222759765625,
+     0.12253125000000009,
+     0.12278652343750007,
+     0.12304179687500005,
+     0.12329707031250003,
+     0.12355234375000002,
+     0.1238076171875,
+     0.12406289062500009,
+     0.12431816406250007,
+     0.12457343750000005,
+     0.12482871093750003,
+     0.125083984375,
+     0.1253392578125,
+     0.12559453125000009,
+     0.12584980468750007,
+     0.12610507812500005,
+     0.12636035156250003,
+     0.126615625,
+     0.1268708984375,
+     0.12712617187500008,
+     0.12738144531250006,
+     0.12763671875000004,
+     0.12789199218750003,
+     0.128147265625,
+     0.1284025390625,
+     0.12865781250000008,
+     0.12891308593750006,
+     0.12916835937500004,
+     0.12942363281250002,
+     0.12967890625,
+     0.12993417968749998,
+     0.13018945312500008,
+     0.13044472656250006
+    ],
+    "y": [
+     113.3238626934075,
+     113.15689252805717,
+     112.58201452627459,
+     111.9197470840943,
+     111.4010856518788,
+     110.90758866004178,
+     110.35403997554373,
+     109.7903963570667,
+     109.25259872559026,
+     108.71931901113417,
+     108.17521781858369,
+     107.62945851860276,
+     107.08863516664648,
+     106.54885600528966,
+     106.00732316436158,
+     105.46573590572466,
+     104.92531750293811,
+     104.38537359964359,
+     103.84540489568101,
+     103.30574260521915,
+     102.76662442297514,
+     102.22794296174025,
+     101.6896196715629,
+     101.15173554727599,
+     100.61434680693209,
+     100.07745433650894,
+     99.54105598598242,
+     99.0051875007563,
+     98.46987106293685,
+     97.93512804120162,
+     97.40096953211912,
+     96.86742360670453,
+     96.33450543855001,
+     95.80224076976742,
+     95.2706423543241,
+     94.7397374678519,
+     94.20953922299398,
+     93.68007476994939,
+     93.15135638675949,
+     92.62341180349513,
+     92.09625297112704,
+     91.56990789239829,
+     91.0443879705389,
+     90.51972160724635,
+     89.99591974928275,
+     89.47301113786855,
+     88.95100622110785,
+     88.4299340997491,
+     87.909804738317,
+     87.39064758298719,
+     86.87247210537902,
+     86.35530809750969,
+     85.83916453933801,
+     85.32407156283192,
+     84.81003765312931,
+     84.29709327886832,
+     83.7852464292148,
+     83.27452790498916,
+     82.76494519749762,
+     82.25652943568264,
+     81.74928761154388,
+     81.24325117781271,
+     80.7384266256728,
+     80.23484572733888,
+     79.73251447182359,
+     79.23146494641837,
+     78.73170263667238,
+     78.2332599405011,
+     77.73614183880076,
+     77.24038103558874,
+     76.74598200600578,
+     76.25297775558977,
+     75.76137225271812,
+     75.27119879980447,
+     74.78246085754739,
+     74.2951920205301,
+     73.8093952409514,
+     73.32510440079554,
+     72.84232194303519,
+     72.36108203222571,
+     71.88138660148275,
+     71.40327009304119,
+     70.92673392962462,
+     70.45181282619453,
+     69.97850769464435,
+     69.5068535176481,
+     69.0368506959278,
+     68.56853447479531,
+     68.10190474355808,
+     67.63699700503024,
+     67.17381063695959,
+     66.71238139446676,
+     66.25270814369378,
+     65.7948268868121,
+     65.33873597841118,
+     64.88447166239754,
+     64.43203178196107,
+     63.981452817368556,
+     63.53273210066343,
+     63.08590634303888,
+     62.64097236574553,
+     62.19796710541055,
+     61.75688687294658,
+     61.31776882486395,
+     60.88060876229315,
+     60.445444056019426,
+     60.01226999804878,
+     59.58112416777559,
+     59.15200134884081,
+     58.72493932352545,
+     58.29993236796688,
+     57.87701846155411,
+     57.45619137388485,
+     57.03748927562153,
+     56.620905430888385,
+     56.20647819573182,
+     55.79420032997169,
+     55.38411036909396,
+     54.976200569885606,
+     54.570509641274356,
+     54.167029338388815,
+     53.76579853754694,
+     53.36680849369606,
+     52.970098244440614,
+     52.57565854612673,
+     52.18352859148952,
+     51.793698639956595,
+     51.4062080331869,
+     51.02104653547495,
+     50.638253631146355,
+     50.25781859125041,
+     49.87978103647276,
+     49.50412974660773,
+     49.13090447234566,
+     48.7600935043184,
+     48.3917367168178,
+     48.02582191350747,
+     47.66238908583089,
+     47.30142555277941,
+     46.94297141645213,
+     46.587013513565395,
+     46.23359205033299,
+     45.882693383694416,
+     45.53435781739336,
+     45.188571231191126,
+     44.845374019733484,
+     44.504751588302256,
+     44.16674441577565,
+     43.831337435754435,
+     43.49857120463882,
+     43.168430187245775,
+     42.84095501074756,
+     42.51612967417317,
+     42.1939948686785,
+     41.874534130598235,
+     41.55778820824617,
+     41.24374017845348,
+     40.93243083983026,
+     40.62384281299147,
+     40.31801693994706,
+     40.014935388478825,
+     39.71463903706676,
+     39.41710960413744,
+     39.122387997679034,
+     38.83045549033495,
+     38.541353012608894,
+     38.255061395026466,
+     37.971621583584934,
+     37.69101397044966,
+     37.41327951006171,
+     37.13839816007527,
+     36.86641087629887,
+     36.597297185814895,
+     36.33109803869823,
+     36.06779253548818,
+     35.807421613401345,
+     35.5499639505509,
+     35.29546046414879,
+     35.043889414086294,
+     34.79529169040393,
+     34.54964513906112,
+     34.30699061574167,
+     34.06730555684812,
+     33.83063077650518,
+     33.59694330601705,
+     33.36628391073161,
+     33.13862922139552,
+     32.9140199473485,
+     32.69243232340152,
+     32.47390699564286,
+     32.25841980764928,
+     32.04601133500413,
+     31.83665703482976,
+     31.630397404942705,
+     31.42720752086755,
+     31.227127795385574,
+     31.030132927355712,
+     30.836263237250634,
+     30.64549305226972,
+     30.457862593300746,
+     30.273345820962035,
+     30.091982849279145,
+     29.913747277438834,
+     29.738679105327762,
+     29.56675157591996,
+     29.39800456768924,
+     29.232410972683518,
+     29.070010540694355,
+     28.910775818196242,
+     28.75474641903563,
+     28.601894549530897,
+     28.452259680328858,
+     28.305813683071843,
+     28.162595877962985,
+     28.022577807509823,
+     27.88579863424007,
+     27.752229577127125,
+     27.621909633805863,
+     27.4948097053739,
+     27.37096861737222,
+     27.25035695873696,
+     27.13301337573241,
+     27.01890815090165,
+     26.908079744069838,
+     26.80049813720782,
+     26.69620159656146,
+     26.595159809400748,
+     26.497410841276444,
+     26.402924090677832,
+     26.31173741537101,
+     26.223819931031546,
+     26.139209280579802,
+     26.05787430288977,
+     25.979852419005212,
+     25.905112197053803,
+     25.833690829204347,
+     25.76555661893488,
+     25.700746522575145,
+     25.639228585089608,
+     25.581039520041312,
+     25.526147120054905,
+     25.474587849037416,
+     25.426329253483093,
+     25.38140754079398,
+     25.339790017577165,
+     25.30151262792315,
+     25.266542444827095,
+     25.234915142305606,
+     25.206597566047137,
+     25.181625113278404,
+     25.159964408714657,
+     25.141650566124813,
+     25.12664999561061,
+     25.11499752086549,
+     25.106659343761883,
+     25.101669991352068,
+     25.099995463685875,
+     25.10166998466267,
+     25.10665935893707,
+     25.11499750079957,
+     25.126650025955826,
+     25.14165053268919,
+     25.159964454219587,
+     25.181625066484443,
+     25.206597626696325,
+     25.234915082169195,
+     25.266542520599945,
+     25.301512554464708,
+     25.33979010844797,
+     25.381407454038417,
+     25.426329359421043,
+     25.474587749014134,
+     25.52614724102413,
+     25.58103940678416,
+     25.639228721049168,
+     25.700746396122394,
+     25.765556769838863,
+     25.833690689598725,
+     25.905112362851312,
+     25.97985226629375,
+     26.05787448352495,
+     26.13920911481389,
+     26.223820126443684,
+     26.31173723660632,
+     26.402924300801363,
+     26.497410649572913,
+     26.595160034165332,
+     26.69620139198318,
+     26.800498376538336,
+     26.908079526685068,
+     27.018908404718356,
+     27.13301314561352,
+     27.25035722695548,
+     27.3709683745956,
+     27.494809987905313,
+     27.62190937845188,
+     27.75222987387804,
+     27.88579836639301,
+     28.022578118382434,
+     28.16259559771099,
+     28.305814007964017,
+     28.452259387763853,
+     28.60189488833624,
+     28.754746114253237,
+     28.91077617080421,
+     29.070010223793883,
+     29.232411338979457,
+     29.39800423877351,
+     29.56675195578521,
+     29.738678764503128,
+     29.913747670750848,
+     30.091982496655362,
+     30.27334622759441,
+     30.457862228990876,
+     30.64549347209233,
+     30.836262861371036,
+     31.030133360234796,
+     31.227127408055722,
+     31.4272079666658,
+     31.63039700628519,
+     31.836657493406424,
+     32.046010925144515,
+     32.25842027886027,
+     32.47390657470962,
+     32.69243280709951,
+     32.914019515472916,
+     33.13862971742999,
+     33.366283468047676,
+     33.59694381423452,
+     33.83063032314956,
+     34.067306077092155,
+     34.30699015185354,
+     34.54964567117243,
+     34.7952912161249,
+     35.0438899579029,
+     35.29545997962284,
+     35.54996450590815,
+     35.80742111877464,
+     36.067793102219,
+     36.331097534119245,
+     36.59729776374981,
+     36.86641036191803,
+     37.13839874904246,
+     37.41327898603144,
+     37.691014570275186,
+     37.97162105005954,
+     38.25506200553428,
+     38.54135246974443,
+     38.83045611134704,
+     39.122387445633265,
+     39.41711023547394,
+     39.714638475998996,
+     40.01493602995812,
+     40.31801637001815,
+     40.623843464430365,
+     40.93243026120248,
+     41.243740839667225,
+     41.55778762108304,
+     41.874534801400614,
+     42.19399427314474,
+     42.51613035437663,
+     42.840954407008965,
+     43.1684308766616,
+     43.49857059286239,
+     43.83133813419279,
+     44.16674379612908,
+     44.504752295572246,
+     44.845373392385454,
+     45.188571947101025,
+     45.53435718251333,
+     45.882694108051666,
+     46.233591408091044,
+     46.58701424617674,
+     46.942970767018934,
+     47.301426293450966,
+     47.662388429377586,
+     48.025822662044845,
+     48.39173605351599,
+     48.760094260526785,
+     49.13090380236723,
+     49.504130510291965,
+     49.87978035998984,
+     50.257819362215145,
+     50.6382529483313,
+     51.02104731352466,
+     51.40620734421211,
+     51.793699424895685,
+     52.18352789652738,
+     52.575659337759625,
+     52.97009754366347,
+     53.36680929182732,
+     53.765797831127045,
+     54.16703014282322,
+     54.57050892938375,
+     54.97620138042818,
+     55.38410965190434,
+     55.79420114642777,
+     56.2064774734146,
+     56.62090625306381,
+     57.03748854834767,
+     57.45619220158589,
+     57.87701772949417,
+     58.29993320100043,
+     58.724938586849355,
+     59.1520021870144,
+     59.581123426652795,
+     60.012270841170654,
+     60.44544331061859,
+     60.8806096101723,
+     61.31776807535313,
+     61.756887725392886,
+     62.19796635195701,
+     62.64097322256972,
+     63.08590558580896,
+     63.53273296167716,
+     63.98145205652782,
+     64.43203264697712,
+     64.88447089811068,
+     65.33873684724335,
+     65.7948261192427,
+     66.25270901615698,
+     66.7123806237775,
+     67.17381151286995,
+     67.63699623138278,
+     68.10190562273296,
+     68.56853369835007,
+     69.03685157818566,
+     69.50685273856433,
+     69.97850857980521,
+     70.45181204463063,
+     70.9267348175098,
+     71.403269309154,
+     71.88138749191482,
+     72.3610812461709,
+     72.84232283583822,
+     73.32510361272756,
+     73.80939613595105,
+     74.29519123060214,
+     74.78246175457073,
+     75.27119800816823,
+     75.76137315159366,
+     76.25297696239562,
+     76.74598290656375,
+     77.24038024098571,
+     77.73614274087289,
+     78.2332591446368,
+     78.73170354009218,
+     79.23146414943889,
+     79.73251537642598,
+     80.23484492938917,
+     80.73842753129478,
+     81.24325037903533,
+     81.74928851802328,
+     82.25652863622092,
+     82.76494610467589,
+     83.2745271049792,
+     83.78524733693035,
+     84.29709247845827,
+     84.81003856123394,
+     85.32407076213704,
+     85.83916544765822,
+     86.35530729671649,
+     86.87247301380569,
+     87.39064678211054,
+     87.90980564659677,
+     88.42993329919959,
+     88.95100712933026,
+     89.47301033712723,
+     89.99592065674268,
+     90.5197208079602,
+     91.04438887839312,
+     91.56990709115061,
+     92.09625387619018,
+     92.6234110086887,
+     93.15135729599166,
+     93.68007396237967,
+     94.20954011966957,
+     94.73973669278057,
+     95.27064327703643,
+     95.80223992190454,
+     96.33450629671361,
+     96.86742293233246,
+     97.4009705368213,
+     97.93512696558301,
+     98.46987172078515,
+     99.00518736644678,
+     99.54105744873732,
+     100.07745200867396,
+     100.61434638449471,
+     101.15173834695644,
+     101.68962364558683,
+     102.22793379277881,
+     102.76661812375144,
+     103.30576139191163,
+     103.84542258031802,
+     104.38532710896627,
+     104.92527917203068,
+     105.46584186050167,
+     106.00741563606704,
+     106.54860596914764,
+     107.08842217486111,
+     107.63003981310264,
+     108.1757181458304,
+     108.71795895623758,
+     109.25143338981769,
+     109.79356970656785,
+     110.35676192449503,
+     110.90017693584687,
+     111.39478832580993,
+     111.93701437192165,
+     112.5954040037715,
+     113.1174352614195
+    ]
+   },
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "aggressor": "A1 slide-10",
+    "waveform": "rectified_sine",
+    "referencing": "resonance",
+    "s_ref_pm_per_k": 85.86440156543232,
+    "ring_t0": "lock temperature (ENGINE_BRIEF)",
+    "window": "one period in periodic steady state, t = 0 at the cusp",
+    "site": "aggressor"
+   },
+   "notes": [
+    "CAL-13a is a scenario calibration: the power waveform is fitted to this target by mrm.scenarios, so the residual measures the calibration (and the waveform family), not a prediction"
+   ],
+   "detail": {
+    "rms_vs_target_c": 0.014528068083596258,
+    "victim_rise_k": [
+     0.11380616585313653,
+     94.82056094893532
+    ],
+    "calibration_residual_rms_k": [
+     0.012353630868812429
+    ],
+    "peak_power_mw": 283.73342383583577,
+    "mean_power_mw": 103.50260864406089
+   },
+   "evaluation": {
+    "target_id": "CAL-13a",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.014528068083596258,
+    "z": null,
+    "detail": "rms residual 0.01453 c"
+   },
+   "runtime_s": 0.52
+  },
+  {
+   "id": "CAL-13b",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "aggressor_trajectory",
+   "preset": "g26",
+   "quantity": "aggressor_rate_808",
+   "unit": "k_per_s",
+   "value": 808.0,
+   "sigma": null,
+   "tolerance": {
+    "kind": "abs",
+    "value": 80.0
+   },
+   "replica_status": "ok",
+   "predicted": 801.0671882560464,
+   "predicted_nonfinite": false,
+   "variants": {
+    "delta_t_per_period/rectified_sine": 805.3202216714683,
+    "one_sided_sawtooth/one_sided_sawtooth": 848.2359828447221
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "aggressor": "A2 808 degC/s",
+    "primary": "delta_t_per_period/symmetric_triangle",
+    "referencing": "resonance"
+   },
+   "notes": [
+    "a scenario calibration (the A2 power is fitted to each reading); the one-sided sawtooth cannot be followed by a heater, so its residual is large by construction"
+   ],
+   "detail": {},
+   "evaluation": {
+    "target_id": "CAL-13b",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 6.932811743953607,
+    "z": null,
+    "detail": "max |pred - value| = 6.933 k_per_s"
+   },
+   "runtime_s": 1.23
+  },
+  {
+   "id": "CAL-14",
+   "role": "calibration",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "reloma_stabilized_low_bias_db",
+   "unit": "db",
+   "value": -2.1,
+   "sigma": 0.1,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": -6.165548128567829,
+   "predicted_nonfinite": false,
+   "variants": {
+    "mode=setpoint_lock": -7.289131269693707,
+    "p_in=preset_line_power": -6.165548128567829
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "oracle",
+    "output": "level_db",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "min_db": -6.241608477266695,
+     "max_db": -6.088002897231238,
+     "infeasible_points": 0,
+     "biases_v": [
+      1.0,
+      1.05,
+      1.0999999999999999,
+      1.15
+     ],
+     "temps_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ]
+    },
+    "mode=setpoint_lock": {
+     "min_db": -7.362293795117134,
+     "max_db": -7.21472103900248,
+     "infeasible_points": 0,
+     "biases_v": [
+      1.0,
+      1.05,
+      1.0999999999999999,
+      1.15
+     ],
+     "temps_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ]
+    },
+    "p_in=preset_line_power": {
+     "min_db": -6.241608477266695,
+     "max_db": -6.088002897231238,
+     "infeasible_points": 0,
+     "biases_v": [
+      1.0,
+      1.05,
+      1.0999999999999999,
+      1.15
+     ],
+     "temps_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "CAL-14",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 4.065548128567828,
+    "z": 40.65548128567828,
+    "detail": "max |pred - value| = 4.066 db"
+   },
+   "runtime_s": 0.64
+  },
+  {
+   "id": "VAL-1",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "tuning_range_at_v",
+   "preset": "g25_test_vehicle",
+   "quantity": "tuning_range_at_1p5v_nm",
+   "unit": "nm",
+   "value": 13.0,
+   "sigma": 0.05,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.7
+   },
+   "replica_status": "ok",
+   "predicted": 15.63493861887849,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "heater_v": 1.5,
+    "relative_to_v": 0.0,
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "t_base_c": 25.0,
+    "heater_drive": "bench voltage source, TCR solved"
+   },
+   "notes": [],
+   "detail": {
+    "rows": [
+     {
+      "heater_v": 1.5,
+      "lam_min_nm": 1317.5382944123164,
+      "shift_nm": 15.63493861887849
+     }
+    ],
+    "p_heater_mw": 37.039527538735065,
+    "fsr_nm": 10.176754279056258
+   },
+   "evaluation": {
+    "target_id": "VAL-1",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 2.63493861887849,
+    "z": 52.698772377569796,
+    "detail": "max |pred - value| = 2.635 nm"
+   },
+   "runtime_s": 0.45
+  },
+  {
+   "id": "VAL-2a",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "notch_er_vs_heater_v",
+   "preset": "g25_test_vehicle",
+   "quantity": "notch_depth_at_1p4v_db",
+   "unit": "db",
+   "value": 18.0,
+   "sigma": 0.5,
+   "tolerance": {
+    "kind": "abs",
+    "value": 1.5
+   },
+   "replica_status": "ok",
+   "predicted": 25.51587157108001,
+   "predicted_nonfinite": false,
+   "variants": {
+    "topology=all_pass": 24.260069092517007
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "topology": "add_drop",
+    "heater_v": [
+     1.4
+    ],
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "port": "through",
+    "heater_drive": "bench voltage source, TCR solved",
+    "t_base_c": 25.0,
+    "assumption": "P_in -> 0 (sweep power not printed)"
+   },
+   "notes": [],
+   "detail": {
+    "add_drop": [
+     {
+      "heater_v": 1.4,
+      "p_heater_mw": 33.14531387721987,
+      "t_ring_c": 211.41390320322773,
+      "er_db": 25.51587157108001,
+      "lam_min_nm": 1315.6989091169119
+     }
+    ],
+    "all_pass": [
+     {
+      "heater_v": 1.4,
+      "p_heater_mw": 33.14531387721987,
+      "t_ring_c": 211.41390320322773,
+      "er_db": 24.260069092517007,
+      "lam_min_nm": 1315.6989069776482
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "VAL-2a",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 7.515871571080009,
+    "z": 15.031743142160018,
+    "detail": "max |pred - value| = 7.516 db"
+   },
+   "runtime_s": 0.49
+  },
+  {
+   "id": "VAL-2b",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "notch_er_vs_heater_v",
+   "preset": "g25_test_vehicle",
+   "quantity": "notch_depth_at_1p5v_db",
+   "unit": "db",
+   "value": 16.9,
+   "sigma": 0.5,
+   "tolerance": {
+    "kind": "abs",
+    "value": 1.5
+   },
+   "replica_status": "ok",
+   "predicted": 23.5521105886254,
+   "predicted_nonfinite": false,
+   "variants": {
+    "topology=all_pass": 22.511311907307757
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "topology": "add_drop",
+    "heater_v": [
+     1.5
+    ],
+    "bias_v": 0.0,
+    "p_in_w": 0.0,
+    "port": "through",
+    "heater_drive": "bench voltage source, TCR solved",
+    "t_base_c": 25.0,
+    "assumption": "P_in -> 0 (sweep power not printed)"
+   },
+   "notes": [],
+   "detail": {
+    "add_drop": [
+     {
+      "heater_v": 1.5,
+      "p_heater_mw": 37.039527538735065,
+      "t_ring_c": 233.31550809493172,
+      "er_db": 23.5521105886254,
+      "lam_min_nm": 1317.5382944123164
+     }
+    ],
+    "all_pass": [
+     {
+      "heater_v": 1.5,
+      "p_heater_mw": 37.039527538735065,
+      "t_ring_c": 233.31550809493172,
+      "er_db": 22.511311907307757,
+      "lam_min_nm": 1317.538292140885
+     }
+    ]
+   },
+   "evaluation": {
+    "target_id": "VAL-2b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 6.652110588625401,
+    "z": 13.304221177250803,
+    "detail": "max |pred - value| = 6.652 db"
+   },
+   "runtime_s": 0.42
+  },
+  {
+   "id": "VAL-3a",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "eo_bandwidth_at_bias",
+   "preset": "g25_test_vehicle",
+   "quantity": "eo_bandwidth_at_2v_ghz",
+   "unit": "ghz",
+   "value": 35.4,
+   "sigma": 0.7,
+   "tolerance": {
+    "kind": "abs",
+    "value": 3.0
+   },
+   "replica_status": "ok",
+   "predicted": 47.34213605736237,
+   "predicted_nonfinite": false,
+   "variants": {
+    "detuning=hwhm": 75.12656151517268,
+    "r_drv_ohm=0": 49.64379522079677,
+    "loss_modulation=off": 48.91050701949797,
+    "method=linearized_index_only_r_source_0": 51.31437118089711
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "bias_v": 2.0,
+    "detuning": "max_slope",
+    "x_bias": 0.5773502691896258,
+    "method": "waveform",
+    "r_drv_ohm": 50.0,
+    "response": "mrm.waveform.eo_bandwidth: TCMT with index + loss modulation, C_j(V), R_s, driver output resistance",
+    "laser": "re-centred at each bias to the detuning rule (ring temperature set accordingly)"
+   },
+   "notes": [
+    "method changed at the 2026-10-09 review: the primary was the replica's own linearized index-only TCMT with R_source = 0 (variant 'method=linearized_index_only_r_source_0') while mrm.waveform did not exist; it is now the README's waveform mode with the plant's driver output resistance and the loss modulation. The change was made after the earlier predictions had been compared with CAL-10 / VAL-3 (50.1 GHz, 51.3 GHz, ratio 1.025: all failed); report both"
+   ],
+   "detail": {
+    "max_slope": {
+     "bw_hz": 47342136057.362366,
+     "peaking_db": 0.06834455839912504,
+     "fwhm_hz": 61039876004.52306,
+     "rc_pole_hz": 126974162729.15315,
+     "x_bias": 0.5773502691897537,
+     "r_s_ohm": 99.99999999999999,
+     "r_drv_ohm": 50.0,
+     "c_j_f": 8.356290217967335e-15
+    },
+    "hwhm": {
+     "bw_hz": 75126561515.17268,
+     "peaking_db": 1.735948158431335,
+     "fwhm_hz": 61038686479.47352,
+     "rc_pole_hz": 126974162729.15315,
+     "x_bias": 0.9999999999998568,
+     "r_s_ohm": 99.99999999999999,
+     "r_drv_ohm": 50.0,
+     "c_j_f": 8.356290217967335e-15
+    },
+    "method=linearized_index_only_r_source_0": {
+     "bw_hz": 51314371180.89711,
+     "peaking_db": 0.14965955142041495,
+     "fwhm_hz": 61041501253.73657,
+     "rc_pole_hz": 190461244093.32657,
+     "x_bias": 0.5773503383103978,
+     "r_s_ohm": 99.99999999999999,
+     "c_j_f": 8.356290217967335e-15
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-3a",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 11.942136057362369,
+    "z": 17.06019436766053,
+    "detail": "max |pred - value| = 11.94 ghz"
+   },
+   "runtime_s": 0.52
+  },
+  {
+   "id": "VAL-3b",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "eo_bandwidth_at_bias",
+   "preset": "g25_test_vehicle",
+   "quantity": "eo_bandwidth_ratio_2v_over_1v",
+   "unit": "1",
+   "value": 1.09,
+   "sigma": 0.02,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.06
+   },
+   "replica_status": "ok",
+   "predicted": 1.0403941560859464,
+   "predicted_nonfinite": false,
+   "variants": {
+    "detuning=hwhm": 1.0505383372717578,
+    "r_drv_ohm=0": 1.022575053762239,
+    "loss_modulation=off": 1.0427042121857262,
+    "method=linearized_index_only_r_source_0": 1.0245220706882243
+   },
+   "conditions": {
+    "preset": "g25_test_vehicle",
+    "alts": {
+     "uncertainty.heater.driver_mode": "voltage"
+    },
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "204b63bb2b8bf9a8cc095a1039878cad8a02b55547a29fa09b319e901300613f",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "bias_v": [
+     1.0,
+     2.0
+    ],
+    "detuning": "max_slope",
+    "x_bias": 0.5773502691896258,
+    "method": "waveform",
+    "r_drv_ohm": 50.0,
+    "response": "mrm.waveform.eo_bandwidth: TCMT with index + loss modulation, C_j(V), R_s, driver output resistance",
+    "laser": "re-centred at each bias to the detuning rule (ring temperature set accordingly)"
+   },
+   "notes": [
+    "VAL-3b: both biases at the same detuning rule (laser re-tuned at each bias)",
+    "method changed at the 2026-10-09 review: the primary was the replica's own linearized index-only TCMT with R_source = 0 (variant 'method=linearized_index_only_r_source_0') while mrm.waveform did not exist; it is now the README's waveform mode with the plant's driver output resistance and the loss modulation. The change was made after the earlier predictions had been compared with CAL-10 / VAL-3 (50.1 GHz, 51.3 GHz, ratio 1.025: all failed); report both"
+   ],
+   "detail": {
+    "max_slope": {
+     "bw_ghz": [
+      45.50403881108638,
+      47.34213605736237
+     ],
+     "rows": [
+      {
+       "bw_hz": 45504038811.08638,
+       "peaking_db": 0.032948827212891614,
+       "fwhm_hz": 61987356542.08457,
+       "rc_pole_hz": 102776342711.48701,
+       "x_bias": 0.5773502691894923,
+       "r_s_ohm": 99.99999999999999,
+       "r_drv_ohm": 50.0,
+       "c_j_f": 1.032370802417528e-14
+      },
+      {
+       "bw_hz": 47342136057.362366,
+       "peaking_db": 0.06834455839912504,
+       "fwhm_hz": 61039876004.52306,
+       "rc_pole_hz": 126974162729.15315,
+       "x_bias": 0.5773502691897537,
+       "r_s_ohm": 99.99999999999999,
+       "r_drv_ohm": 50.0,
+       "c_j_f": 8.356290217967335e-15
+      }
+     ]
+    },
+    "hwhm": {
+     "bw_ghz": [
+      71.51244162138428,
+      75.12656151517268
+     ],
+     "rows": [
+      {
+       "bw_hz": 71512441621.38428,
+       "peaking_db": 1.5292265774200482,
+       "fwhm_hz": 61986129807.09293,
+       "rc_pole_hz": 102776342711.48701,
+       "x_bias": 0.9999999999997935,
+       "r_s_ohm": 99.99999999999999,
+       "r_drv_ohm": 50.0,
+       "c_j_f": 1.032370802417528e-14
+      },
+      {
+       "bw_hz": 75126561515.17268,
+       "peaking_db": 1.735948158431335,
+       "fwhm_hz": 61038686479.47352,
+       "rc_pole_hz": 126974162729.15315,
+       "x_bias": 0.9999999999998568,
+       "r_s_ohm": 99.99999999999999,
+       "r_drv_ohm": 50.0,
+       "c_j_f": 8.356290217967335e-15
+      }
+     ]
+    },
+    "method=linearized_index_only_r_source_0": {
+     "bw_ghz": [
+      50.08615494874268,
+      51.31437118089711
+     ],
+     "rows": [
+      {
+       "bw_hz": 50086154948.74268,
+       "peaking_db": 0.10800790430860094,
+       "fwhm_hz": 61989032636.524536,
+       "rc_pole_hz": 154164514067.2308,
+       "x_bias": 0.5773517835236333,
+       "r_s_ohm": 99.99999999999999,
+       "c_j_f": 1.032370802417528e-14
+      },
+      {
+       "bw_hz": 51314371180.89711,
+       "peaking_db": 0.14965955142041495,
+       "fwhm_hz": 61041501253.73657,
+       "rc_pole_hz": 190461244093.32657,
+       "x_bias": 0.5773503383103978,
+       "r_s_ohm": 99.99999999999999,
+       "c_j_f": 8.356290217967335e-15
+      }
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-3b",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.04960584391405365,
+    "z": 2.4802921957026824,
+    "detail": "max |pred - value| = 0.04961 1"
+   },
+   "runtime_s": 0.61
+  },
+  {
+   "id": "VAL-4a",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "reloma_minus3db_contour_bias_at_0c_v",
+   "unit": "v",
+   "value": 3.15,
+   "sigma": 0.1,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": null,
+   "predicted_nonfinite": true,
+   "variants": {
+    "relative_to_low_bias_level": 2.2074860632875817,
+    "mode=setpoint_lock": null,
+    "p_in=preset_line_power": null
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "oracle",
+    "output": "contour_bias_v",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [
+    "the -3.0 dB contour is not reached between 1.0 and 4.0 V (map from -6.09 to -10.79 dB); the variant 'relative_to_low_bias_level' places it the printed 0.9 dB below the map's own low-bias level instead"
+   ],
+   "detail": {
+    "primary": {
+     "t_c": 0.0,
+     "reloma_db_at_1v": -6.088002897231238,
+     "reloma_db_min": -10.79307025786681,
+     "reloma_db_at_3p75v": -9.335664577087094,
+     "contour_bias_relative_to_low_bias_level_v": 2.2074860632875817,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    },
+    "mode=setpoint_lock": {
+     "t_c": 0.0,
+     "reloma_db_at_1v": -7.21472103900248,
+     "reloma_db_min": -11.842242365036157,
+     "reloma_db_at_3p75v": -10.394434863155924,
+     "contour_bias_relative_to_low_bias_level_v": 2.254906986154864,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    },
+    "p_in=preset_line_power": {
+     "t_c": 0.0,
+     "reloma_db_at_1v": -6.088002897231238,
+     "reloma_db_min": -10.79307025786681,
+     "reloma_db_at_3p75v": -9.335664577087094,
+     "contour_bias_relative_to_low_bias_level_v": 2.2074860632875817,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-4a",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": null,
+    "z": null,
+    "detail": "non-finite prediction (replica failed?)"
+   },
+   "runtime_s": 1.97
+  },
+  {
+   "id": "VAL-4b",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "reloma_minus3db_contour_bias_at_105c_v",
+   "unit": "v",
+   "value": 3.4,
+   "sigma": 0.1,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": null,
+   "predicted_nonfinite": true,
+   "variants": {
+    "relative_to_low_bias_level": 2.2074860632875817,
+    "mode=setpoint_lock": null,
+    "p_in=preset_line_power": null
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "oracle",
+    "output": "contour_bias_v",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [
+    "the -3.0 dB contour is not reached between 1.0 and 4.0 V (map from -6.09 to -10.79 dB); the variant 'relative_to_low_bias_level' places it the printed 0.9 dB below the map's own low-bias level instead"
+   ],
+   "detail": {
+    "primary": {
+     "t_c": 105.0,
+     "reloma_db_at_1v": -6.088002897231238,
+     "reloma_db_min": -10.79307025786681,
+     "reloma_db_at_3p75v": -9.335664577087094,
+     "contour_bias_relative_to_low_bias_level_v": 2.2074860632875817,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    },
+    "mode=setpoint_lock": {
+     "t_c": 105.0,
+     "reloma_db_at_1v": -7.21472103900248,
+     "reloma_db_min": -11.842242365036157,
+     "reloma_db_at_3p75v": -10.394434863155924,
+     "contour_bias_relative_to_low_bias_level_v": 2.254906986154864,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    },
+    "p_in=preset_line_power": {
+     "t_c": 105.0,
+     "reloma_db_at_1v": -6.088002897231238,
+     "reloma_db_min": -10.79307025786681,
+     "reloma_db_at_3p75v": -9.335664577087094,
+     "contour_bias_relative_to_low_bias_level_v": 2.2074860632875817,
+     "relative_drop_db": -0.8999999999999999,
+     "infeasible_points": 0
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-4b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": null,
+    "z": null,
+    "detail": "non-finite prediction (replica failed?)"
+   },
+   "runtime_s": 1.84
+  },
+  {
+   "id": "VAL-4c",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "reloma_stabilized_spread_db",
+   "unit": "db",
+   "value": 0.9,
+   "sigma": 0.1,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": 3.247661679855856,
+   "predicted_nonfinite": false,
+   "variants": {
+    "mode=setpoint_lock": 3.1797138241534437,
+    "p_in=preset_line_power": 3.247661679855856
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "oracle",
+    "output": "spread_db",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "max_db": -6.088002897231238,
+     "min_db": -9.335664577087094,
+     "infeasible_points": 0
+    },
+    "mode=setpoint_lock": {
+     "max_db": -7.21472103900248,
+     "min_db": -10.394434863155924,
+     "infeasible_points": 0
+    },
+    "p_in=preset_line_power": {
+     "max_db": -6.088002897231238,
+     "min_db": -9.335664577087094,
+     "infeasible_points": 0
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-4c",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 2.347661679855856,
+    "z": 23.47661679855856,
+    "detail": "max |pred - value| = 2.348 db"
+   },
+   "runtime_s": 2.07
+  },
+  {
+   "id": "VAL-5",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "reloma_open_loop_contour_offsets_k",
+   "unit": "k",
+   "value": {
+    "levels_db": [
+     -16.0,
+     -24.0
+    ],
+    "below_peak_k": [
+     7.6,
+     12.6
+    ],
+    "above_peak_k": [
+     4.9,
+     9.4
+    ]
+   },
+   "sigma": 0.7,
+   "tolerance": {
+    "kind": "contour_asymmetry",
+    "abs": 2.0,
+    "require": "cold_side_wider"
+   },
+   "replica_status": "ok",
+   "predicted": {
+    "below_peak_k": [
+     2.897350306553733,
+     7.147259966971319
+    ],
+    "above_peak_k": [
+     10.618451701285338,
+     18.68222030474803
+    ]
+   },
+   "predicted_nonfinite": false,
+   "variants": {
+    "ambient_sweep=down": {
+     "below_peak_k": [
+      2.897350306553733,
+      7.147259966971319
+     ],
+     "above_peak_k": [
+      10.618451701285338,
+      18.68222030474803
+     ]
+    },
+    "p_in=preset_line_power": {
+     "below_peak_k": [
+      1.886182500573483,
+      4.1759903134369125
+     ],
+     "above_peak_k": [
+      12.916683414774838,
+      22.10989118964899
+     ]
+    }
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "fixed_code",
+    "output": "contour_offsets",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [
+    "the ambient sweep direction of the loop-open map is not published; the primary is the up-sweep (from cold), chosen before any comparison. At this power the fixed-code line is hysteretic (bistable) between 66.00 and 68.00 degC (the two branches differ by up to 7.1 K of ring temperature); the 5 degC sampled offsets of both directions nevertheless agree, because no sample falls inside that window. The self-heating steepens the cold side (laser red of the resonance, positive feedback; the up-sweep jumps across it) and widens the hot side."
+   ],
+   "detail": {
+    "primary": {
+     "continuous": {
+      "below_peak_k": [
+       2.464414127980149,
+       6.879538693452226
+      ],
+      "above_peak_k": [
+       10.597679965932869,
+       18.500617727621744
+      ]
+     },
+     "u0": 0.44432158105970765,
+     "peak_c": 69.59999999999991,
+     "peak_db": -7.094259149511314,
+     "samples_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ],
+     "samples_db": [
+      "-inf",
+      "-inf",
+      "-inf",
+      "-inf",
+      -41.21876638655699,
+      -41.60971684316686,
+      -42.263707479219896,
+      -43.67623111554535,
+      -49.327241415954994,
+      -42.76777704063747,
+      -36.98294584952778,
+      -32.30898390312529,
+      -27.286609890019573,
+      -20.58673577828719,
+      -7.1173304274906934,
+      -9.99755825466419,
+      -15.7578139999598,
+      -21.301053045829313,
+      -25.41251830955109,
+      -28.469478299269664,
+      -30.83785590518414,
+      -32.734688493876135
+     ],
+     "hysteresis_c": [
+      66.0,
+      68.0
+     ],
+     "max_branch_gap_k": 7.053158775945519
+    },
+    "ambient_sweep=down": {
+     "continuous": {
+      "below_peak_k": [
+       3.4159472878407797,
+       6.879538693452226
+      ],
+      "above_peak_k": [
+       10.597679965932869,
+       18.500617727621744
+      ]
+     },
+     "u0": 0.44432158105970765,
+     "peak_c": 69.59999999999991,
+     "peak_db": -7.094259149511314,
+     "samples_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ],
+     "samples_db": [
+      "-inf",
+      "-inf",
+      "-inf",
+      "-inf",
+      -41.21876638655699,
+      -41.60971684316686,
+      -42.263707479219896,
+      -43.67623111554535,
+      -49.327241415954994,
+      -42.76777704063747,
+      -36.98294584952778,
+      -32.30898390312529,
+      -27.286609890019573,
+      -20.58673577828719,
+      -7.1173304274906934,
+      -9.99755825466419,
+      -15.7578139999598,
+      -21.301053045829313,
+      -25.41251830955109,
+      -28.469478299269664,
+      -30.83785590518414,
+      -32.734688493876135
+     ],
+     "hysteresis_c": [
+      66.0,
+      68.0
+     ],
+     "max_branch_gap_k": 7.053158775945519
+    },
+    "p_in=preset_line_power": {
+     "continuous": {
+      "below_peak_k": [
+       0.43369825136244344,
+       3.5153694169216436
+      ],
+      "above_peak_k": [
+       13.001100628904027,
+       21.970758433654055
+      ]
+     },
+     "u0": 0.4278419650827293,
+     "peak_c": 69.62004083385261,
+     "peak_db": -7.934157936542868,
+     "samples_c": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0,
+      25.0,
+      30.0,
+      35.0,
+      40.0,
+      45.0,
+      50.0,
+      55.0,
+      60.0,
+      65.0,
+      70.0,
+      75.0,
+      80.0,
+      85.0,
+      90.0,
+      95.0,
+      100.0,
+      105.0
+     ],
+     "samples_db": [
+      "-inf",
+      "-inf",
+      "-inf",
+      "-inf",
+      "-inf",
+      -41.2761800163921,
+      -41.69969980191059,
+      -42.440785510827084,
+      -44.15524191857206,
+      -56.243015276285064,
+      -41.29651077989351,
+      -35.91468467872933,
+      -31.13832694913269,
+      -25.551398393947874,
+      -8.082683432241325,
+      -10.20715545681278,
+      -13.664473368930954,
+      -18.26790362417594,
+      -22.754854102631835,
+      -26.35368307525189,
+      -29.1503321132919,
+      -31.365745995583158
+     ],
+     "hysteresis_c": [
+      57.5,
+      69.25
+     ],
+     "max_branch_gap_k": 19.377921529752143
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-5",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 9.282220304748028,
+    "z": 13.260314721068612,
+    "detail": "max offset error 9.28 K; asymmetry WRONG"
+   },
+   "runtime_s": 1.18
+  },
+  {
+   "id": "VAL-6",
+   "role": "validation",
+   "target_status": "deferred",
+   "scored": false,
+   "replica": "stabilizer_code_vs_T",
+   "preset": "g26",
+   "quantity": "stabilizer_code_excursion_0_105c",
+   "unit": "codes",
+   "value": null,
+   "sigma": null,
+   "tolerance": {
+    "kind": "pending"
+   },
+   "replica_status": "ok",
+   "predicted": 24858.09970942611,
+   "predicted_nonfinite": false,
+   "variants": {
+    "driver_mode=current": 32032.470020703753,
+    "driver_mode=power": 14520.105395493474,
+    "driver_mode=dac_pwm": 24777.012069634984,
+    "variation=off (nominal die)": 27464.093269162342
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "method": "quasi_static",
+    "output": "excursion",
+    "n_dies": 8,
+    "variation": "sample (device seeds 0..n_dies-1)",
+    "uncertainty": "nominal",
+    "setpoint": "half_max",
+    "bias_v": 1.05,
+    "driver_law": "voltage",
+    "aggressor": null,
+    "referencing": "resonance",
+    "statistic": "median over dies",
+    "laser": "every TX line on at the preset chip-input power, filtered along the bus by the rings upstream (single forward pass); each ring locks its own line, the others heat it and leak into its drop monitor"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "per_die": [
+      {
+       "excursion": 24664.182620517677,
+       "per_lane": [
+        34229.86008940832,
+        35355.59428872338,
+        26496.46673742978,
+        23060.24451443361,
+        6841.78742089312,
+        37500.02662093864,
+        33829.48129231458,
+        0.0
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 25052.016798334545,
+       "per_lane": [
+        0.0,
+        29685.40236149774,
+        18157.600475451618,
+        28729.780236355877,
+        31707.391507205783,
+        31043.354591356456,
+        31906.949703047834,
+        29185.65551176105
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 25662.153750802325,
+       "per_lane": [
+        25988.206787592302,
+        20154.883677151323,
+        23535.021320488016,
+        29009.25723432924,
+        25996.105841614164,
+        24695.719412722297,
+        33406.86786623048,
+        22511.16786629075
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 19965.333198196764,
+       "per_lane": [
+        23305.82157224621,
+        34712.219286702566,
+        32276.07226074723,
+        0.0,
+        27311.312138422254,
+        11570.930017115921,
+        9489.507030593957,
+        21056.803279745982
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 26611.71192290812,
+       "per_lane": [
+        28600.41571636389,
+        22663.159085489264,
+        29246.96735112336,
+        26941.233661120863,
+        17786.11894321482,
+        27864.59782184834,
+        25872.58273237122,
+        33918.6200717332
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 13374.529827331016,
+       "per_lane": [
+        8799.09496335873,
+        0.0,
+        22876.99616231547,
+        25519.396555190302,
+        6086.117987335845,
+        7564.678518239333,
+        12471.577774466168,
+        23678.37665774228
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 21461.2264078632,
+       "per_lane": [
+        18718.728412845307,
+        32018.284789543435,
+        22785.114092204414,
+        25913.759822145304,
+        29618.860838541063,
+        28288.296492848713,
+        0.0,
+        14346.766814777337
+       ],
+       "infeasible": true
+      },
+      {
+       "excursion": 26256.222919528813,
+       "per_lane": [
+        18905.96353943274,
+        23278.40844477443,
+        31961.821901652453,
+        25627.3524065029,
+        35020.35810445107,
+        32242.486542693387,
+        4346.8876579969,
+        38666.50475872661
+       ],
+       "infeasible": true
+      }
+     ],
+     "law": "voltage"
+    },
+    "driver_mode=current": {
+     "law": "current"
+    },
+    "driver_mode=power": {
+     "law": "power"
+    },
+    "driver_mode=dac_pwm": {
+     "law": "dac_pwm"
+    },
+    "variation=off (nominal die)": {
+     "law": "voltage",
+     "per_die": [
+      {
+       "excursion": 27464.093269162342,
+       "per_lane": [
+        27575.366092449076,
+        27567.541993747785,
+        27594.456325322717,
+        27538.924101641118,
+        27380.835974655256,
+        27353.27074564741,
+        27339.85333179085,
+        27362.497588044527
+       ],
+       "infeasible": false
+      }
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-6",
+    "scored": false,
+    "passed": null,
+    "level": "not_scored",
+    "max_abs_residual": null,
+    "z": null,
+    "detail": "tolerance pending"
+   },
+   "runtime_s": 18.62
+  },
+  {
+   "id": "VAL-7a",
+   "role": "validation",
+   "target_status": "unverified",
+   "scored": false,
+   "replica": "mode_solve_published_geometry",
+   "preset": "g26",
+   "quantity": "group_index_published_geometry",
+   "unit": "1",
+   "value": 2.73,
+   "sigma": null,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.03
+   },
+   "replica_status": "ok",
+   "predicted": 3.054568522864431,
+   "predicted_nonfinite": false,
+   "variants": {
+    "n_g_centreline": 3.338326254496646
+   },
+   "conditions": {
+    "artefact": "modes_decea2019.json",
+    "paper": "DEC19",
+    "output": "n_g",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "thickness_sweep": {
+     "80.0": {
+      "n_eff": 1.9850403927994493,
+      "n_g_centreline": 3.039976243521454,
+      "n_g_outer": 2.7815782628221304,
+      "gamma_robinson": 0.6397905215878377,
+      "energy_fraction_si": 0.7550869012217061
+     },
+     "90.0": {
+      "n_eff": 2.0828029271433235,
+      "n_g_centreline": 3.2012368585613817,
+      "n_g_outer": 2.9291317255836646,
+      "gamma_robinson": 0.7092101841438141,
+      "energy_fraction_si": 0.7956338644497352
+     },
+     "100.0": {
+      "n_eff": 2.1752893996076157,
+      "n_g_centreline": 3.3383273414329375,
+      "n_g_outer": 3.054569517411138,
+      "gamma_robinson": 0.7684842675892144,
+      "energy_fraction_si": 0.8273607919683078
+     },
+     "110.0": {
+      "n_eff": 2.2619535631685266,
+      "n_g_centreline": 3.454069797004737,
+      "n_g_outer": 3.1604738642593344,
+      "gamma_robinson": 0.8188543675955935,
+      "energy_fraction_si": 0.8525659240829385
+     },
+     "120.0": {
+      "n_eff": 2.342647162614781,
+      "n_g_centreline": 3.5512560354472495,
+      "n_g_outer": 3.2493992724342333,
+      "gamma_robinson": 0.8615139295665231,
+      "energy_fraction_si": 0.8728594770513284
+     }
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-7a",
+    "scored": false,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 0.32456852286443105,
+    "z": null,
+    "detail": "max |pred - value| = 0.3246 1"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-7b",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "mode_solve_published_geometry",
+   "preset": "g26",
+   "quantity": "confinement_factor_published_geometry",
+   "unit": "1",
+   "value": 0.65,
+   "sigma": null,
+   "tolerance": {
+    "kind": "abs",
+    "value": 0.05
+   },
+   "replica_status": "ok",
+   "predicted": 0.827360791968308,
+   "predicted_nonfinite": false,
+   "variants": {
+    "gamma_robinson_dn_eff_dn_si": 0.7684842675892096
+   },
+   "conditions": {
+    "artefact": "modes_decea2019.json",
+    "paper": "DEC19",
+    "output": "confinement_poynting_si",
+    "preset": "g26"
+   },
+   "notes": [
+    "VAL-7b definition conflict: the frozen target asks for an energy/power fraction; the extraction reads de Cea's Gamma as Robinson's dn_eff/dn_Si (variant)"
+   ],
+   "detail": {
+    "thickness_sweep": {
+     "80.0": {
+      "n_eff": 1.9850403927994493,
+      "n_g_centreline": 3.039976243521454,
+      "n_g_outer": 2.7815782628221304,
+      "gamma_robinson": 0.6397905215878377,
+      "energy_fraction_si": 0.7550869012217061
+     },
+     "90.0": {
+      "n_eff": 2.0828029271433235,
+      "n_g_centreline": 3.2012368585613817,
+      "n_g_outer": 2.9291317255836646,
+      "gamma_robinson": 0.7092101841438141,
+      "energy_fraction_si": 0.7956338644497352
+     },
+     "100.0": {
+      "n_eff": 2.1752893996076157,
+      "n_g_centreline": 3.3383273414329375,
+      "n_g_outer": 3.054569517411138,
+      "gamma_robinson": 0.7684842675892144,
+      "energy_fraction_si": 0.8273607919683078
+     },
+     "110.0": {
+      "n_eff": 2.2619535631685266,
+      "n_g_centreline": 3.454069797004737,
+      "n_g_outer": 3.1604738642593344,
+      "gamma_robinson": 0.8188543675955935,
+      "energy_fraction_si": 0.8525659240829385
+     },
+     "120.0": {
+      "n_eff": 2.342647162614781,
+      "n_g_centreline": 3.5512560354472495,
+      "n_g_outer": 3.2493992724342333,
+      "gamma_robinson": 0.8615139295665231,
+      "energy_fraction_si": 0.8728594770513284
+     }
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-7b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 0.177360791968308,
+    "z": null,
+    "detail": "max |pred - value| = 0.1774 1"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-7c",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "self_heating_time_constant",
+   "preset": "g26",
+   "quantity": "self_heating_time_constant_published",
+   "unit": "us",
+   "value": 0.45,
+   "sigma": 0.05,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.5
+   },
+   "replica_status": "blocked",
+   "predicted": null,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "paper": "DEC19",
+    "preset": "g26"
+   },
+   "notes": [
+    "no de Cea thermal stack in mrm/extraction/thermal_fem.py and no thermal_val7_decea.json"
+   ],
+   "detail": {},
+   "evaluation": null,
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-8a",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "thermal_step_published_stack",
+   "preset": "g26",
+   "quantity": "heater_node_time_constant_published",
+   "unit": "us",
+   "value": 5.0,
+   "sigma": 0.5,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": 1.1342867458414903,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "artefact": "thermal_val8_imec.json",
+    "materials": "mrm",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "artefact_comparison": {
+     "predicted": 1.1342867458414903,
+     "target": 5.0,
+     "rel_err": -0.773142650831702,
+     "tolerance": 0.3,
+     "pass": false
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-8a",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 3.8657132541585097,
+    "z": 7.7314265083170195,
+    "detail": "max |pred - value| = 3.866 us"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-8b",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "thermal_step_published_stack",
+   "preset": "g26",
+   "quantity": "waveguide_time_constant_published",
+   "unit": "us",
+   "value": 10.0,
+   "sigma": 1.0,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": 3.123643118566137,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "artefact": "thermal_val8_imec.json",
+    "materials": "mrm",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "artefact_comparison": {
+     "predicted": 3.123643118566137,
+     "target": 10.0,
+     "rel_err": -0.6876356881433863,
+     "tolerance": 0.3,
+     "pass": false
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-8b",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 6.876356881433863,
+    "z": 6.876356881433863,
+    "detail": "max |pred - value| = 6.876 us"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-8c",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "thermal_step_published_stack",
+   "preset": "g26",
+   "quantity": "heater_efficiency_published_no_undercut_pm_per_mw",
+   "unit": "pm_per_mw",
+   "value": 222.0,
+   "sigma": 10.0,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.25
+   },
+   "replica_status": "ok",
+   "predicted": 290.8996980517859,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "artefact": "thermal_val8_imec.json",
+    "materials": "mrm",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "artefact_comparison": {
+     "predicted": 290.8996980517859,
+     "target": 222.0,
+     "rel_err": 0.3103590002332697,
+     "tolerance": 0.25,
+     "pass": false
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-8c",
+    "scored": true,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 68.89969805178589,
+    "z": 6.889969805178589,
+    "detail": "max |pred - value| = 68.9 pm_per_mw"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-8d",
+   "role": "validation",
+   "target_status": "active",
+   "scored": true,
+   "replica": "thermal_step_published_stack",
+   "preset": "g26",
+   "quantity": "heater_efficiency_published_full_undercut_pm_per_mw",
+   "unit": "pm_per_mw",
+   "value": 843.0,
+   "sigma": 55.0,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": 676.3979483780283,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "artefact": "thermal_val8_imec.json",
+    "materials": "mrm",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "artefact_comparison": {
+     "predicted": 676.3979483780283,
+     "target": 843.0,
+     "rel_err": -0.1976299544744622,
+     "tolerance": 0.3,
+     "pass": true
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-8d",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 166.60205162197167,
+    "z": 3.0291282113085756,
+    "detail": "max |pred - value| = 166.6 pm_per_mw"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "VAL-8e",
+   "role": "validation",
+   "target_status": "cross_check",
+   "scored": false,
+   "replica": "thermal_step_published_stack",
+   "preset": "g26",
+   "quantity": "foster_two_pole_fit_published",
+   "unit": "mixed",
+   "value": {
+    "tau1_us": 3.18,
+    "tau2_us": 13.01,
+    "share1_frac": 0.427,
+    "share2_frac": 0.573
+   },
+   "sigma": null,
+   "tolerance": {
+    "kind": "rel",
+    "value": 0.3
+   },
+   "replica_status": "ok",
+   "predicted": {
+    "tau1_us": 3.5155878337523943,
+    "tau2_us": 32.67140505158389,
+    "share1_frac": 0.873426590512189,
+    "share2_frac": 0.1265734094878111
+   },
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "artefact": "thermal_val8_imec.json",
+    "materials": "mrm",
+    "preset": "g26"
+   },
+   "notes": [],
+   "detail": {
+    "artefact_comparison": {
+     "predicted": {
+      "tau_us": [
+       3.5155878337523943,
+       32.67140505158389
+      ],
+      "share": [
+       0.873426590512189,
+       0.1265734094878111
+      ]
+     },
+     "target": {
+      "tau_us": [
+       3.18,
+       13.01
+      ],
+      "share": [
+       0.427,
+       0.573
+      ]
+     },
+     "status": "cross_check",
+     "rel_err_tau": [
+      0.10553076533094163,
+      1.5112532706828508
+     ]
+    }
+   },
+   "evaluation": {
+    "target_id": "VAL-8e",
+    "scored": false,
+    "passed": false,
+    "level": "fail",
+    "max_abs_residual": 19.66140505158389,
+    "z": null,
+    "detail": "max |pred - value| = 19.66 mixed"
+   },
+   "runtime_s": 0.0
+  },
+  {
+   "id": "BND-1",
+   "role": "bounds",
+   "target_status": "active",
+   "scored": true,
+   "replica": "adjacent_order_penalty",
+   "preset": "g26",
+   "quantity": "next_order_distance_fwhm",
+   "unit": "1",
+   "value": 2.0,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": ">=",
+    "value": 2.0,
+    "hard_value": 1.0
+   },
+   "replica_status": "ok",
+   "predicted": 2.6209683712828746,
+   "predicted_nonfinite": false,
+   "variants": {
+    "sampled_worlds_min": 0.7962726135370711
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "lines": "tx bank at realized frequencies",
+    "orders": "all inside span +- 2 FWHM",
+    "lock": "resonance on its own line (rigid comb)",
+    "fwhm": "TCMT at each order"
+   },
+   "notes": [],
+   "detail": {
+    "rows": [
+     {
+      "b": 0,
+      "ring": 7,
+      "order_offset": -1,
+      "lam_nm": 1312.7635649477402,
+      "distance_fwhm": 2.6209683712828746
+     },
+     {
+      "b": 0,
+      "ring": 6,
+      "order_offset": -1,
+      "lam_nm": 1315.067246756529,
+      "distance_fwhm": 2.626109593139029
+     },
+     {
+      "b": 0,
+      "ring": 5,
+      "order_offset": -1,
+      "lam_nm": 1317.3790282010589,
+      "distance_fwhm": 2.631269901428298
+     },
+     {
+      "b": 0,
+      "ring": 2,
+      "order_offset": 1,
+      "lam_nm": 1303.86640897763,
+      "distance_fwhm": 3.0209789446142015
+     },
+     {
+      "b": 0,
+      "ring": 1,
+      "order_offset": 1,
+      "lam_nm": 1306.1385300580953,
+      "distance_fwhm": 3.0274546371853996
+     },
+     {
+      "b": 0,
+      "ring": 0,
+      "order_offset": 1,
+      "lam_nm": 1308.418584024382,
+      "distance_fwhm": 3.03395309335166
+     }
+    ],
+    "orders_in_span": 6,
+    "sampled": {
+     "batch": 32,
+     "fraction_below_2": 0.3125,
+     "fraction_below_1": 0.0625
+    }
+   },
+   "evaluation": {
+    "target_id": "BND-1",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "worst prediction 2.621 >= 2 (margin +0.621 1)"
+   },
+   "runtime_s": 2.46
+  },
+  {
+   "id": "BND-2",
+   "role": "bounds",
+   "target_status": "active",
+   "scored": true,
+   "replica": "order_hop_margin",
+   "preset": "g26",
+   "quantity": "order_hop_margin_nm",
+   "unit": "nm",
+   "value": 0.0,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": ">=",
+    "value": 0.0
+   },
+   "replica_status": "ok",
+   "predicted": 0.2765348289495028,
+   "predicted_nonfinite": false,
+   "variants": {
+    "lock=half_max": 0.7407813173459109,
+    "lock=peak": -0.17415806029294456,
+    "sampled_dies_worst_lane": -6.788498954688818
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "t_hot_c": 105.0,
+    "bias_v": 3.75,
+    "lock": "oracle",
+    "lanes": "worst",
+    "traffic": "random NRZ",
+    "t0_c": 25.0,
+    "order": "the order a heater-only acquisition takes at t0 (cold start), held to the hot end",
+    "definition": "own-heater share of the shift at lock (R1), nm"
+   },
+   "notes": [],
+   "detail": {
+    "per_lane_nm": [
+     0.3095628887711601,
+     0.2765348289495028,
+     0.28447122766442684,
+     0.31264661879827244,
+     0.38593518904831164,
+     0.4002229045677147,
+     0.41428445142722253,
+     0.47625401922914623
+    ]
+   },
+   "evaluation": {
+    "target_id": "BND-2",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "worst prediction 0.2765 >= 0 (margin +0.2765 nm)"
+   },
+   "runtime_s": 3.71
+  },
+  {
+   "id": "BND-3a",
+   "role": "bounds",
+   "target_status": "active",
+   "scored": true,
+   "replica": "aggressor_feasibility",
+   "preset": "g26",
+   "quantity": "aggressor_slide10_drop_error_band_pct",
+   "unit": "pct",
+   "value": [
+    -1.9,
+    3.0
+   ],
+   "sigma": 0.3,
+   "tolerance": {
+    "kind": "band",
+    "lo": -1.9,
+    "hi": 3.0,
+    "slack": 0.3,
+    "either_sign": true
+   },
+   "replica_status": "blocked",
+   "predicted": null,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "controllers": [
+     "drop_setpoint_pi",
+     "bias_dither_lockin",
+     "dual_actuator_midrange"
+    ],
+    "aggressor": "CAL-13a",
+    "preset": "g26"
+   },
+   "notes": [
+    "controllers not registered yet: ['drop_setpoint_pi', 'bias_dither_lockin', 'dual_actuator_midrange'] (mrm/control/baselines)"
+   ],
+   "detail": {},
+   "evaluation": null,
+   "runtime_s": 0.0
+  },
+  {
+   "id": "BND-3b",
+   "role": "bounds",
+   "target_status": "active",
+   "scored": true,
+   "replica": "aggressor_feasibility",
+   "preset": "g26",
+   "quantity": "aggressor_808_monitor_deviation_ua",
+   "unit": "ua",
+   "value": [
+    -0.5,
+    0.5
+   ],
+   "sigma": null,
+   "tolerance": {
+    "kind": "band",
+    "lo": -0.5,
+    "hi": 0.5,
+    "slack": 0.0
+   },
+   "replica_status": "blocked",
+   "predicted": null,
+   "predicted_nonfinite": false,
+   "variants": {},
+   "conditions": {
+    "controllers": [
+     "drop_setpoint_pi",
+     "bias_dither_lockin",
+     "dual_actuator_midrange"
+    ],
+    "aggressor": "CAL-13b",
+    "preset": "g26"
+   },
+   "notes": [
+    "controllers not registered yet: ['drop_setpoint_pi', 'bias_dither_lockin', 'dual_actuator_midrange'] (mrm/control/baselines)"
+   ],
+   "detail": {},
+   "evaluation": null,
+   "runtime_s": 0.0
+  },
+  {
+   "id": "BND-4",
+   "role": "bounds",
+   "target_status": "active",
+   "scored": true,
+   "replica": "relOMA_map",
+   "preset": "g26",
+   "quantity": "oracle_reloma_variation_over_t_db",
+   "unit": "db",
+   "value": 1.0,
+   "sigma": null,
+   "tolerance": {
+    "kind": "inequality",
+    "op": "<=",
+    "value": 1.0
+   },
+   "replica_status": "ok",
+   "predicted": 0.0,
+   "predicted_nonfinite": false,
+   "variants": {
+    "p_in=preset_line_power": 0.0
+   },
+   "conditions": {
+    "preset": "g26",
+    "alts": {},
+    "overrides": {},
+    "batch": 1,
+    "config_hash": "8bdf1541a5b0635a8f05bc34a89a7af529a6ac472735aa2a5d3cc05d3712e589",
+    "artefact_fallbacks": 2,
+    "ring": 0,
+    "mode": "oracle",
+    "output": "max_variation_over_t_at_fixed_bias_db",
+    "p_in_w": 0.001,
+    "line_nm": 1318.6442781802427,
+    "swing_pp_v": 1.3,
+    "level_convention": "centered",
+    "data_heat": "on (random NRZ)",
+    "rho": 0.5,
+    "reloma": "|T(level 1) - T(level 0)| at the through port (OMA / P_in)",
+    "map_axes": "bias 1.0-3.75 V step 0.05, 0-105 degC step 5 (contours: bias step 0.025 to 4.0 V)"
+   },
+   "notes": [],
+   "detail": {
+    "primary": {
+     "max_db": -6.088002897231238,
+     "min_db": -9.335664577087094,
+     "infeasible_points": 0,
+     "worst_bias_v": 1.0
+    },
+    "p_in=preset_line_power": {
+     "max_db": -6.088002897231238,
+     "min_db": -9.335664577087094,
+     "infeasible_points": 0,
+     "worst_bias_v": 1.0
+    }
+   },
+   "evaluation": {
+    "target_id": "BND-4",
+    "scored": true,
+    "passed": true,
+    "level": "pass",
+    "max_abs_residual": 0.0,
+    "z": null,
+    "detail": "worst prediction 0 <= 1 (margin +1 db)"
+   },
+   "runtime_s": 1.61
+  }
+ ]
+}

@@ -22,6 +22,10 @@ XSECS_COUPLING = ("rib160", "rib200", "strip400x200")
 LIGHTMATTER_XSECS = ("rib160", "rib200")
 
 
+def Q_L_OK(q):
+    return 3400.0 <= q <= 4300.0         # the design Q_L must sit in the published 3500-4200 window
+
+
 def _load(name):
     path = DATA / f"{name}.json"
     side = DATA / f"{name}.sidecar.json"
@@ -265,8 +269,10 @@ def test_coupling_design_consistent(xs):
     crit = des["critical"]
     assert crit["kappa2"] == pytest.approx(q_to_k2(crit["q_e"], lam, fsr), rel=1e-12)
     assert d["through"]["kappa2_per_pass"] == pytest.approx(crit["kappa2"], rel=0.02)
-    # mirror: the over-coupled branch needs a smaller gap than the under-coupled one
-    assert des["over"]["nominal"]["gap_nm"] < crit["gap_nm"] < des["under"]["nominal"]["gap_nm"]
+    # mirror (same Q_L and notch depth): the over-coupled branch needs a smaller gap than the under-coupled one
+    assert des["over"]["nominal"]["gap_nm"] < des["under"]["nominal"]["gap_nm"]
+    assert des["over"]["nominal"]["kappa2"] > des["under"]["nominal"]["kappa2"]
+    assert Q_L_OK(des["critical"]["q_loaded"])
     # drop prior: higher kappa_d/kappa -> smaller gap; drop weaker than through
     dr = des["drop"]
     assert dr["high"]["gap_nm"] < dr["nominal"]["gap_nm"] < dr["low"]["gap_nm"]

@@ -1,0 +1,522 @@
+{
+ "schema": "coupling/1",
+ "xsec": "strip400x200",
+ "inputs": {
+  "geometry": {
+   "name": "strip400x200",
+   "width_nm": 400.0,
+   "film_nm": 200.0,
+   "slab_nm": 0.0,
+   "sidewall_deg": 90.0,
+   "clad": {
+    "top": "SiO2 (beol)",
+    "box": "SiO2 (thermal), 2.0 um",
+    "below_box": "sio2"
+   },
+   "width_definition": "mid-height of the etched sidewall",
+   "lam0_nm": 1310.0,
+   "provenance": {
+    "film_nm": "printed (SMTAI render; textbook REF.waveguideLmNm)",
+    "width_nm": "printed",
+    "note": "the textbook's reference strip (06 audit, 05 smoke tests); oxide-clad, vertical walls"
+   },
+   "ranges_nm": {
+    "width_nm": [
+     380.0,
+     420.0
+    ],
+    "film_nm": [
+     190.0,
+     210.0
+    ]
+   }
+  },
+  "r_ref": {
+   "source": "modes_strip400x200.json",
+   "sha256": "287b644f4421c6f43ccd2c2809288a4f72029ae7df65fdd68fb0369e58e4e306",
+   "n_g": 4.349170339219704,
+   "fsr_thz": 1.7999999452712927
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "film_nm": 200.0,
+  "settings": {
+   "quick": false,
+   "mesh_scale": 1.5,
+   "dx_um": 0.005,
+   "du_um": 0.0025,
+   "dz_um": 0.04,
+   "gaps_nm": [
+    60,
+    80,
+    100,
+    120,
+    140,
+    160,
+    180,
+    200,
+    250,
+    300,
+    350,
+    400,
+    450,
+    500,
+    600,
+    700
+   ],
+   "lam_table_nm": [
+    1270.0,
+    1290.0,
+    1300.0,
+    1310.0,
+    1320.0,
+    1330.0,
+    1350.0
+   ],
+   "dlam_nm": 10.0,
+   "method_b": true,
+   "meep2d": true,
+   "meep_res": [
+    30,
+    45,
+    60
+   ],
+   "meep2d_json": "/private/tmp/claude-501/-Users-kenny-interactive-textbooks-lightmatter-capstone/d5794d65-9500-4988-a2ee-6908737d147d/scratchpad/meep2d_runs.json",
+   "jac": true
+  },
+  "targets": {
+   "q_loaded_nominal": 3850.0,
+   "q_loaded_range": [
+    3500.0,
+    4200.0
+   ],
+   "q_i_nominal": 7700.0,
+   "q_i_range": [
+    7000.0,
+    8400.0
+   ],
+   "notch_db_nominal": 27.9,
+   "kappa_d_over_kappa_nominal": 0.03,
+   "kappa_d_over_kappa_prior": [
+    0.004,
+    0.18
+   ],
+   "fsr_thz": 1.8
+  }
+ },
+ "mesh": {
+  "fem": {
+   "h_core": 0.01,
+   "h_slab": 0.02,
+   "h_max": 0.2,
+   "core_dist": 0.4,
+   "slab_dist": 0.15,
+   "scale": 1.5,
+   "h_core_eff_nm": 15.0
+  },
+  "overlap_grid_dx_um": 0.005,
+  "ring_u_grid_um": 0.0025,
+  "dz_um": 0.04
+ },
+ "validation": {
+  "sampling": {
+   "bus_power_on_grid": 1.0022622612446024,
+   "ring_power_on_grid": 1.0012954960211655,
+   "n_eff_bus": {
+    "re": 2.491421935987426,
+    "im": -3.621684111195849e-15
+   },
+   "n_eff_ring_bent": {
+    "re": 2.491996527953563,
+    "im": -1.3950155801973533e-17
+   }
+  },
+  "convergence_at_through_gap": [
+   {
+    "dx_um": 0.01,
+    "du_um": 0.005,
+    "dz_um": 0.04,
+    "kappa2": 0.10320855372443247,
+    "power_out_over_in": 0.9994898755281998
+   },
+   {
+    "dx_um": 0.0075,
+    "du_um": 0.00375,
+    "dz_um": 0.03,
+    "kappa2": 0.1047937905397117,
+    "power_out_over_in": 1.0047091371223233
+   },
+   {
+    "dx_um": 0.005,
+    "du_um": 0.0025,
+    "dz_um": 0.04,
+    "kappa2": 0.10338673576317009,
+    "power_out_over_in": 0.9998899433294185
+   },
+   {
+    "dx_um": 0.005,
+    "du_um": 0.0025,
+    "dz_um": 0.02,
+    "kappa2": 0.10340187552651023,
+    "power_out_over_in": 0.9998991644506348
+   },
+   {
+    "mesh_scale": 2.0,
+    "kappa2": 0.10347891114582762
+   },
+   {
+    "mesh_scale": 1.0,
+    "kappa2": 0.10317574513405496
+   }
+  ],
+  "power_conservation_range": [
+   0.9999159682720333,
+   1.0000000045884734
+  ],
+  "method_B": {
+   "50.5": {
+    "kappa2": 0.13819724434575975,
+    "kappa2_no_phase_mismatch": 0.13937556128905335,
+    "kappa2_outer_edge_phase_ref": 0.13246015706599293,
+    "dln_kappa2_dlambda_per_nm": 0.007795948293172816,
+    "method_A_kappa2": 0.10338673576307678
+   },
+   "189.5": {
+    "kappa2": 0.006449319856754542,
+    "kappa2_no_phase_mismatch": 0.006517086004677896,
+    "kappa2_outer_edge_phase_ref": 0.0061867473202040345,
+    "dln_kappa2_dlambda_per_nm": 0.012608665970381905,
+    "method_A_kappa2": 0.006602292844584333
+   }
+  },
+  "validation_2d": {
+   "model": {
+    "n_core": 2.929353326618524,
+    "n_clad": 1.45003004407,
+    "width_um": 0.4,
+    "R_um": 6.094834611049774,
+    "lambda_um": 1.31,
+    "note": "2-D effective-index ring arc + bus (TE, E in plane); the arc leaves the coupler into straight guides that end in the PML, so there is no resonance"
+   },
+   "n_eff_bus": 2.5394146341434136,
+   "n_eff_ring_bent": 2.540334680518413,
+   "meep": [
+    {
+     "gap_nm": 100.0,
+     "res": 30,
+     "kappa2": 0.1022776115173315,
+     "t2": 0.892796572244021,
+     "kappa2_vs_lam": [
+      0.1391897263455326,
+      0.1192705088896562,
+      0.1022776115173315,
+      0.0877575277031346,
+      0.07543069638813456
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 41.8,
+     "params": {
+      "res": 30,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.1,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 100.0,
+     "res": 45,
+     "kappa2": 0.10171811022655962,
+     "t2": 0.8946923821001048,
+     "kappa2_vs_lam": [
+      0.13868344539408248,
+      0.11872452328117898,
+      0.10171811022655962,
+      0.08721829955438203,
+      0.07493150131335011
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 180.4,
+     "params": {
+      "res": 45,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.1,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 100.0,
+     "res": 60,
+     "kappa2": 0.09956870573932364,
+     "t2": 0.8965112598198083,
+     "kappa2_vs_lam": [
+      0.13609534706698637,
+      0.1163566522690962,
+      0.09956870573932364,
+      0.08526707016821951,
+      0.07314470363333997
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 627.2,
+     "params": {
+      "res": 60,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.1,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 200.0,
+     "res": 30,
+     "kappa2": 0.012077398237958687,
+     "t2": 0.9858219465563223,
+     "kappa2_vs_lam": [
+      0.018775511926482025,
+      0.015043931148631354,
+      0.012077398237958687,
+      0.009720012264844232,
+      0.007855950871378444
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 39.2,
+     "params": {
+      "res": 30,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.2,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 200.0,
+     "res": 45,
+     "kappa2": 0.011906695250766394,
+     "t2": 0.9872389129249668,
+     "kappa2_vs_lam": [
+      0.018542931564681113,
+      0.01483937098475117,
+      0.011906695250766394,
+      0.009570958078998633,
+      0.007728236231167131
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 154.0,
+     "params": {
+      "res": 45,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.2,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 200.0,
+     "res": 60,
+     "kappa2": 0.01287430953116048,
+     "t2": 0.9866300531664401,
+     "kappa2_vs_lam": [
+      0.01998362620561359,
+      0.01601828091637851,
+      0.01287430953116048,
+      0.010369140724967588,
+      0.008382254935608022
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 743.0,
+     "params": {
+      "res": 60,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.2,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 100.0,
+     "res": 80,
+     "kappa2": 0.10000079469648931,
+     "t2": 0.8979461210050009,
+     "kappa2_vs_lam": [
+      0.13662165540708707,
+      0.11682959334924298,
+      0.10000079469648931,
+      0.08566682614521073,
+      0.07351093473559026
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 1055.4,
+     "params": {
+      "res": 80,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.1,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    },
+    {
+     "gap_nm": 200.0,
+     "res": 80,
+     "kappa2": 0.012937942032321034,
+     "t2": 0.986803532599923,
+     "kappa2_vs_lam": [
+      0.020073016020826076,
+      0.01609267907996203,
+      0.012937942032321034,
+      0.010424342480822187,
+      0.008428774407824665
+     ],
+     "lam_um": [
+      1.3645833333333335,
+      1.3367346938775513,
+      1.31,
+      1.2843137254901962,
+      1.2596153846153846
+     ],
+     "seconds": 1766.0,
+     "params": {
+      "res": 80,
+      "R": 6.094834611049774,
+      "w": 0.4,
+      "gap": 0.2,
+      "n1": 2.929353326618524,
+      "n2": 1.45003004407,
+      "lam": 1.31
+     }
+    }
+   ],
+   "A": [
+    {
+     "gap_nm": 100.0,
+     "kappa2": 0.08136034839858486,
+     "power_out_over_in": 0.99995112647227
+    },
+    {
+     "gap_nm": 200.0,
+     "kappa2": 0.012090808153543088,
+     "power_out_over_in": 0.9999931236739099
+    }
+   ],
+   "B": [
+    {
+     "gap_nm": 100.0,
+     "kappa2": 0.08616896731874797,
+     "kappa2_outer_edge_ref": 0.09481894390486625
+    },
+    {
+     "gap_nm": 200.0,
+     "kappa2": 0.006970685774456491,
+     "kappa2_outer_edge_ref": 0.020092017386209724
+    }
+   ],
+   "meep_source": {
+    "file": "/private/tmp/claude-501/-Users-kenny-interactive-textbooks-lightmatter-capstone/d5794d65-9500-4988-a2ee-6908737d147d/scratchpad/meep2d_runs.json",
+    "sha256": "e7705b787d4485d4f571bffcc61073fe8d6ca80eed8fb022e76ec4745fe2d9ff",
+    "note": "same parameters (R within 0.2 %); produced by --meep2d-only"
+   },
+   "summary": [
+    {
+     "gap_nm": 100.0,
+     "meep_kappa2": 0.09978475021790648,
+     "meep_uncertainty": 0.0002160444785828386,
+     "A_kappa2": 0.08136034839858486,
+     "B_kappa2": 0.08616896731874797,
+     "A_over_meep": 0.8153585414696429,
+     "B_over_meep": 0.8635484593645338
+    },
+    {
+     "gap_nm": 200.0,
+     "meep_kappa2": 0.012906125781740756,
+     "meep_uncertainty": 3.181625058027663e-05,
+     "A_kappa2": 0.012090808153543088,
+     "B_kappa2": 0.006970685774456491,
+     "A_over_meep": 0.9368270818070626,
+     "B_over_meep": 0.5401067595605207
+    }
+   ]
+  }
+ },
+ "assumptions": {
+  "bus": "straight bus of the ring's cross-section; slab continuous through the gap (rib)",
+  "drop": "drop bus identical to the through bus, on the opposite side",
+  "smoke_comparison": "femwell smoke (05 C2, strip 400x200, g0 200 nm, point coupler without phase mismatch) gave d ln K^2/d lambda 1.3-1.5 %/nm"
+ },
+ "runtime_s": 1661.1,
+ "sha256": "d0c003af9eea704690a82c8932c0d26a1c85760c94b6d6b6546516906a7106e5",
+ "data_file": "coupling_strip400x200.json",
+ "created_utc": "2026-10-09T15:04:41Z",
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "femwell": "0.1.12",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0",
+  "meshio": "5.3.5"
+ }
+}

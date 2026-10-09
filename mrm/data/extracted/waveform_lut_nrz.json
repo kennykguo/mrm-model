@@ -1,0 +1,397 @@
+{
+ "schema": "waveform_lut/1",
+ "file": "waveform_lut_nrz.npz",
+ "sha256": "49fa5461495f740b9284a84d0f2d3d5d4c33b9d4f6b2e08e8cd086714372e2cb",
+ "description": "Normalized-coordinate data-modulation LUT (07 P2-6): time-domain corrections, relative to the two-level static average, of the mean stored energy (drop, loss, heat; through by energy conservation) and of the through and drop OMA, from the single-mode TCMT in normalized time (mrm/waveform/lut.py docstring).",
+ "fields6": [
+  "u_td"
+ ],
+ "fields6_extra": [
+  "oma_drop_td"
+ ],
+ "fields7": [
+  "oma_thru_td"
+ ],
+ "static_parts": "analytic: u_st = p L(x1) + (1 - p) L(x0), oma_drop_st = |L(x1) - L(x0)|, oma_thru_st = 4 r_e (1 - r_e) oma_drop_st, L(x) = 1/(1 + x^2)",
+ "storage": "float32, C order over (xc, w, p1, td, tr, tau[, re])",
+ "axes": {
+  "xc": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   1.0,
+   1.25,
+   1.5,
+   1.75,
+   2.0,
+   2.25,
+   2.5,
+   2.75,
+   3.0,
+   3.5,
+   4.0,
+   5.0,
+   6.0
+  ],
+  "w": [
+   0.0,
+   0.05,
+   0.1,
+   0.15,
+   0.2,
+   0.3,
+   0.4,
+   0.5,
+   0.6,
+   0.8,
+   1.0
+  ],
+  "p1": [
+   0.3,
+   0.5,
+   0.7
+  ],
+  "td": [
+   0.0,
+   0.15,
+   0.3,
+   0.45,
+   0.6
+  ],
+  "tr": [
+   0.0,
+   0.05,
+   0.1,
+   0.15,
+   0.2,
+   0.3,
+   0.4,
+   0.5,
+   0.7
+  ],
+  "tau": [
+   0.07,
+   0.085,
+   0.1,
+   0.125,
+   0.15,
+   0.175,
+   0.2,
+   0.25
+  ],
+  "re": [
+   0.3,
+   0.4,
+   0.5,
+   0.6,
+   0.7
+  ]
+ },
+ "axes_meaning": {
+  "xc": "(x0 + x1)/2, detuning/HWHM at the level midpoint (x_c >= 0 stored; symmetry)",
+  "w": "|x1 - x0|/2 = resonance swing / FWHM",
+  "p1": "mark density of the higher-x level",
+  "td": "transition density (cyclic)",
+  "tr": "10-90 % rise of the junction-charge edge / UI",
+  "tau": "photon energy lifetime 1/kappa / UI",
+  "re": "kappa_e/kappa"
+ },
+ "domain": {
+  "abs_xc": [
+   0.0,
+   6.0
+  ],
+  "w": [
+   0.0,
+   1.0
+  ],
+  "p1": [
+   0.3,
+   0.7
+  ],
+  "td": [
+   0.0,
+   0.6
+  ],
+  "tr_ui": [
+   0.0,
+   0.7
+  ],
+  "tau_ui": [
+   0.07,
+   0.25
+  ],
+  "r_e": [
+   0.3,
+   0.7
+  ]
+ },
+ "config": {
+  "schema": "waveform_lut/1",
+  "axes": {
+   "xc": [
+    0.0,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    1.75,
+    2.0,
+    2.25,
+    2.5,
+    2.75,
+    3.0,
+    3.5,
+    4.0,
+    5.0,
+    6.0
+   ],
+   "w": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.8,
+    1.0
+   ],
+   "p1": [
+    0.3,
+    0.5,
+    0.7
+   ],
+   "td": [
+    0.0,
+    0.15,
+    0.3,
+    0.45,
+    0.6
+   ],
+   "tr": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.7
+   ],
+   "tau": [
+    0.07,
+    0.085,
+    0.1,
+    0.125,
+    0.15,
+    0.175,
+    0.2,
+    0.25
+   ],
+   "re": [
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7
+   ]
+  },
+  "n_bits": 1024,
+  "n_warm": 32,
+  "base_samples": 32,
+  "samples_per_bit": [
+   32,
+   32,
+   32,
+   32,
+   32,
+   32,
+   32,
+   32
+  ],
+  "seed": 2026,
+  "pattern": "cyclic two-state Markov (driver.markov_bits, best of 64 seeds)",
+  "edge": "single pole, tau_e = t_r/ln 9",
+  "integrator": "exponential, Simpson exponent + first-order forcing correction (tcmt_time._mode_step)",
+  "model": "normalized single-mode TCMT, g = 0, q = 0",
+  "oma": "max over phases [0, 2 UI) of |P1 - P0|, parabola-refined",
+  "storage": "float32"
+ },
+ "config_hash": "ad5cf117ed524d28903f39975099593a259b2e708612f8d701a779b3ae9c3649",
+ "validation": {
+  "build_seconds": 212.7,
+  "pattern_stats": {
+   "0.3_0.15": [
+    0.298828125,
+    0.1484375
+   ],
+   "0.3_0.3": [
+    0.298828125,
+    0.30078125
+   ],
+   "0.3_0.45": [
+    0.2998046875,
+    0.453125
+   ],
+   "0.3_0.6": [
+    0.2998046875,
+    0.599609375
+   ],
+   "0.5_0.15": [
+    0.4990234375,
+    0.146484375
+   ],
+   "0.5_0.3": [
+    0.4990234375,
+    0.30078125
+   ],
+   "0.5_0.45": [
+    0.5,
+    0.443359375
+   ],
+   "0.5_0.6": [
+    0.5009765625,
+    0.599609375
+   ],
+   "0.7_0.15": [
+    0.69921875,
+    0.146484375
+   ],
+   "0.7_0.3": [
+    0.6982421875,
+    0.298828125
+   ],
+   "0.7_0.45": [
+    0.7001953125,
+    0.453125
+   ],
+   "0.7_0.6": [
+    0.69921875,
+    0.6015625
+   ]
+  },
+  "p2_6_prbs9_tau_0p15": {
+   "tau_ui": 0.15,
+   "pattern": "PRBS9",
+   "max_abs_correction": 0.3042130373958465,
+   "at": {
+    "xc": 0.0,
+    "w": 1.0,
+    "tr_ui": 0.7
+   },
+   "max_swing_w_below_limit": 0.25,
+   "limit": 0.03,
+   "max_abs_correction_by_w": {
+    "0.05": 0.0010658305410446989,
+    "0.1": 0.0042488139264338365,
+    "0.15": 0.009506090809796808,
+    "0.2": 0.016768385492982985,
+    "0.25": 0.025943035058516806,
+    "0.3": 0.036917849328336194,
+    "0.4": 0.0637480097440204,
+    "0.5": 0.09613931505360718,
+    "0.6": 0.13293466232866602,
+    "0.8": 0.21548475293820424,
+    "1": 0.3042130373958465
+   },
+   "max_abs_correction_by_tr_at_w0p3": {
+    "0": 0.02436350481486005,
+    "0.05": 0.024504250174143927,
+    "0.1": 0.024890921150999334,
+    "0.15": 0.02547234897180095,
+    "0.2": 0.02621029853387502,
+    "0.3": 0.02803166389253442,
+    "0.4": 0.030146062995212386,
+    "0.5": 0.0323976503799146,
+    "0.7": 0.036917849328336194
+   },
+   "grid": {
+    "xc": [
+     0.0,
+     0.25,
+     0.5,
+     0.75,
+     1.0,
+     1.25,
+     1.5,
+     1.75,
+     2.0,
+     2.25,
+     2.5,
+     2.75,
+     3.0,
+     3.5,
+     4.0,
+     5.0,
+     6.0
+    ],
+    "w": [
+     0.05,
+     0.1,
+     0.15,
+     0.2,
+     0.25,
+     0.3,
+     0.4,
+     0.5,
+     0.6,
+     0.8,
+     1.0
+    ],
+    "tr": [
+     0.0,
+     0.05,
+     0.1,
+     0.15,
+     0.2,
+     0.3,
+     0.4,
+     0.5,
+     0.7
+    ]
+   }
+  },
+  "interpolation": {
+   "n": 300,
+   "practical": false,
+   "c_mean_abs_err_max": 0.013423561449482868,
+   "c_mean_abs_err_p95": 0.0019800680456767547,
+   "oma_thru_diff_err_rel_scale_max": 0.08042326390217899,
+   "oma_thru_diff_err_rel_scale_p95": 0.011482630062150735,
+   "c_oma_thru_abs_err_max": 0.22020905646935918,
+   "c_oma_thru_abs_err_p95": 0.04692588944241654,
+   "n_ratio": 92
+  },
+  "interpolation_practical": {
+   "n": 150,
+   "practical": true,
+   "c_mean_abs_err_max": 0.003897661872251601,
+   "c_mean_abs_err_p95": 0.0009509106440536795,
+   "oma_thru_diff_err_rel_scale_max": 0.012088743401001613,
+   "oma_thru_diff_err_rel_scale_p95": 0.004961005468912253,
+   "c_oma_thru_abs_err_max": 0.016318954786950668,
+   "c_oma_thru_abs_err_p95": 0.013111111665816442,
+   "n_ratio": 99
+  },
+  "validation_seconds": 5.3
+ },
+ "inputs": {
+  "model": "normalized single-mode TCMT, g = 0, q = 0",
+  "code": "mrm/waveform/lut.py"
+ },
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "numba": "0.68.0",
+  "scipy": "1.18.1"
+ },
+ "created_utc": "2026-10-09T12:29:33Z"
+}

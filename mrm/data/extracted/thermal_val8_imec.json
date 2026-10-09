@@ -1,0 +1,565 @@
+{
+ "schema": "thermal_val8/1",
+ "target_ids": [
+  "VAL-8a",
+  "VAL-8b",
+  "VAL-8c",
+  "VAL-8d",
+  "VAL-8e"
+ ],
+ "source": "Coenen et al., JLT 40(13) 4357 (2022), Tables I-IV, Figs. 6, 10, 16; CO22-TCPMT Table I",
+ "targets": {
+  "VAL-8a_tau_heater_us": 5.0,
+  "VAL-8b_tau_wg_us": 10.0,
+  "VAL-8c_eff_no_ucut_pm_per_mw": 222.0,
+  "VAL-8d_eff_full_ucut_pm_per_mw": 843.0,
+  "VAL-8e_two_pole": {
+   "tau_us": [
+    3.18,
+    13.01
+   ],
+   "share": [
+    0.427,
+    0.573
+   ]
+  },
+  "tolerance": {
+   "VAL-8a": 0.3,
+   "VAL-8b": 0.3,
+   "VAL-8c": 0.25,
+   "VAL-8d": 0.3,
+   "VAL-8e": 0.3
+  },
+  "imec_model": {
+   "tau_heater_us": 4.92,
+   "tau_wg_us": 10.38,
+   "eta_h_c_per_mw": 3.16,
+   "r_h_c_per_mw": 5.4,
+   "coupling": 0.584,
+   "ucut_tau_heater_us": 18.1,
+   "ucut_tau_wg_us": 38.1,
+   "ucut_eta_h_c_per_mw": 9.73,
+   "no_cu_eta_ratio": 1.18
+  }
+ },
+ "predicted": {
+  "VAL-8a_tau_heater_us": 1.1342867458414903,
+  "VAL-8b_tau_wg_us": 3.123643118566137,
+  "VAL-8c_eff_no_ucut_pm_per_mw": 290.8996980517859,
+  "VAL-8d_eff_full_ucut_pm_per_mw": 676.3979483780283,
+  "VAL-8e_two_pole": {
+   "tau_us": [
+    3.5155878337523943,
+    32.67140505158389
+   ],
+   "share": [
+    0.873426590512189,
+    0.1265734094878111
+   ]
+  }
+ },
+ "comparison": {
+  "VAL-8a": {
+   "predicted": 1.1342867458414903,
+   "target": 5.0,
+   "rel_err": -0.773142650831702,
+   "tolerance": 0.3,
+   "pass": false
+  },
+  "VAL-8b": {
+   "predicted": 3.123643118566137,
+   "target": 10.0,
+   "rel_err": -0.6876356881433863,
+   "tolerance": 0.3,
+   "pass": false
+  },
+  "VAL-8c": {
+   "predicted": 290.8996980517859,
+   "target": 222.0,
+   "rel_err": 0.3103590002332697,
+   "tolerance": 0.25,
+   "pass": false
+  },
+  "VAL-8d": {
+   "predicted": 676.3979483780283,
+   "target": 843.0,
+   "rel_err": -0.1976299544744622,
+   "tolerance": 0.3,
+   "pass": true
+  },
+  "VAL-8e": {
+   "predicted": {
+    "tau_us": [
+     3.5155878337523943,
+     32.67140505158389
+    ],
+    "share": [
+     0.873426590512189,
+     0.1265734094878111
+    ]
+   },
+   "target": {
+    "tau_us": [
+     3.18,
+     13.01
+    ],
+    "share": [
+     0.427,
+     0.573
+    ]
+   },
+   "status": "cross_check",
+   "rel_err_tau": [
+    0.10553076533094163,
+    1.5112532706828508
+   ]
+  },
+  "mesh_change_last_level": {
+   "tau_heater_us": 0.0002146896393588893,
+   "tau_wg_us": 0.0004656644602762938,
+   "eta_h_c_per_mw": 0.0011599444879910603
+  }
+ },
+ "nominal": {
+  "eta_h_rib_c_per_mw": 3.864714058543965,
+  "r_h_c_per_mw": 8.089898312467177,
+  "tau_wg_rib_us": 3.119293138389403,
+  "tau_heater_us": 1.1342867458414903,
+  "dofs": 7728,
+  "scale": 1.0,
+  "materials": "mrm",
+  "eta_h_c_per_mw": 3.8567611426002424,
+  "tau_wg_us": 3.123643118566137,
+  "coupling": 0.4767379012238839,
+  "two_pole_fit": {
+   "tau_us": [
+    3.5155878337523943,
+    32.67140505158389
+   ],
+   "share": [
+    0.873426590512189,
+    0.1265734094878111
+   ]
+  }
+ },
+ "mesh_levels": {
+  "2.0": {
+   "eta_h_rib_c_per_mw": 3.8552428156424225,
+   "r_h_c_per_mw": 8.043665114266782,
+   "tau_wg_rib_us": 3.118336129164695,
+   "tau_heater_us": 1.1430158533987262,
+   "dofs": 3226,
+   "scale": 2.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.8473097078198246,
+   "tau_wg_us": 3.1226768268661473,
+   "coupling": 0.47830306870881273,
+   "two_pole_fit": {
+    "tau_us": [
+     3.518857096455582,
+     32.75212969610003
+    ],
+    "share": [
+     0.8736755025834476,
+     0.12632449741655233
+    ]
+   }
+  },
+  "1.414": {
+   "eta_h_rib_c_per_mw": 3.860229157063476,
+   "r_h_c_per_mw": 8.079161738564595,
+   "tau_wg_rib_us": 3.117849793135148,
+   "tau_heater_us": 1.134043278499012,
+   "dofs": 4930,
+   "scale": 1.414,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.8522926969203217,
+   "tau_wg_us": 3.1221892260053288,
+   "coupling": 0.47681836576337056,
+   "two_pole_fit": {
+    "tau_us": [
+     3.5237296437190953,
+     32.842880055927154
+    ],
+    "share": [
+     0.8739992271394661,
+     0.1260007728605338
+    ]
+   }
+  },
+  "1.0": {
+   "eta_h_rib_c_per_mw": 3.864714058543965,
+   "r_h_c_per_mw": 8.089898312467177,
+   "tau_wg_rib_us": 3.119293138389403,
+   "tau_heater_us": 1.1342867458414903,
+   "dofs": 7728,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.8567611426002424,
+   "tau_wg_us": 3.123643118566137,
+   "coupling": 0.4767379012238839,
+   "two_pole_fit": {
+    "tau_us": [
+     3.5155878337523943,
+     32.67140505158389
+    ],
+    "share": [
+     0.873426590512189,
+     0.1265734094878111
+    ]
+   }
+  }
+ },
+ "dlambda_dt": {
+  "n_eff": 2.4848032621290934,
+  "n_g": 3.9650579751350685,
+  "dneff_dt_per_k": 0.0001865660202037045,
+  "alpha_l_per_k": 2.56806293533473e-06,
+  "dlambda_dt_pm_per_k": 75.42590461167639,
+  "dlambda_dt_thermo_optic_only_pm_per_k": 72.93142575195039,
+  "method": "femwell bent TE0 (R = 7.50 um), central differences +/-10 K and +/-5 nm, mrm.materials"
+ },
+ "variants": {
+  "full_ucut": {
+   "eta_h_rib_c_per_mw": 8.978528372521243,
+   "r_h_c_per_mw": 12.772176246113418,
+   "tau_wg_rib_us": 19.37246604993796,
+   "tau_heater_us": 9.146427406228849,
+   "dofs": 9875,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 8.967714101148717,
+   "tau_wg_us": 19.38778682946013,
+   "coupling": 0.7021289033556516,
+   "two_pole_fit": {
+    "tau_us": [
+     3.7445180798616176,
+     34.11841929576997
+    ],
+    "share": [
+     0.30824022844268867,
+     0.6917597715573113
+    ]
+   }
+  },
+  "imec_table1_materials": {
+   "eta_h_rib_c_per_mw": 4.1038886141998585,
+   "r_h_c_per_mw": 9.124187271189847,
+   "tau_wg_rib_us": 3.207322796942153,
+   "tau_heater_us": 0.9334627229331198,
+   "dofs": 7728,
+   "scale": 1.0,
+   "materials": "imec_table1",
+   "eta_h_c_per_mw": 4.100327656799374,
+   "tau_wg_us": 3.2090592469794186,
+   "coupling": 0.4493910016233882
+  },
+  "heater_gap_0p3um": {
+   "eta_h_rib_c_per_mw": 4.110214819366192,
+   "r_h_c_per_mw": 7.519455033184522,
+   "tau_wg_rib_us": 2.7094659921060673,
+   "tau_heater_us": 1.1173141342726232,
+   "dofs": 7632,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 4.100663992497317,
+   "tau_wg_us": 2.714592897181329,
+   "coupling": 0.5453405831141287
+  },
+  "heater_gap_0p8um": {
+   "eta_h_rib_c_per_mw": 3.4298668220178747,
+   "r_h_c_per_mw": 9.118961532936803,
+   "tau_wg_rib_us": 4.01627831607035,
+   "tau_heater_us": 1.2063717492928394,
+   "dofs": 7884,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.423956470011089,
+   "tau_wg_us": 4.019541258792816,
+   "coupling": 0.37547657785857425
+  },
+  "heater_width_1p5um": {
+   "eta_h_rib_c_per_mw": 3.6944299659370152,
+   "r_h_c_per_mw": 6.2298841210216835,
+   "tau_wg_rib_us": 3.276411200341491,
+   "tau_heater_us": 1.8756329676878247,
+   "dofs": 8300,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.688714646128059,
+   "tau_wg_us": 3.2790977594269592,
+   "coupling": 0.5921000414247064
+  },
+  "heater_width_3um": {
+   "eta_h_rib_c_per_mw": 3.2858555108671954,
+   "r_h_c_per_mw": 4.709480692017123,
+   "tau_wg_rib_us": 3.5183769864580867,
+   "tau_heater_us": 2.553149190242269,
+   "dofs": 9216,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.28259333478827,
+   "tau_wg_us": 3.5195022282602086,
+   "coupling": 0.697018110797753
+  },
+  "substrate_100um": {
+   "eta_h_rib_c_per_mw": 3.848142157344506,
+   "r_h_c_per_mw": 8.073328371083337,
+   "tau_wg_rib_us": 3.0872850955729767,
+   "tau_heater_us": 1.1245742079023888,
+   "dofs": 7674,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.8401892482369817,
+   "tau_wg_us": 3.091553243739599,
+   "coupling": 0.4756637004870989
+  },
+  "substrate_750um": {
+   "eta_h_rib_c_per_mw": 3.857057046307764,
+   "r_h_c_per_mw": 8.083402885847665,
+   "tau_wg_rib_us": 3.1050334991325363,
+   "tau_heater_us": 1.1295615652171453,
+   "dofs": 11965,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.849104839967425,
+   "tau_wg_us": 3.1093437919509403,
+   "coupling": 0.4761738211399059
+  },
+  "no_beol_cu": {
+   "eta_h_rib_c_per_mw": 4.5812309328853384,
+   "r_h_c_per_mw": 8.991364800693923,
+   "tau_wg_rib_us": 4.665423860927734,
+   "tau_heater_us": 1.787157890061432,
+   "dofs": 7728,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 4.57357945222712,
+   "tau_wg_us": 4.673567988279159,
+   "coupling": 0.5086635403642111
+  },
+  "beol_cu_fill_0p3": {
+   "eta_h_rib_c_per_mw": 3.7684249662415983,
+   "r_h_c_per_mw": 7.972896746613459,
+   "tau_wg_rib_us": 2.9496842604367743,
+   "tau_heater_us": 1.06735507477129,
+   "dofs": 7728,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.7604129727946876,
+   "tau_wg_us": 2.953584509805104,
+   "coupling": 0.47164952617653655
+  },
+  "beol_keepout_0p5um": {
+   "eta_h_rib_c_per_mw": 3.1536326398592798,
+   "r_h_c_per_mw": 6.913863922000501,
+   "tau_wg_rib_us": 2.381320851238706,
+   "tau_heater_us": 0.6288647147345029,
+   "dofs": 7780,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.1465358847571854,
+   "tau_wg_us": 2.3859473905929773,
+   "coupling": 0.4551052667878871
+  },
+  "with_metal_tbr": {
+   "eta_h_rib_c_per_mw": 3.846117614035968,
+   "r_h_c_per_mw": 11.248462244680887,
+   "tau_wg_rib_us": 3.161221670287233,
+   "tau_heater_us": 0.4952653742202486,
+   "dofs": 9344,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.8381001142676348,
+   "tau_wg_us": 3.1657327893028593,
+   "coupling": 0.3412110945282832
+  },
+  "beol_4um": {
+   "eta_h_rib_c_per_mw": 3.740503481477389,
+   "r_h_c_per_mw": 7.931946044211407,
+   "tau_wg_rib_us": 2.8858778265933616,
+   "tau_heater_us": 1.04473303593599,
+   "dofs": 8107,
+   "scale": 1.0,
+   "materials": "mrm",
+   "eta_h_c_per_mw": 3.732602618877434,
+   "tau_wg_us": 2.8897279334950206,
+   "coupling": 0.47057841771395065
+  },
+  "imec_table1_full_ucut": {
+   "eta_h_rib_c_per_mw": 7.9598723395194595,
+   "r_h_c_per_mw": 12.46469869297743,
+   "tau_wg_rib_us": 14.42830366294562,
+   "tau_heater_us": 4.4953982108200385,
+   "dofs": 9875,
+   "scale": 1.0,
+   "materials": "imec_table1",
+   "eta_h_c_per_mw": 7.955376942663493,
+   "tau_wg_us": 14.43456087522697,
+   "coupling": 0.6382325909847726
+  },
+  "geometry_search": {
+   "n": 24,
+   "tau_wg_us_range": [
+    1.8890280266015376,
+    6.372945239741126
+   ],
+   "tau_heater_us_range": [
+    0.5313801715220424,
+    4.495090579295609
+   ],
+   "eff_pm_per_mw_range": [
+    134.42245888964186,
+    346.59071417245485
+   ],
+   "best": [
+    {
+     "override": {
+      "metal_width_um": 3.0,
+      "metal_gap_um": 0.8,
+      "keepout_um": 5.0,
+      "beol_lo_um": 1.5,
+      "metal_thick_um": 0.15
+     },
+     "score": 0.2928687127892689,
+     "tau_heater_us": 4.495090579295609,
+     "tau_wg_us": 6.372945239741126,
+     "eta_h_c_per_mw": 3.6216224120952067,
+     "r_h_c_per_mw": 6.106988001573962
+    },
+    {
+     "override": {
+      "metal_width_um": 3.0,
+      "metal_gap_um": 0.8,
+      "keepout_um": 5.0,
+      "beol_lo_um": 4.0,
+      "metal_thick_um": 0.15
+     },
+     "score": 0.35478328709637325,
+     "tau_heater_us": 4.0320530672172294,
+     "tau_wg_us": 5.775031104283489,
+     "eta_h_c_per_mw": 3.4985986386107792,
+     "r_h_c_per_mw": 5.923948362603794
+    },
+    {
+     "override": {
+      "metal_width_um": 1.5,
+      "metal_gap_um": 0.8,
+      "keepout_um": 5.0,
+      "beol_lo_um": 1.5,
+      "metal_thick_um": 0.15
+     },
+     "score": 0.44088796253577855,
+     "tau_heater_us": 3.1198475762350353,
+     "tau_wg_us": 5.8964048948492005,
+     "eta_h_c_per_mw": 3.9167813301403296,
+     "r_h_c_per_mw": 7.780984218390438
+    },
+    {
+     "override": {
+      "metal_width_um": 1.5,
+      "metal_gap_um": 0.8,
+      "keepout_um": 5.0,
+      "beol_lo_um": 4.0,
+      "metal_thick_um": 0.15
+     },
+     "score": 0.5050180974792029,
+     "tau_heater_us": 2.851824985357816,
+     "tau_wg_us": 5.374907456602281,
+     "eta_h_c_per_mw": 3.793717350629778,
+     "r_h_c_per_mw": 7.59911338679144
+    },
+    {
+     "override": {
+      "metal_width_um": 3.0,
+      "metal_gap_um": 0.3,
+      "keepout_um": 5.0,
+      "beol_lo_um": 1.5,
+      "metal_thick_um": 0.15
+     },
+     "score": 0.5154968349072467,
+     "tau_heater_us": 3.780957477515404,
+     "tau_wg_us": 4.553282244241829,
+     "eta_h_c_per_mw": 4.039028114912732,
+     "r_h_c_per_mw": 5.232490307291299
+    }
+   ]
+  }
+ },
+ "assumptions": "replication with mrm.materials on the printed geometry and boundary conditions; the dimensions imec does not print are assumed (imec_config) and swept; tau = 63 % time of the step response; heater node = heater_resistor observer, waveguide = femwell TE0 mode-weighted ring observer (the rib volume average is also given)",
+ "config": {
+  "family": "metal_above",
+  "film_nm": 220.0,
+  "t_k": 300.0,
+  "lam_m": 1.55e-06,
+  "radius_um": 7.5,
+  "width_nm": 450.0,
+  "slab_nm": 70.0,
+  "slab_out_um": 1.5,
+  "slab_in_um": 1.5,
+  "contact_offset_um": 1.0,
+  "box_um": 2.0,
+  "sub_um": 240.0,
+  "die_side_mm": 0.24,
+  "bottom_bc": "dirichlet",
+  "h_bottom_w_per_m2_k": 20000.0,
+  "clad_um": 1.42,
+  "beol_lo_um": 1.5,
+  "beol_hi_um": 0.5,
+  "pass_um": 1.0,
+  "fill_lo": 0.15,
+  "fill_hi": 0.0,
+  "via_ratio": 0.1,
+  "keepout_um": 2.0,
+  "heater_gap_um": 2.0,
+  "heater_width_um": 1.0,
+  "heater_doping_factor": 0.8,
+  "sil_gap_um": 1.5,
+  "sil_width_um": 1.0,
+  "undercut_margin_um": 0.0,
+  "undercut_depth_um": 15.0,
+  "air_k_w_per_m_k": 0.026,
+  "metal_gap_um": 0.45,
+  "metal_width_um": 0.6,
+  "metal_thick_um": 0.1,
+  "metal": "w_film",
+  "tbr_shell_um": 0.0,
+  "driver_radius_um": 5.0,
+  "aggressor_radius_um": 10.0,
+  "cmos_film_nm": 88.0,
+  "pd_radius_um": 3.0,
+  "sensor_radius_um": 2.0,
+  "site_offsets_um": {
+   "monitor_pd": [
+    0.0,
+    25.0
+   ],
+   "temp_sensor": [
+    40.0,
+    0.0
+   ],
+   "driver": [
+    0.0,
+    -30.0
+   ],
+   "aggressor": [
+    60.0,
+    0.0
+   ]
+  },
+  "pitch_um": 50.0,
+  "mode_weight": "femwell",
+  "mode_bent": true
+ },
+ "tool_versions": {
+  "python": "3.12.8",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "femwell": "0.1.12",
+  "pyamg": "5.3.0",
+  "meshio": "5.3.5"
+ },
+ "created_utc": "2026-10-09T12:55:49Z"
+}

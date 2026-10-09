@@ -1,0 +1,325 @@
+{
+ "schema": "modes/1",
+ "xsec": "rib160",
+ "inputs": {
+  "geometry": {
+   "name": "rib160",
+   "width_nm": 400.0,
+   "film_nm": 160.0,
+   "slab_nm": 60.0,
+   "sidewall_deg": 90.0,
+   "clad": {
+    "top": "SiO2 (beol)",
+    "box": "SiO2 (thermal), 2.0 um",
+    "below_box": "sio2"
+   },
+   "width_definition": "mid-height of the etched sidewall",
+   "lam0_nm": 1310.0,
+   "provenance": {
+    "film_nm": "printed (GF-IMAPS)",
+    "width_nm": "assumed (SMTAI render 400; BU 45CLO 410)",
+    "slab_nm": "assumed",
+    "sidewall_deg": "assumed",
+    "box_um": "printed (GF-IMAPS)",
+    "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
+   },
+   "ranges_nm": {
+    "width_nm": [
+     360.0,
+     450.0
+    ],
+    "film_nm": [
+     150.0,
+     170.0
+    ],
+    "slab_nm": [
+     40.0,
+     100.0
+    ]
+   }
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "film_nm": 160.0,
+  "lambda0_nm": 1310.0,
+  "t_ref_c": 25.0,
+  "fsr_design_thz": 1.8,
+  "settings": {
+   "quick": false,
+   "mesh_scale": 1.5,
+   "conv_scales": [
+    3.0,
+    2.0,
+    1.5,
+    1.0
+   ],
+   "lam_grid_nm": [
+    1260,
+    1270,
+    1280,
+    1290,
+    1300,
+    1310,
+    1320,
+    1330,
+    1340,
+    1350,
+    1360
+   ],
+   "t_list_c": [
+    0.0,
+    25.0,
+    50.0,
+    75.0,
+    105.0,
+    125.0
+   ],
+   "dlam_um": 0.002,
+   "dt_k": 2.5,
+   "dn_idx": 0.001,
+   "jac_steps_nm": [
+    [
+     "width_nm",
+     10.0
+    ],
+    [
+     "film_nm",
+     5.0
+    ],
+    [
+     "slab_nm",
+     10.0
+    ]
+   ],
+   "tidy3d": true,
+   "tidy3d_dl": [
+    0.01,
+    0.005,
+    0.0025
+   ],
+   "pml": true,
+   "families": true,
+   "alt_radius_um": 7.5
+  }
+ },
+ "mesh": {
+  "production": {
+   "h_core": 0.01,
+   "h_slab": 0.02,
+   "h_max": 0.2,
+   "core_dist": 0.4,
+   "slab_dist": 0.15,
+   "scale": 1.5,
+   "h_core_eff_nm": 15.0
+  },
+  "window_bent": {
+   "x_min": -2.0,
+   "x_max": 2.5,
+   "y_min": -1.5,
+   "y_max": 1.5,
+   "pml_left_um": 0.0,
+   "pml_right_um": 0.0,
+   "pml_strength": 2.0
+  },
+  "elements": "2nd-order Nedelec (transverse) x 2nd-order Lagrange (longitudinal)"
+ },
+ "validation": {
+  "mesh_convergence": {
+   "rows": [
+    {
+     "scale": 3.0,
+     "h_core_nm": 30.0,
+     "ntri": 1958,
+     "n_eff_straight": 2.4371215981425762,
+     "n_eff_bent": 2.4401609252133096,
+     "n_eff_bent_isotropic": 2.443533850893069,
+     "n_g_bent": 3.940344924596942,
+     "dneff_dt_bent": 0.00018953170426865283,
+     "w_si_pert": 0.9685029944433837,
+     "seconds": 13.5
+    },
+    {
+     "scale": 2.0,
+     "h_core_nm": 20.0,
+     "ntri": 3514,
+     "n_eff_straight": 2.436995649210391,
+     "n_eff_bent": 2.4400340483370315,
+     "n_eff_bent_isotropic": 2.4434034863848484,
+     "n_g_bent": 3.9404394256202595,
+     "dneff_dt_bent": 0.0001895246712405374,
+     "w_si_pert": 0.9684577665490932,
+     "seconds": 25.9
+    },
+    {
+     "scale": 1.5,
+     "h_core_nm": 15.0,
+     "ntri": 5594,
+     "n_eff_straight": 2.436899990654657,
+     "n_eff_bent": 2.4399315138864743,
+     "n_eff_bent_isotropic": 2.4432976122175223,
+     "n_g_bent": 3.94048493534264,
+     "dneff_dt_bent": 0.00018951813087033642,
+     "w_si_pert": 0.9684173700466182,
+     "seconds": 50.0
+    },
+    {
+     "scale": 1.0,
+     "h_core_nm": 10.0,
+     "ntri": 12062,
+     "n_eff_straight": 2.4368437884609717,
+     "n_eff_bent": 2.439878106943366,
+     "n_eff_bent_isotropic": 2.4432430272131986,
+     "n_g_bent": 3.940509735234093,
+     "dneff_dt_bent": 0.00018951456574853865,
+     "w_si_pert": 0.9683953563596233,
+     "seconds": 132.8
+    }
+   ],
+   "n_eff_straight": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.4368437884609717,
+     2.436899990654657,
+     2.436995649210391,
+     2.4371215981425762
+    ],
+    "f0": 2.436813535068032,
+    "p": 2.5896741055547166,
+    "err": 3.0253392939716406e-05,
+    "monotone": true
+   },
+   "n_eff_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.439878106943366,
+     2.4399315138864743,
+     2.4400340483370315,
+     2.4401609252133096
+    ],
+    "f0": 2.4398550470864326,
+    "p": 2.9565141995214654,
+    "err": 2.3059856933294043e-05,
+    "monotone": true
+   },
+   "n_eff_bent_isotropic": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     2.4432430272131986,
+     2.4432976122175223,
+     2.4434034863848484,
+     2.443533850893069
+    ],
+    "f0": 2.443219881822792,
+    "p": 2.9878051034011737,
+    "err": 2.314539040648711e-05,
+    "monotone": true
+   },
+   "n_g_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     3.940509735234093,
+     3.94048493534264,
+     3.9404394256202595,
+     3.940344924596942
+    ],
+    "f0": 3.9405213473115843,
+    "p": 2.818619396309077,
+    "err": 1.161207749111881e-05,
+    "monotone": true
+   },
+   "dneff_dt_bent": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     0.00018951456574853865,
+     0.00018951813087033642,
+     0.0001895246712405374,
+     0.00018953170426865283
+    ],
+    "f0": 0.00018951289556564348,
+    "p": 2.817731746409131,
+    "err": 1.6701828951706365e-09,
+    "monotone": true
+   },
+   "w_si_pert": {
+    "h": [
+     10.0,
+     15.0,
+     20.0,
+     30.0
+    ],
+    "f": [
+     0.9683953563596233,
+     0.9684173700466182,
+     0.9684577665490932,
+     0.9685029944433837
+    ],
+    "f0": 0.9683850487217196,
+    "p": 2.8185953332081333,
+    "err": 1.0307637903661515e-05,
+    "monotone": true
+   }
+  },
+  "index_weight_identity_residual": -2.231331710511597e-07,
+  "crosscheck_delta_tidy3d": -0.00016007768742332118,
+  "bend_formulation": "exact transform; see modes_study_bend.json"
+ },
+ "assumptions": {
+  "substrate": "omitted: the 2 um BOX makes substrate leakage negligible (decay exp(-2 k0 sqrt(n_eff^2 - n_ox^2) * 2 um) < 1e-14)",
+  "expansion": "ring length follows the substrate-clamped Si alpha_L; the change of the cross-section (width, film) with temperature and stress-optic terms are neglected (< 0.5 % of dn_eff/dT, estimated from the Jacobian x alpha_Si x dimensions)",
+  "doping": "undoped Si; the junction's free-carrier index change is in junction_<xsec>.json",
+  "geometry": {
+   "film_nm": "printed (GF-IMAPS)",
+   "width_nm": "assumed (SMTAI render 400; BU 45CLO 410)",
+   "slab_nm": "assumed",
+   "sidewall_deg": "assumed",
+   "box_um": "printed (GF-IMAPS)",
+   "note": "GF 45SPCLO photonics SOI 160 nm and BOX 2 um are printed (GF-IMAPS, 01 section 4.2); the partial-etch (slab) depth, the rib width of Lightmatter's MRM and the sidewall angle are NOT public. Width 400 nm: Lightmatter SMTAI render (400 x 200 nm, printed for an unspecified product) and the BU 45CLO rib ring (w = 410 nm, R = 8 um, printed, Al Qubaisi et al. CLEO 2021). Slab: assumed, 60 nm on 160 and 80 nm on 200 (slab/film 0.375-0.4, typical foundry ribs such as 220/90 and 220/70 nm; the same values as junction.py), swept for the Jacobian and in slab_sweep."
+  }
+ },
+ "runtime_s": 1795.5,
+ "sha256": "deab882d53fa1fb01564f6708435d457442b6cac79565fa6fbe2ec0d625d9b74",
+ "data_file": "modes_rib160.json",
+ "created_utc": "2026-10-09T12:18:52Z",
+ "tool_versions": {
+  "python": "3.12.8",
+  "platform": "macOS-26.1-arm64-arm-64bit",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "femwell": "0.1.12",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0",
+  "meshio": "5.3.5"
+ }
+}
