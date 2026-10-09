@@ -51,6 +51,13 @@ integrated OMA against independent quadrature, and actual-model replay.
   ODE tolerances on a specified self-heating transient; source hashes and
   configurations accompany the generated report. Such checks must be repeated
   when changing operating regimes, especially near a thermal instability.
+- [Independent solver comparison](../artifacts/solver_comparison.json): four
+  fresh-process runs of a 0.2 ms, eight-lane case compare Radau and DOP853 at
+  `rtol=1e-6` and `1e-8`. All recorded ADC/DAC codes match. The largest recorded
+  temperature discrepancy from the refined Radau reference is under 0.1 µK;
+  the reference is not exact truth. DOP853 is faster on this example, but no
+  such speed or error guarantee is inferred for other stiffness or operating
+  regimes.
 
 The recorded extraction runs used approximately 245 MB peak process RSS for
 the finest thermal study and 119 MB for the optical study on this machine.
@@ -91,6 +98,47 @@ RTL/fixed-point verification. Full Meep, Femwell optical, DEVSIM or commercial
 multiphysics extraction has not been run. The actual executed spatial backend
 is the documented conservative thermal finite-volume workflow.
 
+## Executed controller examples
+
+The [bundled run evidence](../artifacts/example_runs.json) contains complete
+resolved configurations, controller settings, metrics, source/environment
+fingerprints and the paired comparison results. Numerical traces and
+[single-ring](../artifacts/reference_response.png) /
+[eight-lane](../artifacts/wdm_response.png) plots accompany it.
+
+The 4 ms single-ring reference acquired a red-side operating point. Its
+time-averaged modeled OMA is about 28.87 µW including acquisition, with about
+1.016 µJ of heater energy. These are synthetic-example outputs, not target
+hardware specifications. Its saved-run replay reproduces all recorded values
+bit for bit in the checked environment. An importable custom-controller run
+and replay were also exercised.
+
+The supplied paired study completed all 15 runs: three controllers across
+three named cases and two uncertainty samples. Hold and dither begin far from
+the useful fringe in this cold-start example; dither is a local tracker and
+does not replace global acquisition. Therefore, the larger scan/PI mean OMA
+is not evidence of general algorithm superiority. The small study demonstrates
+the comparison workflow, not statistical robustness.
+
+In the 30 ms eight-lane case with DOP853 at `rtol=1e-8`, every controller reports
+acquisition, yet the final nearest-laser identities are `[0,1,2,3,0,1,2,3]`
+instead of `[0,1,2,3,4,5,6,7]`. The assumed 15 µm diameter and group index of 4
+give a 1.59045 THz FSR, close to four 400 GHz channel spacings. This is a
+periodic-resonance identity risk under **assumed geometry and bus topology**,
+not a demonstrated flaw in Lightmatter's hardware or a validated BER penalty.
+The mean-field WDM approximation itself limits precise modulated-waveform
+claims in this collision regime. Monitor acquisition is not wavelength
+identification.
+
+The full 30 ms Radau (`rtol=1e-6`) and independent DOP853 (`rtol=1e-8`) runs
+have identical recorded ADC and DAC codes. Across all recorded lanes/times,
+their maximum differences are 11.8 µK, 176.9 kHz detuning, and 0.738 nW OMA.
+Both give the same final nearest-laser identities. This separates the observed
+identity risk from this particular solver choice; it does not remove physical
+model uncertainty or establish a universal convergence bound. Runtime was
+about 844 s versus 218 s under the recorded machine load; the Radau process
+peaked at approximately 183 MB RSS.
+
 ## Reproduce checks
 
 ```sh
@@ -98,6 +146,7 @@ uv sync --extra dev
 uv run pytest -q
 uv run python examples/optical_accuracy_checks.py
 uv run python examples/integration_accuracy_checks.py
+uv run python examples/solver_comparison.py
 uv run python examples/thermal_extraction.py --max-refinement 16
 uv run ringlab run examples/models/reference.yaml --dry-run
 uv run ringlab run examples/models/reference.yaml

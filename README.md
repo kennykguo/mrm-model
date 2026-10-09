@@ -113,6 +113,18 @@ The eight-lane example combines published architecture with assumed devices.
 Its FSR may put unwanted resonance orders close to other lanes. Such failures
 are results to investigate, not reasons to silently change the model.
 
+The supplied 30 ms eight-lane example was cross-checked with two adaptive
+solvers. The faster checked invocation is:
+
+```bash
+uv run ringlab run examples/models/wdm_context.yaml \
+  --set simulation.method=DOP853 --set simulation.rtol=1e-8
+```
+
+That check applies to this configuration; changed stiffness or operating
+regimes need new convergence checks. See the [accuracy audit](docs/STATUS.md)
+for full results, runtime, memory, and the observed wavelength-identity risk.
+
 ## Read the model and its evidence
 
 - [Intuitive explanation](docs/EXPLAINED.md)
