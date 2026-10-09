@@ -1,0 +1,12 @@
+# Corner (07 D1, P0-2): the textbook's absorbed fraction 0.3 as a named stress corner (outside the 0.5-0.95 set).
+# The coupling regime and the film are pinned to under / 160 nm, where the eta alternatives are exact (the
+# over-coupled branch would give 0.24, the 200 nm world 0.28).
+extends: g26
+meta:
+  name: g26_low_eta
+  kind: corner
+  description: "g26 with uncertainty.self_heating.eta pinned to stress_0p3 (eta = 0.3; under-coupled, 160 nm film)"
+alts:
+  uncertainty.self_heating.eta: stress_0p3
+  uncertainty.coupling_regime: under
+  uncertainty.film_thickness: "160"

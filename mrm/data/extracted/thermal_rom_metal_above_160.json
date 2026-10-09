@@ -1,0 +1,2524 @@
+{
+ "family": "metal_above",
+ "film_nm": 160.0,
+ "quick": false,
+ "description": "Common-pole Foster thermal ROM (ARCHITECTURE 5.3): step response sum_k r_k (1 - exp(-t/tau_k)), residues in K/W, sources normalized to 1 W, observers are weighted averages.",
+ "units": {
+  "taus_s": "s",
+  "self_res": "K/W",
+  "cross_res": "K/W",
+  "cross_r_um": "um",
+  "site_offsets_um": "um"
+ },
+ "conventions": {
+  "self": "source of ring i -> observer of ring i; site observers/sources at site_offsets_um",
+  "cross_distance": "source centre (ring centre, or site centre for driver/aggressor) to observer centre (ring centre for ring_mode_weighted/heater_resistor, site centre for monitor_pd/temp_sensor); radially symmetric approximation, valid d > 2R",
+  "observer_weights": {
+   "ring_mode_weighted": "n dn/dT |E|^2 of TE0 (femwell) x 2 pi r",
+   "heater_resistor": "volume average of the heater body",
+   "monitor_pd": "disk r = 3.0 um at film mid-plane",
+   "temp_sensor": "disk r = 2.0 um at film mid-plane"
+  },
+  "source_weights": {
+   "heater": "uniform in the heater body",
+   "waveguide_absorption": "|E|^2 of TE0 in Si (free-carrier absorption) x 2 pi r",
+   "junction": "density ~ 1/t^2 in the rib and the slab within 1.0 um of the rib (lateral series-resistance current path)",
+   "driver": "uniform disk r = 5.0 um in the 88.0 nm CMOS film",
+   "aggressor": "uniform disk r = 10.0 um in the CMOS film"
+  }
+ },
+ "summary": {
+  "z_heater_ring_k_per_mw": 3.5714522302750336,
+  "z_heater_heater_k_per_mw": 10.323850419253182,
+  "z_opt_ring_k_per_mw": 5.119883779818909,
+  "z_junction_ring_k_per_mw": 4.3521053579487985,
+  "z_ratio_opt_heater": 1.4335579617775351,
+  "heater_to_ring_coupling": 0.3459418807167674,
+  "t63_heater_ring_s": 4.733570163607268e-06,
+  "t10_heater_ring_s": 5.197734560635982e-07,
+  "t63_heater_heater_s": 1.2073442535827671e-06,
+  "t63_opt_ring_s": 1.726716322082286e-06,
+  "t10_opt_ring_s": 1.0188592510252796e-08,
+  "pitch_um": 50.0,
+  "xt_frac_heater_ring_at_pitch": 0.00956939108533589,
+  "t63_xt_heater_ring_at_pitch_s": 0.00010548342787302529,
+  "xt_frac_heater_ring_at_1000um": 0.0007323509860142923,
+  "package_floor_k_per_mw": 0.002,
+  "share_of_dc_in_poles_below_1us_opt_ring": 0.38636913024554925,
+  "share_of_dc_in_poles_above_1ms_heater_ring": -0.010981916013908482
+ },
+ "inputs": {
+  "config": {
+   "family": "metal_above",
+   "film_nm": 160.0,
+   "t_k": 300.0,
+   "lam_m": 1.31e-06,
+   "radius_um": 7.5,
+   "width_nm": 400.0,
+   "slab_nm": 60.0,
+   "slab_out_um": 2.0,
+   "slab_in_um": 2.0,
+   "contact_offset_um": 1.0,
+   "box_um": 2.0,
+   "sub_um": 775.0,
+   "die_side_mm": 5.0,
+   "bottom_bc": "robin",
+   "h_bottom_w_per_m2_k": 20000.0,
+   "clad_um": 1.5,
+   "beol_lo_um": 2.5,
+   "beol_hi_um": 5.0,
+   "pass_um": 1.0,
+   "fill_lo": 0.15,
+   "fill_hi": 0.3,
+   "via_ratio": 0.1,
+   "keepout_um": 5.0,
+   "heater_gap_um": 2.0,
+   "heater_width_um": 1.0,
+   "heater_doping_factor": 0.8,
+   "sil_gap_um": 1.5,
+   "sil_width_um": 1.0,
+   "undercut_margin_um": 4.0,
+   "undercut_depth_um": 15.0,
+   "air_k_w_per_m_k": 0.026,
+   "metal_gap_um": 0.8,
+   "metal_width_um": 1.0,
+   "metal_thick_um": 0.1,
+   "metal": "tin_film",
+   "tbr_shell_um": 0.02,
+   "driver_radius_um": 5.0,
+   "aggressor_radius_um": 10.0,
+   "cmos_film_nm": 88.0,
+   "pd_radius_um": 3.0,
+   "sensor_radius_um": 2.0,
+   "site_offsets_um": {
+    "monitor_pd": [
+     0.0,
+     25.0
+    ],
+    "temp_sensor": [
+     40.0,
+     0.0
+    ],
+    "driver": [
+     0.0,
+     -30.0
+    ],
+    "aggressor": [
+     60.0,
+     0.0
+    ]
+   },
+   "pitch_um": 50.0,
+   "mode_weight": "femwell",
+   "mode_bent": true
+  },
+  "assumptions": {
+   "radius_um": [
+    "printed",
+    "Lightmatter '~15 um diameter' (HC, LM26-S); GF PDK MRM R = 7.5 um (GF-ECIO)"
+   ],
+   "film_nm": [
+    "printed",
+    "45SPCLO 160 nm photonics SOI (GF-IMAPS); 200 nm = SMTAI render (hypothesis D21)"
+   ],
+   "box_um": [
+    "printed",
+    "45SPCLO 2 um BOX (GF-IMAPS)"
+   ],
+   "die_side_mm": [
+    "assumed",
+    "5 x 5 mm = 45SPCLO MPW block (Europractice, printed); the G25/G26 die is not printed"
+   ],
+   "width_nm": [
+    "assumed",
+    "rib width; BU 45CLO ring 410 nm"
+   ],
+   "slab_nm": [
+    "assumed",
+    "partial-etch depth not public (01 4.2)"
+   ],
+   "sub_um": [
+    "assumed",
+    "un-thinned 300 mm wafer"
+   ],
+   "h_bottom_w_per_m2_k": [
+    "assumed",
+    "die attach + package to a TEC-held plate (R'' = 5e-5 m^2 K/W)"
+   ],
+   "clad_um": [
+    "assumed",
+    "pre-metal dielectric thickness"
+   ],
+   "beol_lo_um": [
+    "assumed",
+    "9-level BEOL printed, total thickness not public"
+   ],
+   "beol_hi_um": [
+    "assumed",
+    "9-level BEOL printed, total thickness not public"
+   ],
+   "fill_lo": [
+    "assumed",
+    "effective Cu area fraction of the thin levels"
+   ],
+   "fill_hi": [
+    "assumed",
+    "effective Cu area fraction of the thick levels"
+   ],
+   "via_ratio": [
+    "assumed",
+    "via area fraction relative to the line fill"
+   ],
+   "keepout_um": [
+    "assumed",
+    "metal no-fill zone beyond the ring radius (imec: tiling costs up to 60 %)"
+   ],
+   "heater_gap_um": [
+    "assumed",
+    "in-ring heater placement ('heater and PN inside the ring', LM26-S schematic)"
+   ],
+   "heater_width_um": [
+    "assumed",
+    "in-ring heater width"
+   ],
+   "sil_gap_um": [
+    "assumed",
+    "GF PDK: four silicide resistors, two inside, two outside (GF-ECIO); spacing assumed"
+   ],
+   "undercut_depth_um": [
+    "assumed",
+    "isotropic Si undercut depth; imec UCUT ~27 x 45 um^2 (CO22-JLT)"
+   ],
+   "metal_gap_um": [
+    "assumed",
+    "metal heater height above the film"
+   ],
+   "metal_width_um": [
+    "assumed",
+    "metal heater width"
+   ],
+   "pitch_um": [
+    "assumed",
+    "ring pitch on the TX bus not published (04 open question 2)"
+   ],
+   "site_offsets_um": [
+    "assumed",
+    "PD near the drop port, sensor, monolithic driver, aggressor (G26: heater adjacent to the MRM)"
+   ]
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT"
+  },
+  "material_values_k_r_k_z_rho_c": {
+   "si_sub": [
+    148.0,
+    148.0,
+    1655919.0
+   ],
+   "box": [
+    1.38,
+    1.38,
+    1559800.0
+   ],
+   "clad": [
+    1.242,
+    1.242,
+    1559800.0
+   ],
+   "si_film": [
+    71.75757575757576,
+    71.75757575757576,
+    1655919.0
+   ],
+   "si_slab": [
+    69.375,
+    69.375,
+    1655919.0
+   ],
+   "si_heater": [
+    57.40606060606061,
+    57.40606060606061,
+    1655919.0
+   ],
+   "si_cmos": [
+    69.375,
+    69.375,
+    1655919.0
+   ],
+   "beol_lo": [
+    47.845,
+    5.548529411764705,
+    1622500.0
+   ],
+   "beol_hi": [
+    95.3694,
+    11.224285714285713,
+    2126860.0
+   ],
+   "beol_lo_ko": [
+    0.7,
+    0.7,
+    1300000.0
+   ],
+   "beol_hi_ko": [
+    1.242,
+    1.242,
+    1559800.0
+   ],
+   "pass": [
+    1.242,
+    1.242,
+    1559800.0
+   ],
+   "air": [
+    0.026,
+    0.026,
+    1200.0
+   ],
+   "metal": [
+    20.0,
+    20.0,
+    3100000.0
+   ],
+   "tbr": [
+    0.092548435171386,
+    0.092548435171386,
+    1559800.0
+   ]
+  },
+  "material_notes": [
+   "air (undercut) k = 0.026 W/(m K), rho c = 1.2e3 J/(m^3 K): handbook, not in mrm.materials",
+   "slab and CMOS film k clamped to the 150 nm value of k_si_film_w_per_m_k (fit valid 150-300 nm)",
+   "BEOL effective medium: k_r = f k_Cu + (1-f) k_d, k_z = f_via k_Cu + k_d/(1-f) (assumed)"
+  ],
+  "mode_weight": {
+   "method": "femwell",
+   "bent": true,
+   "radius_um": 7.5,
+   "n_eff": 2.442063154793626,
+   "te_fraction": 0.983627973242312,
+   "power_fraction_core": 0.6521552410403646,
+   "mesh_res_um": 0.02,
+   "bin_um": 0.02,
+   "lambda_um": 1.31,
+   "n_si": 3.5057041190984966,
+   "n_sio2": 1.4472375047184667,
+   "si_obs_weight_fraction": 0.988770373813972
+  }
+ },
+ "tool_versions": {
+  "python": "3.12.8",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "scikit-fem": "12.0.2",
+  "gmsh": "4.15.2",
+  "femwell": "0.1.12",
+  "pyamg": "5.3.0",
+  "meshio": "5.3.5"
+ },
+ "mesh": {
+  "ring_model": {
+   "nodes": 12366,
+   "elements": 23618,
+   "dofs": 48349,
+   "scale": 1.0,
+   "h_core_um": 0.05,
+   "element": "P2 triangle, axisymmetric"
+  },
+  "site_model": {
+   "nodes": 11834,
+   "elements": 22534,
+   "dofs": 46201,
+   "scale": 1.0,
+   "element": "P2 triangle, axisymmetric"
+  },
+  "convergence": {
+   "levels": [
+    {
+     "scale": 2.0,
+     "h_core_um": 0.1,
+     "dofs_ring": 19669,
+     "dofs_site": 17877,
+     "z_heater_ring_k_per_mw": 3.568696967210192,
+     "z_heater_heater_k_per_mw": 10.301122541586231,
+     "z_opt_ring_k_per_mw": 5.114183476295519,
+     "z_junction_ring_k_per_mw": 4.347232204149552,
+     "z_heater_pd_k_per_mw": 0.06641500876263072,
+     "xt_frac_at_pitch": 0.009578718904310668,
+     "t63_heater_ring_s": 4.7443027749943825e-06,
+     "t63_opt_ring_s": 1.7277767711069478e-06,
+     "t63_heater_heater_s": 1.2138506711353294e-06,
+     "t10_opt_ring_s": 9.915303515788033e-09,
+     "t63_xt_at_pitch_s": 0.00010547121749489515,
+     "z_heater_ring_at_50um_k_per_mw": 0.03418354510357242,
+     "z_heater_ring_at_300um_k_per_mw": 0.005345906657997473,
+     "z_driver_ring_k_per_mw": 0.07114456017664514,
+     "z_aggressor_ring_k_per_mw": 0.03373130239324212,
+     "seconds": 7.2
+    },
+    {
+     "scale": 1.414213562373095,
+     "h_core_um": 0.07071067811865475,
+     "dofs_ring": 28907,
+     "dofs_site": 27478,
+     "z_heater_ring_k_per_mw": 3.57064271104463,
+     "z_heater_heater_k_per_mw": 10.31032596628218,
+     "z_opt_ring_k_per_mw": 5.117586174857295,
+     "z_junction_ring_k_per_mw": 4.350179460721619,
+     "z_heater_pd_k_per_mw": 0.06639144937901191,
+     "xt_frac_at_pitch": 0.009571805673914703,
+     "t63_heater_ring_s": 4.743849612445328e-06,
+     "t63_opt_ring_s": 1.7275422166736803e-06,
+     "t63_heater_heater_s": 1.212677807223249e-06,
+     "t10_opt_ring_s": 9.916243857188092e-09,
+     "t63_xt_at_pitch_s": 0.00010549095524527018,
+     "z_heater_ring_at_50um_k_per_mw": 0.03417749816109917,
+     "z_heater_ring_at_300um_k_per_mw": 0.005346004714738587,
+     "z_driver_ring_k_per_mw": 0.07115579710339602,
+     "z_aggressor_ring_k_per_mw": 0.03372887723114648,
+     "seconds": 10.6
+    },
+    {
+     "scale": 1.0,
+     "h_core_um": 0.05,
+     "dofs_ring": 48349,
+     "dofs_site": 46201,
+     "z_heater_ring_k_per_mw": 3.5714522302750336,
+     "z_heater_heater_k_per_mw": 10.323850419253182,
+     "z_opt_ring_k_per_mw": 5.119883779818909,
+     "z_junction_ring_k_per_mw": 4.3521053579487985,
+     "z_heater_pd_k_per_mw": 0.06640089482862073,
+     "xt_frac_at_pitch": 0.00956939108533589,
+     "t63_heater_ring_s": 4.745402780039236e-06,
+     "t63_opt_ring_s": 1.7274446263183436e-06,
+     "t63_heater_heater_s": 1.2106594038564362e-06,
+     "t10_opt_ring_s": 9.910759260762168e-09,
+     "t63_xt_at_pitch_s": 0.00010550880409572949,
+     "z_heater_ring_at_50um_k_per_mw": 0.03417662313409689,
+     "z_heater_ring_at_300um_k_per_mw": 0.005345846692795284,
+     "z_driver_ring_k_per_mw": 0.07116446856089467,
+     "z_aggressor_ring_k_per_mw": 0.033729395252232654,
+     "seconds": 13.2
+    },
+    {
+     "scale": 0.7071067811865475,
+     "h_core_um": 0.035355339059327376,
+     "dofs_ring": 81955,
+     "dofs_site": 79296,
+     "z_heater_ring_k_per_mw": 3.5720513328179906,
+     "z_heater_heater_k_per_mw": 10.32752879793953,
+     "z_opt_ring_k_per_mw": 5.121016312797723,
+     "z_junction_ring_k_per_mw": 4.3529224612318,
+     "z_heater_pd_k_per_mw": 0.06638900239766966,
+     "xt_frac_at_pitch": 0.009566528785824311,
+     "t63_heater_ring_s": 4.745818721321433e-06,
+     "t63_opt_ring_s": 1.7274874017513696e-06,
+     "t63_heater_heater_s": 1.2101461234677513e-06,
+     "t10_opt_ring_s": 9.905759070543727e-09,
+     "t63_xt_at_pitch_s": 0.00010552610522375749,
+     "z_heater_ring_at_50um_k_per_mw": 0.03417213189984541,
+     "z_heater_ring_at_300um_k_per_mw": 0.005345856798763313,
+     "z_driver_ring_k_per_mw": 0.07116464893944999,
+     "z_aggressor_ring_k_per_mw": 0.03372994242823715,
+     "seconds": 60.6
+    }
+   ],
+   "refinement_ratio": 1.4142135623730951,
+   "richardson": {
+    "z_heater_ring_k_per_mw": {
+     "values": [
+      3.568696967210192,
+      3.57064271104463,
+      3.5714522302750336,
+      3.5720513328179906
+     ],
+     "order": 0.8685247908986089,
+     "extrapolated": 3.5734976943024495,
+     "rel_err_est": 0.0005723983061965222,
+     "method": "richardson",
+     "gci_rel": 0.0007154978827456528,
+     "production_value": 3.5714522302750336
+    },
+    "z_heater_heater_k_per_mw": {
+     "values": [
+      10.301122541586231,
+      10.31032596628218,
+      10.323850419253182,
+      10.32752879793953
+     ],
+     "order": 3.756856650150657,
+     "extrapolated": 10.32890299737872,
+     "rel_err_est": 0.0004891689007845238,
+     "method": "richardson",
+     "gci_rel": 0.0006114611259806547,
+     "production_value": 10.323850419253182
+    },
+    "z_opt_ring_k_per_mw": {
+     "values": [
+      5.114183476295519,
+      5.117586174857295,
+      5.119883779818909,
+      5.121016312797723
+     ],
+     "order": 2.0411554165392682,
+     "extrapolated": 5.122117215546255,
+     "rel_err_est": 0.00043603760581022665,
+     "method": "richardson",
+     "gci_rel": 0.0005450470072627834,
+     "production_value": 5.119883779818909
+    },
+    "z_junction_ring_k_per_mw": {
+     "values": [
+      4.347232204149552,
+      4.350179460721619,
+      4.3521053579487985,
+      4.3529224612318
+     ],
+     "order": 2.4738807282781754,
+     "extrapolated": 4.353524608978545,
+     "rel_err_est": 0.0003260004610562197,
+     "method": "richardson",
+     "gci_rel": 0.0004075005763202746,
+     "production_value": 4.3521053579487985
+    },
+    "z_heater_pd_k_per_mw": {
+     "values": [
+      0.06641500876263072,
+      0.06639144937901191,
+      0.06640089482862073,
+      0.06638900239766966
+     ],
+     "order": null,
+     "extrapolated": 0.06638900239766966,
+     "rel_err_est": 0.00017913254487287485,
+     "method": "last-change",
+     "gci_rel": 0.00022391568109109356,
+     "production_value": 0.06640089482862073
+    },
+    "xt_frac_at_pitch": {
+     "values": [
+      0.009578718904310668,
+      0.009571805673914703,
+      0.00956939108533589,
+      0.009566528785824311
+     ],
+     "order": null,
+     "extrapolated": 0.009566528785824311,
+     "rel_err_est": 0.00029919938314714524,
+     "method": "last-change",
+     "gci_rel": 0.00037399922893393157,
+     "production_value": 0.00956939108533589
+    },
+    "t63_heater_ring_s": {
+     "values": [
+      4.7443027749943825e-06,
+      4.743849612445328e-06,
+      4.745402780039236e-06,
+      4.745818721321433e-06
+     ],
+     "order": 3.801523453533675,
+     "extrapolated": 4.745970852122887e-06,
+     "rel_err_est": 0.00011969565371372348,
+     "method": "richardson",
+     "gci_rel": 0.00014961956714215434,
+     "production_value": 4.745402780039236e-06
+    },
+    "t63_opt_ring_s": {
+     "values": [
+      1.7277767711069478e-06,
+      1.7275422166736803e-06,
+      1.7274446263183436e-06,
+      1.7274874017513696e-06
+     ],
+     "order": null,
+     "extrapolated": 1.7274874017513696e-06,
+     "rel_err_est": 2.4761646876606516e-05,
+     "method": "last-change",
+     "gci_rel": 3.0952058595758146e-05,
+     "production_value": 1.7274446263183436e-06
+    },
+    "t63_heater_heater_s": {
+     "values": [
+      1.2138506711353294e-06,
+      1.212677807223249e-06,
+      1.2106594038564362e-06,
+      1.2101461234677513e-06
+     ],
+     "order": 3.950790946836645,
+     "extrapolated": 1.2099710834469442e-06,
+     "rel_err_est": 0.0005688734374800904,
+     "method": "richardson",
+     "gci_rel": 0.000711091796850113,
+     "production_value": 1.2106594038564362e-06
+    },
+    "t10_opt_ring_s": {
+     "values": [
+      9.915303515788033e-09,
+      9.916243857188092e-09,
+      9.910759260762168e-09,
+      9.905759070543727e-09
+     ],
+     "order": 0.2668049743072232,
+     "extrapolated": 9.89368754350392e-09,
+     "rel_err_est": 0.0017255161114782256,
+     "method": "richardson",
+     "gci_rel": 0.002156895139347782,
+     "production_value": 9.910759260762168e-09
+    },
+    "t63_xt_at_pitch_s": {
+     "values": [
+      0.00010547121749489515,
+      0.00010549095524527018,
+      0.00010550880409572949,
+      0.00010552610522375749
+     ],
+     "order": 0.0899301149264983,
+     "extrapolated": 0.00010556787384168704,
+     "rel_err_est": 0.0005595428212008402,
+     "method": "richardson",
+     "gci_rel": 0.0006994285265010502,
+     "production_value": 0.00010550880409572949
+    },
+    "z_heater_ring_at_50um_k_per_mw": {
+     "values": [
+      0.03418354510357242,
+      0.03417749816109917,
+      0.03417662313409689,
+      0.03417213189984541
+     ],
+     "order": null,
+     "extrapolated": 0.03417213189984541,
+     "rel_err_est": 0.00013142973533652848,
+     "method": "last-change",
+     "gci_rel": 0.0001642871691706606,
+     "production_value": 0.03417662313409689
+    },
+    "z_heater_ring_at_300um_k_per_mw": {
+     "values": [
+      0.005345906657997473,
+      0.005346004714738587,
+      0.005345846692795284,
+      0.005345856798763313
+     ],
+     "order": null,
+     "extrapolated": 0.005345856798763313,
+     "rel_err_est": 1.8904299926068475e-06,
+     "method": "last-change",
+     "gci_rel": 2.3630374907585594e-06,
+     "production_value": 0.005345846692795284
+    },
+    "z_driver_ring_k_per_mw": {
+     "values": [
+      0.07114456017664514,
+      0.07115579710339602,
+      0.07116446856089467,
+      0.07116464893944999
+     ],
+     "order": 11.174349531938475,
+     "extrapolated": 0.07116467470781503,
+     "rel_err_est": 2.896759118198288e-06,
+     "method": "richardson",
+     "gci_rel": 3.62094889774786e-06,
+     "production_value": 0.07116446856089467
+    },
+    "z_aggressor_ring_k_per_mw": {
+     "values": [
+      0.03373130239324212,
+      0.03372887723114648,
+      0.033729395252232654,
+      0.03372994242823715
+     ],
+     "order": null,
+     "extrapolated": 0.03372994242823715,
+     "rel_err_est": 1.6222263220975627e-05,
+     "method": "last-change",
+     "gci_rel": 2.0277829026219532e-05,
+     "production_value": 0.033729395252232654
+    }
+   },
+   "production_scale": 1.0,
+   "max_rel_err_est": 0.0017255161114782256,
+   "worst_metric": "t10_opt_ring_s",
+   "note": "rel_err_est is |f(production level) - f(Richardson extrapolation)| / |f_extrapolated| from the last three levels (or the last change when convergence is not monotone)"
+  },
+  "production_scale": 1.0
+ },
+ "rom": {
+  "vf_iterations": 19,
+  "vf_last_change": 5.326160774110633e-05,
+  "taus_vf_s": [
+   0.06758294175268949,
+   0.00562225376454588,
+   0.0017644035381474995,
+   0.0008723882251986466,
+   0.0005270299422422459,
+   0.0003858380581602873,
+   0.0002094200074763026,
+   0.00010844884106110568,
+   5.2596856154223786e-05,
+   5.1565545249239e-05,
+   2.6568458060344186e-05,
+   2.6047507902298222e-05,
+   1.1513471233501613e-05,
+   1.1287716895589816e-05,
+   5.14766355531823e-06,
+   5.046728975802186e-06,
+   2.355178520398154e-06,
+   2.308998549409955e-06,
+   7.006459050848185e-07,
+   6.869077500831554e-07,
+   4.4694332355521447e-07,
+   1.4867991038699974e-07,
+   3.301979766211031e-08,
+   3.1476477910849407e-09
+  ],
+  "n_poles": 24,
+  "varpro": {
+   "cost0": 2.0558420705786093,
+   "cost": 0.2602160495175226,
+   "nfev": 60,
+   "status": 0,
+   "min_ratio": 1.5
+  },
+  "fit_rms_max": 0.022878500524754944,
+  "min_pole_ratio": 1.5000000006156984,
+  "max_abs_residue_over_dc": 6.581181053568665,
+  "nonneg_pairs": [
+   "heater->heater_resistor",
+   "waveguide_absorption->ring_mode_weighted"
+  ],
+  "residue_cancellation": {
+   "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+   "max_self": 6.581181053568665,
+   "max_cross": 4.522715444812298,
+   "max_cross_d_le_300um": 4.522715444812298
+  },
+  "roms": {
+   "ring": {
+    "method": "galerkin_rational_krylov",
+    "order": 146,
+    "shift_f_lo_hz": 0.001,
+    "shift_f_hi_hz": 3000000000.0,
+    "shifts_per_decade": 3.0,
+    "n_moments": 2,
+    "n_shifts": 39,
+    "seconds": 19.8,
+    "dc_rel_err_max": 1.1074775756362238e-07
+   },
+   "site": {
+    "method": "galerkin_rational_krylov",
+    "order": 103,
+    "shift_f_lo_hz": 0.001,
+    "shift_f_hi_hz": 3000000000.0,
+    "shifts_per_decade": 3.0,
+    "n_moments": 2,
+    "n_shifts": 39,
+    "seconds": 13.4,
+    "dc_rel_err_max": 5.386429331035585e-09
+   }
+  },
+  "n_pairs": 440,
+  "n_polish_pairs": 120,
+  "f_fit_hz": [
+   0.001,
+   3162277660.1683793,
+   126
+  ],
+  "t_fit_s": [
+   1e-10,
+   10.0,
+   111
+  ],
+  "attempts": [
+   {
+    "n_poles": 20,
+    "min_ratio": 1.5,
+    "pass": false,
+    "score": 1.4474031427749157,
+    "self": {
+     "max_db": 0.35698966339458343,
+     "max_deg": 2.9932006277111447,
+     "max_time_err_frac_of_dc": 0.008011157019834013
+    },
+    "nearest_neighbour": {
+     "max_db": 0.10535759008076404,
+     "max_deg": 0.5121612461807608,
+     "max_time_err_frac_of_dc": 0.0007246933883351653
+    },
+    "residue_cancellation": {
+     "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+     "max_self": 11.579225142199325,
+     "max_cross": 3.8012395163609622,
+     "max_cross_d_le_300um": 3.8012395163609622
+    }
+   },
+   {
+    "n_poles": 22,
+    "min_ratio": 1.5,
+    "pass": false,
+    "score": 1.8612511570562182,
+    "self": {
+     "max_db": 0.3953630040758498,
+     "max_deg": 3.0490890077834303,
+     "max_time_err_frac_of_dc": 0.0076534045600756715
+    },
+    "nearest_neighbour": {
+     "max_db": 0.1075242068845415,
+     "max_deg": 0.43499584050124995,
+     "max_time_err_frac_of_dc": 0.0004883362792384055
+    },
+    "residue_cancellation": {
+     "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+     "max_self": 14.890009256449746,
+     "max_cross": 7.208984942363261,
+     "max_cross_d_le_300um": 7.208984942363261
+    }
+   },
+   {
+    "n_poles": 24,
+    "min_ratio": 1.5,
+    "pass": true,
+    "score": 0.8226476316960831,
+    "self": {
+     "max_db": 0.08696851756905377,
+     "max_deg": 1.4141385471426138,
+     "max_time_err_frac_of_dc": 0.003120381769836549
+    },
+    "nearest_neighbour": {
+     "max_db": 0.02866628291605583,
+     "max_deg": 0.3835844231281206,
+     "max_time_err_frac_of_dc": 0.0002484631421422558
+    },
+    "residue_cancellation": {
+     "definition": "max_k |r_k| / |H(0)| per pair (1 = no cancellation)",
+     "max_self": 6.581181053568665,
+     "max_cross": 4.522715444812298,
+     "max_cross_d_le_300um": 4.522715444812298
+    }
+   }
+  ]
+ },
+ "validation": {
+  "pitch_um": 50.0,
+  "f_ver_hz": [
+   0.0,
+   0.1,
+   1.0,
+   10.0,
+   100.0,
+   1000.0,
+   3000.0,
+   10000.0,
+   30000.0,
+   100000.0,
+   200000.0,
+   500000.0,
+   1000000.0,
+   3000000.0,
+   10000000.0,
+   100000000.0
+  ],
+  "nn_band_floor": 0.001,
+  "time_window_s": [
+   1e-08,
+   0.01
+  ],
+  "rom_vs_fem": {
+   "ring": {
+    "max_abs_err_frac_of_dc": 2.2057681810950246e-06,
+    "seconds": 12.4,
+    "fem_time_steps": 840,
+    "fem_step_seconds": 85.9,
+    "fem_time_discretization_err_frac_of_dc": 3.236263520387118e-05
+   },
+   "site": {
+    "max_abs_err_frac_of_dc": 3.1948942457340615e-06,
+    "seconds": 7.4,
+    "fem_time_steps": 840,
+    "fem_step_seconds": 56.4,
+    "fem_time_discretization_err_frac_of_dc": 3.2285982950771417e-05
+   }
+  },
+  "self": {
+   "n_pairs": 20,
+   "max_db": 0.08696851756905377,
+   "max_deg": 1.4141385471426138,
+   "max_time_err_frac_of_dc": 0.003120381769836549,
+   "worst_time_pair": "waveguide_absorption->ring_mode_weighted@None",
+   "worst_phase_pair": "heater->ring_mode_weighted@None"
+  },
+  "self_collocated": {
+   "n_pairs": 6,
+   "max_db": 0.08696851756905377,
+   "max_deg": 1.4141385471426138,
+   "max_time_err_frac_of_dc": 0.003120381769836549,
+   "worst_time_pair": "waveguide_absorption->ring_mode_weighted@None",
+   "worst_phase_pair": "heater->ring_mode_weighted@None"
+  },
+  "nearest_neighbour": {
+   "n_pairs": 20,
+   "max_db": 0.02866628291605583,
+   "max_deg": 0.3835844231281206,
+   "max_time_err_frac_of_dc": 0.0002484631421422558,
+   "worst_time_pair": "waveguide_absorption->temp_sensor@50.0",
+   "worst_phase_pair": "waveguide_absorption->temp_sensor@50.0",
+   "d_um": 50.0
+  },
+  "all_pairs": {
+   "n_pairs": 440,
+   "max_db": 0.2842275341902855,
+   "max_deg": 2.8423075264163304,
+   "max_time_err_frac_of_dc": 0.003120381769836549,
+   "worst_time_pair": "waveguide_absorption->ring_mode_weighted@None",
+   "worst_phase_pair": "driver->heater_resistor@250.0"
+  },
+  "key_pairs": [
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "ring_mode_weighted",
+    "d_um": null,
+    "dc_k_per_w": 3571.4522302750333,
+    "freq_db": 0.07793058613661284,
+    "freq_deg": 1.4141385471426138,
+    "freq_band_max_hz": 1000000.0,
+    "collocated": true,
+    "time_err": 0.0010229482094921585
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "heater_resistor",
+    "d_um": null,
+    "dc_k_per_w": 10323.850419253182,
+    "freq_db": 0.06234534408014522,
+    "freq_deg": 0.26931991962219937,
+    "freq_band_max_hz": 1000000.0,
+    "collocated": true,
+    "time_err": 0.0013869434249881689
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "monitor_pd",
+    "d_um": null,
+    "dc_k_per_w": 66.40089482862072,
+    "freq_db": 0.028854531060457732,
+    "freq_deg": 0.36853587124113685,
+    "freq_band_max_hz": 200000.0,
+    "collocated": false,
+    "time_err": 0.00024042479533664947
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "temp_sensor",
+    "d_um": null,
+    "dc_k_per_w": 42.51860776906691,
+    "freq_db": 0.04175002871159461,
+    "freq_deg": 0.2493178267144971,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.0003139819102928917
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "ring_mode_weighted",
+    "d_um": 50.0,
+    "dc_k_per_w": 34.176623134096886,
+    "freq_db": 0.011499134918023146,
+    "freq_deg": 0.14987296557315408,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.00011395124805796045
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "heater_resistor",
+    "d_um": 50.0,
+    "dc_k_per_w": 40.14305377600271,
+    "freq_db": 0.004569116145041353,
+    "freq_deg": 0.027287844854984936,
+    "freq_band_max_hz": 30000.0,
+    "collocated": false,
+    "time_err": 4.6268968883281715e-05
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "monitor_pd",
+    "d_um": 50.0,
+    "dc_k_per_w": 34.09101396348052,
+    "freq_db": 0.012302506349900915,
+    "freq_deg": 0.19395729436564715,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.00014862628292219688
+   },
+   {
+    "model": "ring",
+    "source": "heater",
+    "observer": "temp_sensor",
+    "d_um": 50.0,
+    "dc_k_per_w": 34.084839359669346,
+    "freq_db": 0.012458617795180253,
+    "freq_deg": 0.1961571807762601,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.00015031277495559435
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "ring_mode_weighted",
+    "d_um": null,
+    "dc_k_per_w": 5119.883779818909,
+    "freq_db": 0.02279444645843771,
+    "freq_deg": 0.16815179006232492,
+    "freq_band_max_hz": 1000000.0,
+    "collocated": true,
+    "time_err": 0.003120381769836549
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "heater_resistor",
+    "d_um": null,
+    "dc_k_per_w": 3570.900559624173,
+    "freq_db": 0.0774133983798019,
+    "freq_deg": 1.4040788599250724,
+    "freq_band_max_hz": 1000000.0,
+    "collocated": true,
+    "time_err": 0.001014757778607914
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "monitor_pd",
+    "d_um": null,
+    "dc_k_per_w": 57.55002765520692,
+    "freq_db": 0.020270325267119665,
+    "freq_deg": 0.3281940454024147,
+    "freq_band_max_hz": 200000.0,
+    "collocated": false,
+    "time_err": 0.00014295031614384863
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "temp_sensor",
+    "d_um": null,
+    "dc_k_per_w": 37.29028804156979,
+    "freq_db": 0.0047985600700941045,
+    "freq_deg": 0.013209903860626765,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 5.4095892720895636e-05
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "ring_mode_weighted",
+    "d_um": 50.0,
+    "dc_k_per_w": 30.33239000322792,
+    "freq_db": 0.013015667908200901,
+    "freq_deg": 0.26517579954853365,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.000164674670814897
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "heater_resistor",
+    "d_um": 50.0,
+    "dc_k_per_w": 34.29917056647559,
+    "freq_db": 0.012085270247001604,
+    "freq_deg": 0.10988542299958734,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 8.478547021099312e-05
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "monitor_pd",
+    "d_um": 50.0,
+    "dc_k_per_w": 30.2530782773996,
+    "freq_db": 0.020213843651983796,
+    "freq_deg": 0.3781931572082527,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.0002445480617379099
+   },
+   {
+    "model": "ring",
+    "source": "waveguide_absorption",
+    "observer": "temp_sensor",
+    "d_um": 50.0,
+    "dc_k_per_w": 30.24796078799238,
+    "freq_db": 0.020568086756989394,
+    "freq_deg": 0.3835844231281206,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.0002484631421422558
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "ring_mode_weighted",
+    "d_um": null,
+    "dc_k_per_w": 33.729395252232656,
+    "freq_db": 0.06064219815274497,
+    "freq_deg": 0.3136220961565964,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 0.0003523621350228655
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "heater_resistor",
+    "d_um": null,
+    "dc_k_per_w": 41.048032784458314,
+    "freq_db": 0.016705707839139418,
+    "freq_deg": 0.09136587240954663,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 8.369418378683939e-05
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "monitor_pd",
+    "d_um": null,
+    "dc_k_per_w": 30.585519188517907,
+    "freq_db": 0.04190808522231446,
+    "freq_deg": 0.29559717345718384,
+    "freq_band_max_hz": 30000.0,
+    "collocated": false,
+    "time_err": 0.00040739247241408985
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "temp_sensor",
+    "d_um": null,
+    "dc_k_per_w": 109.97087266962055,
+    "freq_db": 0.058470816639149784,
+    "freq_deg": 0.27997261184593164,
+    "freq_band_max_hz": 200000.0,
+    "collocated": false,
+    "time_err": 0.0004668567508841669
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "ring_mode_weighted",
+    "d_um": 50.0,
+    "dc_k_per_w": 41.60691846706969,
+    "freq_db": 0.024260229176609922,
+    "freq_deg": 0.08553896895227071,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 6.473579293706153e-05
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "heater_resistor",
+    "d_um": 50.0,
+    "dc_k_per_w": 51.438986909033666,
+    "freq_db": 0.011002446431523562,
+    "freq_deg": 0.021530712132414028,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 3.5223881625706255e-05
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "monitor_pd",
+    "d_um": 50.0,
+    "dc_k_per_w": 41.50000914658858,
+    "freq_db": 0.02843163502537523,
+    "freq_deg": 0.10366735099386688,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 8.046274676611248e-05
+   },
+   {
+    "model": "site",
+    "source": "aggressor",
+    "observer": "temp_sensor",
+    "d_um": 50.0,
+    "dc_k_per_w": 41.49143434850114,
+    "freq_db": 0.028555885536408587,
+    "freq_deg": 0.10430206072162704,
+    "freq_band_max_hz": 100000.0,
+    "collocated": false,
+    "time_err": 8.105662568824764e-05
+   }
+  ],
+  "thresholds": {
+   "time_err_frac_of_dc": 0.02,
+   "db": 0.3,
+   "deg": 3.0
+  },
+  "pass_self": true,
+  "pass_nearest_neighbour": true,
+  "pass_all_pairs": true,
+  "step_max_rel_err": 0.003120381769836549,
+  "freq_max_db_err": 0.08696851756905377,
+  "freq_max_deg_err": 1.4141385471426138,
+  "superposition_rel_err": null
+ },
+ "validation_per_pair_summary": {
+  "n": 440,
+  "max_time_err": 0.003120381769836549
+ },
+ "rom_dc_scale": {
+  "z_fem_heater_ring_k_per_mw": 3.5714522302750336,
+  "dlambda_dt_hypotheses": {
+   "H86": {
+    "pm_per_k": 85.9,
+    "source": "G26 ~15 GHz/C aside (printed), 07 D2"
+   },
+   "materials_ceiling": {
+    "pm_per_k": 70.6488242343886,
+    "source": "mrm.materials dlambda_dt_ceiling_pm_per_k (n_eff/n_g = 0.6), 298 K"
+   },
+   "bench_62p5": {
+    "pm_per_k": 62.5,
+    "source": "Lightmatter bench equivalence (inferred); imec 62.54"
+   },
+   "H_solver_proxy": {
+    "pm_per_k": 67.5,
+    "source": "06 section 2.7 femwell 66-69 pm/K at 22 C (400x200 strip); modes artefact not available when this ran"
+   }
+  },
+  "efficiency_nm_per_mw": {
+   "printed_0p44": 0.44,
+   "fsr_1p80thz_window_b": 0.4047151277013753,
+   "fsr_1p40thz_window_a": 0.3147347740667976,
+   "fsr_1p53thz_g25_cluster": 0.34420432220039293,
+   "fsr_1p60thz_pdk_size": 0.35992141453831045,
+   "swept_device_0p348": 0.348
+  },
+  "table": {
+   "H86|printed_0p44": {
+    "rom_dc_scale": 1.4342163430714652,
+    "required_z_k_per_mw": 5.122235157159487,
+    "warn": false
+   },
+   "H86|fsr_1p80thz_window_b": {
+    "rom_dc_scale": 1.319202387358108,
+    "required_z_k_per_mw": 4.711468308514264,
+    "warn": false
+   },
+   "H86|fsr_1p40thz_window_a": {
+    "rom_dc_scale": 1.025903992498878,
+    "required_z_k_per_mw": 3.663967102058179,
+    "warn": false
+   },
+   "H86|fsr_1p53thz_g25_cluster": {
+    "rom_dc_scale": 1.1219624187628179,
+    "required_z_k_per_mw": 4.007035182775238,
+    "warn": false
+   },
+   "H86|fsr_1p60thz_pdk_size": {
+    "rom_dc_scale": 1.1731935794369193,
+    "required_z_k_per_mw": 4.190004825824335,
+    "warn": false
+   },
+   "H86|swept_device_0p348": {
+    "rom_dc_scale": 1.1343347440656133,
+    "required_z_k_per_mw": 4.051222351571595,
+    "warn": false
+   },
+   "materials_ceiling|printed_0p44": {
+    "rom_dc_scale": 1.743824970973419,
+    "required_z_k_per_mw": 6.227987581792313,
+    "warn": false
+   },
+   "materials_ceiling|fsr_1p80thz_window_b": {
+    "rom_dc_scale": 1.603982604128078,
+    "required_z_k_per_mw": 5.72854724883558,
+    "warn": false
+   },
+   "materials_ceiling|fsr_1p40thz_window_a": {
+    "rom_dc_scale": 1.2473689960258159,
+    "required_z_k_per_mw": 4.454918782832329,
+    "warn": false
+   },
+   "materials_ceiling|fsr_1p53thz_g25_cluster": {
+    "rom_dc_scale": 1.3641638458409673,
+    "required_z_k_per_mw": 4.8720460096892895,
+    "warn": false
+   },
+   "materials_ceiling|fsr_1p60thz_pdk_size": {
+    "rom_dc_scale": 1.426454432409048,
+    "required_z_k_per_mw": 5.094513864013002,
+    "warn": false
+   },
+   "materials_ceiling|swept_device_0p348": {
+    "rom_dc_scale": 1.3792070224971587,
+    "required_z_k_per_mw": 4.925771996508466,
+    "warn": false
+   },
+   "bench_62p5|printed_0p44": {
+    "rom_dc_scale": 1.9711869419174222,
+    "required_z_k_per_mw": 7.04,
+    "warn": false
+   },
+   "bench_62p5|fsr_1p80thz_window_b": {
+    "rom_dc_scale": 1.813111761184984,
+    "required_z_k_per_mw": 6.475442043222005,
+    "warn": false
+   },
+   "bench_62p5|fsr_1p40thz_window_a": {
+    "rom_dc_scale": 1.4100024472904582,
+    "required_z_k_per_mw": 5.035756385068762,
+    "warn": false
+   },
+   "bench_62p5|fsr_1p53thz_g25_cluster": {
+    "rom_dc_scale": 1.5420251483476173,
+    "required_z_k_per_mw": 5.507269155206287,
+    "warn": false
+   },
+   "bench_62p5|fsr_1p60thz_pdk_size": {
+    "rom_dc_scale": 1.6124372555781021,
+    "required_z_k_per_mw": 5.758742632612967,
+    "warn": false
+   },
+   "bench_62p5|swept_device_0p348": {
+    "rom_dc_scale": 1.5590296722437793,
+    "required_z_k_per_mw": 5.568,
+    "warn": false
+   },
+   "H_solver_proxy|printed_0p44": {
+    "rom_dc_scale": 1.8251730943679834,
+    "required_z_k_per_mw": 6.518518518518518,
+    "warn": false
+   },
+   "H_solver_proxy|fsr_1p80thz_window_b": {
+    "rom_dc_scale": 1.6788071862823926,
+    "required_z_k_per_mw": 5.9957796696500045,
+    "warn": false
+   },
+   "H_solver_proxy|fsr_1p40thz_window_a": {
+    "rom_dc_scale": 1.305557821565239,
+    "required_z_k_per_mw": 4.662737393582187,
+    "warn": false
+   },
+   "H_solver_proxy|fsr_1p53thz_g25_cluster": {
+    "rom_dc_scale": 1.4278010632848308,
+    "required_z_k_per_mw": 5.099323291857673,
+    "warn": false
+   },
+   "H_solver_proxy|fsr_1p60thz_pdk_size": {
+    "rom_dc_scale": 1.492997458868613,
+    "required_z_k_per_mw": 5.332169104271266,
+    "warn": false
+   },
+   "H_solver_proxy|swept_device_0p348": {
+    "rom_dc_scale": 1.443545992818314,
+    "required_z_k_per_mw": 5.155555555555556,
+    "warn": false
+   }
+  },
+  "definition": "efficiency_measured / (Z_FEM(0) * dlambda/dT) (07 P1-2)"
+ },
+ "reciprocity": {
+  "z_heater_to_ring_k_per_w": 3571.452230275032,
+  "z_ringweight_to_heater_k_per_w": 3571.45223027503,
+  "rel_err": 5.09313659056215e-16,
+  "heater_source_equals_heater_observer": true
+ },
+ "runtime_seconds": 654.3,
+ "stages": {
+  "uncertainty": {
+   "mesh_scale": 2.0,
+   "base_metrics": {
+    "z_heater_ring_k_per_mw": 3.568696967210192,
+    "z_heater_heater_k_per_mw": 10.301122541586231,
+    "z_opt_ring_k_per_mw": 5.114183476295517,
+    "z_junction_ring_k_per_mw": 4.347232204149553,
+    "z_heater_pd_k_per_mw": 0.06641500876263072,
+    "xt_frac_at_pitch": 0.00957871890431067,
+    "t63_heater_ring_s": 4.7443027748701685e-06,
+    "t63_opt_ring_s": 1.7277767711181502e-06,
+    "t63_heater_heater_s": 1.2138506711426908e-06,
+    "t10_opt_ring_s": 9.915303515520208e-09,
+    "t63_xt_at_pitch_s": 0.00010547121796361793,
+    "z_heater_ring_at_50um_k_per_mw": 0.034183545103572424,
+    "z_driver_ring_k_per_mw": 0.07114456017664514,
+    "z_aggressor_ring_k_per_mw": 0.03373130239324212
+   },
+   "jacobian": {
+    "width_nm": {
+     "step": 50.0,
+     "sigma_assumed": 30.0,
+     "base_value": 400.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -4.637462136644288e-05,
+      "z_heater_heater_k_per_mw": -2.0764660794059254e-05,
+      "z_opt_ring_k_per_mw": -0.00012775336631924982,
+      "z_junction_ring_k_per_mw": -0.00017804742735390454,
+      "z_heater_pd_k_per_mw": 4.828651068216061e-06,
+      "xt_frac_at_pitch": 5.584406463944092e-05,
+      "t63_heater_ring_s": -2.7529588759023228e-06,
+      "t63_opt_ring_s": 0.00014673678057611995,
+      "t63_heater_heater_s": -7.931878250619918e-05,
+      "t10_opt_ring_s": 0.0008983965770550384,
+      "t63_xt_at_pitch_s": -8.379969573901747e-06,
+      "z_heater_ring_at_50um_k_per_mw": 9.469443273006917e-06,
+      "z_driver_ring_k_per_mw": 1.1678524404201696e-05,
+      "z_aggressor_ring_k_per_mw": 9.17157938515878e-06
+     }
+    },
+    "slab_nm": {
+     "step": 20.0,
+     "sigma_assumed": 20.0,
+     "base_value": 60.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.001470587120872402,
+      "z_heater_heater_k_per_mw": -0.0002787719580262804,
+      "z_opt_ring_k_per_mw": -0.003888588246300195,
+      "z_junction_ring_k_per_mw": -0.0015562855521177865,
+      "z_heater_pd_k_per_mw": 3.12542864896459e-05,
+      "xt_frac_at_pitch": 0.0014526369822794206,
+      "t63_heater_ring_s": 0.0009988307968439968,
+      "t63_opt_ring_s": 0.0058036162217159236,
+      "t63_heater_heater_s": -0.0008211661419950999,
+      "t10_opt_ring_s": 0.010448617712857277,
+      "t63_xt_at_pitch_s": -4.651960441668379e-05,
+      "z_heater_ring_at_50um_k_per_mw": -1.795013859295924e-05,
+      "z_driver_ring_k_per_mw": -3.178114255719677e-05,
+      "z_aggressor_ring_k_per_mw": -3.366421928634456e-05
+     }
+    },
+    "slab_out_um": {
+     "step": 1.0,
+     "sigma_assumed": 1.0,
+     "base_value": 2.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.08727945339455556,
+      "z_heater_heater_k_per_mw": -0.013414749803061454,
+      "z_opt_ring_k_per_mw": -0.15202749141390504,
+      "z_junction_ring_k_per_mw": -0.09582404215987972,
+      "z_heater_pd_k_per_mw": 0.012969825068719576,
+      "xt_frac_at_pitch": 0.09440523067182482,
+      "t63_heater_ring_s": 0.009056177128700327,
+      "t63_opt_ring_s": 0.07896658048585081,
+      "t63_heater_heater_s": -0.05598250042327635,
+      "t10_opt_ring_s": 0.16406964038402805,
+      "t63_xt_at_pitch_s": -0.009340688715415268,
+      "z_heater_ring_at_50um_k_per_mw": 0.007125777277269929,
+      "z_driver_ring_k_per_mw": -8.326757459231615e-05,
+      "z_aggressor_ring_k_per_mw": -0.0008501516245278395
+     }
+    },
+    "box_um": {
+     "step": 0.2,
+     "sigma_assumed": 0.1,
+     "base_value": 2.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": 0.24353642914232698,
+      "z_heater_heater_k_per_mw": 0.07420329799226799,
+      "z_opt_ring_k_per_mw": 0.1990010583967805,
+      "z_junction_ring_k_per_mw": 0.2309670912514128,
+      "z_heater_pd_k_per_mw": 0.27341940204549164,
+      "xt_frac_at_pitch": 7.582510624271066e-05,
+      "t63_heater_ring_s": 0.379276768878718,
+      "t63_opt_ring_s": 0.6617769434278209,
+      "t63_heater_heater_s": 0.32857836393549,
+      "t10_opt_ring_s": 0.38906040615517057,
+      "t63_xt_at_pitch_s": 0.006915732622898574,
+      "z_heater_ring_at_50um_k_per_mw": 0.24361225424857524,
+      "z_driver_ring_k_per_mw": 0.3289108841765809,
+      "z_aggressor_ring_k_per_mw": 0.29583622011803534
+     }
+    },
+    "clad_um": {
+     "step": 0.5,
+     "sigma_assumed": 0.5,
+     "base_value": 1.5,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.04488566028880436,
+      "z_heater_heater_k_per_mw": -0.051157445197720364,
+      "z_opt_ring_k_per_mw": -0.013647650532238043,
+      "z_junction_ring_k_per_mw": -0.015395976458007166,
+      "z_heater_pd_k_per_mw": -0.055191470682986576,
+      "xt_frac_at_pitch": 0.005608570470768015,
+      "t63_heater_ring_s": 0.11001804224374823,
+      "t63_opt_ring_s": -0.025727434265029103,
+      "t63_heater_heater_s": 0.030279148833539438,
+      "t10_opt_ring_s": -0.026374587403317662,
+      "t63_xt_at_pitch_s": 0.11906998165269655,
+      "z_heater_ring_at_50um_k_per_mw": -0.039277089818035904,
+      "z_driver_ring_k_per_mw": -0.19717954994047027,
+      "z_aggressor_ring_k_per_mw": -0.12598227241974502
+     }
+    },
+    "fill_lo": {
+     "step": 0.1,
+     "sigma_assumed": 0.1,
+     "base_value": 0.15,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.015082475498195969,
+      "z_heater_heater_k_per_mw": -0.00645509950126133,
+      "z_opt_ring_k_per_mw": -0.00860024325850306,
+      "z_junction_ring_k_per_mw": -0.010254903486610623,
+      "z_heater_pd_k_per_mw": -0.36986230398670994,
+      "xt_frac_at_pitch": -0.057962054894034054,
+      "t63_heater_ring_s": -0.033128082150764016,
+      "t63_opt_ring_s": -0.03082897259577777,
+      "t63_heater_heater_s": -0.02832917808534674,
+      "t10_opt_ring_s": -0.016538422186620494,
+      "t63_xt_at_pitch_s": -0.14777756568667755,
+      "z_heater_ring_at_50um_k_per_mw": -0.07304453039222558,
+      "z_driver_ring_k_per_mw": -0.021104474878259616,
+      "z_aggressor_ring_k_per_mw": 0.15979066571818024
+     }
+    },
+    "fill_hi": {
+     "step": 0.1,
+     "sigma_assumed": 0.15,
+     "base_value": 0.3,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.011439378651225685,
+      "z_heater_heater_k_per_mw": -0.005445383376452284,
+      "z_opt_ring_k_per_mw": -0.005841653241662748,
+      "z_junction_ring_k_per_mw": -0.006889053902086051,
+      "z_heater_pd_k_per_mw": -0.8089106289438286,
+      "xt_frac_at_pitch": -0.47122302345303346,
+      "t63_heater_ring_s": -0.02523087660733836,
+      "t63_opt_ring_s": -0.020943340531491828,
+      "t63_heater_heater_s": -0.023899384330707818,
+      "t10_opt_ring_s": -0.011235152479969202,
+      "t63_xt_at_pitch_s": 0.10736180286581742,
+      "z_heater_ring_at_50um_k_per_mw": -0.4826624021042525,
+      "z_driver_ring_k_per_mw": -0.8583645210665436,
+      "z_aggressor_ring_k_per_mw": -0.34442684161716475
+     }
+    },
+    "via_ratio": {
+     "step": 0.1,
+     "sigma_assumed": 0.05,
+     "base_value": 0.1,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.003734130721568807,
+      "z_heater_heater_k_per_mw": -0.0014199278788984415,
+      "z_opt_ring_k_per_mw": -0.0024450559043187603,
+      "z_junction_ring_k_per_mw": -0.0029448759900585486,
+      "z_heater_pd_k_per_mw": 0.025181742381668037,
+      "xt_frac_at_pitch": 0.16494998356746393,
+      "t63_heater_ring_s": -0.008174660157518332,
+      "t63_opt_ring_s": -0.008767371050186767,
+      "t63_heater_heater_s": -0.006233212369508578,
+      "t10_opt_ring_s": -0.004703326866213331,
+      "t63_xt_at_pitch_s": -0.23112102148754587,
+      "z_heater_ring_at_50um_k_per_mw": 0.16121585284590179,
+      "z_driver_ring_k_per_mw": 0.35014665134548206,
+      "z_aggressor_ring_k_per_mw": 0.38305262126734796
+     }
+    },
+    "keepout_um": {
+     "step": 5.0,
+     "sigma_assumed": 5.0,
+     "base_value": 5.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": 0.010263522931735025,
+      "z_heater_heater_k_per_mw": 0.00503944822225959,
+      "z_opt_ring_k_per_mw": 0.005157651900539406,
+      "z_junction_ring_k_per_mw": 0.006080849034253122,
+      "z_heater_pd_k_per_mw": -0.04592473645853854,
+      "xt_frac_at_pitch": -0.043597782001823224,
+      "t63_heater_ring_s": 0.023497326262621597,
+      "t63_opt_ring_s": 0.018688909898972383,
+      "t63_heater_heater_s": 0.022984228506289738,
+      "t10_opt_ring_s": 0.009947100984226864,
+      "t63_xt_at_pitch_s": 0.05485518634483988,
+      "z_heater_ring_at_50um_k_per_mw": -0.033334259070088114,
+      "z_driver_ring_k_per_mw": 0.0,
+      "z_aggressor_ring_k_per_mw": 0.0
+     }
+    },
+    "beol_hi_um": {
+     "step": 2.0,
+     "sigma_assumed": 2.0,
+     "base_value": 5.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.0030640473722749473,
+      "z_heater_heater_k_per_mw": -0.0016576850007758992,
+      "z_opt_ring_k_per_mw": -0.0013709381589510627,
+      "z_junction_ring_k_per_mw": -0.001601395799364469,
+      "z_heater_pd_k_per_mw": -0.040021072165788985,
+      "xt_frac_at_pitch": -0.025275093135345372,
+      "t63_heater_ring_s": -0.006732669287658588,
+      "t63_opt_ring_s": -0.004912094163255887,
+      "t63_heater_heater_s": -0.0072635174421282755,
+      "t10_opt_ring_s": -0.002633860333464355,
+      "t63_xt_at_pitch_s": 0.05301477232779206,
+      "z_heater_ring_at_50um_k_per_mw": -0.028339140507620098,
+      "z_driver_ring_k_per_mw": -0.04781894123278696,
+      "z_aggressor_ring_k_per_mw": -0.027033194634266344
+     }
+    },
+    "radius_um": {
+     "step": -1.0,
+     "sigma_assumed": 0.5,
+     "base_value": 7.5,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.14357329910431238,
+      "z_heater_heater_k_per_mw": -0.14362429889934214,
+      "z_opt_ring_k_per_mw": -0.14215105841630615,
+      "z_junction_ring_k_per_mw": -0.1433444353472091,
+      "z_heater_pd_k_per_mw": -0.00405421627893654,
+      "xt_frac_at_pitch": 0.13697978451962722,
+      "t63_heater_ring_s": 0.002811985404539641,
+      "t63_opt_ring_s": -0.002139172412714885,
+      "t63_heater_heater_s": -0.001211721773790586,
+      "t10_opt_ring_s": -0.009007839182338273,
+      "t63_xt_at_pitch_s": 0.014762092643163527,
+      "z_heater_ring_at_50um_k_per_mw": -0.0065935145846856,
+      "z_driver_ring_k_per_mw": 0.004441529321191684,
+      "z_aggressor_ring_k_per_mw": 0.0010329082273283774
+     }
+    },
+    "contact_offset_um": {
+     "step": 0.5,
+     "sigma_assumed": 0.5,
+     "base_value": 1.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.00014329152257142042,
+      "z_heater_heater_k_per_mw": -0.00033110294143234853,
+      "z_opt_ring_k_per_mw": -0.00011681698071441815,
+      "z_junction_ring_k_per_mw": -0.13790205432047786,
+      "z_heater_pd_k_per_mw": 0.00012225210849603485,
+      "xt_frac_at_pitch": 0.0002172778356950289,
+      "t63_heater_ring_s": -0.0003929558544975009,
+      "t63_opt_ring_s": -0.0006564442505450074,
+      "t63_heater_heater_s": 0.0002843450258431801,
+      "t10_opt_ring_s": 0.000989761561832836,
+      "t63_xt_at_pitch_s": -9.503838890267957e-05,
+      "z_heater_ring_at_50um_k_per_mw": 7.398631312405257e-05,
+      "z_driver_ring_k_per_mw": 0.0,
+      "z_aggressor_ring_k_per_mw": 0.0
+     }
+    },
+    "metal_gap_um": {
+     "step": -0.3,
+     "sigma_assumed": 0.3,
+     "base_value": 0.8,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.2802231218445739,
+      "z_heater_heater_k_per_mw": 0.2689144085765364,
+      "z_opt_ring_k_per_mw": -0.007441497725824883,
+      "z_junction_ring_k_per_mw": -0.005631386231568966,
+      "z_heater_pd_k_per_mw": 0.13638456114248854,
+      "xt_frac_at_pitch": 0.3962612207351679,
+      "t63_heater_ring_s": 0.6674268390277582,
+      "t63_opt_ring_s": 0.04847048226074217,
+      "t63_heater_heater_s": 0.4496840500357754,
+      "t10_opt_ring_s": -0.015024756311798153,
+      "t63_xt_at_pitch_s": -0.03674664434108503,
+      "z_heater_ring_at_50um_k_per_mw": 0.11603809889059255,
+      "z_driver_ring_k_per_mw": -0.0,
+      "z_aggressor_ring_k_per_mw": -0.0
+     }
+    },
+    "metal_width_um": {
+     "step": 0.5,
+     "sigma_assumed": 0.5,
+     "base_value": 1.0,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.03633428751684464,
+      "z_heater_heater_k_per_mw": -0.3200222894286311,
+      "z_opt_ring_k_per_mw": 0.0018306185013114984,
+      "z_junction_ring_k_per_mw": 0.0020254120164997502,
+      "z_heater_pd_k_per_mw": 0.007216655927116733,
+      "xt_frac_at_pitch": 0.04156037377654087,
+      "t63_heater_ring_s": 0.04161521565527693,
+      "t63_opt_ring_s": -0.008510609304849481,
+      "t63_heater_heater_s": 0.7260275438848787,
+      "t10_opt_ring_s": 0.0034104421847374056,
+      "t63_xt_at_pitch_s": -0.0030868654052724764,
+      "z_heater_ring_at_50um_k_per_mw": 0.005226086259696672,
+      "z_driver_ring_k_per_mw": 0.0,
+      "z_aggressor_ring_k_per_mw": 0.0
+     }
+    },
+    "metal_thick_um": {
+     "step": 0.1,
+     "sigma_assumed": 0.05,
+     "base_value": 0.1,
+     "d_ln_dparam": {
+      "z_heater_ring_k_per_mw": -0.1277226171590229,
+      "z_heater_heater_k_per_mw": -0.40011727245417905,
+      "z_opt_ring_k_per_mw": -0.009406288078597225,
+      "z_junction_ring_k_per_mw": -0.009496434743818671,
+      "z_heater_pd_k_per_mw": 0.06356255844073733,
+      "xt_frac_at_pitch": 0.18188928721897035,
+      "t63_heater_ring_s": 0.4540585371967687,
+      "t63_opt_ring_s": 0.08996269633913201,
+      "t63_heater_heater_s": 2.1027124138222852,
+      "t10_opt_ring_s": -0.01808880934884627,
+      "t63_xt_at_pitch_s": -0.010813647889449385,
+      "z_heater_ring_at_50um_k_per_mw": 0.054166670059947464,
+      "z_driver_ring_k_per_mw": 0.0,
+      "z_aggressor_ring_k_per_mw": 0.0
+     }
+    }
+   },
+   "sigma_ln_total": {
+    "z_heater_ring_k_per_mw": 0.15763622865223664,
+    "z_heater_heater_k_per_mw": 0.19808306974287887,
+    "z_opt_ring_k_per_mw": 0.18801575703057516,
+    "z_junction_ring_k_per_mw": 0.1469842779452749,
+    "z_heater_pd_k_per_mw": 0.2803657453843154,
+    "xt_frac_at_pitch": 0.2903046721040136,
+    "t63_heater_ring_s": 0.24494314451821755,
+    "t63_opt_ring_s": 0.1826796313777091,
+    "t63_heater_heater_s": 0.4233077507822724,
+    "t10_opt_ring_s": 0.27487061334362756,
+    "t63_xt_at_pitch_s": 0.3014839610175226,
+    "z_heater_ring_at_50um_k_per_mw": 0.19651652280357293,
+    "z_driver_ring_k_per_mw": 0.19194417238742578,
+    "z_aggressor_ring_k_per_mw": 0.10516221913888961
+   },
+   "dominant_parameter": {
+    "z_heater_ring_k_per_mw": "slab_out_um",
+    "z_heater_heater_k_per_mw": "metal_width_um",
+    "z_opt_ring_k_per_mw": "slab_out_um",
+    "z_junction_ring_k_per_mw": "slab_out_um",
+    "z_heater_pd_k_per_mw": "keepout_um",
+    "xt_frac_at_pitch": "keepout_um",
+    "t63_heater_ring_s": "metal_gap_um",
+    "t63_opt_ring_s": "slab_nm",
+    "t63_heater_heater_s": "metal_width_um",
+    "t10_opt_ring_s": "slab_nm",
+    "t63_xt_at_pitch_s": "keepout_um",
+    "z_heater_ring_at_50um_k_per_mw": "keepout_um",
+    "z_driver_ring_k_per_mw": "fill_hi",
+    "z_aggressor_ring_k_per_mw": "clad_um"
+   },
+   "sweeps": {
+    "bottom": [
+     {
+      "override": {
+       "bottom_bc": "dirichlet"
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5660511408120272,
+       "z_heater_heater_k_per_mw": 10.298477037191587,
+       "z_opt_ring_k_per_mw": 5.111537327571089,
+       "z_junction_ring_k_per_mw": 4.344586058842167,
+       "z_heater_pd_k_per_mw": 0.06377045007383673,
+       "xt_frac_at_pitch": 0.008844478671414403,
+       "t63_heater_ring_s": 4.736546357567829e-06,
+       "t63_opt_ring_s": 1.724573751032211e-06,
+       "t63_heater_heater_s": 1.2124828766547308e-06,
+       "t10_opt_ring_s": 9.905438511156113e-09,
+       "t63_xt_at_pitch_s": 9.087160916668483e-05,
+       "z_heater_ring_at_50um_k_per_mw": 0.031539863256084974,
+       "z_driver_ring_k_per_mw": 0.06850072760111245,
+       "z_aggressor_ring_k_per_mw": 0.03108873586588079
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 0.9992586015505168,
+       "z_heater_heater_k_per_mw": 0.9997431829022552,
+       "z_opt_ring_k_per_mw": 0.9994825862746822,
+       "z_junction_ring_k_per_mw": 0.9993913034355836,
+       "z_heater_pd_k_per_mw": 0.9601813093446133,
+       "xt_frac_at_pitch": 0.923346718884731,
+       "t63_heater_ring_s": 0.9983651091276416,
+       "t63_opt_ring_s": 0.998146160928031,
+       "t63_heater_heater_s": 0.9988731773022193,
+       "t10_opt_ring_s": 0.9990050728806583,
+       "t63_xt_at_pitch_s": 0.861577318639013,
+       "z_heater_ring_at_50um_k_per_mw": 0.9226621510590145,
+       "z_driver_ring_k_per_mw": 0.9628385842997932,
+       "z_aggressor_ring_k_per_mw": 0.9216583309901858
+      }
+     },
+     {
+      "override": {
+       "h_bottom_w_per_m2_k": 100000.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5669129722962136,
+       "z_heater_heater_k_per_mw": 10.29933862322873,
+       "z_opt_ring_k_per_mw": 5.112399404769512,
+       "z_junction_ring_k_per_mw": 4.34544813343558,
+       "z_heater_pd_k_per_mw": 0.06463131515142605,
+       "xt_frac_at_pitch": 0.009083501601195884,
+       "t63_heater_ring_s": 4.739071481190667e-06,
+       "t63_opt_ring_s": 1.725616595935355e-06,
+       "t63_heater_heater_s": 1.2129281696294277e-06,
+       "t10_opt_ring_s": 9.908651236605766e-09,
+       "t63_xt_at_pitch_s": 9.52279718329488e-05,
+       "z_heater_ring_at_50um_k_per_mw": 0.03240005969517903,
+       "z_driver_ring_k_per_mw": 0.06936103942316958,
+       "z_aggressor_ring_k_per_mw": 0.031948082472293124
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 0.9995000990752732,
+       "z_heater_heater_k_per_mw": 0.9998268229165996,
+       "z_opt_ring_k_per_mw": 0.9996511522251256,
+       "z_junction_ring_k_per_mw": 0.9995896076790491,
+       "z_heater_pd_k_per_mw": 0.9731432149985909,
+       "xt_frac_at_pitch": 0.9483002572617591,
+       "t63_heater_ring_s": 0.9988973524819684,
+       "t63_opt_ring_s": 0.9987497371078804,
+       "t63_heater_heater_s": 0.9992400205929823,
+       "t10_opt_ring_s": 0.9993290897344665,
+       "t63_xt_at_pitch_s": 0.9028811240787746,
+       "z_heater_ring_at_50um_k_per_mw": 0.9478262010862352,
+       "z_driver_ring_k_per_mw": 0.9749310312826835,
+       "z_aggressor_ring_k_per_mw": 0.9471345665767636
+      }
+     },
+     {
+      "override": {
+       "h_bottom_w_per_m2_k": 5000.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5747504142580437,
+       "z_heater_heater_k_per_mw": 10.307175967437423,
+       "z_opt_ring_k_per_mw": 5.1202369445540095,
+       "z_junction_ring_k_per_mw": 4.353285672183239,
+       "z_heater_pd_k_per_mw": 0.07246837239321964,
+       "xt_frac_at_pitch": 0.011255849064214386,
+       "t63_heater_ring_s": 4.762097477893859e-06,
+       "t63_opt_ring_s": 1.7351255185730787e-06,
+       "t63_heater_heater_s": 1.2169862577348531e-06,
+       "t10_opt_ring_s": 9.937866617178703e-09,
+       "t63_xt_at_pitch_s": 0.00016483371169837384,
+       "z_heater_ring_at_50um_k_per_mw": 0.04023685110512639,
+       "z_driver_ring_k_per_mw": 0.0771978759368716,
+       "z_aggressor_ring_k_per_mw": 0.03978453487120421
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0016962625584274,
+       "z_heater_heater_k_per_mw": 1.0005876472031814,
+       "z_opt_ring_k_per_mw": 1.0011836627071653,
+       "z_junction_ring_k_per_mw": 1.0013924878519045,
+       "z_heater_pd_k_per_mw": 1.0911445130154815,
+       "xt_frac_at_pitch": 1.1750891926841036,
+       "t63_heater_ring_s": 1.0037507519793945,
+       "t63_opt_ring_s": 1.0042532968250133,
+       "t63_heater_heater_s": 1.0025831732573913,
+       "t10_opt_ring_s": 1.0022755835586048,
+       "t63_xt_at_pitch_s": 1.5628312148176091,
+       "z_heater_ring_at_50um_k_per_mw": 1.177082452484466,
+       "z_driver_ring_k_per_mw": 1.0850847309365137,
+       "z_aggressor_ring_k_per_mw": 1.1794544547196264
+      }
+     }
+    ],
+    "substrate": [
+     {
+      "override": {
+       "sub_um": 100.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5817928328594473,
+       "z_heater_heater_k_per_mw": 10.314150561717208,
+       "z_opt_ring_k_per_mw": 5.127348564317234,
+       "z_junction_ring_k_per_mw": 4.360396523402861,
+       "z_heater_pd_k_per_mw": 0.07923568486287554,
+       "xt_frac_at_pitch": 0.01306541401534388,
+       "t63_heater_ring_s": 4.782914905454268e-06,
+       "t63_opt_ring_s": 1.7437932017598842e-06,
+       "t63_heater_heater_s": 1.2206092469711966e-06,
+       "t10_opt_ring_s": 9.964427417607892e-09,
+       "t63_xt_at_pitch_s": 0.00024500535069048936,
+       "z_heater_ring_at_50um_k_per_mw": 0.046797606278500076,
+       "z_driver_ring_k_per_mw": 0.0838177908922446,
+       "z_aggressor_ring_k_per_mw": 0.046124121026006014
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0036696491099082,
+       "z_heater_heater_k_per_mw": 1.001264718488532,
+       "z_opt_ring_k_per_mw": 1.0025742306827157,
+       "z_junction_ring_k_per_mw": 1.0030282070602858,
+       "z_heater_pd_k_per_mw": 1.1930388377432322,
+       "xt_frac_at_pitch": 1.3640043251988643,
+       "t63_heater_ring_s": 1.0081386311996405,
+       "t63_opt_ring_s": 1.009269965257936,
+       "t63_heater_heater_s": 1.0055678807856518,
+       "t10_opt_ring_s": 1.004954351827031,
+       "t63_xt_at_pitch_s": 2.322959338300269,
+       "z_heater_ring_at_50um_k_per_mw": 1.3690097424567411,
+       "z_driver_ring_k_per_mw": 1.178133516942589,
+       "z_aggressor_ring_k_per_mw": 1.3673981659020296
+      }
+     },
+     {
+      "override": {
+       "sub_um": 300.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.570744091893943,
+       "z_heater_heater_k_per_mw": 10.303166605365059,
+       "z_opt_ring_k_per_mw": 5.116233664351055,
+       "z_junction_ring_k_per_mw": 4.349282358323516,
+       "z_heater_pd_k_per_mw": 0.0684501174526767,
+       "xt_frac_at_pitch": 0.01014085943964128,
+       "t63_heater_ring_s": 4.7503128862335986e-06,
+       "t63_opt_ring_s": 1.7302625398594688e-06,
+       "t63_heater_heater_s": 1.2149085617231326e-06,
+       "t10_opt_ring_s": 9.922946152105958e-09,
+       "t63_xt_at_pitch_s": 0.00011981641213877452,
+       "z_heater_ring_at_50um_k_per_mw": 0.036210413930826024,
+       "z_driver_ring_k_per_mw": 0.07317279842147156,
+       "z_aggressor_ring_k_per_mw": 0.03574750879653806
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0005736336546813,
+       "z_heater_heater_k_per_mw": 1.0001984311681154,
+       "z_opt_ring_k_per_mw": 1.0004008827733772,
+       "z_junction_ring_k_per_mw": 1.000471599877275,
+       "z_heater_pd_k_per_mw": 1.0306423010093928,
+       "xt_frac_at_pitch": 1.058686400649844,
+       "t63_heater_ring_s": 1.0012668060300165,
+       "t63_opt_ring_s": 1.0014387094345005,
+       "t63_heater_heater_s": 1.000871516246266,
+       "t10_opt_ring_s": 1.000770791995806,
+       "t63_xt_at_pitch_s": 1.1360105102806808,
+       "z_heater_ring_at_50um_k_per_mw": 1.05929369879901,
+       "z_driver_ring_k_per_mw": 1.0285086904717733,
+       "z_aggressor_ring_k_per_mw": 1.059772563175618
+      }
+     }
+    ],
+    "die": [
+     {
+      "override": {
+       "die_side_mm": 3.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.571761010391348,
+       "z_heater_heater_k_per_mw": 10.304147140112509,
+       "z_opt_ring_k_per_mw": 5.117225257265356,
+       "z_junction_ring_k_per_mw": 4.350254935264299,
+       "z_heater_pd_k_per_mw": 0.06957432156319987,
+       "xt_frac_at_pitch": 0.010455177468662577,
+       "t63_heater_ring_s": 4.7535395343906685e-06,
+       "t63_opt_ring_s": 1.7315648967827533e-06,
+       "t63_heater_heater_s": 1.2154496274071067e-06,
+       "t10_opt_ring_s": 9.927634201654729e-09,
+       "t63_xt_at_pitch_s": 0.0001296361955825335,
+       "z_heater_ring_at_50um_k_per_mw": 0.03734339523929111,
+       "z_driver_ring_k_per_mw": 0.07430455515653948,
+       "z_aggressor_ring_k_per_mw": 0.03689157037914248
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0008585887816503,
+       "z_heater_heater_k_per_mw": 1.0002936183424735,
+       "z_opt_ring_k_per_mw": 1.0005947735320677,
+       "z_junction_ring_k_per_mw": 1.000695323132696,
+       "z_heater_pd_k_per_mw": 1.0475692597114703,
+       "xt_frac_at_pitch": 1.0915006039019977,
+       "t63_heater_ring_s": 1.001946916113665,
+       "t63_opt_ring_s": 1.002192485584901,
+       "t63_heater_heater_s": 1.001317259447499,
+       "t10_opt_ring_s": 1.001243601480804,
+       "t63_xt_at_pitch_s": 1.2291144265277303,
+       "z_heater_ring_at_50um_k_per_mw": 1.0924377540756725,
+       "z_driver_ring_k_per_mw": 1.044416536865902,
+       "z_aggressor_ring_k_per_mw": 1.0936894742176781
+      }
+     },
+     {
+      "override": {
+       "die_side_mm": 10.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5677860740870235,
+       "z_heater_heater_k_per_mw": 10.299845152729526,
+       "z_opt_ring_k_per_mw": 5.113239365691574,
+       "z_junction_ring_k_per_mw": 4.3462901281690876,
+       "z_heater_pd_k_per_mw": 0.06549654806286702,
+       "xt_frac_at_pitch": 0.009323691550554462,
+       "t63_heater_ring_s": 4.741616793284857e-06,
+       "t63_opt_ring_s": 1.726700973971307e-06,
+       "t63_heater_heater_s": 1.2134834131335313e-06,
+       "t10_opt_ring_s": 9.912124799229041e-09,
+       "t63_xt_at_pitch_s": 9.996864363458281e-05,
+       "z_heater_ring_at_50um_k_per_mw": 0.03326493687315105,
+       "z_driver_ring_k_per_mw": 0.07022612762141908,
+       "z_aggressor_ring_k_per_mw": 0.03281268729327892
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 0.9997447547013552,
+       "z_heater_heater_k_per_mw": 0.9998759951790158,
+       "z_opt_ring_k_per_mw": 0.9998153936775402,
+       "z_junction_ring_k_per_mw": 0.9997832929238134,
+       "z_heater_pd_k_per_mw": 0.9861708864174616,
+       "xt_frac_at_pitch": 0.9733756302587145,
+       "t63_heater_ring_s": 0.9994338511446743,
+       "t63_opt_ring_s": 0.9993773517708847,
+       "t63_heater_heater_s": 0.999697443830703,
+       "t10_opt_ring_s": 0.9996794131126504,
+       "t63_xt_at_pitch_s": 0.947828664205497,
+       "z_heater_ring_at_50um_k_per_mw": 0.9731271807052754,
+       "z_driver_ring_k_per_mw": 0.9870906144764171,
+       "z_aggressor_ring_k_per_mw": 0.9727666874746219
+      }
+     }
+    ],
+    "beol_metal": [
+     {
+      "override": {
+       "fill_lo": 0.0,
+       "fill_hi": 0.0
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.831411202282763,
+       "z_heater_heater_k_per_mw": 10.675909325737958,
+       "z_opt_ring_k_per_mw": 5.3000681099719715,
+       "z_junction_ring_k_per_mw": 4.533726713139104,
+       "z_heater_pd_k_per_mw": 0.09957900425489745,
+       "xt_frac_at_pitch": 0.006772629296753716,
+       "t63_heater_ring_s": 5.597374520009572e-06,
+       "t63_opt_ring_s": 1.966805877959175e-06,
+       "t63_heater_heater_s": 1.424588722681271e-06,
+       "t10_opt_ring_s": 1.0624936471758814e-08,
+       "t63_xt_at_pitch_s": 0.00021963232152788482,
+       "z_heater_ring_at_50um_k_per_mw": 0.02594872775649062,
+       "z_driver_ring_k_per_mw": 0.05809763236551665,
+       "z_aggressor_ring_k_per_mw": 0.020340828047361856
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0736162911803482,
+       "z_heater_heater_k_per_mw": 1.0363831012240357,
+       "z_opt_ring_k_per_mw": 1.0363468840212788,
+       "z_junction_ring_k_per_mw": 1.042899596854186,
+       "z_heater_pd_k_per_mw": 1.4993448937241862,
+       "xt_frac_at_pitch": 0.7070495923735541,
+       "t63_heater_ring_s": 1.1798097182283542,
+       "t63_opt_ring_s": 1.13834490128394,
+       "t63_heater_heater_s": 1.1736111834416967,
+       "t10_opt_ring_s": 1.0715694638220437,
+       "t63_xt_at_pitch_s": 2.0823910614519168,
+       "z_heater_ring_at_50um_k_per_mw": 0.7590999610446721,
+       "z_driver_ring_k_per_mw": 0.8166138383773234,
+       "z_aggressor_ring_k_per_mw": 0.6030252793155425
+      }
+     },
+     {
+      "override": {
+       "fill_lo": 0.3,
+       "fill_hi": 0.5
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5556435492210112,
+       "z_heater_heater_k_per_mw": 10.284194105007606,
+       "z_opt_ring_k_per_mw": 5.104003217661274,
+       "z_junction_ring_k_per_mw": 4.336964481492675,
+       "z_heater_pd_k_per_mw": 0.05502878161922968,
+       "xt_frac_at_pitch": 0.008702494464807482,
+       "t63_heater_ring_s": 4.706268753386273e-06,
+       "t63_opt_ring_s": 1.7154822986760529e-06,
+       "t63_heater_heater_s": 1.2051260661296816e-06,
+       "t10_opt_ring_s": 9.877404565815692e-09,
+       "t63_xt_at_pitch_s": 0.00010701947294006112,
+       "z_heater_ring_at_50um_k_per_mw": 0.030942968305924284,
+       "z_driver_ring_k_per_mw": 0.06080294468919153,
+       "z_aggressor_ring_k_per_mw": 0.03204363352789224
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 0.996342245332367,
+       "z_heater_heater_k_per_mw": 0.9983566415688888,
+       "z_opt_ring_k_per_mw": 0.9980094068424746,
+       "z_junction_ring_k_per_mw": 0.9976381011699634,
+       "z_heater_pd_k_per_mw": 0.8285594272207993,
+       "xt_frac_at_pitch": 0.9085238382860505,
+       "t63_heater_ring_s": 0.9919832221321633,
+       "t63_opt_ring_s": 0.9928842240226781,
+       "t63_heater_heater_s": 0.9928124560784762,
+       "t10_opt_ring_s": 0.9961777317612927,
+       "t63_xt_at_pitch_s": 1.0146794073903391,
+       "z_heater_ring_at_50um_k_per_mw": 0.9052006809759039,
+       "z_driver_ring_k_per_mw": 0.8546394065579102,
+       "z_aggressor_ring_k_per_mw": 0.9499672782961386
+      }
+     }
+    ],
+    "mode_weight": [
+     {
+      "override": {
+       "mode_weight": "uniform_core"
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.574095656056341,
+       "z_heater_heater_k_per_mw": 10.301122541586231,
+       "z_opt_ring_k_per_mw": 5.158135895711673,
+       "z_junction_ring_k_per_mw": 4.349539193395569,
+       "z_heater_pd_k_per_mw": 0.06641500876263072,
+       "xt_frac_at_pitch": 0.00957784125229471,
+       "t63_heater_ring_s": 4.740315131084202e-06,
+       "t63_opt_ring_s": 1.7026751698190212e-06,
+       "t63_heater_heater_s": 1.2138506712283017e-06,
+       "t10_opt_ring_s": 9.218453806753279e-09,
+       "t63_xt_at_pitch_s": 0.00010541287967087016,
+       "z_heater_ring_at_50um_k_per_mw": 0.03423212081422375,
+       "z_driver_ring_k_per_mw": 0.07129902948269867,
+       "z_aggressor_ring_k_per_mw": 0.033791069559630425
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0015127899330634,
+       "z_heater_heater_k_per_mw": 1.0,
+       "z_opt_ring_k_per_mw": 1.0085942202934013,
+       "z_junction_ring_k_per_mw": 1.000530680013783,
+       "z_heater_pd_k_per_mw": 1.0,
+       "xt_frac_at_pitch": 0.9999083748020244,
+       "t63_heater_ring_s": 0.9991594879215786,
+       "t63_opt_ring_s": 0.9854717335487244,
+       "t63_heater_heater_s": 1.0000000000705282,
+       "t10_opt_ring_s": 0.9297197803701959,
+       "t63_xt_at_pitch_s": 0.9994468795006436,
+       "z_heater_ring_at_50um_k_per_mw": 1.0014210261254104,
+       "z_driver_ring_k_per_mw": 1.0021712033312176,
+       "z_aggressor_ring_k_per_mw": 1.0017718606204866
+      }
+     },
+     {
+      "override": {
+       "mode_bent": false
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5710105047977625,
+       "z_heater_heater_k_per_mw": 10.301122541586231,
+       "z_opt_ring_k_per_mw": 5.123790303208947,
+       "z_junction_ring_k_per_mw": 4.34905695430009,
+       "z_heater_pd_k_per_mw": 0.06641500876263072,
+       "xt_frac_at_pitch": 0.009572940708761352,
+       "t63_heater_ring_s": 4.743946812692796e-06,
+       "t63_opt_ring_s": 1.72465140404102e-06,
+       "t63_heater_heater_s": 1.2138506712202138e-06,
+       "t10_opt_ring_s": 9.844751575774388e-09,
+       "t63_xt_at_pitch_s": 0.00010547143045636655,
+       "z_heater_ring_at_50um_k_per_mw": 0.03418507183279292,
+       "z_driver_ring_k_per_mw": 0.07114601842181714,
+       "z_aggressor_ring_k_per_mw": 0.03373338980738335
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 1.0006482863658157,
+       "z_heater_heater_k_per_mw": 1.0,
+       "z_opt_ring_k_per_mw": 1.001878467395227,
+       "z_junction_ring_k_per_mw": 1.0004197498695364,
+       "z_heater_pd_k_per_mw": 1.0,
+       "xt_frac_at_pitch": 0.999396767395824,
+       "t63_heater_ring_s": 0.9999249706027917,
+       "t63_opt_ring_s": 0.9981911048178361,
+       "t63_heater_heater_s": 1.0000000000638654,
+       "t10_opt_ring_s": 0.9928845405856324,
+       "t63_xt_at_pitch_s": 1.000002014698917,
+       "z_heater_ring_at_50um_k_per_mw": 1.0000446626941668,
+       "z_driver_ring_k_per_mw": 1.0000204969314364,
+       "z_aggressor_ring_k_per_mw": 1.000061883591594
+      }
+     }
+    ],
+    "air_k": [
+     {
+      "override": {
+       "air_k_w_per_m_k": 0.0001
+      },
+      "metrics": {
+       "z_heater_ring_k_per_mw": 3.5686969672101907,
+       "z_heater_heater_k_per_mw": 10.301122541586231,
+       "z_opt_ring_k_per_mw": 5.1141834762955165,
+       "z_junction_ring_k_per_mw": 4.347232204149552,
+       "z_heater_pd_k_per_mw": 0.06641500876263072,
+       "xt_frac_at_pitch": 0.00957871890431067,
+       "t63_heater_ring_s": 4.744302774910216e-06,
+       "t63_opt_ring_s": 1.7277767711089828e-06,
+       "t63_heater_heater_s": 1.213850671187413e-06,
+       "t10_opt_ring_s": 9.91530356494406e-09,
+       "t63_xt_at_pitch_s": 0.0001054712171948986,
+       "z_heater_ring_at_50um_k_per_mw": 0.03418354510357241,
+       "z_driver_ring_k_per_mw": 0.07114456017664512,
+       "z_aggressor_ring_k_per_mw": 0.03373130239324212
+      },
+      "ratio_to_base": {
+       "z_heater_ring_k_per_mw": 0.9999999999999997,
+       "z_heater_heater_k_per_mw": 1.0,
+       "z_opt_ring_k_per_mw": 0.9999999999999998,
+       "z_junction_ring_k_per_mw": 0.9999999999999998,
+       "z_heater_pd_k_per_mw": 1.0,
+       "xt_frac_at_pitch": 1.0,
+       "t63_heater_ring_s": 1.0000000000084412,
+       "t63_opt_ring_s": 0.9999999999946941,
+       "t63_heater_heater_s": 1.0000000000368434,
+       "t10_opt_ring_s": 1.000000004984603,
+       "t63_xt_at_pitch_s": 0.9999999927115725,
+       "z_heater_ring_at_50um_k_per_mw": 0.9999999999999996,
+       "z_driver_ring_k_per_mw": 0.9999999999999998,
+       "z_aggressor_ring_k_per_mw": 1.0
+      }
+     }
+    ]
+   },
+   "k_temp_scaling": {
+    "method": "07 P2-5 quasi-static: DC gains and 63 % times recomputed with k(T) and rho c(T) of mrm.materials; the runtime scales residues by the DC ratio and taus by the t63 ratio",
+    "points": [
+     {
+      "t_k": 300.0,
+      "ratio_to_300k": {
+       "z_heater_ring_k_per_mw": 1.0,
+       "z_heater_heater_k_per_mw": 1.0,
+       "z_opt_ring_k_per_mw": 1.0,
+       "z_junction_ring_k_per_mw": 1.0,
+       "z_heater_pd_k_per_mw": 1.0,
+       "xt_frac_at_pitch": 1.0,
+       "t63_heater_ring_s": 1.0,
+       "t63_opt_ring_s": 1.0,
+       "t63_heater_heater_s": 1.0,
+       "t10_opt_ring_s": 1.0,
+       "t63_xt_at_pitch_s": 1.0,
+       "z_heater_ring_at_50um_k_per_mw": 1.0,
+       "z_driver_ring_k_per_mw": 1.0,
+       "z_aggressor_ring_k_per_mw": 1.0
+      }
+     },
+     {
+      "t_k": 325.0,
+      "ratio_to_300k": {
+       "z_heater_ring_k_per_mw": 0.9866504586467026,
+       "z_heater_heater_k_per_mw": 0.9839301003942127,
+       "z_opt_ring_k_per_mw": 0.9897698060524516,
+       "z_junction_ring_k_per_mw": 0.9849603027752938,
+       "z_heater_pd_k_per_mw": 1.0383734920350942,
+       "xt_frac_at_pitch": 1.0623696021440285,
+       "t63_heater_ring_s": 1.0234236421206018,
+       "t63_opt_ring_s": 1.027413099578448,
+       "t63_heater_heater_s": 1.018099638471799,
+       "t10_opt_ring_s": 1.023390042318476,
+       "t63_xt_at_pitch_s": 1.0743890841934862,
+       "z_heater_ring_at_50um_k_per_mw": 1.0481874552077206,
+       "z_driver_ring_k_per_mw": 1.02819491767952,
+       "z_aggressor_ring_k_per_mw": 1.040526950405036
+      }
+     },
+     {
+      "t_k": 350.0,
+      "ratio_to_300k": {
+       "z_heater_ring_k_per_mw": 0.975408496835459,
+       "z_heater_heater_k_per_mw": 0.9695414547575926,
+       "z_opt_ring_k_per_mw": 0.9819503163774149,
+       "z_junction_ring_k_per_mw": 0.9722287513063721,
+       "z_heater_pd_k_per_mw": 1.0787889462074585,
+       "xt_frac_at_pitch": 1.1262665753168226,
+       "t63_heater_ring_s": 1.04376251322564,
+       "t63_opt_ring_s": 1.0495246401709497,
+       "t63_heater_heater_s": 1.0339247422386182,
+       "t10_opt_ring_s": 1.0426599306063107,
+       "t63_xt_at_pitch_s": 1.1523485148495174,
+       "z_heater_ring_at_50um_k_per_mw": 1.098569987265802,
+       "z_driver_ring_k_per_mw": 1.058154976987229,
+       "z_aggressor_ring_k_per_mw": 1.0831786579269742
+      }
+     },
+     {
+      "t_k": 375.0,
+      "ratio_to_300k": {
+       "z_heater_ring_k_per_mw": 0.9658782662151519,
+       "z_heater_heater_k_per_mw": 0.956565110048392,
+       "z_opt_ring_k_per_mw": 0.976012356901675,
+       "z_junction_ring_k_per_mw": 0.9613563986561944,
+       "z_heater_pd_k_per_mw": 1.1209903240327779,
+       "xt_frac_at_pitch": 1.1915236742280466,
+       "t63_heater_ring_s": 1.0615253135911533,
+       "t63_opt_ring_s": 1.0673322226112254,
+       "t63_heater_heater_s": 1.04781228961582,
+       "t10_opt_ring_s": 1.0587483377935836,
+       "t63_xt_at_pitch_s": 1.2339090161289767,
+       "z_heater_ring_at_50um_k_per_mw": 1.1508668206176929,
+       "z_driver_ring_k_per_mw": 1.089661225926199,
+       "z_aggressor_ring_k_per_mw": 1.1276863641816401
+      }
+     },
+     {
+      "t_k": 400.0,
+      "ratio_to_300k": {
+       "z_heater_ring_k_per_mw": 0.9577567383971513,
+       "z_heater_heater_k_per_mw": 0.9447895825830455,
+       "z_opt_ring_k_per_mw": 0.9715604885458762,
+       "z_junction_ring_k_per_mw": 0.9520018942900671,
+       "z_heater_pd_k_per_mw": 1.1647623376817768,
+       "xt_frac_at_pitch": 1.2579851629282224,
+       "t63_heater_ring_s": 1.0771416201579918,
+       "t63_opt_ring_s": 1.0816699587560847,
+       "t63_heater_heater_s": 1.060053054960889,
+       "t10_opt_ring_s": 1.0723605305283868,
+       "t63_xt_at_pitch_s": 1.3190756243992057,
+       "z_heater_ring_at_50um_k_per_mw": 1.2048437665981429,
+       "z_driver_ring_k_per_mw": 1.1225293147650715,
+       "z_aggressor_ring_k_per_mw": 1.1738268607238316
+      }
+     }
+    ]
+   },
+   "uncertainty_thermal_suggestion": {
+    "z_heater_ring_scale_2sigma": [
+     0.7295900650442815,
+     1.3706326989791267
+    ],
+    "time_scale_fast_2sigma": [
+     0.61269606048284,
+     1.6321306182578392
+    ],
+    "selfheat_tau_scale_2sigma": [
+     0.5770991289131988,
+     1.7328045562695857
+    ],
+    "crosstalk_scale_2sigma": [
+     0.5595572996627756,
+     1.7871270745688832
+    ],
+    "z_ratio_opt_heater_base": 1.433067453831335,
+    "note": "independent Gaussian parameters with the assumed sigmas; bottom/substrate/die choices are in sweeps"
+   },
+   "g25_consistency": {
+    "efficiency_nm_per_mw": 0.4047151277013753,
+    "note": "rom_dc_scale = (FSR/P_FSR) / (Z * dlambda/dT) per variant; 1 means the variant reproduces the G25 median efficiency under that hypothesis",
+    "variants": [
+     {
+      "override": {
+       "metal_gap_um": 0.3,
+       "fill_lo": 0.15,
+       "fill_hi": 0.3,
+       "keepout_um": 5.0
+      },
+      "z_heater_ring_k_per_mw": 4.132838312984052,
+      "t63_heater_ring_s": 3.285544351480415e-06,
+      "xt_frac_at_pitch": 0.007799160105047581,
+      "z_opt_ring_k_per_mw": 5.138733241880326,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.1400078957147544,
+       "materials_ceiling": 1.3861048545834285,
+       "bench_62p5": 1.5668268518703585,
+       "H_solver_proxy": 1.4507656035836654
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.3,
+       "fill_lo": 0.15,
+       "fill_hi": 0.3,
+       "keepout_um": 20.0
+      },
+      "z_heater_ring_k_per_mw": 4.348639097563476,
+      "t63_heater_ring_s": 3.764924547949227e-06,
+      "xt_frac_at_pitch": 0.00533551819358294,
+      "z_opt_ring_k_per_mw": 5.317200614302178,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.0834351167826457,
+       "materials_ceiling": 1.317319538437959,
+       "bench_62p5": 1.4890732245060685,
+       "H_solver_proxy": 1.3787715041722857
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.3,
+       "fill_lo": 0.0,
+       "fill_hi": 0.0,
+       "keepout_um": 5.0
+      },
+      "z_heater_ring_k_per_mw": 4.355368466269507,
+      "t63_heater_ring_s": 3.782682997133688e-06,
+      "xt_frac_at_pitch": 0.0058702018196443795,
+      "z_opt_ring_k_per_mw": 5.322840150773927,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.0817611288235658,
+       "materials_ceiling": 1.3152841816256797,
+       "bench_62p5": 1.486772495455109,
+       "H_solver_proxy": 1.3766411994954713
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.3,
+       "fill_lo": 0.0,
+       "fill_hi": 0.0,
+       "keepout_um": 20.0
+      },
+      "z_heater_ring_k_per_mw": 4.35608666904065,
+      "t63_heater_ring_s": 3.782871230675926e-06,
+      "xt_frac_at_pitch": 0.005869130344372105,
+      "z_opt_ring_k_per_mw": 5.323525066169218,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.0815827752003566,
+       "materials_ceiling": 1.3150673262653862,
+       "bench_62p5": 1.4865273662353704,
+       "H_solver_proxy": 1.3764142279957132
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.8,
+       "fill_lo": 0.15,
+       "fill_hi": 0.3,
+       "keepout_um": 5.0
+      },
+      "z_heater_ring_k_per_mw": 3.568696967210192,
+      "t63_heater_ring_s": 4.7443027748701685e-06,
+      "xt_frac_at_pitch": 0.00957871890431067,
+      "z_opt_ring_k_per_mw": 5.114183476295517,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.320220896255427,
+       "materials_ceiling": 1.6052209816273189,
+       "bench_62p5": 1.814511599813459,
+       "H_solver_proxy": 1.6801033331606101
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.8,
+       "fill_lo": 0.15,
+       "fill_hi": 0.3,
+       "keepout_um": 20.0
+      },
+      "z_heater_ring_k_per_mw": 3.8227631456757742,
+      "t63_heater_ring_s": 5.565959993053999e-06,
+      "xt_frac_at_pitch": 0.0062147853733904405,
+      "z_opt_ring_k_per_mw": 5.293538178867159,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.2324771713475824,
+       "materials_ceiling": 1.4985357529449836,
+       "bench_62p5": 1.6939166243001171,
+       "H_solver_proxy": 1.5684413187964048
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.8,
+       "fill_lo": 0.0,
+       "fill_hi": 0.0,
+       "keepout_um": 5.0
+      },
+      "z_heater_ring_k_per_mw": 3.8314112022827636,
+      "t63_heater_ring_s": 5.597374520054802e-06,
+      "xt_frac_at_pitch": 0.006772629296753715,
+      "z_opt_ring_k_per_mw": 5.30006810997197,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.2296952897426308,
+       "materials_ceiling": 1.4951533381283897,
+       "bench_62p5": 1.6900932062222718,
+       "H_solver_proxy": 1.5649011168724738
+      }
+     },
+     {
+      "override": {
+       "metal_gap_um": 0.8,
+       "fill_lo": 0.0,
+       "fill_hi": 0.0,
+       "keepout_um": 20.0
+      },
+      "z_heater_ring_k_per_mw": 3.831408186306293,
+      "t63_heater_ring_s": 5.597012886941469e-06,
+      "xt_frac_at_pitch": 0.006772565620032103,
+      "z_opt_ring_k_per_mw": 5.299913925993052,
+      "rom_dc_scale_by_hypothesis": {
+       "H86": 1.2296962577240826,
+       "materials_ceiling": 1.495154515070931,
+       "bench_62p5": 1.6900945366159794,
+       "H_solver_proxy": 1.5649023487184994
+      }
+     }
+    ]
+   }
+  }
+ },
+ "k_temp_scaling": {
+  "t_k": [
+   300.0,
+   325.0,
+   350.0,
+   375.0,
+   400.0
+  ],
+  "dc_ratio": {
+   "heater->ring_mode_weighted": [
+    1.0,
+    0.9866504586467026,
+    0.975408496835459,
+    0.9658782662151519,
+    0.9577567383971513
+   ],
+   "heater->heater_resistor": [
+    1.0,
+    0.9839301003942127,
+    0.9695414547575926,
+    0.956565110048392,
+    0.9447895825830455
+   ],
+   "waveguide_absorption->ring_mode_weighted": [
+    1.0,
+    0.9897698060524516,
+    0.9819503163774149,
+    0.976012356901675,
+    0.9715604885458762
+   ],
+   "heater->ring_mode_weighted@pitch": [
+    1.0,
+    1.0481874552077208,
+    1.0985699872658024,
+    1.150866820617693,
+    1.204843766598143
+   ]
+  },
+  "tau_ratio": {
+   "heater->ring_mode_weighted": [
+    1.0,
+    1.0234236421206018,
+    1.04376251322564,
+    1.0615253135911533,
+    1.0771416201579918
+   ],
+   "waveguide_absorption->ring_mode_weighted": [
+    1.0,
+    1.027413099578448,
+    1.0495246401709497,
+    1.0673322226112254,
+    1.0816699587560847
+   ]
+  },
+  "note": "07 P2-5 quasi-static scaling: multiply residues by dc_ratio(T) and taus by tau_ratio(T) (T = mean temperature of the conduction path, K); k(T), rho c(T) from mrm.materials"
+ },
+ "previous_sha256": "5e15bc9b95292b1bda4190260057e2be2818bb32940c48fb1f8c76ae1105e306",
+ "site_offsets_um": {
+  "monitor_pd": [
+   0.0,
+   25.0
+  ],
+  "temp_sensor": [
+   40.0,
+   0.0
+  ],
+  "driver": [
+   0.0,
+   -30.0
+  ],
+  "aggressor": [
+   60.0,
+   0.0
+  ]
+ },
+ "schema": "thermal_rom/1",
+ "file": "thermal_rom_metal_above_160.npz",
+ "sha256": "f5621f676c2f05f3a9fcae61fc42165e08313bd8c0ce977b4ff25e67b3c9ea6b",
+ "created_utc": "2026-10-09T10:59:29Z"
+}

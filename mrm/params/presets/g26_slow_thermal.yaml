@@ -1,0 +1,10 @@
+# Corner (07 section 4.8, D15): both die-level thermal time scales at x2 (slow end of 0.5-2x on top of the family).
+# A thin extends: file that only selects alternatives (07 D3).
+extends: g26
+meta:
+  name: g26_slow_thermal
+  kind: corner
+  description: "g26 with uncertainty.thermal.time_scale_fast and time_scale_slow pinned high (x2): slower heater and crosstalk poles"
+alts:
+  uncertainty.thermal.time_scale_fast: high
+  uncertainty.thermal.time_scale_slow: high

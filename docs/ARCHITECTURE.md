@@ -39,7 +39,8 @@ mrm/
   units.py                 physical constants, conversions (dB, dBm, wavelength<->frequency), unit-suffix parser
   materials.py             Si/SiO2 n(lambda,T) (Li 1980 shape on Frey/Franta level), dn/dT, alpha_L, k(T), rho*c,
                            plasma dispersion (Nedeljkovic 2011 @1.31um; Soref-Bennett switch), TCR by heater family,
-                           Ge PD dark current law. Coefficients from docs/research/02_materials.json.
+                           Ge PD dark current law. Coefficients from mrm/data/materials.json (the cleaned copy of
+                           docs/research/02_materials.json with its verification-log corrections; CHANGELOG).
   params/
     units.py               suffix grammar and conversion table
     schema.py              every key: type, enum, unit, required/forbidden under each fidelity choice (07 P1-15)
@@ -62,6 +63,8 @@ mrm/
   data/extracted/          committed artefacts + JSON sidecars (schema id, sha256, inputs, tool versions, errors)
   plant/
     optics.py              exact add-drop ring with CW/CCW backscatter + TCMT (complex sum over orders) (P2-2, P2-4)
+    phase.py               ring state (T_ring, T_heater, junction levels) -> optics inputs per ring and line: phase
+                           model (P1-6), K^2 at the line (P1-5), alpha_i(V, T) and eta (P0-2), R1 shift (P0-3)
     thermal.py             ROM load/assemble/scale; exact ZOH and FOH per Foster pole; interim 3-pole model (P1-2)
     selfheat.py            implicit per-ring self-heating solve with branch continuation (P0-1)
     electrical.py          heater driver laws (voltage|current|power|dac_pwm), DAC INL/DNL, slew, settle, TCR,

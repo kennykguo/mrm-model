@@ -1,0 +1,302 @@
+# Published numbers that are deliberately NOT fitted and NOT scored, each with its reason (07 section 4.7).
+#
+# EXC-1 to EXC-8 are 07 4.7. EXC-9 to EXC-18 were added by this split so that every public number the model could be
+# tempted to fit or score has exactly one home (calibration, validation/bounds, or here). Categories:
+#   excluded        not evidence of plant accuracy for the reason given (07 4.7);
+#   closure_only    appears only in the closure and conflict table of VALIDATION.md (07 4.6), never fitted or scored;
+#   hypothesis_only defines or bounds an uncertainty hypothesis (07 4.8), not a target;
+#   scenario_input  used directly as a scenario definition, not fitted and not scored;
+#   prior_only      a different device or platform: it may set a prior range, never a target;
+#   not_a_limit     a measured demand that must not be turned into a hardware limit (07 P1-11);
+#   controller_specific  a property of Lightmatter's unknown controller, not of the plant.
+schema: mrm.validation.targets/1
+role: excluded
+frozen_on: "2026-10-09"
+excluded:
+
+  - id: EXC-1
+    quantity: rx_polarization_monitor_codes_and_swing
+    value: {codes_in7: [7000, 41500], swing_db_in7: 7.7, codes_in0: [15000, 54000], swing_db_in0: 5.6}
+    unit: mixed
+    generation: G26
+    source: [LM26-P, LM26-S]
+    locator: LM26-P Fig. 2(e); LM26-S slide 6
+    provenance: read-off
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      These are RX-path monitors ("polarization dependent monitoring photodetectors at the input of the receive
+      path", Fig. 2(e) caption), not the TX lock sensor, and the low code is an ADC offset, not a light level: the
+      text says the photocurrent swings between maximum and zero (01 D8, 07 D14). The textbook acceptance-table row
+      "while the monitor swings 8 to 9 dB" should be corrected.
+    data_points: [g26_fig2e/pol_monitor_codes, g26_fig2e/pol_swing_db]
+
+  - id: EXC-2
+    quantity: ber_traces_as_accuracy_evidence
+    value: null
+    unit: none
+    generation: G26
+    source: [LM26-P, LM26-S]
+    locator: LM26-P Fig. 2-3; LM26-S slides 6 and 10
+    provenance: printed
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      The receive link budget dominates BER, and pass/fail at 1e-9 cannot tell plants apart. BER results are used only
+      as feasibility facts (BND-1, BND-2, BND-3a, BND-3b), never as a measure of plant accuracy.
+    used_in: [BND-1, BND-2, BND-3a, BND-3b]
+    data_points: []
+
+  - id: EXC-3
+    quantity: fig3b_temperature_waveform
+    value: {peaks_between_s: [73.0, 79.8], n_peaks: 35, apparent_spacing_s: 0.20, peak_heights_c: [95, 113]}
+    unit: mixed
+    generation: G26
+    source: LM26-P
+    locator: LM26-P Fig. 3(b) inset
+    provenance: read-off
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      Plot-sampled and aliased: against the printed 100 ms period the apparent 0.20 s spacing is under-sampled, and
+      identical ramps peak anywhere from 95 to 113 degC (01 section 2.5). The printed 808 degC/s is kept (CAL-13b).
+    data_points: [g26_fig3b/temperature_trace]
+
+  - id: EXC-4
+    quantity: reloma_open_loop_halfwidth_and_curvature
+    value: {halfwidth_c: 2.85, k_db_per_c2: 0.67, contour_m8db_c: [66.8, 72.4]}
+    unit: mixed
+    generation: G26
+    source: [LM26-S, textbook-REF]
+    locator: LM26-S slide 9 loop-open map at 2.25 V; textbook REF.relOma8dbHalfWidthC and omaPenaltyDbPerC
+    provenance: read-off
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      Both are interpolated from 5 degC samples (kept in the closure table only). [corrected after 07 was written]
+      k = 0.67 dB/degC^2 = (8 - 2.55) dB / (2.85 K)^2 is a secant taken about 0.65 FWHM from the optimum (2.85 K x
+      86 pm/K = 245 pm against a 374 pm FWHM at Q 3500), where relOMA is far from quadratic; it is not a local
+      curvature. Matched like-for-like with a large-signal model it gives FWHM/(dlambda/dT) of about 4.2 K (the -8 dB
+      anchor) or 3.5 K (the -16 dB anchor), not 6 to 8 K (06 V5). The map's peak position (69.6 degC) is used only as
+      the alignment input of VAL-5, not scored.
+    used_in: [closure table]
+    data_points: [g26_slide9_open/contour_m8db_cold, g26_slide9_open/contour_m8db_hot, textbook/k_0p67_db_per_c2, textbook/halfwidth_2p85_c]
+
+  - id: EXC-5
+    quantity: fsr_lower_bound_14p1_nm
+    value: 14.1
+    unit: nm
+    generation: G25
+    source: textbook-REF
+    locator: textbook REF.fsrMeasuredBoundNm
+    provenance: read-off
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      Unsupported: each trace of the G25 heater sweep is a window about 1 to 1.5 nm wide around its own dip, so the
+      figure gives no FSR information (01 D2, verification log item 12). It would also need D < about 10 um, against the
+      printed "~15 um" diameter.
+    data_points: [textbook/fsr_bound_14p1]
+
+  - id: EXC-6
+    quantity: junction_swing_0p9_vpp
+    value: 0.9
+    unit: v
+    generation: G25
+    source: LM-P
+    locator: LM-P section 3.2 (PPG output swing 0.9 Vpp, about -6 dB electrical loss at Nyquist)
+    provenance: printed
+    category: excluded
+    origin: 07 4.7
+    reason: >-
+      It is the pattern-generator swing into the 50 ohm-terminated on-chip driver (about 0.45 Vpp at the driver input
+      at Nyquist, inferred), not the junction swing; the driver is CMOS rail-to-rail (1.3 Vpp simulated at 1.3 V
+      supply). 01 D3.
+    data_points: [g25_paper/ppg_swing_0p9vpp]
+
+  - id: EXC-7
+    quantity: modulation_insertion_loss_4p9_db
+    value: 4.9
+    unit: db
+    generation: G25
+    source: LM-P
+    locator: LM-P section 3.2 (about 4.9 dB at about +4 dBm input)
+    provenance: printed
+    category: excluded
+    origin: 07 4.7
+    reason: The operating detuning is not stated; it is a sanity check only (reported next to the model value, not scored).
+    used_in: [sanity check]
+    data_points: [g25_paper/mod_il_4p9db]
+
+  - id: EXC-8
+    quantity: textbook_derived_values
+    value: {rth_k_per_mw: 4.7, k_db_per_c2: 0.67, heater_self_heating_k_per_mw: 9.0, loop_lag_budget_us: 29.0, dlambda_dt_derived_pm_per_k: 50.0, gamma1_cap_pm_per_k: 58.0}
+    unit: mixed
+    generation: none
+    source: textbook-REF
+    locator: textbook REF.RthKPerMw, omaPenaltyDbPerC, heaterSelfHeatPerMw, SOURCES_AND_GENERATIONS section 4, dLambdaDT_derivedPmK
+    provenance: derived
+    category: excluded
+    origin: 07 4.7 (the last two added from 06 T3, T4)
+    reason: >-
+      Arithmetic on the same public numbers: using them as targets would be circular (4.7 K/mW is 0.405/0.086 by
+      construction). The 50 pm/K derivation used the power fraction in place of the index weight and is refuted
+      (06 T3); the 58 pm/K "Gamma = 1 cap" is not a ceiling (06 T4; the ceiling is lambda*(dn_Si/dT)/n_g,Si).
+    data_points: [textbook/rth_4p7, textbook/heater_self_9p0, textbook/loop_lag_29us, textbook/dldt_50, textbook/cap_58]
+
+  - id: EXC-9
+    quantity: eo_bandwidth_66p8_ghz
+    value: 66.8
+    unit: ghz
+    generation: none
+    source: LM26-S
+    locator: LM26-S slide 8 (reverse bias -2 V, "detuning 4 dB", RF 0 dBm, "Reticle 0, device 25", footer cites Tu3J.6)
+    provenance: printed
+    category: closure_only
+    origin: added (07 4.6 row "EO bandwidth")
+    reason: >-
+      A single device at a specific detuning with about +2 dB of peaking near 35 to 40 GHz, and its generation is
+      unclear (the slide cites the G25 paper; the Hot Chips copy of the same slide showed 31.8 / 35.4 GHz). 01 D4.
+    data_points: [g26_slides/eo_bw_66p8]
+
+  - id: EXC-10
+    quantity: fsr_design_and_patent_bound
+    value: {design_thz: 1.8, design_nm: 10.30, patent_max_nm: 11.44}
+    unit: mixed
+    generation: none
+    source: [LM-P, PAT-4]
+    locator: LM-P section 2 (1.8 THz design FSR); US12355492B2 (modulator FSR < 11.44 nm)
+    provenance: printed
+    category: hypothesis_only
+    origin: added
+    reason: >-
+      The measured FSR is unpublished (01 D2). These define the default FSR hypothesis window B (1.72 to 1.88 THz) of
+      07 P1-6 and are tested indirectly by BND-1; they are not targets.
+    used_in: [uncertainty.fsr, BND-1]
+    data_points: [g25_paper/fsr_design_1p8thz, pat4/fsr_max_11p44nm]
+
+  - id: EXC-11
+    quantity: other_dlambda_dt_values
+    value: {bench_sib_pm_per_k: 62.5, imec_o_band_pm_per_k: 62.54, ocp_pm_per_k: 80.0}
+    unit: pm_per_k
+    generation: none
+    source: [SIB, CO24-JOM, OCP]
+    locator: SIB (50 nm/s over 4 nm "representing" 800 degC/s); Coenen et al. J. Opt. Microsyst. 2024 Eq. 2; OCP vision v1.0.6
+    provenance: inferred
+    category: closure_only
+    origin: added (07 4.6 row "dlambda/dT")
+    reason: >-
+      Alternatives on the dlambda/dT leaf (07 P0-3), not targets: the bench value is an equivalence inferred from two
+      printed numbers; imec's 62.54 pm/K is printed "for the rings measured in the O-band" with the method not stated
+      (04 V9); OCP's 80 is a planning figure with no derivation.
+    used_in: [closure table, alternatives]
+    data_points: [sib/bench_62p5, co24jom/imec_62p54, ocp/dldt_80]
+
+  - id: EXC-12
+    quantity: heater_efficiency_printed_0p44_nm_per_mw
+    value: 0.44
+    unit: nm_per_mw
+    generation: G25
+    source: LM-P
+    locator: LM-P section 3.1 ("The integrated heaters provided tuning of 0.44 nm/mW")
+    provenance: printed
+    category: closure_only
+    origin: added (07 D16, 4.6 row "Heater efficiency")
+    reason: >-
+      The heater anchor is P_FSR (CAL-3a). 0.44 nm/mW is a closure check: with 25.45 mW per FSR it implies
+      FSR = 11.2 nm, against 10.3 nm (1.8 THz design) and 0.348 nm/mW for the swept device at 1.195 V (06 E4).
+    used_in: [closure table]
+    data_points: [g25_paper/heater_0p44_nm_per_mw]
+
+  - id: EXC-13
+    quantity: heater_slew_and_code_range_as_limits
+    value: {slew_envelope_codes_per_ms: 460, slew_mean_per_lane_codes_per_ms: 340, slew_peak_codes_per_ms: 700, code_range: [19500, 49300]}
+    unit: mixed
+    generation: G26
+    source: [LM26-S, textbook-REF]
+    locator: LM26-S slide 10 DAC panel; textbook REF.heaterDacSlewCodesPerMs and heaterDacCodeRange
+    provenance: read-off
+    category: not_a_limit
+    origin: added (07 P1-11)
+    reason: >-
+      These are the demand of Lightmatter's controller during one test, not hardware limits: presets must not set
+      slew_codes_per_s or code_min/code_max from them (07 P1-11; 01 D11). The code trajectory itself is calibration
+      data (CAL-9a-c); metrics report the demanded peak slew and the code range used.
+    data_points: [textbook/slew_460, g26_slide10_dac/slew_trace]
+
+  - id: EXC-14
+    quantity: soak_temperature_profile
+    value: {t_range_c: [33.0, 108.0], period_min: 20.3, cycles: 90, hours: 30.4, ramp_k_per_s: 0.124, printed_paper_c: [35, 105], printed_other_c: [25, 105]}
+    unit: mixed
+    generation: G26
+    source: [LM26-P, LM26-S, SMTAI, PECC, SIB]
+    locator: LM26-P Fig. 3(a) (35 -> 105 degC, 31 h); LM26-S slide 10 left (trace); SMTAI 19, PECC 9, SIB (25 -> 105 -> 25 degC)
+    provenance: read-off
+    category: scenario_input
+    origin: added (07 D12, P0-10)
+    reason: >-
+      One experiment with two label sets (01 D5). It defines the soak scenario directly and is not fitted; its
+      all-lanes BER is the feasibility fact of BND-2.
+    used_in: [scenario soak, BND-2]
+    data_points: [g26_soak/temperature_profile]
+
+  - id: EXC-15
+    quantity: guide_roadmap_accuracy_3_ghz
+    value: 3.0
+    unit: ghz
+    generation: Guide
+    source: HOTI26
+    locator: HotI 2026 deck ("3 GHz Frequency Accuracy")
+    provenance: printed
+    category: excluded
+    origin: added
+    reason: A roadmap capability claim with no distribution attached; the G26 hardware is described by CAL-12a/b.
+    data_points: [hoti26/guide_3ghz]
+
+  - id: EXC-16
+    quantity: other_device_and_platform_numbers
+    value: {gf_pdk_radius_um: 7.5, gf_pdk_drop_coupling_frac: 0.05, bu45clo_q_loaded: 5000, bu45clo_n_g: 3.91, decea_eta_abs: 0.63}
+    unit: mixed
+    generation: GF
+    source: [GF-ECIO, BU-45CLO, DEC19]
+    locator: GF ECIO 2023 (PDK MRM); Al Qubaisi et al. CLEO 2021 (45CLO rib ring); de Cea et al. 2019 Table 1
+    provenance: literature
+    category: prior_only
+    origin: added (07 D1, D7, P1-6, P1-9)
+    reason: >-
+      Different devices. They set prior ranges (drop-coupling prior, n_g range, the low end of eta) but are never
+      targets for the Lightmatter ring (07 D7: the GF figure shows how far apart two plausible readings can be).
+    used_in: [priors]
+    data_points: [gf_ecio/pdk_ring, bu45clo/rib_ring, dec19/eta_abs]
+
+  - id: EXC-17
+    quantity: laser_sweep_emulation
+    value: {sweep_nm_per_s: 50.0, span_nm: 4.0, labelled_k_per_s: 800.0, heater_trapezoid_period_s: 0.44}
+    unit: mixed
+    generation: none
+    source: SIB
+    locator: Seeing is Believing blog, Fig. 1
+    provenance: printed
+    category: scenario_input
+    origin: added (01 D6, 07 P1-4)
+    reason: >-
+      An optical-only stimulus with no thermal path; the heater trace is in arbitrary units. It defines a scenario and
+      yields only the inferred 62.5 pm/K equivalence (EXC-11).
+    used_in: [scenario laser_sweep]
+    data_points: [sib/laser_sweep]
+
+  - id: EXC-18
+    quantity: slide10_error_ramp_offsets
+    value: {heating_pct: -0.3, cooling_pct: 0.4}
+    unit: pct
+    generation: G26
+    source: LM26-S
+    locator: LM26-S slide 10 embedded image (PDF object 184), "MRM Drop-Port PD Error Signal" panel
+    provenance: read-off
+    category: controller_specific
+    origin: added (01 verification log item 7)
+    reason: >-
+      A ramp-direction-dependent offset consistent with a single-integrator loop (inferred). It describes Lightmatter's
+      unknown controller, not the plant; it is reported beside controller results for comparison only. The error band
+      at the cusps is the bound BND-3a.
+    data_points: [g26_slide10_error/ramp_offsets]

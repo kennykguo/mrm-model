@@ -1,0 +1,8 @@
+# Corner (07 D2, required robustness corner): the printed ~15 GHz/degC = 86 pm/K as a constant at the ring (beta 0).
+extends: g26
+meta:
+  name: g26_h86
+  kind: corner
+  description: "g26 with uncertainty.thermo_optic pinned to H86 (86 pm/K, constant)"
+alts:
+  uncertainty.thermo_optic: H86

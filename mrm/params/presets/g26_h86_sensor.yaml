@@ -1,0 +1,9 @@
+# Corner (07 D2): H_solver at the ring, with Lightmatter's degC read at a node that sees 0.8 of the ring's rise
+# (ring.thermal.reference_rise_frac = 0.8). The plant equals g26; degC scenario targets and replicas change.
+extends: g26
+meta:
+  name: g26_h86_sensor
+  kind: corner
+  description: "g26 with uncertainty.thermo_optic pinned to H86_sensor"
+alts:
+  uncertainty.thermo_optic: H86_sensor

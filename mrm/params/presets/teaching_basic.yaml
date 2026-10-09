@@ -1,0 +1,47 @@
+# teaching_basic: g26 for first experiments. Optical self-heating off (the only preset allowed to do so, 07 P0-1 item
+# 1), every noise source off, ideal converters, the nominal world of every uncertainty entry and no per-device
+# variation, so one realize() gives one deterministic plant. The physics is otherwise g26 (same thermo-optics, thermal
+# poles, heater law and optics), so a controller tuned here transfers to g26 and its corners.
+extends: g26
+meta:
+  name: teaching_basic
+  kind: preset
+  description: >-
+    g26 with self-heating off, shot/electronic/RIN/sensor noise off, ideal DAC and ADC linearity, nominal world and no
+    device variation: a deterministic plant for first experiments.
+
+fidelity:
+  self_heating: "off"
+  shot_noise: "off"
+  pattern_noise: "off"
+
+experiment:
+  uncertainty: nominal
+  variation: "off"
+
+laser:
+  rin_db_per_hz: {value: -200.0, provenance: assumed, generation: none, source: MODEL, range: [-200.0, -135.0],
+                  note: "teaching: RIN off (the schema floor)"}
+
+ring:
+  heater:
+    dac_inl_lsb: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: ideal DAC"}
+    dac_dnl_lsb: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: ideal DAC"}
+  monitor:
+    input_noise_pa_per_rt_hz: {value: 0.0, provenance: assumed, generation: none, source: MODEL, range: [0.0, 6.4],
+                               note: "teaching: no electronic noise"}
+    flicker_corner_hz: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: no 1/f noise"}
+    adc_inl_lsb: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: ideal ADC"}
+    adc_dnl_lsb: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: ideal ADC"}
+  bias_dac:
+    noise_rms_codes: {value: 0.0, provenance: assumed, generation: none, source: MODEL, note: "teaching: no bias noise"}
+
+temp_sensors:
+  value:
+    - {name: die0, attach: die, type: diode, sample_rate_hz: 1000.0, latency_s: 1.0e-3, noise_rms_k: 0.0,
+       flicker_corner_hz: 0.0, resolution_k: 0.0625, offset_sigma_k: 0.0, gain_error_sigma_frac: 0.0,
+       self_heating_k: 0.0, adc_bits: 12, code_zero_c: -40.0}
+  provenance: assumed
+  generation: none
+  source: MODEL
+  note: "teaching: the g26 die sensor without noise, offset or gain error"
