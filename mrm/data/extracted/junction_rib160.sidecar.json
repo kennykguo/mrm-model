@@ -2,7 +2,7 @@
  "schema": "junction/1",
  "artefact": "junction_rib160.json",
  "created_utc": "2026-10-09T16:17:31Z",
- "command": "python -m mrm.extraction.junction --xsec rib160 --topology lshape",
+ "command": "python -m mrm.extraction.junction --xsec rib160 --topology lshape --scale 2 --ladder 2.8284 2.3784 2 --study-scale 2.8284 --direct-mode-res-floor 0.0141 --doping-sweep",
  "study_level": "full",
  "inputs": {
   "geometry": {
@@ -48,7 +48,80 @@
    "sio2": 3.9
   },
   "lambda0_nm": 1310.0,
-  "t_k": 298.15
+  "t_k": 298.15,
+  "range_notes": {
+   "notes": [
+    "doping.junction_offset_nm = 100 lies outside its recorded range [-60, 60] (the lateral range about the rib centre); read it as the nominal +-60 nm, [40.0, 160.0], as the handoff's Jacobian table does",
+    "doping.y_junction_nm = 90.0 has no recorded range; the current code writes [60.0, 120.0] (reviewer assumption: from the slab top to 60 nm above it)",
+    "doping.outer_side = n has no recorded range; the current code writes ['n', 'p'] (two-valued; jacobian stores the difference)",
+    "fixed without a range and not swept: n_pp_cm3 = 1e+20, plus_grading_nm = 20, contact_width_nm = 300",
+    "the body doping (N_A 3.2e+18, N_D 3.2e+18 cm^-3, selected by CAL-5) lies above the 5e17-3e18 cm^-3 research range that doping.provenance quotes as containing it; it is inside the recorded assumed range 5e17-5e18",
+    "xsec.ranges.film_nm [155.0, 205.0] spans both film hypotheses; the modes artefact of rib160 uses [150.0, 170.0] (the current code writes that)",
+    "xsec.sidewall_deg = 90.0 is assumed without a range or Jacobian (as in the modes artefacts); listed as not modelled"
+   ],
+   "suggested_ranges": {
+    "doping": {
+     "na_cm3": [
+      5e+17,
+      5e+18
+     ],
+     "nd_cm3": [
+      5e+17,
+      5e+18
+     ],
+     "junction_offset_nm": [
+      40.0,
+      160.0
+     ],
+     "grading_nm": [
+      0.0,
+      30.0
+     ],
+     "plus_gap_nm": [
+      150.0,
+      500.0
+     ],
+     "n_plus_cm3": [
+      3e+18,
+      5e+19
+     ],
+     "pp_gap_nm": [
+      400.0,
+      900.0
+     ],
+     "contact_gap_nm": [
+      700.0,
+      1500.0
+     ],
+     "contact_rho_ohm_cm2": [
+      1e-08,
+      1e-06
+     ],
+     "y_junction_nm": [
+      60.0,
+      120.0
+     ],
+     "outer_side": [
+      "n",
+      "p"
+     ]
+    },
+    "xsec": {
+     "width_nm": [
+      360.0,
+      450.0
+     ],
+     "film_nm": [
+      150.0,
+      170.0
+     ],
+     "slab_nm": [
+      40.0,
+      100.0
+     ]
+    }
+   }
+  }
  },
  "tool_versions": {
   "python": "3.12.8",
@@ -92,7 +165,125 @@
    -0.5,
    4.0,
    0.05
-  ]
+  ],
+  "settings": {
+   "devsim_scale": 2.0,
+   "devsim_ladder": [
+    2.8284,
+    2.3784,
+    2.0
+   ],
+   "study_scale": 2.8284,
+   "direct_mode_res_floor_um": 0.0141,
+   "ac_jobs": 4,
+   "jacobian_mode_res_um": 0.016
+  },
+  "memory": {
+   "self_limit_gb_at_run_time": 2.7,
+   "rule_at_run_time": "3 GB per job (tools/memguard.py, --heavy was not used); since 2026-10-09 a --heavy job defaults to 6 GB",
+   "run_history": [
+    {
+     "time": "2026-10-09 11:04 EDT",
+     "job": "rib160 lshape",
+     "stage": "DEVSIM production DC sweep at scale 1.4142",
+     "nodes": 29868,
+     "nodes_si": 14862,
+     "outcome": "killed by memguard: RSS 2.86 GB > 2.7 GB"
+    },
+    {
+     "time": "2026-10-09 11:08 EDT",
+     "job": "rib160 lateral",
+     "stage": "direct re-solve on the 10 nm femwell mesh with the carrier fields",
+     "outcome": "killed by memguard: RSS 2.71 GB > 2.7 GB",
+     "completed_before_the_kill": "production DC sweep (scale 1.0, 10606 Si nodes), AC, DEVSIM ladder 2.0/1.4142/1.0, mode-mesh ladder 20/14.1/10 nm"
+    },
+    {
+     "time": "2026-10-09 11:17 EDT",
+     "job": "rib200 lshape",
+     "stage": "DEVSIM ladder level 4.0 at N_A = N_D = 4.2e18 (the ladder was then 4.0/2.8284/2.0)",
+     "outcome": "DEVSIM convergence failure at 0.4639 V reverse (not memory; peak 2.39 GB)"
+    },
+    {
+     "time": "2026-10-09 11:24 EDT",
+     "job": "rib200 lateral",
+     "stage": "DEVSIM small-signal AC, two jobs of five biases, scale 1.0 (13346 Si nodes)",
+     "outcome": "killed by memguard: RSS 2.73 GB > 2.7 GB"
+    },
+    {
+     "time": "2026-10-09 11:29 EDT",
+     "job": "rib160 lshape (re-run)",
+     "stage": "complete: scale 2.0, ladder 2.8284/2.3784/2.0, study 2.8284, direct re-solve 14.1 nm, four AC jobs",
+     "outcome": "junction_rib160.json written; peak RSS 2.00 GB; 2865 s"
+    },
+    {
+     "time": "2026-10-09 11:30-12:28 EDT",
+     "job": "rib160 lateral, rib200 lshape, rib200 lateral (re-runs)",
+     "stage": "queued (two re-run scripts, 11:30 and 12:28)",
+     "outcome": "never started before the session restart (empty logs)"
+    }
+   ],
+   "reductions": [
+    {
+     "what": "L-shape DEVSIM production mesh, ladder and study level",
+     "intended": {
+      "devsim_scale": 1.4142,
+      "devsim_ladder": [
+       2.8284,
+       2.0,
+       1.4142
+      ],
+      "study_scale": 2.0
+     },
+     "used": {
+      "devsim_scale": 2.0,
+      "devsim_ladder": [
+       2.8284,
+       2.3784,
+       2.0
+      ],
+      "study_scale": 2.8284
+     },
+     "trigger": "killed by memguard: RSS 2.86 GB > 2.7 GB",
+     "accuracy_consequence": "convergence.devsim_mesh: the forced-order-2 Richardson errors (2e-5 to 5e-4) are not supported (free_order_view); the coarse-to-fine spread is 1.4e-4 to 1.3e-3, and the lateral junction moved by up to 1.3e-3 between 2.0 and 1.0 nm (logged run), so the 2.0 nm values carry about 1e-3 of mesh error. The coarser ladder is the larger loss: it shows no convergence order",
+     "intended_mesh": {
+      "scale": 1.4142,
+      "h_junction_nm": 1.4142,
+      "triangles": 58904,
+      "nodes": 29868,
+      "nodes_si": 14862
+     },
+     "intended_est_peak_gb": [
+      2.86,
+      2.86
+     ],
+     "scale_1_mesh": {
+      "scale": 1.0,
+      "h_junction_nm": 1.0,
+      "triangles": 104988,
+      "nodes": 53050,
+      "nodes_si": 27674
+     },
+     "scale_1_est_peak_gb": [
+      5.07,
+      5.7
+     ],
+     "intended_est_peak_note": "the calibration point itself: the DC sweep at 1.4142 was killed at 2.86 GB, so its peak is >= 2.86 GB; the AC jobs (2-3 small-signal solves, about 75 MB each at this size) add about 0.2 GB: about 3.1 GB",
+     "fits_6gb": "intended (1.4142) yes; scale 1.0 marginal (estimate 5.1-5.7 GB from a lower-bound calibration), not recommended with UMFPACK"
+    },
+    {
+     "what": "direct re-solve mode mesh floored at 14.1 nm (production mode mesh 10 nm)",
+     "trigger": "killed by memguard: RSS 2.71 GB > 2.7 GB",
+     "accuracy_consequence": "the 14.1 -> 10 nm change of the perturbative dn_eff(1.6 V) is 1.1e-4 relative and of alpha(0) 1.7e-4 (convergence.mode_mesh), so the stored direct-vs-perturbative differences carry about 1e-4 of mesh mismatch (tolerance 2e-2)",
+     "fits_6gb": "yes (killed at 2.71 GB under a 2.7 GB limit)"
+    },
+    {
+     "what": "AC small-signal solves split into four jobs instead of two",
+     "trigger": "killed by memguard: RSS 2.73 GB > 2.7 GB",
+     "accuracy_consequence": "none (identical solutions; dn_eff of the AC runs equals the DC run to 5.5e-16)",
+     "fits_6gb": "yes"
+    }
+   ]
+  }
  },
  "convergence": {
   "devsim_mesh": {
@@ -127,7 +318,8 @@
     "extrapolated": 0.00029813,
     "observed_order": 2.0,
     "error_estimate": 1.04329e-07,
-    "rel_error_estimate": 0.0003499
+    "rel_error_estimate": 0.0003499,
+    "order_forced": true
    },
    "dneff_1v": {
     "values": [
@@ -143,7 +335,8 @@
     "extrapolated": 0.000203148,
     "observed_order": 2.0,
     "error_estimate": 4.63695e-08,
-    "rel_error_estimate": 0.0002283
+    "rel_error_estimate": 0.0002283,
+    "order_forced": true
    },
    "dneff_4v": {
     "values": [
@@ -159,7 +352,8 @@
     "extrapolated": 0.000586465,
     "observed_order": 2.0,
     "error_estimate": 4.66764e-08,
-    "rel_error_estimate": 7.959e-05
+    "rel_error_estimate": 7.959e-05,
+    "order_forced": true
    },
    "dneff_fwd0v5": {
     "values": [
@@ -175,7 +369,8 @@
     "extrapolated": -0.000147442,
     "observed_order": 2.0,
     "error_estimate": 4.30801e-09,
-    "rel_error_estimate": 2.922e-05
+    "rel_error_estimate": 2.922e-05,
+    "order_forced": true
    },
    "alpha_fca_0v_per_m": {
     "values": [
@@ -191,7 +386,8 @@
     "extrapolated": 1394.45,
     "observed_order": 2.0,
     "error_estimate": 0.544496,
-    "rel_error_estimate": 0.0003905
+    "rel_error_estimate": 0.0003905,
+    "order_forced": true
    },
    "alpha_fca_2v_per_m": {
     "values": [
@@ -207,7 +403,8 @@
     "extrapolated": 1179.3,
     "observed_order": 2.0,
     "error_estimate": 0.610546,
-    "rel_error_estimate": 0.0005177
+    "rel_error_estimate": 0.0005177,
+    "order_forced": true
    },
    "c_1v_f_per_m": {
     "values": [
@@ -223,7 +420,8 @@
     "extrapolated": 1.04159e-09,
     "observed_order": 2.0,
     "error_estimate": 3.07496e-13,
-    "rel_error_estimate": 0.0002952
+    "rel_error_estimate": 0.0002952,
+    "order_forced": true
    },
    "c_2v_f_per_m": {
     "values": [
@@ -239,7 +437,8 @@
     "extrapolated": 8.52143e-10,
     "observed_order": 2.0,
     "error_estimate": 1.57243e-13,
-    "rel_error_estimate": 0.0001845
+    "rel_error_estimate": 0.0001845,
+    "order_forced": true
    },
    "r_series_1v_ohm_m": {
     "values": [
@@ -256,6 +455,122 @@
     "observed_order": 5.673,
     "error_estimate": 6.78745e-08,
     "rel_error_estimate": 2.297e-05
+   },
+   "free_order_view": {
+    "rows": {
+     "dneff_1v6": {
+      "observed_order": null,
+      "apparent_order": 8.924064678548975,
+      "pattern": "apparent order above 8 (the first increment dominates; not in the asymptotic range)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.000824854543942517,
+      "all_levels_spread_rel": 0.000824854543942517,
+      "finest_step_rel": 0.00014485250527768192,
+      "ladder_spread_rel": 0.000824854543942517
+     },
+     "dneff_1v": {
+      "observed_order": null,
+      "apparent_order": 12.119324729299631,
+      "pattern": "apparent order above 8 (the first increment dominates; not in the asymptotic range)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0008661673080898375,
+      "all_levels_spread_rel": 0.0008661673080898375,
+      "finest_step_rel": 9.449097906441625e-05,
+      "ladder_spread_rel": 0.0008661673080898375
+     },
+     "dneff_4v": {
+      "observed_order": null,
+      "apparent_order": 17.408883014731153,
+      "pattern": "apparent order above 8 (the first increment dominates; not in the asymptotic range)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0007085957817409339,
+      "all_levels_spread_rel": 0.0007085957817409339,
+      "finest_step_rel": 3.3076896452778864e-05,
+      "ladder_spread_rel": 0.0007085957817409339
+     },
+     "dneff_fwd0v5": {
+      "observed_order": null,
+      "apparent_order": null,
+      "pattern": "non-monotone",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0012778243886756987,
+      "all_levels_spread_rel": 0.0012778243886756987,
+      "finest_step_rel": 1.2208513267536645e-05,
+      "ladder_spread_rel": 0.0012778243886756987
+     },
+     "alpha_fca_0v_per_m": {
+      "observed_order": null,
+      "apparent_order": -3.165741112464127,
+      "pattern": "increments grow under refinement (no convergence visible at these levels)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.00025468037971052395,
+      "all_levels_spread_rel": 0.00025468037971052395,
+      "finest_step_rel": 0.00016141714206997687,
+      "ladder_spread_rel": 0.00025468037971052395
+     },
+     "alpha_fca_2v_per_m": {
+      "observed_order": null,
+      "apparent_order": -0.42767264986356734,
+      "pattern": "increments grow under refinement (no convergence visible at these levels)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0004123207550050109,
+      "all_levels_spread_rel": 0.0004123207550050109,
+      "finest_step_rel": 0.00021379594703964958,
+      "ladder_spread_rel": 0.0004123207550050109
+     },
+     "c_1v_f_per_m": {
+      "observed_order": null,
+      "apparent_order": 11.16496050158343,
+      "pattern": "apparent order above 8 (the first increment dominates; not in the asymptotic range)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0009732210641894127,
+      "all_levels_spread_rel": 0.0009732210641894127,
+      "finest_step_rel": 0.00012285236313245123,
+      "ladder_spread_rel": 0.0009732210641894127
+     },
+     "c_2v_f_per_m": {
+      "observed_order": null,
+      "apparent_order": 12.712463696043176,
+      "pattern": "apparent order above 8 (the first increment dominates; not in the asymptotic range)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.0007676868034955493,
+      "all_levels_spread_rel": 0.0007676868034955493,
+      "finest_step_rel": 7.638149305764093e-05,
+      "ladder_spread_rel": 0.0007676868034955493
+     },
+     "r_series_1v_ohm_m": {
+      "observed_order": 5.711,
+      "apparent_order": 5.711152238280973,
+      "pattern": "monotone, order observed",
+      "order_forced_in_stored_entry": false,
+      "last3_spread_rel": 0.00014113709793709203,
+      "all_levels_spread_rel": 0.00014113709793709203,
+      "finest_step_rel": 3.8245784333162665e-05,
+      "free_rel_error_estimate": 2.263e-05,
+      "ladder_spread_rel": 0.00014113709793709203
+     }
+    },
+    "summary": {
+     "entries": 9,
+     "order_forced": [
+      "alpha_fca_0v_per_m",
+      "alpha_fca_2v_per_m",
+      "c_1v_f_per_m",
+      "c_2v_f_per_m",
+      "dneff_1v",
+      "dneff_1v6",
+      "dneff_4v",
+      "dneff_fwd0v5"
+     ],
+     "observed": [
+      "r_series_1v_ohm_m"
+     ],
+     "all_levels_spread_rel_range": [
+      0.00014113709793709203,
+      0.0012778243886756987
+     ]
+    },
+    "note": "where no order in [0.2, 8] is observed (see pattern) the stored entry forced order 2 (order_forced) and its error estimate rests on that assumption. The supported error scale is the coarse-to-fine spread (all_levels_spread_rel): for monotone convergence of order p the finest-level error is spread / ((h_coarse/h_fine)^p - 1), 1.0x the spread at p = 2 and 2.4x at p = 1 on a sqrt(2) ladder. A narrow ladder (ratio 2^0.25 per step) makes the increments comparable with mesh-to-mesh noise, so apparent orders far above 2 or growing increments mean 'not asymptotic', not 'converged'"
    }
   },
   "oxide_effect_on_dneff": {
@@ -401,7 +716,8 @@
     "extrapolated": 0.000298224,
     "observed_order": 4.0,
     "error_estimate": 1.07464e-08,
-    "rel_error_estimate": 3.603e-05
+    "rel_error_estimate": 3.603e-05,
+    "order_forced": true
    },
    "alpha_fca_0v_per_m": {
     "values": [
@@ -421,7 +737,77 @@
     "extrapolated": 1393.82,
     "observed_order": 4.0,
     "error_estimate": 0.082583,
-    "rel_error_estimate": 5.925e-05
+    "rel_error_estimate": 5.925e-05,
+    "order_forced": true
+   },
+   "free_order_view": {
+    "rows": {
+     "n_eff": {
+      "observed_order": 3.604,
+      "apparent_order": 3.6601499971064766,
+      "pattern": "monotone, order observed",
+      "order_forced_in_stored_entry": false,
+      "last3_spread_rel": 6.712423016909783e-05,
+      "all_levels_spread_rel": 0.00018950316200141542,
+      "finest_step_rel": 1.4734587110325232e-05,
+      "free_rel_error_estimate": 6.014e-06
+     },
+     "n_g": {
+      "observed_order": 4.317,
+      "apparent_order": 4.375254006372377,
+      "pattern": "monotone, order observed",
+      "order_forced_in_stored_entry": false,
+      "last3_spread_rel": 1.2694334391588091e-05,
+      "all_levels_spread_rel": 7.261159272005526e-05,
+      "finest_step_rel": 2.284980190472327e-06,
+      "free_rel_error_estimate": 6.707e-07
+     },
+     "dneff_dnsi": {
+      "observed_order": 2.995,
+      "apparent_order": 3.049135805331702,
+      "pattern": "monotone, order observed",
+      "order_forced_in_stored_entry": false,
+      "last3_spread_rel": 7.492907317287096e-05,
+      "all_levels_spread_rel": 0.00015833288289760386,
+      "finest_step_rel": 1.93265333563441e-05,
+      "free_rel_error_estimate": 1.075e-05
+     },
+     "dneff_1v6": {
+      "observed_order": null,
+      "apparent_order": null,
+      "pattern": "non-monotone",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.00010629223188192866,
+      "all_levels_spread_rel": 0.0004677528816259085,
+      "finest_step_rel": 0.00010629223188192866
+     },
+     "alpha_fca_0v_per_m": {
+      "observed_order": null,
+      "apparent_order": -5.861474675110983,
+      "pattern": "increments grow under refinement (no convergence visible at these levels)",
+      "order_forced_in_stored_entry": true,
+      "last3_spread_rel": 0.00019800502760596662,
+      "all_levels_spread_rel": 0.00019800502760596662,
+      "finest_step_rel": 0.00017504792295589547
+     }
+    },
+    "summary": {
+     "entries": 5,
+     "order_forced": [
+      "alpha_fca_0v_per_m",
+      "dneff_1v6"
+     ],
+     "observed": [
+      "dneff_dnsi",
+      "n_eff",
+      "n_g"
+     ],
+     "last3_spread_rel_range": [
+      1.2694334391588091e-05,
+      0.00019800502760596662
+     ]
+    },
+    "note": "entries with order_forced_in_stored_entry: the stored order 4 was assumed on a sequence that shows no order (pattern), so the stored error estimate is not supported; use last3_spread_rel (spread of the three finest levels) as the error scale"
    }
   },
   "bias_grid": {
@@ -560,7 +946,77 @@
     "dneff_dnsi": 0.971222130884429
    },
    "delta_n_eff": -0.01766,
-   "delta_dneff_dnsi": -0.01052
+   "delta_dneff_dnsi": -0.01052,
+   "reassessment": {
+    "finest_dl_nm": 6.666666666666667,
+    "delta_n_eff_finest": 0.00032373571766131093,
+    "delta_dneff_dnsi_finest": 0.0006261850684433634,
+    "free_order_n_eff": {
+     "values": [
+      2.459566,
+      2.446154,
+      2.437163
+     ],
+     "h": [
+      20.0,
+      10.0,
+      6.666667
+     ],
+     "extrapolated": 2.43716,
+     "observed_order": null,
+     "error_estimate": 0.0224025,
+     "note": "no observed order in [0.2, 8] (non-monotone or non-asymptotic): finest value, error = spread of the last three"
+    },
+    "free_order_dneff_dnsi": {
+     "values": [
+      0.9861597,
+      0.9774191,
+      0.9718483
+     ],
+     "h": [
+      20.0,
+      10.0,
+      6.666667
+     ],
+     "extrapolated": 0.971848,
+     "observed_order": null,
+     "error_estimate": 0.0143114,
+     "note": "no observed order in [0.2, 8] (non-monotone or non-asymptotic): finest value, error = spread of the last three"
+    },
+    "order_test_n_eff": {
+     "d12_over_d23": 1.4918527212942239,
+     "minimum_for_any_positive_order": 1.7095112913514547,
+     "power_law_possible": false
+    },
+    "order_test_dneff_dnsi": {
+     "d12_over_d23": 1.5689875082963571,
+     "minimum_for_any_positive_order": 1.7095112913514547,
+     "power_law_possible": false
+    },
+    "stored_extrapolation_valid": false,
+    "modes_artefact_tidy3d_straight": {
+     "dl_nm": [
+      2.5,
+      5.0,
+      10.0
+     ],
+     "n_eff": [
+      2.4390019150135926,
+      2.4414563035982835,
+      2.447009483292456
+     ],
+     "extrapolated": 2.437057923595059,
+     "observed_order": 1.177950402524909,
+     "error_estimate": 0.0019439914185337415,
+     "delta_vs_junction_femwell_straight": 0.00021832486278183794,
+     "within_error": true,
+     "source": "modes_<xsec>.json crosscheck (interface-aligned grids, +R/-R mean for the bend)"
+    },
+    "verdict": "no power law fits this Tidy3D series (d12/d23 = 1.492 below 1.710, the minimum for any positive order with these refinement ratios): the forced first-order extrapolation stored as delta_n_eff is not valid. The finest grid (6.67 nm) is 3.24e-04 from femwell in n_eff and 6.26e-04 in dn_eff/dn_Si. This stage alone neither confirms nor refutes femwell at the 2e-3 level. The modes artefact's independent Tidy3D run of the same cross-section extrapolates to 2.437058 +- 0.0019, 2.18e-04 from this femwell n_eff.",
+    "status": "consistent via the modes artefact's Tidy3D run"
+   },
+   "delta_n_eff_valid": false,
+   "delta_note": "delta_n_eff and delta_dneff_dnsi come from a first-order extrapolation that no power law supports (reassessment); do not use them"
   },
   "weight_integral": {
    "over_devsim_si_nodes": 0.9675295606423315,
@@ -713,15 +1169,37 @@
    "note": "analytic = abrupt box depletion through the 2-D femwell weight; its C has no fringe field; its r_s is the 1-D series sum of sheet resistances (no current spreading)"
   },
   "modes_artefact_consistency": {
+   "modes_sha256": "deab882d53fa1fb01564f6708435d457442b6cac79565fa6fbe2ec0d625d9b74",
+   "modes_r_ref_um": 6.726957098619907,
+   "junction_r_ref_um": 6.726957,
+   "delta_r_ref_um": -9.861990779569396e-08,
+   "straight": {
+    "modes_n_eff": 2.436899990654657,
+    "junction_n_eff": 2.436839598732277,
+    "modes_n_g": 3.9449990080299475,
+    "junction_n_g": 3.945028756222267,
+    "modes_index_weight_si": 0.9712478787435863,
+    "junction_index_weight_si": 0.971222130884429,
+    "delta_n_eff": -6.039192237983215e-05,
+    "rel_diff_n_g": 7.5407350568212905e-06,
+    "rel_diff_index_weight_si": -2.6510080197716945e-05
+   },
    "modes_n_eff": 2.4399315138864743,
    "junction_n_eff_bent": 2.443230981165569,
    "modes_n_g": 3.94048550161624,
    "junction_n_g_bent": 3.938764964849158,
    "modes_index_weight_si": 0.9684172952799663,
    "junction_index_weight_si": 0.9675816959456275,
-   "rel_diff_n_g": -0.0004366,
-   "rel_diff_index_weight_si": -0.0008629,
-   "note": "modes uses the exact anisotropic bend transform and its own mesh; this file the isotropic conformal map (femwell). Same geometry, materials, r_ref."
+   "note": "modes: exact anisotropic bend transform (mrm.extraction.common, formulation 'exact') on its own mesh; junction: femwell's isotropic conformal map. Same geometry, materials and r_ref. The straight rows compare two independent femwell meshes and domains; the bent rows differ by the bend formulation (see uncertainty.model.bend_formulation).",
+   "delta_n_eff_bent": 0.003299467279094692,
+   "rel_diff_n_g": -0.00043663065537902224,
+   "rel_diff_index_weight_si": -0.0008628504864706121,
+   "bend_shift_n_eff": {
+    "junction_isotropic": 0.006391382433291959,
+    "modes_isotropic": 0.006397621562865385,
+    "modes_exact": 0.0030315232318174345,
+    "tidy3d_finest": 0.0030199202658205415
+   }
   },
   "bend_effect": {
    "dneff_1v6_straight": 0.0003068496610564013,
@@ -734,20 +1212,33 @@
   "numerical": {
    "dneff_1v6": {
     "devsim_mesh_rel": 0.00035,
-    "mode_mesh_rel": 3.6e-05
+    "mode_mesh_rel": 3.6e-05,
+    "devsim_mesh_order_forced": true,
+    "devsim_mesh_rel_spread": 0.000824854543942517,
+    "mode_mesh_order_forced": true,
+    "mode_mesh_rel_spread_last3": 0.00010629223188192866
    },
    "alpha_fca_0v_per_m": {
     "devsim_mesh_rel": 0.000391,
-    "mode_mesh_rel": 5.92e-05
+    "mode_mesh_rel": 5.92e-05,
+    "devsim_mesh_order_forced": true,
+    "devsim_mesh_rel_spread": 0.00025468037971052395,
+    "mode_mesh_order_forced": true,
+    "mode_mesh_rel_spread_last3": 0.00019800502760596662
    },
    "c_1v_f_per_m": {
     "devsim_mesh_rel": 0.000295,
-    "mode_mesh_rel": null
+    "mode_mesh_rel": null,
+    "devsim_mesh_order_forced": true,
+    "devsim_mesh_rel_spread": 0.0009732210641894127
    },
    "r_series_1v_ohm_m": {
     "devsim_mesh_rel": 2.3e-05,
-    "mode_mesh_rel": null
-   }
+    "mode_mesh_rel": null,
+    "devsim_mesh_order_forced": false,
+    "devsim_mesh_rel_spread": 0.00014113709793709203
+   },
+   "note": "devsim_mesh_rel and mode_mesh_rel are Richardson estimates; where *_order_forced is true the order was assumed, not observed, and the *_rel_spread values (spread of the levels) are the supported error scale"
   },
   "model": {
    "plasma_dispersion_soref_vs_nsm_dneff": 0.071,
@@ -758,12 +1249,346 @@
     "vertical implant profiles (box profiles assumed)",
     "sidewall angle and roughness",
     "pads, vias and C_pad"
-   ]
+   ],
+   "bend_formulation": {
+    "k_range": [
+     0.47385160282279454,
+     0.777539912456683
+    ],
+    "k_from_n_g_bend_change": 0.7205710000311527,
+    "k_basis": "exact/isotropic ratio of the bend effect on the same rib at the same r_ref: n_eff shift (lower), Si index weight (upper); n_g gives a value inside the range",
+    "stored_bend_effect": {
+     "dneff_1v6": -0.02807674245730074,
+     "alpha_fca_0v": 0.042111370037014595,
+     "dneff_range_over_bias": [
+      -0.03180848659689117,
+      -0.023409857304949266
+     ]
+    },
+    "bias_of_stored": {
+     "dneff_1v6_rel": [
+      -0.014971719939246952,
+      -0.006385351846636356
+     ],
+     "alpha_fca_0v_rel": [
+      0.009071082163707667,
+      0.0217233503797174
+     ],
+     "dneff_1v6_rel_hard_bound": [
+      -0.02807674245730074,
+      0.0
+     ],
+     "alpha_fca_0v_rel_hard_bound": [
+      0.0,
+      0.042111370037014595
+     ],
+     "dneff_shape_0_to_4v_rel": [
+      0.001868359807529263,
+      0.004418925340440761
+     ]
+    },
+    "consequence_for_cal5": {
+     "fill_endpoint_stored": 0.8517,
+     "fill_endpoint_exact_estimate": [
+      0.8393150568110682,
+      0.8466312609945722
+     ],
+     "n_g_ratio_modes_over_junction": 1.0004368213849866,
+     "ring_alpha_fca_0v_per_m_stored": 1187.18820714,
+     "ring_alpha_fca_0v_per_m_exact_estimate": [
+      1145.0504506698326,
+      1169.5141119505115
+     ],
+     "note": "the runtime calibrates fill to CAL-5, so fill x dneff is fixed; what remains is the calibrated fill (C_j, R_s and the ring-average alpha_FCA scale with it) and alpha_FCA per unit of shift (eta)"
+    },
+    "fix": "solve the bent TE0 with mrm.extraction.common.FemProblem(...).solve(formulation='exact') and take the index-weight density of the transformed tensors (as mrm.extraction.modes.index_weight_block does) in place of femwell compute_modes(radius=...); then re-run the extraction"
+   }
   },
-  "assumption_jacobian": "see artefact.jacobian (per unit of each input)"
+  "assumption_jacobian": "see artefact.jacobian (per unit of each input)",
+  "jacobian_remesh_noise": {
+   "noise_over_value": {
+    "dneff_1v6": {
+     "width_nm": 0.14122411692418235,
+     "film_nm": 0.4620215478460491,
+     "slab_nm": 0.019344961516446775,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.01675168836361892,
+     "y_junction_nm": 0.05863789130392264,
+     "plus_gap_nm": 6.345190629686482,
+     "contact_gap_nm": 3.9613031634988416,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "dneff_1v": {
+     "width_nm": 0.12485642981927808,
+     "film_nm": 0.5276078876395911,
+     "slab_nm": 0.01818122611353745,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.0178642725033193,
+     "y_junction_nm": 0.06651780282691272,
+     "plus_gap_nm": 6.0228205982128475,
+     "contact_gap_nm": 3.3255134122376866,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "dneff_4v": {
+     "width_nm": 0.1281568138810885,
+     "film_nm": 0.22473494672371574,
+     "slab_nm": 0.014823727274269616,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.0137485782613854,
+     "y_junction_nm": 0.03858019410082637,
+     "plus_gap_nm": 6.702030334492118,
+     "contact_gap_nm": 8.503260936555069,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "dneff_fwd0v5": {
+     "width_nm": 0.15351435712152783,
+     "film_nm": 273.6190450392118,
+     "slab_nm": 0.026228926867482398,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.028082061814233693,
+     "y_junction_nm": 0.14278891986294254,
+     "plus_gap_nm": 535.6535772462721,
+     "contact_gap_nm": 2.714612779262245,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "eff_avg_0_1v6_pm_per_v_fill1": {
+     "width_nm": 0.20275506998115742,
+     "film_nm": 0.056634672718783446,
+     "slab_nm": 0.026498958646193466,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.016751153745924906,
+     "y_junction_nm": 0.058637386913862194,
+     "plus_gap_nm": 6.345313362413958,
+     "contact_gap_nm": 3.961339143036811,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "alpha_fca_0v_per_m": {
+     "width_nm": 0.17661663494050284,
+     "film_nm": 0.034935996936395194,
+     "slab_nm": 0.005892940650915349,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.01252592604168917,
+     "y_junction_nm": 0.013742868866029852,
+     "plus_gap_nm": 0.0208672147498366,
+     "contact_gap_nm": 0.16260862662202002,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "alpha_fca_2v_per_m": {
+     "width_nm": 0.09432269573488347,
+     "film_nm": 0.028546222359439648,
+     "slab_nm": 0.0041362248796334095,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.012628668298662367,
+     "y_junction_nm": 0.01862514327772664,
+     "plus_gap_nm": 0.028521920570259443,
+     "contact_gap_nm": 0.21934242916423333,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "c_1v_f_per_m": {
+     "width_nm": 0.03949979943022655,
+     "film_nm": 0.7457107091022713,
+     "slab_nm": 0.28834034435359834,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.019834033809338753,
+     "y_junction_nm": 0.04909247139826368,
+     "plus_gap_nm": 3.249933867500565,
+     "contact_gap_nm": 2.0608869972773634,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "c_2v_f_per_m": {
+     "width_nm": 0.031276380276822044,
+     "film_nm": 0.45835244118405866,
+     "slab_nm": 0.1426056357069378,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.015656137563971554,
+     "y_junction_nm": 0.04054252352644085,
+     "plus_gap_nm": 4.322270025251964,
+     "contact_gap_nm": 1.0811741256778717,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "r_series_1v_ohm_m": {
+     "width_nm": 0.01691719329021123,
+     "film_nm": 0.011220461956202965,
+     "slab_nm": 0.0010238971190062768,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.010322880560300719,
+     "y_junction_nm": 0.06238178641030357,
+     "plus_gap_nm": 0.002685784242660049,
+     "contact_gap_nm": 0.007721990329120754,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    },
+    "f_rc_1v_ghz": {
+     "width_nm": 0.033749719973427204,
+     "film_nm": 0.09932629472336918,
+     "slab_nm": 0.00851863788473361,
+     "log10_na_cm3": 0.0,
+     "log10_nd_cm3": 0.0,
+     "junction_offset_nm": 0.017724474219433413,
+     "y_junction_nm": 0.05066051867453652,
+     "plus_gap_nm": 0.021267404588482808,
+     "contact_gap_nm": 0.05946976938560284,
+     "grading_nm": 0.0,
+     "outer_side": 0.0
+    }
+   },
+   "above_0p2": [
+    {
+     "of": "dneff_1v6",
+     "d": "film_nm",
+     "noise_over_value": 0.462,
+     "effect_over_range_rel": 0.00403
+    },
+    {
+     "of": "dneff_1v",
+     "d": "film_nm",
+     "noise_over_value": 0.528,
+     "effect_over_range_rel": 0.00328
+    },
+    {
+     "of": "dneff_1v",
+     "d": "plus_gap_nm",
+     "noise_over_value": 6.023,
+     "effect_over_range_rel": 0.00101
+    },
+    {
+     "of": "dneff_1v",
+     "d": "contact_gap_nm",
+     "noise_over_value": 3.326,
+     "effect_over_range_rel": 0.00104
+    },
+    {
+     "of": "dneff_4v",
+     "d": "film_nm",
+     "noise_over_value": 0.225,
+     "effect_over_range_rel": 0.00631
+    },
+    {
+     "of": "dneff_fwd0v5",
+     "d": "contact_gap_nm",
+     "noise_over_value": 2.715,
+     "effect_over_range_rel": 0.00188
+    },
+    {
+     "of": "eff_avg_0_1v6_pm_per_v_fill1",
+     "d": "width_nm",
+     "noise_over_value": 0.203,
+     "effect_over_range_rel": 0.02067
+    },
+    {
+     "of": "alpha_fca_2v_per_m",
+     "d": "contact_gap_nm",
+     "noise_over_value": 0.219,
+     "effect_over_range_rel": 0.00752
+    },
+    {
+     "of": "c_1v_f_per_m",
+     "d": "film_nm",
+     "noise_over_value": 0.746,
+     "effect_over_range_rel": 0.00261
+    },
+    {
+     "of": "c_1v_f_per_m",
+     "d": "slab_nm",
+     "noise_over_value": 0.288,
+     "effect_over_range_rel": 0.02025
+    },
+    {
+     "of": "c_1v_f_per_m",
+     "d": "plus_gap_nm",
+     "noise_over_value": 3.25,
+     "effect_over_range_rel": 0.0021
+    },
+    {
+     "of": "c_1v_f_per_m",
+     "d": "contact_gap_nm",
+     "noise_over_value": 2.061,
+     "effect_over_range_rel": 0.00189
+    },
+    {
+     "of": "c_2v_f_per_m",
+     "d": "film_nm",
+     "noise_over_value": 0.458,
+     "effect_over_range_rel": 0.00335
+    },
+    {
+     "of": "c_2v_f_per_m",
+     "d": "plus_gap_nm",
+     "noise_over_value": 4.322,
+     "effect_over_range_rel": 0.00124
+    },
+    {
+     "of": "c_2v_f_per_m",
+     "d": "contact_gap_nm",
+     "noise_over_value": 1.081,
+     "effect_over_range_rel": 0.00284
+    }
+   ],
+   "note": "upper estimate (the ladder spread also holds the systematic part that cancels in a difference on similar meshes); doping-level, grading and outer_side steps reuse the nominal DEVSIM mesh (0 here). above_0p2 lists the entries whose noise may exceed 20 % of their value and whose effect over the assumed range exceeds 1e-3 of the output (entries with a smaller effect, such as the implant and contact gaps on dn_eff and C, are zero within noise and negligible)"
+  }
  },
  "seconds": 2865.5,
  "quick": false,
  "sha256": "809979b82be7df21a1e722a3b08c86dd41bc1687f0b8a233f3b1bf199fdbb561",
- "data_file": "junction_rib160.json"
+ "data_file": "junction_rib160.json",
+ "not_done": [
+  {
+   "artefact": "junction_rib160_lateral.json",
+   "why": "killed at the direct re-solve (2.71 GB > 2.7 GB self-limit); the re-run never started before the session restart",
+   "command_as_committed_settings": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib160 --topology lateral --doping-sweep",
+   "command_intended_settings_6gb": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib160 --topology lateral --doping-sweep --direct-mode-res-floor 0.010",
+   "runtime_fallback": "none needed (alternative topology; the default L-shape artefact or the analytic law)"
+  },
+  {
+   "artefact": "junction_rib200.json",
+   "why": "DEVSIM convergence failure on the coarse ladder level 4.0 (not memory); the ladder and the DC tolerance fallback were fixed afterwards, the re-run never started",
+   "command_as_committed_settings": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib200 --topology lshape --doping-sweep",
+   "command_intended_settings_6gb": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib200 --topology lshape --doping-sweep --scale 1.4142 --ladder 2.8284 2.0 1.4142 --study-scale 2.0 --direct-mode-res-floor 0.010",
+   "runtime_fallback": "fidelity.junction_model = analytic (the g26 default): the analytic depletion law with the preset fill, eff_at_0v, V_bi, exponent, C0, R_s and q"
+  },
+  {
+   "artefact": "junction_rib200_lateral.json",
+   "why": "killed in the AC stage (2.73 GB > 2.7 GB self-limit); the re-run never started",
+   "command_as_committed_settings": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib200 --topology lateral --doping-sweep",
+   "command_intended_settings_6gb": ".venv/bin/python tools/memguard.py --heavy -- .venv/bin/python -m mrm.extraction.junction --xsec rib200 --topology lateral --doping-sweep --direct-mode-res-floor 0.010",
+   "runtime_fallback": "none needed (alternative topology; the default L-shape artefact or the analytic law)"
+  }
+ ],
+ "history": [
+  {
+   "sidecar_update_utc": "2026-10-09T20:07:52Z",
+   "note": "postprocess (no solver): validation.modes_artefact_consistency (straight and bent, bend shifts); validation.tidy3d_vs_femwell.reassessment; uncertainty.model.bend_formulation; convergence.devsim_mesh.free_order_view (order_forced flags); convergence.mode_mesh.free_order_view (order_forced flags); uncertainty.numerical (spreads); uncertainty.jacobian_remesh_noise; inputs.range_notes; mesh.settings, mesh.memory (run history, reductions, mesh counts without solving); not_done, open_issues. Data file unchanged.",
+   "command": "python -m mrm.extraction.junction --postprocess"
+  }
+ ],
+ "open_issues": [
+  "bent-mode overlap uses femwell's isotropic bend map: dn_eff low by 0.6-1.5 %, alpha_FCA high by 0.9-2.2 % (uncertainty.model.bend_formulation; fix described there)",
+  "the junction's own Tidy3D stage is inconclusive (no power law); the independent check is the modes artefact's Tidy3D run (validation.tidy3d_vs_femwell.reassessment)",
+  "doping.provenance says the lateral junction cannot reach CAL-5 with fill <= 1 up to 5e18; the lateral sweep that shows it (fill 1.46-3.46) is from an unarchived run of an earlier code version, recorded in docs/handoff/extract_junction.md; junction_<xsec>_lateral.json does not exist yet",
+  "CAL-5 fill without the self-heating relief (the G25 measurement power is not published); reports.cal5.selfheat_relief brackets it (fill 0.90-1.19)",
+  "not modelled: incomplete ionization, band-gap narrowing, implant profiles (box/erf assumed), sidewall angle, pads and vias (uncertainty.model.not_modelled)",
+  "convergence orders forced, not observed, for: alpha_fca_0v_per_m, alpha_fca_2v_per_m, c_1v_f_per_m, c_2v_f_per_m, dneff_1v, dneff_1v6, dneff_4v, dneff_fwd0v5, mode_mesh.alpha_fca_0v_per_m, mode_mesh.dneff_1v6; their stored error estimates rest on the assumed order; use the spreads in the free_order_view blocks (and uncertainty.numerical *_rel_spread)",
+  "assumption labels: doping.junction_offset_nm = 100 lies outside its recorded range [-60, 60] (the lateral range about the rib centre); read it as the nominal +-60 nm, [40.0, 160.0], as the handoff's Jacobian table does; doping.y_junction_nm = 90.0 has no recorded range; the current code writes [60.0, 120.0] (reviewer assumption: from the slab top to 60 nm above it); doping.outer_side = n has no recorded range; the current code writes ['n', 'p'] (two-valued; jacobian stores the difference); fixed without a range and not swept: n_pp_cm3 = 1e+20, plus_grading_nm = 20, contact_width_nm = 300; the body doping (N_A 3.2e+18, N_D 3.2e+18 cm^-3, selected by CAL-5) lies above the 5e17-3e18 cm^-3 research range that doping.provenance quotes as containing it; it is inside the recorded assumed range 5e17-5e18; xsec.ranges.film_nm [155.0, 205.0] spans both film hypotheses; the modes artefact of rib160 uses [150.0, 170.0] (the current code writes that); xsec.sidewall_deg = 90.0 is assumed without a range or Jacobian (as in the modes artefacts); listed as not modelled (inputs.range_notes)",
+  "Jacobian entries whose re-meshing noise may exceed 20 % of the value: d dneff_1v6/d film_nm (0.46), d dneff_1v/d film_nm (0.53), d dneff_1v/d plus_gap_nm (6), d dneff_1v/d contact_gap_nm (3.3), d dneff_4v/d film_nm (0.23), d dneff_fwd0v5/d contact_gap_nm (2.7), d eff_avg_0_1v6_pm_per_v_fill1/d width_nm (0.2), d alpha_fca_2v_per_m/d contact_gap_nm (0.22), d c_1v_f_per_m/d film_nm (0.75), d c_1v_f_per_m/d slab_nm (0.29), d c_1v_f_per_m/d plus_gap_nm (3.2), d c_1v_f_per_m/d contact_gap_nm (2.1), d c_2v_f_per_m/d film_nm (0.46), d c_2v_f_per_m/d plus_gap_nm (4.3), d c_2v_f_per_m/d contact_gap_nm (1.1) (uncertainty.jacobian_remesh_noise; upper estimate)"
+ ],
+ "command_as_run": ".venv/bin/python tools/memguard.py --limit-gb 2.7 -- .venv/bin/python -u -m mrm.extraction.junction --xsec rib160 --topology lshape --doping-sweep"
 }
