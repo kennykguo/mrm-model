@@ -260,6 +260,9 @@ The reviewer of this task (same owner files) re-ran every test, tried to break e
   confident (or the table entry ok), the height check passed, and the found resonance AND the last resonance the
   up-search passed below it sit where the map put them (common drift within 0.3 of the local spacing of the drift the
   window assumed). `RampFSM.sk_w / sk_n` record the passed resonances.
+- Fixed policy: once two rings of a world have confident fresh-map fits, the next rings' fits are narrowed around
+  their median FSR, exponent and curvature (the bank fit's narrowing, built ring by ring). With amb_min = 2 alone,
+  ring 2 of the nominal cold start fell to "not ok" (ambiguity 1.96, from a labelling that needs another FSR).
 - `WdmParams.w_min_target` (PAT-1 [0050] heater headroom, default 0 = off). Tried at 3 nominal linewidths: it broke the
   0.10 A barrel shift, whose lowest-power map sits at w ~ 0.02-0.05.
 - Tests: `test_ctrl_b_robust.py` (engine: ramp and bitstat in 8 sampled worlds, ramp on 7 corner presets (slow),

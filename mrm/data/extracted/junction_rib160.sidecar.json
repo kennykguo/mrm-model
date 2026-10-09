@@ -1,0 +1,769 @@
+{
+ "schema": "junction/1",
+ "artefact": "junction_rib160.json",
+ "created_utc": "2026-10-09T16:17:31Z",
+ "command": "python -m mrm.extraction.junction --xsec rib160 --topology lshape",
+ "study_level": "full",
+ "inputs": {
+  "geometry": {
+   "name": "rib160",
+   "width_nm": 400.0,
+   "film_nm": 160.0,
+   "slab_nm": 60.0,
+   "sidewall_deg": 90.0,
+   "box": "thermal",
+   "clad": "beol",
+   "r_ref_um": 6.726957,
+   "provenance": "assumed"
+  },
+  "doping": {
+   "topology": "lshape",
+   "y_junction_nm": 90.0,
+   "na_cm3": 3.2e+18,
+   "nd_cm3": 3.2e+18,
+   "junction_offset_nm": 100.0,
+   "grading_nm": 2.0,
+   "plus_gap_nm": 250.0,
+   "n_plus_cm3": 1e+19,
+   "pp_gap_nm": 600.0,
+   "n_pp_cm3": 1e+20,
+   "contact_gap_nm": 1000.0,
+   "plus_grading_nm": 20.0,
+   "outer_side": "n",
+   "contact_rho_ohm_cm2": 1e-07,
+   "contact_width_nm": 300.0,
+   "provenance": "assumed"
+  },
+  "materials": {
+   "schema": "materials/1",
+   "file": "mrm/data/materials.json",
+   "sha256": "c87c67dbe8635e5e9f0e7d9c4f5526e8585b70d5c268a4955dc5d50065af9167",
+   "si_index_model": "li1980 temperature shape on the frey level",
+   "sio2_index_model": "malitson1965 x n_air + Leviton/Frey dn/dT",
+   "provenance": "literature"
+  },
+  "plasma_model": "nsm2011 (Nedeljkovic, Soref, Mashanovich 2011, 1.3 um row)",
+  "permittivity": {
+   "si": 11.7,
+   "sio2": 3.9
+  },
+  "lambda0_nm": 1310.0,
+  "t_k": 298.15
+ },
+ "tool_versions": {
+  "python": "3.12.8",
+  "numpy": "2.4.6",
+  "scipy": "1.18.1",
+  "devsim": "2.11.0",
+  "femwell": "0.1.12",
+  "skfem": "12.0.2",
+  "gmsh": "4.15.2",
+  "shapely": "2.2.0",
+  "tidy3d": "2.12.0"
+ },
+ "mesh": {
+  "devsim": {
+   "nx": 240,
+   "ny": 73,
+   "triangles": 33216,
+   "si_triangles": 15176,
+   "h_junction_nm": 2.0,
+   "h_y_si_nm": 10.0,
+   "h_max_nm": 40.0,
+   "oxide": true,
+   "ox_extent_um": 0.6,
+   "contact_x_um": 1.2,
+   "scale": 2.0,
+   "anode_edges": 12,
+   "cathode_edges": 12
+  },
+  "devsim_nodes_si": 7880,
+  "femwell": {
+   "core_res_um": 0.01,
+   "elements": 13962,
+   "order": 2,
+   "domain_um": [
+    5.0,
+    2.2
+   ],
+   "weight_grid_step_um": 0.002
+  },
+  "bias_grid_v": [
+   -0.5,
+   4.0,
+   0.05
+  ]
+ },
+ "convergence": {
+  "devsim_mesh": {
+   "scales": [
+    2.8284,
+    2.3784,
+    2.0
+   ],
+   "h_junction_nm": [
+    2.8284,
+    2.3784,
+    2.0
+   ],
+   "nodes_si": [
+    4353,
+    6149,
+    7880
+   ],
+   "production_scale": 2.0,
+   "failed_levels": [],
+   "dneff_1v6": {
+    "values": [
+     0.0002984804,
+     0.0002982776,
+     0.0002982344
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 0.00029813,
+    "observed_order": 2.0,
+    "error_estimate": 1.04329e-07,
+    "rel_error_estimate": 0.0003499
+   },
+   "dneff_1v": {
+    "values": [
+     0.00020337,
+     0.0002032132,
+     0.000203194
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 0.000203148,
+    "observed_order": 2.0,
+    "error_estimate": 4.63695e-08,
+    "rel_error_estimate": 0.0002283
+   },
+   "dneff_4v": {
+    "values": [
+     0.0005869277,
+     0.0005865315,
+     0.0005865121
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 0.000586465,
+    "observed_order": 2.0,
+    "error_estimate": 4.66764e-08,
+    "rel_error_estimate": 7.959e-05
+   },
+   "dneff_fwd0v5": {
+    "values": [
+     -0.0001476247,
+     -0.0001474363,
+     -0.0001474381
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": -0.000147442,
+    "observed_order": 2.0,
+    "error_estimate": 4.30801e-09,
+    "rel_error_estimate": 2.922e-05
+   },
+   "alpha_fca_0v_per_m": {
+    "values": [
+     1393.549,
+     1393.679,
+     1393.904
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 1394.45,
+    "observed_order": 2.0,
+    "error_estimate": 0.544496,
+    "rel_error_estimate": 0.0003905
+   },
+   "alpha_fca_2v_per_m": {
+    "values": [
+     1178.208,
+     1178.442,
+     1178.694
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 1179.3,
+    "observed_order": 2.0,
+    "error_estimate": 0.610546,
+    "rel_error_estimate": 0.0005177
+   },
+   "c_1v_f_per_m": {
+    "values": [
+     1.042915e-09,
+     1.042029e-09,
+     1.041901e-09
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 1.04159e-09,
+    "observed_order": 2.0,
+    "error_estimate": 3.07496e-13,
+    "rel_error_estimate": 0.0002952
+   },
+   "c_2v_f_per_m": {
+    "values": [
+     8.52955e-10,
+     8.523658e-10,
+     8.523007e-10
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 8.52143e-10,
+    "observed_order": 2.0,
+    "error_estimate": 1.57243e-13,
+    "rel_error_estimate": 0.0001845
+   },
+   "r_series_1v_ohm_m": {
+    "values": [
+     0.002954157,
+     0.002954461,
+     0.002954574
+    ],
+    "h": [
+     2.8284,
+     2.3784,
+     2.0
+    ],
+    "extrapolated": 0.00295464,
+    "observed_order": 5.673,
+    "error_estimate": 6.78745e-08,
+    "rel_error_estimate": 2.297e-05
+   }
+  },
+  "oxide_effect_on_dneff": {
+   "v": [
+    1.0,
+    2.0
+   ],
+   "with_oxide": [
+    0.00020336998333855293,
+    0.0003551199965530443
+   ],
+   "no_oxide": [
+    0.00019807679712370474,
+    0.0003448765225661219
+   ],
+   "analytic": [
+    0.00019855312293762446,
+    0.00034696032375745303
+   ],
+   "analytic_vs_no_oxide_rel": [
+    0.002405,
+    0.006042
+   ],
+   "note": "the fringe field through the oxide depletes extra carriers near the Si surfaces; the abrupt model has no fringe, so it should be compared with the no-oxide DEVSIM run"
+  },
+  "oxide_extent": {
+   "rows": [
+    {
+     "ox_extent_um": 0.3,
+     "c_0v_f_per_m": 1.4605249854543788e-09,
+     "c_1v_f_per_m": 1.0303622027490155e-09,
+     "c_2v_f_per_m": 8.40040638900411e-10
+    },
+    {
+     "ox_extent_um": 0.6,
+     "c_0v_f_per_m": 1.4719779773924372e-09,
+     "c_1v_f_per_m": 1.042914539875747e-09,
+     "c_2v_f_per_m": 8.529550348797327e-10
+    },
+    {
+     "ox_extent_um": 1.2,
+     "c_0v_f_per_m": 1.4795796313405994e-09,
+     "c_1v_f_per_m": 1.0513957081974095e-09,
+     "c_2v_f_per_m": 8.617312814892601e-10
+    }
+   ],
+   "no_oxide_c_1v_f_per_m": 9.441443754974192e-10,
+   "fringe_fraction_1v": 0.09470590408116775,
+   "rel_change_production_to_double_1v": 0.008132179576931575,
+   "note": "Neumann outer boundary; production uses 0.6 um"
+  },
+  "mode_mesh": {
+   "res_um": [
+    0.04,
+    0.0283,
+    0.02,
+    0.0141,
+    0.01
+   ],
+   "elements": [
+    1688,
+    3210,
+    6032,
+    10374,
+    13962
+   ],
+   "production_res_um": 0.01,
+   "n_eff": {
+    "values": [
+     2.443694,
+     2.443484,
+     2.443395,
+     2.443267,
+     2.443231
+    ],
+    "h": [
+     0.04,
+     0.0283,
+     0.02,
+     0.0141,
+     0.01
+    ],
+    "extrapolated": 2.44322,
+    "observed_order": 3.563,
+    "error_estimate": 1.51384e-05,
+    "rel_error_estimate": 6.196e-06
+   },
+   "n_g": {
+    "values": [
+     3.938479,
+     3.938658,
+     3.938715,
+     3.938756,
+     3.938765
+    ],
+    "h": [
+     0.04,
+     0.0283,
+     0.02,
+     0.0141,
+     0.01
+    ],
+    "extrapolated": 3.93877,
+    "observed_order": 4.395,
+    "error_estimate": 2.47167e-06,
+    "rel_error_estimate": 6.275e-07
+   },
+   "dneff_dnsi": {
+    "values": [
+     0.9677349,
+     0.9676773,
+     0.9676542,
+     0.9676004,
+     0.9675817
+    ],
+    "h": [
+     0.04,
+     0.0283,
+     0.02,
+     0.0141,
+     0.01
+    ],
+    "extrapolated": 0.967571,
+    "observed_order": 2.993,
+    "error_estimate": 1.04175e-05,
+    "rel_error_estimate": 1.077e-05
+   },
+   "dneff_1v6": {
+    "values": [
+     0.0002981988,
+     0.0002983383,
+     0.0002982464,
+     0.0002982661,
+     0.0002982344
+    ],
+    "h": [
+     0.04,
+     0.0283,
+     0.02,
+     0.0141,
+     0.01
+    ],
+    "extrapolated": 0.000298224,
+    "observed_order": 4.0,
+    "error_estimate": 1.07464e-08,
+    "rel_error_estimate": 3.603e-05
+   },
+   "alpha_fca_0v_per_m": {
+    "values": [
+     1394.166,
+     1394.073,
+     1394.18,
+     1394.148,
+     1393.904
+    ],
+    "h": [
+     0.04,
+     0.0283,
+     0.02,
+     0.0141,
+     0.01
+    ],
+    "extrapolated": 1393.82,
+    "observed_order": 4.0,
+    "error_estimate": 0.082583,
+    "rel_error_estimate": 5.925e-05
+   }
+  },
+  "bias_grid": {
+   "v_mid": [
+    0.025,
+    1.025,
+    1.575,
+    3.975
+   ],
+   "dneff_solved": [
+    6.181679e-06,
+    0.0002074498,
+    0.0002945372,
+    0.0005840056
+   ],
+   "dneff_linear_interp": [
+    6.141543e-06,
+    0.0002074353,
+    0.000294527,
+    0.0005840016
+   ],
+   "max_rel_error": 0.006493,
+   "max_abs_error_rel_to_dneff_1v6": 0.0001346,
+   "note": "linear interpolation of the 0.05 V table at mid-points; the relative error is largest just above 0 V where dn_eff itself is small"
+  },
+  "ac_frequency": {
+   "r_1v_20ghz": 0.0028601955795322597,
+   "r_1v_50ghz": 0.0028582203734545614,
+   "rel": -0.0006906,
+   "c_20ghz_over_c_1mhz_1v": 0.99601,
+   "note": "series R-C: Re Z must not depend on frequency"
+  }
+ },
+ "validation": {
+  "perturbation_vs_direct_resolve": {
+   "v": [
+    -0.5,
+    1.0,
+    2.0,
+    4.0
+   ],
+   "dneff_perturbative": [
+    -0.0001474381,
+    0.000203194,
+    0.0003548345,
+    0.0005865121
+   ],
+   "dneff_direct": [
+    -0.0001482046,
+    0.0002028731,
+    0.0003548548,
+    0.0005870029
+   ],
+   "rel_diff": [
+    -0.005172,
+    0.001582,
+    -5.709e-05,
+    -0.0008361
+   ],
+   "alpha_perturbative": [
+    1484.108,
+    1270.348,
+    1178.694,
+    1039.478
+   ],
+   "alpha_direct": [
+    1484.496,
+    1270.374,
+    1178.426,
+    1038.593
+   ],
+   "alpha_rel_diff": [
+    -0.0002609,
+    -1.994e-05,
+    0.000228,
+    0.0008522
+   ],
+   "mode_elements": 10374,
+   "note": "direct: femwell re-solve with the element-averaged complex permittivity (7-level barycentric sub-sampling of the DEVSIM fields); a different discretization of the carriers and no first-order truncation"
+  },
+  "tidy3d_vs_femwell": {
+   "rows": [
+    {
+     "dl_nm": 20.0,
+     "n_eff": 2.4595658048481046,
+     "dneff_dnsi": 0.9861596849174425
+    },
+    {
+     "dl_nm": 10.0,
+     "n_eff": 2.4461536211577863,
+     "dneff_dnsi": 0.9774191367211138
+    },
+    {
+     "dl_nm": 6.666666666666667,
+     "n_eff": 2.4371633344499384,
+     "dneff_dnsi": 0.9718483159528724
+    }
+   ],
+   "seconds": 27.1,
+   "tidy3d_version": "2.12.0",
+   "n_eff_conv": {
+    "values": [
+     2.459566,
+     2.446154,
+     2.437163
+    ],
+    "h": [
+     20.0,
+     10.0,
+     6.666667
+    ],
+    "extrapolated": 2.41918,
+    "observed_order": 1.0,
+    "error_estimate": 0.0179806,
+    "rel_error_estimate": 0.007432
+   },
+   "dneff_dnsi_conv": {
+    "values": [
+     0.9861597,
+     0.9774191,
+     0.9718483
+    ],
+    "h": [
+     20.0,
+     10.0,
+     6.666667
+    ],
+    "extrapolated": 0.960707,
+    "observed_order": 1.0,
+    "error_estimate": 0.0111416,
+    "rel_error_estimate": 0.0116
+   },
+   "note": "uniform grid without subpixel averaging: staircase error, first order in dl",
+   "femwell_straight": {
+    "n_eff": 2.436839598732277,
+    "dneff_dnsi": 0.971222130884429
+   },
+   "delta_n_eff": -0.01766,
+   "delta_dneff_dnsi": -0.01052
+  },
+  "weight_integral": {
+   "over_devsim_si_nodes": 0.9675295606423315,
+   "femwell_si": 0.9675816959456275,
+   "fd_resolve_dn_1e-4": 0.9675938109365845,
+   "rel_diff_weight_vs_fd": -1.252e-05,
+   "rel_diff_nodes_vs_femwell": -5.388e-05
+  },
+  "index_weight_identity": {
+   "sum_ng_i_w_i": 3.938768456834565,
+   "n_g": 3.938764964849158,
+   "rel_residual": 8.866e-07
+  },
+  "capacitance_ac_vs_dqdv": {
+   "v": [
+    -0.5,
+    0.0,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0
+   ],
+   "c_ac_f_per_m": [
+    2.082256e-09,
+    1.469903e-09,
+    1.20158e-09,
+    1.041901e-09,
+    9.328846e-10,
+    8.523007e-10,
+    7.89547e-10,
+    7.388565e-10,
+    6.967952e-10,
+    6.610574e-10
+   ],
+   "c_dqdv_f_per_m": [
+    2.094478e-09,
+    1.478687e-09,
+    1.207287e-09,
+    1.046151e-09,
+    9.36284e-10,
+    8.551425e-10,
+    7.919952e-10,
+    7.410123e-10,
+    6.987253e-10,
+    6.627839e-10
+   ],
+   "rel_diff": [
+    -0.005869,
+    -0.005976,
+    -0.00475,
+    -0.004079,
+    -0.003644,
+    -0.003334,
+    -0.003101,
+    -0.002918,
+    -0.00277,
+    -0.002612
+   ],
+   "max_rel_diff_reverse": 0.005976,
+   "electron_hole_balance_max_rel": 3.583e-12,
+   "dneff_ac_run_vs_dc_run_max_rel": 5.546e-16,
+   "note": "C(V) of the artefact is the low-frequency dQ/dV of the 0.05 V DC sweep; AC (20 GHz) at the listed biases; R(V) is the AC Re Z interpolated (PCHIP) plus the contact term"
+  },
+  "depletion_width_devsim_vs_abrupt": {
+   "cut_nm": -52.911125000000006,
+   "cut_axis_fixed": "x",
+   "v": [
+    0.0,
+    0.45,
+    0.9,
+    1.35,
+    1.8,
+    2.25,
+    2.7,
+    3.15,
+    3.6
+   ],
+   "w_devsim_nm": [
+    27.413,
+    33.332,
+    38.293,
+    42.686,
+    46.69,
+    50.397,
+    53.862,
+    57.088,
+    60.091
+   ],
+   "w_abrupt_nm": [
+    28.654,
+    34.42,
+    39.35,
+    43.728,
+    47.706,
+    51.377,
+    54.802,
+    58.026,
+    61.079
+   ],
+   "w_abrupt_debye_nm": [
+    27.92,
+    33.812,
+    38.819,
+    43.251,
+    47.269,
+    50.971,
+    54.422,
+    57.667,
+    60.738
+   ],
+   "rel_diff_vs_abrupt": [
+    -0.04329,
+    -0.03163,
+    -0.02688,
+    -0.02384,
+    -0.02131,
+    -0.01907,
+    -0.01715,
+    -0.01616,
+    -0.01618
+   ],
+   "mean_rel_diff_vs_abrupt": -0.02256,
+   "range_rel_diff_vs_abrupt": [
+    -0.04329,
+    -0.01456
+   ],
+   "mean_rel_diff_vs_debye": -0.01231,
+   "note": "05 C7c reported 5-8 % (DEVSIM below the abrupt formula) with mixed permittivities; here both use 11.7 eps0; the edges are the half-doping points of the simulated carriers on a mid-film cut"
+  },
+  "analytic_vs_devsim": {
+   "dneff_rel_diff_at": {
+    "0.5V": -0.02426,
+    "1V": -0.02284,
+    "1.6V": -0.0225,
+    "2V": -0.02219,
+    "4V": -0.01425
+   },
+   "c_rel_diff_at": {
+    "0V": -0.04646,
+    "1V": -0.04323,
+    "2V": -0.04305,
+    "4V": -0.04261
+   },
+   "alpha_rel_diff_0v": 0.0001301,
+   "r_series_analytic_vs_devsim_1v": 0.1114,
+   "note": "analytic = abrupt box depletion through the 2-D femwell weight; its C has no fringe field; its r_s is the 1-D series sum of sheet resistances (no current spreading)"
+  },
+  "modes_artefact_consistency": {
+   "modes_n_eff": 2.4399315138864743,
+   "junction_n_eff_bent": 2.443230981165569,
+   "modes_n_g": 3.94048550161624,
+   "junction_n_g_bent": 3.938764964849158,
+   "modes_index_weight_si": 0.9684172952799663,
+   "junction_index_weight_si": 0.9675816959456275,
+   "rel_diff_n_g": -0.0004366,
+   "rel_diff_index_weight_si": -0.0008629,
+   "note": "modes uses the exact anisotropic bend transform and its own mesh; this file the isotropic conformal map (femwell). Same geometry, materials, r_ref."
+  },
+  "bend_effect": {
+   "dneff_1v6_straight": 0.0003068496610564013,
+   "dneff_1v6_bent": 0.0002982343621253465,
+   "rel": -0.02808,
+   "alpha_0v_rel": 0.04211
+  }
+ },
+ "uncertainty": {
+  "numerical": {
+   "dneff_1v6": {
+    "devsim_mesh_rel": 0.00035,
+    "mode_mesh_rel": 3.6e-05
+   },
+   "alpha_fca_0v_per_m": {
+    "devsim_mesh_rel": 0.000391,
+    "mode_mesh_rel": 5.92e-05
+   },
+   "c_1v_f_per_m": {
+    "devsim_mesh_rel": 0.000295,
+    "mode_mesh_rel": null
+   },
+   "r_series_1v_ohm_m": {
+    "devsim_mesh_rel": 2.3e-05,
+    "mode_mesh_rel": null
+   }
+  },
+  "model": {
+   "plasma_dispersion_soref_vs_nsm_dneff": 0.071,
+   "plasma_dispersion_soref_vs_nsm_alpha": -0.0514,
+   "not_modelled": [
+    "incomplete ionization (B ~1e18: 5-15 % fewer holes at 300 K)",
+    "band-gap narrowing (V_bi lower by a few tens of mV)",
+    "vertical implant profiles (box profiles assumed)",
+    "sidewall angle and roughness",
+    "pads, vias and C_pad"
+   ]
+  },
+  "assumption_jacobian": "see artefact.jacobian (per unit of each input)"
+ },
+ "seconds": 2865.5,
+ "quick": false,
+ "sha256": "809979b82be7df21a1e722a3b08c86dd41bc1687f0b8a233f3b1bf199fdbb561",
+ "data_file": "junction_rib160.json"
+}
