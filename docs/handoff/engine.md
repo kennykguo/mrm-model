@@ -68,7 +68,9 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
   fields) and `KState` (90 fields); every array is a writeable C-contiguous copy so that the numba types never
   depend on the config (a read-only view is another type and would recompile the plant; `_check_kernel_arrays`
   raises instead).
-- The per-world tick lives in `kernel._world_block` (one world, the whole block of ticks), in sections marked
+- The per-world tick lives in `kernel._world_block` (one world, the whole block of ticks: views, per-block tables,
+  scratch) and `kernel._world_loop` (the tick loop, compiled without the numba runtime since performance round 2,
+  perf.md R2-11; the rules for what it may call are the comment above `_world_block`), in sections marked
   `# ---` (commands latched at k, scenario k / k+1, laser + laser_ramp, ones density, fault mask and dac_glitch, bias
   DAC with the fast offset, NRZ levels, optics inputs into the self-heating rows and their substep caches, bounds,
   data-activity heat, thermal inputs, substep length, heater TCR split + heater DAC path, implicit thermal +
@@ -76,8 +78,11 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
   (docs/handoff/perf.md P3) merged the former `_prepare_interval`, `_thermal_and_sensors`, `_account`,
   `_auto_substep`, `_heater_step`, `_bias_step` into it: a call that takes the KParams/KState tuples costs a
   reference-count update of all ~270 arrays. The event order is the module docstring of `kernel.py` (= ENGINE_BRIEF
-  section 3 with the controller edge first). Tuple-taking helpers left: `release_row` (event-order step 2 and obs
-  packing), `_edge` / `_push_act` (step 3, clip, latch FIFO), `_oracle`, `_auto_h`, and the public `truth_row`.
+  section 3 with the controller edge first). Since round 2 the loop calls array-taking helpers for the controller
+  edge, the auto policy, the oracle and the fast kernel too (`_release_a`, `_sync_act_a` / `_push_act_a`,
+  `_advance_edge_a`, `_auto_h_a`, `_oracle_a`, `_fast_tick_a`); the tuple-taking forms `release_row`, `_oracle`,
+  `_auto_h`, `_fast_tick` and the public `truth_row` remain as wrappers for other callers (`_edge`, `_push_act`,
+  `_advance_edge`, `_sync_act_from_registers` and `_edge_tick` were removed).
 - Controllers: `step_fn` / `fast_fn` are typed as the first-class `STEP_FT` (the mrm.control.api ABI), so one
   compiled kernel serves every controller and is disk-cached (a Dispatcher argument would recompile the whole
   plant per controller and per process).
@@ -218,50 +223,65 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
 
 ## 4. Performance (07 P0-9)
 
-Performance round 1 (docs/handoff/perf.md: change log P1-P13, error bounds, tests, raw numbers) took the B = 1 fixed
-tick from 54-55 us to 15.5 us on AC power (x3.5), with results equal to commit 8646691 up to floating-point rounding
-(largest scenario difference 2.2e-6 pm of detuning; no ADC, heater or bias code, lock state or line changed; the
-controller scorecard agrees to 2.6e-6 pm). Measured on the 8-core M2 on AC power, Low Power Mode off, load average in
-parentheses (`tools/perf_ab.py`: alternating runs, median of 5 x 7 x 3000 ticks; `pytest tests/perf -m slow -s`):
+Two performance rounds (docs/handoff/perf.md: change logs P1-P13 and R2-1 ... R2-16, error bounds, tests, raw
+numbers). Round 1 took the B = 1 fixed tick from 54-55 us to 15.5 us on AC power (x3.5), with results equal to
+commit 8646691 up to floating-point rounding (largest scenario difference 2.2e-6 pm of detuning; no ADC, heater or
+bias code, lock state or line changed; the controller scorecard agrees to 2.6e-6 pm). Round 2 took it to 9.1 us
+(x1.7) with every change bit-identical: every regression scenario, test and controller-scorecard number is the same
+as at 6b598f7 (perf.md section 8). **07 P0-9's fixed-tick budget (<= 10 us per tick, >= 0.1 simulated s per wall s)
+is met** on this machine, without approximation. Measured on the 8-core M2 on AC power, Low Power Mode off, load
+average in parentheses (`tools/perf_ab.py`: alternating runs, median of 5 x 7 x 3000 ticks; `pytest tests/perf -m
+slow -s`):
 
-| case | 8646691 | round 1 | sim-s / wall-s (round 1) | notes |
-|---|---|---|---|---|
-| B = 1, fixed | 54.3-55.4 us (2.5-3.1) | **15.5-16.0 us** (1.9-3.1) | 0.063-0.065 | 07 target >= 0.1 (<= 10 us per tick): **not met** |
-| B = 1, auto, 100 kHz controller | 29.2 us (2.5) | 9.0-9.1 us (1.9) | 0.110 | 0.42 substeps per tick |
-| B = 1, auto, 10 kHz controller | 12.2 us (2.5) | 4.5 us (1.9) | 0.221 | 0.16 substeps per tick; 07 target >= 20: not met |
-| B = 64, fixed, 8 threads | 11.1-12.1 us (2.5-3.1) | 3.3-3.7 us (1.9-3.1) | 0.0044-0.0048 (bank) | 64 x 1 s Monte Carlo 3.5-3.9 min: 07 target (5 min) met |
-| B = 64, auto | 10.1 us (2.5) | 3.2-3.5 us (1.9) | 0.0045-0.0049 | |
+| case | 8646691 | round 1 (6b598f7) | round 2 | sim-s / wall-s (round 2) | notes |
+|---|---|---|---|---|---|
+| B = 1, fixed | 54.3-55.4 us (2.5-3.1) | 15.45-16.0 us (1.9-3.7) | **9.06-9.29 us** (3.0-3.7) | 0.108-0.110 | 07 target >= 0.1 (<= 10 us per tick): **met** |
+| B = 1, fixed, settled lock codes (b1lock) | 55.1 us (2.5-3.1) | 15.46 us (3.0-3.7) | **9.42 us** (3.0-3.7) | 0.106 | |
+| B = 1, auto, 100 kHz controller | 29.2 us (2.5) | 8.4-9.1 us (1.9-2.8) | 4.8-5.1 us (2.8-3.2) | 0.20-0.21 | 0.42 substeps per tick |
+| B = 1, auto, 10 kHz controller | 12.2 us (2.5) | 4.5-4.6 us (1.9-2.8) | 2.9-3.0 us (2.8-3.2) | 0.34-0.35 | 0.16 substeps per tick; 07 target >= 20: not met |
+| B = 64, fixed, 8 threads | 11.1-12.1 us (2.5-3.1) | 3.3-3.7 us (1.9-3.7) | 2.0-2.3 us (2.8-3.7) | 0.0068-0.0079 (bank) | 64 x 1 s Monte Carlo 2.1-2.5 min: 07 target (5 min) met |
+| B = 64, auto | 10.1 us (2.5) | 3.2-3.5 us (1.9-2.8) | 1.9 us (2.8) | 0.0082 | |
 
-The earlier figures of this section (94 us at load 8-10, 133-143 us at load 15-22) were taken with other agents
-running and on battery or Low Power Mode at times; on a quiet machine on AC the 8646691 engine runs 54-55 us. Battery
-or Low Power Mode makes every number ~1.7x slower: compare only runs under the same power state (perf_bench records
-it).
+The margin to 10 us is ~0.6-0.9 us at load 3-4: other busy processes on the machine can push a B = 1 fixed run
+above it. The earlier figures of this section (94 us at load 8-10, 133-143 us at load 15-22) were taken with other
+agents running and on battery or Low Power Mode at times. Battery or Low Power Mode makes every number ~1.7x slower:
+compare only runs under the same power state (perf_bench records it).
 
-Where the time goes at B = 1 (fixed, ~15.5 us; tools/perf_tick_prof.py, perf.md 5.5): the self-heating optics 6.8 us
-(Newton solves 2.7: 22.5 ring evaluations of 8 lines x 2 NRZ levels per tick at ~1.82 iterations per ring and
-sh_tol_k = 1e-7 K; commit 1.5; the substep caches 1.6; the solver's bounds 1.0), the thermal ROM 2.7 us (945 lags,
-optical lags, heater TCR split), sensors 1.8 us (mostly the counter-based normal draws of the 14 flicker poles per ring
-at every ADC sample), the phase model 1.15 us, Truth 0.9 us, the controller edge 0.5 us, the DACs, laser, data,
-scenario and metrics 1.4 us. ~44 normal draws per tick (Philox + Box-Muller, 35 ns each) are ~1.5 us of it.
+Where the time goes at B = 1 (fixed, settled lock codes, ~9.4 us; tools/perf_tick_prof.py, perf.md 8.6): the
+self-heating optics 4.1 us (Newton solves 1.97: 22.5 ring evaluations of 8 lines x 2 NRZ levels per tick at ~1.82
+iterations per ring and sh_tol_k = 1e-7 K; the substep caches 0.97; the solver's bounds 0.79; commit 0.41), the
+thermal ROM 1.4 us (970 lags with the stress-site source skipped while it is cold, optical lags, heater TCR split),
+sensors 1.4 us (mostly the counter-based normal draws of the 14 flicker poles per ring at every ADC sample), the
+phase model 0.6 us, Truth 0.4 us, the bias and heater DACs, laser and sensor inputs 0.9 us, the controller edge,
+scenario, data, metrics and oracle 0.4 us. ~48 normal draws per tick (Philox + Box-Muller, 32-34 ns each) are
+~1.6 us of it.
 
-Options that trade accuracy for speed (perf.md 5.2, 5.4): `optics_far_hold=True` (the far-line hold, P5; default off)
-gives 14.6-14.8 us, but changes closed-loop trajectories (up to 0.35 pm, 17 monitor codes in the regression
-scenarios); `sh_tol_k=1e-6` gives 15.2 us. Neither reaches 10 us; perf.md 5.6 lists what would (far lines nearly free
-as an opt-in, a kernel outside numba's scalar model for the per-line work, cheaper noise draws in mrm/core/rng.py, a
-smaller thermal ROM), and estimates that even the opt-in far-line hold with cheaper noise lands near, not below,
-10 us on this machine.
+What round 2 changed (perf.md 8.2): unsigned indices in the hot loops (numba adds a negative-index check to every
+signed index it cannot prove non-negative), a light self-heating commit at every substep but the last of a block,
+the tick loop and its leaves compiled without the numba runtime (`_world_loop`, `_nrt=False`: no reference-count
+updates, ~500 per tick, of the arrays passed to calls), the controller edge, auto policy, oracle and fast kernel
+on one world's arrays instead of the KParams/KState tuples, thermal coefficient tables, the Truth Newton iterations
+of all rings in lockstep, and inlining of the Airy evaluation and of the per-tick leaves. The round-1 review items are fixed:
+`ReferenceEngine(airy=False)` checks the engine against an independent optics implementation, and a degenerate ring
+row raises on both optics paths.
 
-Levers taken in round 1 that earlier rounds listed as not taken: K^2 cached while the laser lines do not move (P1,
-exact); the far-line hold (P5, opt-in); the flicker poles were already updated per ADC sample, not per tick. Not
-taken: CW optics when the data is idle (rounding-level, only helps idle scenarios, not the benchmark), lag merging per
-(source, tau) (~0.3 us, changes the thermal state representation of the reference too), evaluating only near lines in
-the Newton iterations (an approximation; its error can be held at rounding level, but the commit still needs every
-line, so it saves ~0.6 us at most), a reduced-order monitor noise model (changes every noise realization).
+Options that trade accuracy for speed (perf.md 8.5): `sh_tol_k=1e-6` gives 8.8 us (b1); `optics_far_hold=True` (the
+far-line hold, P5; default off) is now slower than the exact engine (10.1 us) and changes closed-loop trajectories
+(up to 0.35 pm, 17 monitor codes in the regression scenarios): there is no reason to turn it on. perf.md 8.7 lists
+what is left (each exact lever ~0.05 us; the levers that change results: cached solver bounds or a Newton predictor,
+cheaper noise draws in mrm/core/rng.py, a smaller thermal ROM).
 
-First use in a fresh environment compiles the kernel (~2-5 min on this machine now, ~1.9 GB peak RSS; 5-8 min was
-measured under load); afterwards it is loaded from numba's disk cache in < 1 s per process. Any edit to
-`mrm/sim/kernel.py` recompiles it; an edit to a leaf module it calls does NOT (numba keys the cache on the function's
-own file): run `tools/clear_numba_cache.py` after every edit of njit code (docs/ENGINE.md section 1).
+Levers not taken (rounds 1 and 2): CW optics when the data is idle (rounding-level, only helps idle scenarios, not
+the benchmark), lag merging per (source, tau) (~0.3 us, changes the thermal state representation of the reference
+too), evaluating only near lines in the Newton iterations (an approximation; the commit still needs every line), a
+reduced-order monitor noise model (changes every noise realization).
+
+First use in a fresh environment compiles the kernel (1.7 min and 2.25 GB peak RSS, measured after round 2 at load
+2-4 with an empty numba cache; ~2-5 min after round 1, 5-8 min was measured under load): run it through
+`tools/memguard.py --heavy`. Afterwards it is loaded from numba's disk cache (a fresh process runs a short
+benchmark in 1.3 s, imports included). Any edit to `mrm/sim/kernel.py` recompiles it; an edit to a leaf module it
+calls does NOT (numba keys the cache on the function's own file): run `tools/clear_numba_cache.py` after every
+edit of njit code (docs/ENGINE.md section 1).
 
 ## 5. Tests
 

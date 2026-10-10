@@ -220,7 +220,7 @@ def _log2_bin(n):
     return j
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def metrics_tick_row(k, h, mpf, mpi, det, ref, order, wrong, reloma, oracle, oracle_unr, p_heater, p_abs, reg,
                      popped, ber, bits, af, ai, hist, runhist):
     """Update one world's accumulators with the state at the end of the step [k, k + h) (07 P0-8).
@@ -446,7 +446,7 @@ class RecordSet:
         return out
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def record_tick_row(h, tv, rec_i, acc, cnt, idx, trace):
     """Feed one world's Truth vector tv (N_TR, N) of a step of h ticks into every record (07 P0-8 reducers).
 

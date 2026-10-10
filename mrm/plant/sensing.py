@@ -176,7 +176,7 @@ _RC_NUDGE = 1e-4             # design choice: an OU corner within 1e-4 of the RC
 
 
 # =============================================================================================== small kernels
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def dark_current_a(i0_a, t_k, t0_k, ea_j):
     """Arrhenius dark current, A: I_d0 exp[-(E_a/k)(1/T - 1/T_0)] (07 P1-9, D20; 02 section 10).
 
@@ -204,7 +204,7 @@ def _dnl_threshold(c, dnl, key, ring, slot):
     return c - 0.5 + dnl * (_rng.uniform(key, ring, c, slot) - 0.5)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def adc_quantize(v, inl_bow_lsb, dnl_lsb, code_max, key, ring, slot):
     """Quantize an ideal (real-valued) code v into an integer code with INL and DNL. Returns (code, overrange).
 
@@ -242,7 +242,7 @@ def adc_quantize(v, inl_bow_lsb, dnl_lsb, code_max, key, ring, slot):
     return c, over
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def flicker_step(key, ring, tick, slot0, coef, fx, fc):
     """Advance the J flicker OU processes of one channel by one sample period; return the summed contribution.
 
@@ -263,7 +263,7 @@ def flicker_step(key, ring, tick, slot0, coef, fx, fc):
     return tot
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _flicker_init(key, ring, tick, slot0, coef, fx, fc):
     """Draw the flicker states from their stationary joint distribution (Cholesky S of coef[:, 7:10])."""
     for j in range(coef.shape[0]):
@@ -273,7 +273,7 @@ def _flicker_init(key, ring, tick, slot0, coef, fx, fc):
 
 
 # ============================================================================================= monitor kernels
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def monitor_tick_row(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault,
                      pr, pw, lat, phase, pga_gains, fl_coef,
                      afe_type, window_ticks, period_ticks, code_max, shot_on, stuck_flagged, slot_base,
@@ -424,7 +424,7 @@ def monitor_tick_par(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault, pr, pw,
                          fx[b], fc[b], fv[b], fr[b], fm[b], out_sampled[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def monitor_release_row(now, lat, fv, fr, fm, out_samples, out_ticks, out_count, latest, out_valid, out_over,
                         out_new):
     """Release every queued sample of one world whose release tick (sample tick + latency) is <= now (07 P0-6 step 2).
@@ -486,7 +486,7 @@ def monitor_release(now, lat, fv, fr, fm, out_samples, out_ticks, out_count, lat
     return lost
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def monitor_level_codes_row(p1_w, p0_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, pr, pw, pga_gains, shot_on, tau_s,
                             out_mu1, out_mu0, out_sig1, out_sig0, s_tia_a2_per_hz=-1.0, rin_per_hz=0.0):
     """Ideal monitor codes of the two NRZ levels and their noise for a bit-rate sampler (07 P0-11 bit statistics).
@@ -545,7 +545,7 @@ _TP_GAIN_REF_K = 6  # pivot of the gain error, K
 NTP = 7
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def temp_tick_row(k, t_site_k, tp, period, lat, code_max, fl_coef, key, st, fx, fc, primed, fv, fr, fm,
                   out_sampled):
     """Integrate interval [k, k+1) for the S temperature sensors of one world; take, convert and queue the samples
@@ -594,7 +594,7 @@ def temp_tick(k, t_site_k, tp, period, lat, code_max, fl_coef, key, st, fx, fc, 
                       primed[b], fv[b], fr[b], fm[b], out_sampled[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def temp_release_row(now, fv, fr, fm, latest, out_new):
     """Release the temperature samples whose release tick is <= now; latest (S,) is held, out_new (S,) marks a
     delivery since the last call (07 P0-7 'latest' channel contract)."""
@@ -616,7 +616,7 @@ def temp_release(now, fv, fr, fm, latest, out_new):
 
 
 # ===================================================================================== heater readback kernels
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def readback_tick_row(k, v_v, i_a, lsb_v, lsb_i, noise_codes, period, lat, code_max, average, key, st, fv, fr, fm,
                       out_sampled):
     """Heater V/I readback of one world (07 P1-10 ring.heater.readback): interval [k, k+1) and the samples at tick
@@ -665,7 +665,7 @@ def readback_tick(k, v_v, i_a, lsb_v, lsb_i, noise_codes, period, lat, code_max,
                           key[b], st[b], fv[b], fr[b], fm[b], out_sampled[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def readback_release_row(now, fv, fr, fm, latest_v, latest_i, out_new):
     """Release ready readback samples; latest_v / latest_i (N,) are held, out_new (N,) marks a delivery."""
     mask = (np.int64(1) << 32) - 1
@@ -714,7 +714,7 @@ def dac_glitch(codes, fault, glitch_codes, lo, hi, out):
         dac_glitch_row(codes[b], fault[b], glitch_codes[b if n_b > 1 else 0], lo, hi, out[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def fault_mask_row(adc_drop, adc_stuck, adc_saturate, dac_glitch_codes, out):
     """FAULT_* mask (N,) int8 from the scenario fault signals of one world (mrm.scenarios.generators: fault.adc_drop,
     fault.adc_stuck, fault.adc_saturate are flags, on at >= 0.5; fault.dac_glitch_codes is an additive code, on when

@@ -116,21 +116,43 @@ def p_swing_heat(P, S, b, n):
 
 
 
-@njit(cache=True)
-def p_implicit(P, S, b, n):
-    rf = S.rf[b]
-    ri = S.ri[b]
-    x = S.th_x[b]
+def implicit_tables(P, S, b):
+    """The per-block tables _world_block builds for _implicit_step_eng (fixed policy, substep power 0)."""
     ta = _row(P.th_a, b)[0]
     tc0 = _row(P.th_c0, b)[0]
     tc1 = _row(P.th_c1, b)[0]
+    idx_exo, idx_cross, idx_ax, unit, hs_lo, hs_hi = K._th_struct(P.th_lag_src, P.th_lag_kind, P.th_obs_ptr,
+                                                                  P.th_heater_obs, P.th_heater_src, P.th_src_scale)
+    m_tot, n_obs, n_src = ta.shape[0], P.th_obs_ptr.shape[0] - 1, P.th_src_scale.shape[0]
+    w, gobs, gsplit = np.empty(m_tot), np.empty(n_obs), np.empty(P.n_rings)
+    K._th_gains(tc0, tc1, P.th_lag_src, P.th_lag_kind, P.th_obs_ptr, P.th_heater_obs, P.th_heater_src,
+                P.th_src_scale, w, gobs, gsplit)
+    coef = np.empty(4 * m_tot)
+    K._th_coef(ta, tc0, tc1, w, coef)
+    ms_cross, opt_tab = K._th_tables(idx_cross, P.th_opt_lags, P.th_lag_src, P.th_lag_obs, P.th_src_ring)
+    dead = np.empty(n_src, np.bool_)
+    K._th_dead_init(S.th_x[b], P.th_lag_src, P.th_lag_kind, n_src, dead)
+    ms_exo = np.empty(2 * idx_exo.shape[0], np.int64)
+    obs_end = np.empty(n_obs, np.int64)
+    n_exo = K._th_live(dead, P.th_lag_src, P.th_obs_ptr, idx_exo, ms_exo, obs_end)
+    uu = np.empty(2 * n_src)
+    K._uu_fill(S.th_u0[b], S.th_u1[b], uu)
+    return coef, uu, ms_exo[:2 * n_exo].copy(), ms_cross, idx_ax, opt_tab, obs_end, gobs, unit
+
+
+@njit(cache=True)
+def p_implicit(P, S, b, coef, uu, ms_exo, ms_cross, idx_ax, opt_tab, obs_end, gobs, unit, n):
+    rf = S.rf[b]
+    ri = S.ri[b]
+    x = S.th_x[b]
+    p_cross = np.empty(P.n_rings)
     tot = 0
     for i in range(n):
-        K._implicit_step_eng(x, ta, tc0, tc1, P.th_lag_src, P.th_lag_obs, P.th_lag_kind, P.th_opt_lags,
-                             P.th_obs_ptr, P.th_src_ring, P.th_ring_obs, P.bus_order, S.th_u0[b], S.th_u1[b],
-                             P.th_src_scale, S.wf[b, K.WF_T_BASE1], rf[K.RF_P_PREV], rf[K.RF_T_BRANCH],
-                             S.sh_args_f[b], P.sh_args_i[b], rf[K.RF_PMAX], rf[K.RF_D2P], P.sh_max_iter, P.sh_tol,
-                             P.sh_n_outer, S.th_g[b], S.th_t_obs[b], rf[K.RF_P_NEW], rf[K.RF_T_NEW], ri[K.RI_N_ITER])
+        K._implicit_step_eng(x, coef, uu, ms_exo, ms_cross, idx_ax, opt_tab, P.th_lag_obs, P.th_obs_ptr, obs_end,
+                             P.th_ring_obs, P.bus_order, P.th_src_scale, unit, S.wf[b, K.WF_T_BASE1],
+                             rf[K.RF_P_PREV], rf[K.RF_T_BRANCH], S.sh_args_f[b], P.sh_args_i[b], rf[K.RF_PMAX],
+                             rf[K.RF_D2P], P.sh_max_iter, P.sh_tol, P.sh_n_outer, S.th_g[b], S.th_t_obs[b],
+                             rf[K.RF_P_NEW], rf[K.RF_T_NEW], ri[K.RI_N_ITER], gobs, False, p_cross)
         for m in range(P.n_rings):
             tot += ri[K.RI_N_ITER, m]
             rf[K.RF_P_PREV, m] = rf[K.RF_P_NEW, m]
@@ -270,7 +292,7 @@ def main(argv=None):
         ("  eng_precompute (substep constants)", p_precompute, (P, S, b, n)),
         ("  sh_bounds", p_bounds, (P, S, b, n)),
         ("  swing capacitance + data heat", p_swing_heat, (P, S, b, n)),
-        ("implicit self-heating step (bank)", p_implicit, (P, S, b, n)),
+        ("implicit self-heating step (bank)", p_implicit, (P, S, b, *implicit_tables(P, S, b), n)),
         ("ring evaluation eng_pabs x N rings", p_eval, (P, S, b, n)),
         ("sensors of a tick (monitor, errors, temp, readback)", p_sensors, (P, S, b, k0, n)),
         ("  monitor_tick_row", p_monitor, (P, S, b, k0, n)),

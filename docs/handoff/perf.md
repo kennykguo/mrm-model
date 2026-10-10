@@ -1,4 +1,4 @@
-# Handoff: engine performance (round 1)
+# Handoff: engine performance (rounds 1 and 2)
 
 Owner files: `mrm/sim/kernel.py`, `mrm/sim/kernel_ref.py`, `mrm/plant/plant.py` and the leaf kernels the tick calls
 (`mrm/plant/{selfheat,optics,phase,thermal,electrical,sensing,datapath,laser}.py`, `mrm/sim/metrics.py`). Starting
@@ -7,7 +7,9 @@ point: commit 8646691. Goal: 07 P0-9, >= 0.1 simulated s per wall s at a fixed 1
 floating-point rounding) or an APPROXIMATION with a derived bound, a test of the bound and a fidelity switch.
 
 Round 1 ran in two sessions: P1-P7 by the first optimizer (cut off during its final validation; it ran on battery in
-Low Power Mode), P8-P13 and the validation and AC timings of section 5 by the second. Section 5 has the final numbers.
+Low Power Mode), P8-P13 and the validation and AC timings of section 5 by the second. Section 5 has its numbers.
+Round 2 (section 8, R2-1 ... R2-16) started from 6b598f7 and met the 10 us target: B = 1 fixed 15.5 -> 9.1 us
+per tick, bit-identical results. Section 8 has the current numbers.
 
 ## 1. Tools (all in `tools/`)
 
@@ -16,8 +18,8 @@ Low Power Mode), P8-P13 and the validation and AC timings of section 5 by the se
 | `clear_numba_cache.py` | deletes the numba cache files of the kernel and every leaf module it calls (numba keys a cached function on its own source file only, so an edited leaf would otherwise keep running stale code inside the cached kernel; docs/ENGINE.md section 1). Run after every edit of njit code, before any timing or comparison. |
 | `perf_bench.py` | wall and CPU time (`time.process_time`) per world-tick, median of repeats, load average before and after, Newton iterations per ring and tick. Cases `b1` (B = 1, fixed, open loop, tests/perf setup: sampled world seeds 7, cold rings), `b1lock` (B = 1 nominal world settled at the quasi-static lock codes), `b64` (B = 64, 8 threads). |
 | `perf_ab.py` | back-to-back A/B/A/B runs of `perf_bench.py` for two source trees (each with its own numba cache): the before/after numbers in this file. The baseline tree is `git archive 8646691`. |
-| `perf_tick_prof.py` | in-context breakdown of the tick: re-compiles `kernel._world_block` (and `_implicit_step_eng`, `_truth_a`) from the kernel source with a read of the arm64 virtual counter (`cntvct_el0`, 24 MHz) at every `# ---` comment line, so the sections follow the kernel source. arm64 only. The instrumented functions get an extra argument `acc`: they must not use a local of that name. The counter reads add ~0.6 us per tick. |
-| `perf_profile.py` | cost of single leaf kernels in compiled loops (out of context). |
+| `perf_tick_prof.py` | in-context breakdown of the tick: re-compiles `kernel._world_block`, its tick loop `_world_loop` (since R2-11) and `_implicit_step_eng`, `_truth_a` from the kernel source, each with the kernel's own runtime flag, with a read of the arm64 virtual counter (`cntvct_el0`, 24 MHz) at every `# ---` comment line, so the sections follow the kernel source. arm64 only. The instrumented functions get an extra argument `acc`: they must not use a local of that name. The counter reads add ~0.1-0.6 us per tick. |
+| `perf_profile.py` | cost of single leaf kernels in compiled loops (out of context). Round 2 fixed its implicit-step case (stale since P8). |
 | `perf_scenarios.py` | the fixed accuracy-regression scenarios (section 2), traces + metrics + final Truth to `runs/<dir>/<scenario>.npz`. |
 | `perf_compare.py` | largest difference per signal between two `perf_scenarios.py` runs. |
 | `perf_summarize.py` | the largest difference per signal over all scenarios of a `perf_compare.py --json` file. |
@@ -360,3 +362,281 @@ The g26 default aggressor site moved from (0, 30) to (0, -30) um, and the old si
   AC power, load average 4.6 / 2.6 / 2.4): 15.50 us per tick with both sites against 15.38 us with only the
   default site, i.e. +0.1 us (+0.8 %), at the noise level. Timing comparisons with the trees of sections 2-6 therefore compare 970
   against 945 lags; re-time the baseline tree with the same layout, or accept the 0.1 us.
+
+## 8. Round 2 (2026-10-10): 15.5 -> 9.1 us per tick, bit-identical
+
+Owner files as round 1. Starting point: HEAD 6b598f7 (d2328b4, the reviewed round 1, then the g26 aggressor-site
+change of section 7). Rule unchanged. Every change of this round is bit-identical: no recorded value of any
+regression scenario, test or controller changed. 07 P0-9 (10 us per tick at B = 1, fixed 1 us tick) is met (9.1 us,
+8.5) without any approximation.
+
+### 8.1 New baseline at 6b598f7
+
+`runs/perf_baseline_r2/` (git-ignored), recorded in a `git archive HEAD` tree with its own numba cache before any
+round-2 change: `ref/` (tools/perf_scenarios.py, 6 scenarios; a1_pi now on the default layout), `adv/`
+(tools/perf_scenarios_adv.py, 11 adversarial scenarios), `scorecard/` (tests/validation/test_controllers_on_engine.py:
+19 passed, number for number the committed docs/handoff/controller_scorecard.json of 6b598f7), and copies of the
+committed scorecards of 8646691 and 6b598f7. The baseline tree reproduces runs/perf_final_r1 bit for bit in every
+scenario except a1_pi (the layout change).
+
+### 8.2 Log of changes
+
+After every step: every recorded trace, metric and final Truth (out_rl / out_r / out_l, t_obs and the lag states
+included in the adversarial set) of the 6 + 11 scenarios bit-identical to the new baseline (`runs/perf_r2/s1` ...
+`s14`, `final`, each with `*_adv`), and the engine tests. Savings: tools/perf_tick_prof.py sections (in context,
+instrumented, b1lock) or tools/perf_bench.py / tools/perf_ab.py (b1, b1lock) at the load given; AC power, Low Power
+Mode off throughout.
+
+| # | change | kind | saving (B = 1) | error bound | test |
+|---|---|---|---|---|---|
+| R2-1 | unsigned indices (`_U = np.uint64`) in the hot kernels: Airy-path cache update, evaluation, commit and bounds, thermal lag passes, junction-table lookups, swing capacitance, Truth. numba adds a negative-index wraparound (compare + select) to every access whose signed index it cannot prove non-negative, i.e. every access to the packed rows | exact, bit-identical | with R2-2, R2-3: 16.1 -> 13.5 us instrumented (Newton 2.70 -> 2.27, substep caches 1.52 -> 1.06, bounds 0.98 -> 0.80, lag pass 1.76 -> 1.34); one evaluation 81 -> 60 ns standalone | none | scenarios, parity, test_engine_adapter |
+| R2-2 | the far-line hold's evaluation moved out of the evaluation's loop (`optics._sh_fast_pabs_hold`, called only when optics_far_hold is on) | exact, bit-identical | in R2-1 | none | test_parity_with_far_line_hold, test_far_line_hold_error_is_within_its_bound |
+| R2-3 | light commit: at every step of a block but its last, the self-heating commit writes only the outputs a tick reads (RL_PIN, RL_THRU, RL_THRU1/0 per line, R_DROP_SUM, R_ABS_SUM, R_DROP_SUM1/0, the walk buffer) and the bus pass only its output part (`optics._bus_pout_nb`; the reflection part `_bus_refl_nb` at the block end); the last step of every block commits in full | exact, bit-identical (every value read in a block and every output after it) | commit 1.48 -> 0.65 us (with R2-1) | none | scenarios (adversarial ones save every final output array), parity |
+| R2-4 | review of round 1 (section 6, item 4): `ReferenceEngine(airy=False)` runs independent general-path adapter functions (`optics.selfheat_pabs_general / selfheat_commit_general / selfheat_bounds_general`); degenerate rows (r = t1 t2 a = 1 at resonance) raise ZeroDivisionError explicitly on the Airy path and in `_airy_line` | correctness / test | none | Airy path vs closed forms: P_abs 1e-11, outputs 1e-11 relative; kernel vs independent reference: every Truth field within 1e-9 of its range (measured ~1e-11), codes identical | test_parity_against_independent_optics, test_general_adapter_functions_match_the_airy_path, test_degenerate_row_raises_on_both_paths |
+| R2-5 | lags of a source without input whose states are exactly +0.0 skipped (the stress-site lags of every g26 run, 25 of 970; also cold drivers, unheated heaters) until the source gets an input | exact, bit-identical | ~0.05 us | none (x stays +0.0; +0.0 added to a sum leaves it) | scenarios (agg_edge_pi wakes a dead source), test_kernel_releases_every_array |
+| R2-6 | error counter: the counting-period test once per tick instead of a modulo and a call per lane | exact, bit-identical | 0.21 -> 0.03 us (standalone) | none | test_datapath, scenarios |
+| R2-7 | Truth line search: the division d = num / dpl only for lines that can be inside the wrong-line window (|num| <= lim |dpl| (1 + 1e-12) guarantees fl(|num / dpl|) > lim for the skipped ones) | exact, bit-identical | ~0.05 us | none | scenarios |
+| R2-8 | controller edge, auto-policy decision, oracle and fast_kernel on one world's arrays (`_release_a`, `_auto_h_a`, `_oracle_a`, `_fast_tick_a`): a call that passes the KParams/KState tuples copies ~270 array structs (0.44 us measured) | exact, bit-identical | edge 0.48 -> 0.10 us per tick | none | scenarios (auto_pi10k, mc8_auto), parity |
+| R2-9 | thermal lag passes from per-lag coefficient tables (a, c0, c1, w side by side), (lag, source) pairs and the inputs (u0, u1) side by side: pair loads | exact, bit-identical | lag pass 1.24 -> 0.94, optical lags 0.27 -> 0.18, heater split 0.56 -> 0.46 us | none | scenarios, parity |
+| R2-10 | Truth: the exact-detuning Newton iteration of every ring in lockstep (each ring its own sequence and its own stop at a fixed point) | exact, bit-identical | 11.71 -> 11.24 us b1, 12.03 -> 11.52 b1lock (perf_bench, load 2.2-2.8) | none | scenarios, parity |
+| R2-11 | runtime-free compilation (`_nrt=False`) of the hot leaves (kernel, optics, phase, electrical, sensing, datapath, laser, metrics, thermal) and of the tick loop, split from `_world_block` into `_world_loop` (setup with the runtime, loop without): a function with the runtime increfs and decrefs every array it passes to a call (~500 runtime calls per tick) | exact, bit-identical | leaves: 11.24 -> 10.08 b1, 11.52 -> 10.38 b1lock (load 2.3-2.8); loop: -> 9.41 / 9.79 (load 4.9) | none | scenarios, the whole suite, test_kernel_releases_every_array |
+| R2-12 | no heap allocation per tick (laser enable mask, the cross-lag power, the heater-split sums) | exact, bit-identical | ~0.1 us | none | scenarios |
+| R2-13 | the line constants k1^2, t1^2 kept in the coupler cache (computed when K^2 changes) and the CW energy factor computed where a full commit needs it: 3 stores less per cache entry and substep | exact, bit-identical | substep caches 0.99 -> 0.91 us (1.06 -> 0.82 standalone) | none | test_engine_adapter, scenarios |
+| R2-14 | the Airy evaluation inlined into the Newton solver (`inline="always"` on `optics.sh_fast_pabs` and `kernel.eng_pabs`) | exact, bit-identical | A/B 9.57 -> 9.30 b1, 9.88 -> 9.49 b1lock (load 3.1-3.2) | none | scenarios |
+| R2-15 | large per-tick leaves inlined into the tick loop (laser, pattern, phase model, heater power, heater split, Truth, temperature sensors, error counter, metrics; monitor_tick_row and _implicit_step_eng cannot be: CPython compiles a call with more than 30 arguments to a *args call, which numba's inliner refuses) | exact, bit-identical | A/B 9.26 -> 9.17 b1, 9.59 -> 9.43 b1lock (load 2.9-3.1) | none | scenarios |
+| R2-16 | reference-leak fix of R2-11 (found by the new test): a function with the runtime called from the runtime-free loop must not make views of its arguments (numba 0.68 then leaked one reference to the self-heating rows per block with an oracle call); the oracle and fast kernel take arrays and run runtime-free, the view helpers `_sh_core`, `_sh_outputs`, `selfheat_views` are inlined, the general optics path is runtime-free | exact, bit-identical | none | none | test_kernel_releases_every_array (4 variants: open loop with the oracle, compiled controller with a fast_kernel, Python controller, auto policy, TCMT + backscatter, self-heating off) |
+
+Tried and not kept (each bit-identical, measured slower or no faster): both NRZ levels of a line adjacent in the
+Airy cache (no change; reverted), the cache update fused with the first evaluation of each ring (1.55 -> 1.65 us
+standalone), the bounds in two passes (0.79 -> 0.88 us), a per-ring evaluation table built per substep (73 -> 99 ns
+per evaluation), the observer sums in lockstep (0.19 -> 0.77 us: the sums were never the bottleneck, the advance
+is).
+
+### 8.3 Notes
+
+R2-1. The cast `_U(i)` (np.uint64) turns the index into an unsigned one, for which numba emits no wraparound; under
+NUMBA_DISABLE_JIT=1 it is a plain index. Every cast index is a non-negative offset by construction.
+
+R2-3. The engine passes `full = last_step` (`k + h` reaches the block end, or the next edge on the Python path) to
+`eng_commit` -> `sh_fast_outputs` / `sh_pass_on`. Within a block no kernel computation reads the other fields; after
+a block every output is the full set of its last step, which is what Plant.truth(), the reference parity and the
+adversarial scenarios' final arrays compare.
+
+R2-5. Per block, `_th_dead_init` marks the sources whose lags are all LAG_EXOGENOUS and exactly +0.0 (sign bit
+clear); `_th_live` builds the exogenous lag list without them and trims their trailing lags from each observer's
+range; before each lag pass `_th_wake` checks their inputs and rebuilds the lists when one is non-zero. A skipped
+lag would have computed a (+0.0) + (c0 0 + c1 0) = +0.0 (the input term is +-0.0, and +0.0 + -0.0 = +0.0 in round to
+nearest), and adding +0.0 to an observer sum that starts at the base temperature changes nothing.
+
+R2-11 and R2-16. A function compiled with `_nrt=False` cannot allocate (numba refuses) and cannot return an array it
+did not receive (numba refuses). Two hazards numba does not catch: calling a function that returns arrays (the
+reference is never released) and calling a function with the runtime that makes views of its arguments (measured:
+numba 0.68 leaks one reference per block). The kernel's comment above `_world_block` states the rules;
+`test_kernel_releases_every_array` checks the Python reference count of every KParams/KState array over blocks in
+six configurations. The tick loop calls functions with the runtime only in other owners' modules (scenario
+evaluation, controller pipeline, compiled controllers), none of which makes views of its arguments.
+
+R2-8. The tuple-taking edge helpers that the loop no longer called (`_edge`, `_push_act`, `_advance_edge`,
+`_sync_act_from_registers`, `_edge_tick`: a second copy of the edge logic) were removed at the end of the round;
+`release_row`, `_auto_h`, `_oracle`, `_fast_tick` and `truth_row` stay as thin wrappers of the array forms. The
+scenarios after the removal: `runs/perf_r2/final3`, `final3_adv`, bit-identical.
+
+### 8.4 Accuracy
+
+Bit-identical (8.2). The final tree (`runs/perf_r2/final`, `final_adv`; again `final3`, `final3_adv` after the removal
+of the dead edge helpers) against the new baseline: every recorded trace, metric and final Truth of the 6 regression
+and 11 adversarial scenarios identical, 0 differing signals in every scenario (`compare_vs_baseline_r2.json` in each
+directory). Since 6b598f7 equals the round-1 engine for every scenario but a1_pi (section 7), the comparison with
+8646691 of section 5.3 holds unchanged for those (largest 2.2e-6 pm detuning, no code changed).
+
+Controller scorecard (`MRM_SCORECARD_OUT=... pytest -m slow tests/validation/test_controllers_on_engine.py` on the
+final tree, `runs/perf_r2/scorecard_final`): 19 passed (181 s; 238 s at 6b598f7), every number identical to the
+scorecard of 6b598f7 (`runs/perf_baseline_r2/scorecard`, which equals the committed docs/handoff/
+controller_scorecard.json): `compare_vs_6b598f7.txt` reports no change in any metric. Against the copy of 8646691's
+scorecard (`tools/scorecard_compare.py ... --rename a1=a1_pd_adjacent a1_pd_far=a1`, `compare_vs_8646691.txt`):
+steady and a1_pd_adjacent (the former default a1) differ as in section 5.3 (largest a1_pd_adjacent max_pm 6.4e-7 pm,
+steady rms_pm 3.0e-9 pm, penalty_db 1.9e-10 dB, no discrete metric); `a1` against the former `a1_pd_far` is the
+layout change of section 7 (another PD-driver distance), not an engine difference.
+
+Tests: fast suite (`tools/memguard.py -- pytest -q -m "not slow"`, `runs/perf_r2/suite_final.log`, again
+`suite_final3.log` on the final tree): 1486 passed, 73 skipped, 3 xfailed, 3 failed: VAL-8a/b/c of
+tests/validation/test_thermal_replication.py, the known failures of 5.1 (they read the thermal FEM artefacts, not the
+engine). test_kernel_parity.py 16 passed (test_parity_without_jit
+under NUMBA_DISABLE_JIT=1, the far-line-hold parity, the new test_parity_against_independent_optics and the four
+variants of test_kernel_releases_every_array), test_engine_adapter.py 13 passed (two new). tests/perf: the fixed-step
+B = 1 target and the Monte Carlo target pass (XPASS); the auto target (>= 20 sim-s/wall-s) does not (xfail). The
+numba cache was cleared with tools/clear_numba_cache.py after every edit of njit code and before every timing and
+comparison.
+
+### 8.5 Timing (AC power, Low Power Mode off, no other pytest of this project running)
+
+`tools/perf_ab.py` against the `git archive` tree of 6b598f7 (its own numba cache): 5 alternating rounds, per run the
+median of 7 x 3000 ticks (B = 64: 7 x 200), load average 3.0-3.7, `runs/perf_r2/ab_base_final.json`. The B = 1
+numbers are CPU-bound (CPU time per tick equals the wall time).
+
+| case | 6b598f7 (= round 1) | final | speed-up wall (CPU) |
+|---|---|---|---|
+| b1: B = 1, fixed, open loop, cold rings | 15.45 us (CPU 15.44) | **9.06 us** (CPU 9.06) | x1.71 (x1.70) |
+| b1lock: B = 1, fixed, settled lock codes | 15.46 us (CPU 15.45) | **9.42 us** (CPU 9.42) | x1.64 (x1.64) |
+| b64: B = 64, fixed, 8 threads, per world-tick | 3.57 us (CPU/thread 2.98) | **2.14 us** (CPU/thread 1.76) | x1.67 (x1.69) |
+
+Against 8646691 (section 2: 54.3 us b1 at load 2.5-3.1, not taken back to back with this tree) the B = 1 tick is
+~6x faster. **07 P0-9 (>= 0.1 simulated s per wall s at the fixed 1 us tick, <= 10 us per tick): met**, with
+results bit-identical to 8646691's successors and without any approximation.
+
+tests/perf and the auto policy (`tests/perf/test_perf.py` measure(), single runs, load 2.8-3.2;
+`runs/perf_r2/perf_tables.log` and the back-to-back 6b598f7 / final pair of the auto cases):
+
+| case | 6b598f7 | final | sim-s / wall-s (final) |
+|---|---|---|---|
+| B = 1, fixed | 15.6 us | 9.19-9.29 us | 0.108-0.109 (07 target 0.1: met) |
+| B = 1, auto, 100 kHz controller (0.38-0.42 substeps per tick) | 8.42 us | 4.76-5.08 us | 0.20-0.21 |
+| B = 1, auto, 10 kHz controller (0.16 substeps per tick) | 4.64 us | 2.86-2.98 us | 0.34-0.35 (07 target 20: not met) |
+| B = 64, fixed, 8 threads | 3.56 us per world-tick | 1.97-2.34 us | 64 x 1 s Monte Carlo in 2.1-2.5 min (07: 5 min) |
+| B = 64, auto | 3.45 us | 1.90 us | |
+
+(One tests/perf report-table run gave 5.2 us for B = 64 auto, a 200-tick run that includes the first call; the
+back-to-back 300-tick pair above is the comparable number.)
+
+Options, A/B against the final engine (3 rounds, load 3.3-3.6; `ab_final_tol6.json`, `ab_final_hold.json`):
+
+| option | b1 | b1lock | B = 64 | effect on results |
+|---|---|---|---|---|
+| none (final, exact) | 9.11-9.15 us | 9.39-9.45 us | 2.08 us | bit-identical to 6b598f7 |
+| `sh_tol_k=1e-6` (default 1e-7 K) | 8.76 us | 9.18 us | | each solve within 1e-6 K of its root (1.29 instead of 1.73 iterations) |
+| `optics_far_hold=True` (P5) | 10.07 us | 10.27 us | 2.32 us | now slower than the exact engine: its evaluation (`_sh_fast_pabs_hold`) did not get R2-1 / R2-11 / R2-14; it also changes closed-loop trajectories (5.4, section 6). Kept as it was, off by default; no reason to turn it on. |
+
+The final tree after the removal of the dead edge helpers (`tools/perf_bench.py`, 7 x 3000 ticks, load 2.4;
+`runs/perf_r2/bench_final3.log`): b1 9.12 us, b1lock 9.37 us, b64 1.95 us per world-tick (CPU/thread 1.78).
+
+Compile: a cold compile of the final tree (empty numba cache, `tools/memguard.py --heavy`, load 2-4) took 104 s
+with a peak RSS of 2.25 GB; a fresh process with the warm cache runs a short benchmark in 1.3 s.
+
+### 8.6 Where the time goes now (B = 1, b1lock; tools/perf_tick_prof.py)
+
+Final tree, `tools/perf_tick_prof.py --locked` (load 2.35; instrumented 9.44 us, sections 9.36 us;
+`runs/perf_r2/prof_final_locked.log`):
+
+| part | us per tick | share | round 1 (5.5) |
+|---|---|---|---|
+| self-heating optics: Newton solves (22.5 ring evaluations of 8 lines x 2 levels, 1.82 iterations per ring) | 1.97 | 21 % | 2.7 |
+| self-heating optics: substep caches (cos/sin rotation and Airy constants, 128 entries) | 0.97 | 10 % | 1.6 |
+| self-heating optics: bounds of the solve (128 entries, 2 sqrt + 4 divisions each: at the divide/sqrt throughput) | 0.79 | 8 % | 1.0 |
+| self-heating optics: commit (light, R2-3) and bus output | 0.41 | 4 % | 1.5 |
+| thermal: lag advance and observer sums, optical lags, heater TCR split | 0.88 + 0.16 + 0.38 | 15 % | 2.7 |
+| sensors (monitor with 14 flicker poles per ring per ADC sample, error counter, temperature, readback) | 1.39 | 15 % | 1.8 |
+| phase model (optics inputs; ~450 divisions), K^2 / slope rows / swing capacitance | 0.49 + 0.12 | 7 % | 1.15 |
+| Truth | 0.41 | 4 % | 0.9 |
+| bias DAC (8 normal draws), laser (8 RIN draws), heater DAC, sensor inputs (8 exp, 8 erfc) | 0.37 + 0.24 + 0.12 + 0.20 | 10 % | ~1.6 |
+| controller edge, scenario, data, metrics, oracle, rest | 0.06 + 0.06 + 0.06 + 0.07 + 0.07 + 0.1 | 4 % | 1.0 |
+
+The counter-based normal draws (Philox4x32-10 + Box-Muller, 32-34 ns each; ~48 per tick: 28 normal pairs of the
+monitor flicker, 4 white/shot, 8 bias-DAC, 8 RIN) are ~1.6 us, 17 % of the tick, and fixed by the seeded noise
+contract.
+
+### 8.7 What is left
+
+The 10 us target is met with a margin of ~0.6-0.9 us at load 3-4 (b1 9.1, b1lock 9.4). Exact levers left, each
+small: the solver evaluation (60 ns per ring evaluation of 16 line-levels standalone after R2-1; 1.97 us / 22.5 =
+88 ns in context with the Newton step); the bounds are at the divide/sqrt throughput floor; the per-tick functions of mrm/plant/io.py and mrm/scenarios/generators.py still run
+with the numba runtime (other owners; ~0.05 us); monitor_tick_row and _implicit_step_eng cannot be inlined (more
+than 30 arguments); the light bus output could compute only the declared lines' POUT (~0.03 us).
+
+Levers that change results (opt-in only, by the rule of 5.4: any per-tick change above rounding moves an ADC code
+now and then, and a closed loop then follows another trajectory): cached solver bounds with a margin, or a Newton
+predictor from the last step (each solve then lands elsewhere inside the 1e-7 K tolerance; est. 0.5-0.8 us); a
+re-optimized far-line hold; a cheaper normal generator (07 P1-13, core owner: every seeded realization changes;
+up to ~1 us); a smaller thermal ROM (lags merged per (source, pole): exact up to rounding but another state
+representation, thermal owner).
+
+Requests: plant_thermal / integrator: none. Scenario and io owners: their per-tick row functions
+(`scen_eval_b`, `pipe_pop_row`, `apply_act_row`, ...) could be compiled with `_nrt=False` (they allocate nothing);
+the engine's rule for a function with the runtime called from the runtime-free loop is that it must not make views
+of its arguments (8.3).
+
+## 9. Independent review of round 2
+
+Reviewer's re-run of the round-2 tree (raw files in `runs/review_r2/`, git-ignored; the scripts of the extra checks
+are described below). AC power, Low Power Mode off, no other pytest of this project running during any timing;
+numba caches cleared with `tools/clear_numba_cache.py --all` before the first comparison and again after the
+reviewer's edits. The baseline is a fresh `git archive 6b598f7` with its own numba cache.
+
+**Baseline.** The fresh 6b598f7 tree reproduces `runs/perf_baseline_r2/ref` and `adv` bit for bit (6 + 11
+scenarios, every array of every npz, sign of zero included), so the optimizer's baseline is genuine.
+
+**Accuracy.** The round-2 tree against the fresh 6b598f7 tree and against `runs/perf_baseline_r2`: 0 differing
+arrays in the 6 regression and 11 adversarial scenarios (before and after the reviewer's edits). Against
+`runs/perf_baseline` (8646691; a1_pi left out, layout change of section 7): largest differences 2.2e-6 pm detuning
+(idle_traffic), 2.9e-5 mK ring temperature, 1.5e-5 uW absorbed power, 2.6e-4 nA monitor current; no monitor code,
+heater code or discrete metric changed (round-1 rounding, section 5.3). Seven extra cases aimed at the round-2
+changes, run in both trees and compared bit for bit (0 differing arrays): the stress-site aggressor driven by a
+0.3 W square wave from 1.5 ms (its source is dead at the block start and wakes mid-block, R2-5; checked with
+`_th_dead_init`), both sites driven with a Python controller (blocks end at every edge, R2-3), a Python controller
+under the auto policy with lines moving and aggressor edges, `optics_far_hold=True` and `sh_tol_k=1e-6` with lines
+moving and aggressor edges, traffic on/off and a bias step with a Python controller, and a sampled B = 2 open loop
+run in irregular blocks (1 to 1000 ticks) with `Plant.truth()` out_rl / out_r / out_l saved after every block.
+Chunking (chunk_ticks 1e5 / 777 / 13 / 1, also under the auto policy) and the thread count (B = 8: 1, 3 and 8
+threads) change nothing, bit for bit. The counter RNG streams are unchanged (every monitor code, error count and obs
+vector identical). Controller scorecard rerun (`runs/review_r2/scorecard`): 19 passed, every one of 4338 numbers
+identical to the committed scorecard of 6b598f7; against 8646691 the differences of 8.4 (steady, a1_pd_adjacent at
+rounding level; `a1` is the layout change).
+
+**Runtime rules (R2-11, R2-16).** Python reference counts of every KParams / KState array and numba's runtime
+allocation statistics (NUMBA_NRT_STATS=1: live allocations and meminfos) are unchanged over 5000 ticks in blocks of
+37 with the compiled registry controllers pi_lock_c (square aggressor), dither_lockin_c (traffic on/off),
+kalman_lqg_c (auto policy), mpc_c, pi_lock_c with backscatter, and the open loop without self-heating; also with a
+compiled controller and fast kernel that make views of their arguments (called through the first-class function
+pointer they leak nothing).
+
+**NUMBA_DISABLE_JIT=1.** The shipped no-JIT parity passes; the reviewer added no-JIT kernel/reference parity runs
+for the compiled-controller path, TCMT + backscatter, self-heating off and the far-line hold (all pass the
+comparison of test_kernel_parity `_compare`), and the auto policy (runs, finite; the reference has no auto policy). agg_edge_pi, auto_pi10k and fold_up without JIT equal the JIT runs except one
+Truth sample of agg_edge_pi (detuning of ring 7 at tick 438, 1 ulp of the wavelength: 2.1e-22 m); the 6b598f7 tree
+shows the same sample, and its no-JIT run equals the round-2 no-JIT run bit for bit: pre-existing, not from round 2.
+
+**Exactness of R2-1 ... R2-16 (code review).** R2-1: every `_U` cast is of an offset non-negative by construction
+(the declared line comes from tx.assignment only when in range, else channel_plan.ring_to_line, validated in
+0..L-1; `_U(o_cur)` and `_U(j - 1)` are guarded; `grid_index` returns >= 0 for x strictly inside the grid, and
+every caller sends NaN and the ends elsewhere). R2-3: the tick loop reads only RL_PIN, RL_THRU, RL_THRU1/0,
+RL_POUT1/0, L_POUT, R_DROP_SUM, R_ABS_SUM and R_DROP_SUM1/0, all written by the light commit; the loop's only
+early exit is the Python-path edge, and `last_step` covers it. R2-5: a skipped lag computes a (+0.0) + (+-0.0) =
++0.0 and both wake checks run after the step's inputs are set. R2-7: |num| > fl(fl(lim |dpl|)(1 + 1e-12)) implies
+fl(|num / dpl|) > lim (the rounding error is 2 ulp against the 1e-12 margin). R2-10: the same iteration, the same
+stop and the same `float(order)` as `cold_coordinate`. R2-13: k1^2 and t1^2 from the same cached k1, t1; the
+shared `_afac` memo returns factors of the same a. R2-14 / R2-15: inlining puts the numpy-error-model Airy
+evaluation under the caller's Python error model; its only division by a variable (1 / den) is guarded explicitly,
+so the values are the same.
+
+**Timing** (`tools/perf_ab.py`, 5 alternating rounds, median of 7 x 3000 ticks per run; `ab_base_vs_final.json`,
+load 1.5-2.1; a first pair before the reviewer's edits, load 1.4-2.6, gave 15.48 / 15.46 / 3.55 -> 9.11 / 9.46 /
+2.15):
+
+| case | 6b598f7 | round 2 (final) | wall (cpu) speed-up |
+|---|---|---|---|
+| b1 (B = 1, fixed, cold rings) | 15.36 us (cpu 15.36) | **9.07 us** (cpu 9.08) | x1.69 (x1.69) |
+| b1lock (B = 1, fixed, settled lock codes) | 15.47 us (cpu 15.47) | **9.43 us** (cpu 9.43) | x1.64 (x1.64) |
+| b64 (B = 64, 8 threads, per world-tick) | 3.67 us (cpu/thread 2.96) | **1.96 us** (cpu/thread 1.78) | x1.87 (x1.66) |
+
+tests/perf (load 2.3): B = 1 fixed 9.24-9.29 us, 0.108 sim-s/wall-s (XPASS: 07 P0-9 met); B = 1 auto 10 kHz 2.85 us
+(0.35 sim-s/wall-s, xfail), 100 kHz 5.07 us; B = 64 fixed 2.12-2.33 us (XPASS), auto 1.81 us. Options (3 rounds,
+load 1.6-1.8): `optics_far_hold=True` 9.11 -> 9.98 us (b1), 9.46 -> 10.32 (b1lock): slower than the exact engine,
+as stated; `sh_tol_k=1e-6` 9.11 -> 8.68 (b1), 9.43 -> 9.21 (b1lock). `tools/perf_tick_prof.py --locked` (load 1.6,
+instrumented 10.30 us; the counter reads add more here than in 8.6): Newton 2.13, substep caches 1.05, bounds 0.89,
+commit 0.47, lag pass 0.95, sensors 1.45 us, the shares of 8.6. Cold compile after `--all`: ~110 s, peak RSS 2.0-2.1 GB.
+
+**Tests.** Fast suite on the final tree (`suite_final.log`): 1488 passed, 73 skipped, 3 xfailed, 3 failed (VAL-8a/b/c,
+the known thermal-artefact failures). test_kernel_parity.py + test_engine_adapter.py: 31 passed.
+
+**Findings and fixes.**
+1. No defect in the engine: every change of the round is exact, and no approximation was added.
+2. R2-3 had no test of its invariant (every optics output complete after every block: the parity tests compare
+   Truth fields, not out_rl / out_r / out_l). Added `test_full_optics_outputs_after_every_block` (Airy path and
+   backscatter; blocks of 1 to 64 ticks; the kernel's outputs against the reference's, which commits in full at
+   every step). Under NUMBA_DISABLE_JIT=1 with `eng_commit` forced to full = False it fails at the first block. On
+   the general path the engine writes RL_DABS_DPHI / R_DABS_DLAM, which the reference leaves at zero (documented
+   above EXT_I in kernel.py, since round 1): the test skips those two fields there.
+3. Stale references, fixed: optics.py cited R2-12 for the coupler-cache constants (R2-13 in 8.2); the
+   `_heater_split_all` docstring named the removed `_heater_split_tables`; docs/handoff/engine.md section 2 listed
+   the removed `_edge` and `_push_act` among the remaining wrappers.
+4. Noted, not changed: the margin to 10 us is 0.55-0.95 us (b1lock 9.43, b1 9.07 at load 1.5-2.1), so a loaded
+   machine can still exceed the budget; the 1-ulp JIT / no-JIT Truth difference above is older than round 2.

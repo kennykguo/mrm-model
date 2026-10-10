@@ -133,7 +133,10 @@ Ready-made self-heating adapter for mrm.plant.selfheat (the pabs_fn / commit_fn 
 (commit_fn), :func:`selfheat_bounds` (p_max, d2p_max, dpdt_max in temperature units) and :func:`selfheat_views`
 (views to update inputs and read outputs).
 The hot kernels use ``error_model="numpy"`` (no Python division checks; the Python wrappers validate inputs). All
-kernels are numba @njit(cache=True), take scalars and arrays only, and run unchanged under NUMBA_DISABLE_JIT=1.
+kernels are numba @njit(cache=True), take scalars and arrays only, and run unchanged under NUMBA_DISABLE_JIT=1. The
+per-tick kernels the engine calls are compiled without the numba runtime (``_nrt=False``; docs/handoff/perf.md R2-11):
+they allocate nothing and call no function that returns arrays (the view helpers _sh_core, _sh_outputs and
+selfheat_views are inline="always" for that reason).
 The workspaces (cw, fw, work) and outputs are written by every call: with prange over the batch, give every batch
 element its own (for example cw of shape (B, N_CW, L), passing cw[b]).
 
@@ -157,6 +160,11 @@ from numba import njit
 from mrm.units import C0
 
 TWO_PI = 2.0 * math.pi  # mathematical constant
+# Index cast for the hot per-tick kernels (docs/handoff/perf.md R2-1): numba adds a negative-index wraparound (a
+# compare and a select) to every array access whose index is a signed integer it cannot prove non-negative, which
+# in the packed self-heating rows is every access (the offsets come from args_i). An unsigned index has no
+# wraparound; every index cast with _U here is a non-negative offset by construction. Same values, bit for bit.
+_U = np.uint64
 
 # ---- field indices of the per-(ring, line) output array out_rl[field, ring, line] (units in brackets) -------------
 RL_PIN = 0      # power arriving at the ring's input port, after the bus segment [W]
@@ -532,6 +540,11 @@ def _airy_line(phi_tot, xi, t1, k1, t2, k2, t_rt):
     c = math.cos(phi_tot)
     s = math.sin(phi_tot)
     den = 1.0 - 2.0 * r * c + r * r
+    if den == 0.0:
+        # r = t1 t2 a = 1 (a lossless ring without coupling) at resonance: singular. Raised explicitly: the division
+        # below would give NaN instead whenever this function was compiled for a caller with numba's numpy error
+        # model (numba caches the callee with the caller's error model), so the behaviour would depend on the cache
+        raise ZeroDivisionError("_airy_line: den = 0 (lossless ring without coupling, at resonance)")
     dden = 2.0 * r * s
     num = t1 * t1 - 2.0 * t1 * t2 * a * c + t2 * t2 * a * a
     dnum = 2.0 * t1 * t2 * a * s
@@ -718,7 +731,7 @@ def _has_backscatter(rbk):
     return False
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def _stages_v(nl, cw, fw, trt_row, res):
     """Exact ring, unit forward input, values only: solve, then the field pass in two half-ring stages.
 
@@ -804,7 +817,7 @@ def _stages_v(nl, cw, fw, trt_row, res):
         res[RES_DLOSS, l] = 0.0
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def _stages_d(nl, cw, fw, trt_row, res):
     """:func:`_stages_v` plus d(loss)/d(phi): quotient rule on the closed-form solution, then forward mode through
     the field pass (coupling and loss held fixed; they do not depend on phi)."""
@@ -954,7 +967,7 @@ def _stages_d(nl, cw, fw, trt_row, res):
         res[RES_DLOSS, l] = (dscw + dsccw) * lossfrac
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def ring_rows_nb(phi_row, psi_row, k2t_row, k2d_row, a_row, trt_row, rbk, use_tcmt, m_orders, with_d, cw, fw, res):
     """Unit-forward-input response of ONE ring at all L lines for one junction level.
 
@@ -1013,7 +1026,7 @@ def ring_rows_nb(phi_row, psi_row, k2t_row, k2d_row, a_row, trt_row, rbk, use_tc
 # Single-ring, all-lines kernels (used by the bus and by the implicit self-heating solve)
 # =====================================================================================================================
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def ring_lines_nb(k, pin, p1, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th, k2_dr, t_rt, rb, dphi_dlamres,
                   two_level, use_tcmt, m_orders, with_slope, out_rl, out_r, p_thru, cw, fw):
     """Solve ring k at every line for a given input power per line, and write its outputs (no allocation).
@@ -1113,7 +1126,7 @@ def ring_lines_nb(k, pin, p1, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th, k2_dr,
     out_r[R_DABS_DLAM, k] = slope
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def dpabs_dlambda_res_nb(k, pin, p1, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th, k2_dr, t_rt, rb,
                          dphi_dlamres, two_level, use_tcmt, m_orders, cw, fw):
     """Absorbed power of ring k and its slope with respect to a rigid shift of ring k's resonance (P0-1 Newton step).
@@ -1151,7 +1164,7 @@ def dpabs_dlambda_res_nb(k, pin, p1, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th,
     return pabs, slope
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def pabs_bounds_nb(k, pin, p1, a0, a1, eta0, eta1, k2_th, k2_dr, two_level):
     """Upper bounds of ring k's absorbed power and of its curvature in the round-trip phase, at fixed input.
 
@@ -1195,7 +1208,7 @@ def pabs_bounds_nb(k, pin, p1, a0, a1, eta0, eta1, k2_th, k2_dr, two_level):
 RB_MAX_BOUNDS = 1.0  # |r_b| up to which pabs_bounds_nb / pabs_slope_bound_nb are verified (test_optics; derived)
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def pabs_slope_bound_nb(k, pin, p1, a0, a1, eta0, eta1, k2_th, k2_dr, two_level):
     """Upper bound of |dP_abs/d phi| of ring k at fixed input [W/rad] (multiply by |d phi/dT| for W/K).
 
@@ -1232,7 +1245,7 @@ def pabs_slope_bound_nb(k, pin, p1, a0, a1, eta0, eta1, k2_th, k2_dr, two_level)
     return 1.10 * sm
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
     """After every ring has been solved: bus output, per-level outputs, reflection return and the single-pass bound.
 
@@ -1251,6 +1264,13 @@ def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
     linear in the pair products and E|r_i||r_j| <= sqrt(E r_i^2) sqrt(E r_j^2) for independent data, so it bounds the
     data-averaged error to leading order in eps; it is not a worst case over data states.
     """
+    _bus_pout_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l)
+    _bus_refl_nb(p_in_w, bus_order, bus_t2, out_rl, out_l)
+
+
+@njit(cache=True, _nrt=False)
+def _bus_pout_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
+    """The bus-output part of :func:`bus_finalize_nb`: RL_POUT1 / RL_POUT0 of every ring and line and L_POUT."""
     n = bus_order.shape[0]
     nl = p_in_w.shape[0]
     for l in range(nl):
@@ -1259,7 +1279,6 @@ def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
         for pos in range(n - 1, -1, -1):
             k = bus_order[pos]
             pk = out_rl[RL_PIN, k, l]
-            pin_l = p_in_w[l]
             if pk > 0.0:
                 out_rl[RL_POUT1, k, l] = out_rl[RL_THRU1, k, l] * suffix
                 out_rl[RL_POUT0, k, l] = out_rl[RL_THRU0, k, l] * suffix
@@ -1271,6 +1290,15 @@ def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
             suffix *= tbar * bus_t2[k]
         last = bus_order[n - 1]
         out_l[L_POUT, l] = out_rl[RL_THRU, last, l] * bus_t2_out
+
+
+@njit(cache=True, _nrt=False)
+def _bus_refl_nb(p_in_w, bus_order, bus_t2, out_rl, out_l):
+    """The reflection part of :func:`bus_finalize_nb`: L_REFL_IN and L_BOUND (reads no output of
+    :func:`_bus_pout_nb`, so the two parts are independent)."""
+    n = bus_order.shape[0]
+    nl = p_in_w.shape[0]
+    for l in range(nl):
         # reflection returned to the input (E[T^2] for the double crossing), and the double-reflection bound
         ret = 0.0
         tot = 0.0                     # sum of |r_k|
@@ -1301,7 +1329,7 @@ def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
         out_l[L_BOUND, l] = 1.0 / ((1.0 - eps) * (1.0 - eps)) - 1.0 if eps < 1.0 else np.inf
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def bus_propagate_nb(p_in_w, bus_order, bus_t2, bus_t2_out, p1, phi0, phi1, a0, a1, eta0, eta1, psi,
                      k2_th, k2_dr, t_rt, rb, dphi_dlamres, two_level, use_tcmt, m_orders, with_slope,
                      out_rl, out_r, out_l, work, cw, fw):
@@ -1398,7 +1426,7 @@ SHN_DPL = 12      # dphi/dlambda_res [rad/m]
 N_SHN = 13
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
 def _sh_core(args_f, args_i):
     """The views one evaluation needs: (p_in (L,), p_cur (L,), ring block (N_SHR, N), line block (N_SHN, N, L),
     rb (N, M_b) complex, cw (N_CW, L) complex, fw (N_FW, L))."""
@@ -1422,7 +1450,7 @@ def _sh_core(args_f, args_i):
     return p_in, pcur, rg, nb, rb, cw, fw
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
 def _sh_outputs(args_f, args_i):
     """Output views (out_rl (N_RL, N, L), out_r (N_R, N), out_l (N_L, L)) of packed self-heating rows."""
     n = args_i[SH_N]
@@ -1436,7 +1464,7 @@ def _sh_outputs(args_f, args_i):
     return orl, orr, ol
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
 def selfheat_views(args_f, args_i):
     """Views into packed self-heating rows (no copy): the plant writes its per-substep inputs and reads outputs here.
 
@@ -1455,7 +1483,7 @@ def selfheat_views(args_f, args_i):
             args_i[SH_HDR:SH_HDR + n], args_i[SH_HDR + n:SH_HDR + 2 * n])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _sh_prepare(t, k, pos_k, p_in, pcur, rg, nb):
     """Set ring k's phase rows at temperature t [K] and, for the first ring in bus order (pos_k = 0), its input power.
 
@@ -1476,7 +1504,7 @@ def _sh_prepare(t, k, pos_k, p_in, pcur, rg, nb):
     return s0 * (1.0 + beta * dt)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def selfheat_pabs(t, k, args_f, args_i):
     """pabs_fn for mrm.plant.selfheat: absorbed power of ring k at ring temperature t [K], and dP_abs/dT [W/K].
 
@@ -1496,7 +1524,7 @@ def selfheat_pabs(t, k, args_f, args_i):
     return pabs, slope * dlam_dt
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def selfheat_commit(t, k, args_f, args_i):
     """commit_fn for mrm.plant.selfheat: write every output of ring k at its solved temperature t [K] into the packed
     out_rl / out_r, pass its through power to the next ring in bus order, and after the last ring fill out_l
@@ -1529,7 +1557,7 @@ def selfheat_commit(t, k, args_f, args_i):
         bus_finalize_nb(p_in, args_i[SH_HDR:SH_HDR + n], rg[SHR_T2], args_f[o], orl, ol)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def selfheat_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
     """Bounds that mrm.plant.selfheat and mrm.plant.thermal need, per ring, valid for any state of the other rings.
 
@@ -1546,6 +1574,74 @@ def selfheat_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
         if _fast_flag(k, args_f, args_i) != 0.0:
             _fast_check(k, args_f, args_i)
     sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max)
+
+
+@njit(cache=True, _nrt=False)
+def selfheat_pabs_general(t, k, args_f, args_i):
+    """:func:`selfheat_pabs` without the Airy path: every ring through the general kernels
+    (:func:`dpabs_dlambda_res_nb`, i.e. the closed forms of :func:`_airy_line` for a ring without backscatter). The
+    same P_abs and slope as the Airy path up to floating-point rounding, from an independent implementation: the
+    reference engine runs it when asked for an independent check of the engine's self-heating optics
+    (mrm.sim.kernel_ref.ReferenceEngine(airy=False), tests/verification/test_kernel_parity.py)."""
+    p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
+    n = args_i[SH_N]
+    dlam_dt = _sh_prepare(t, k, args_i[SH_HDR + n + k], p_in, pcur, rg, nb)
+    pabs, slope = dpabs_dlambda_res_nb(k, pcur, rg[SHR_P1, k], nb[SHN_PHI0], nb[SHN_PHI1], nb[SHN_A0], nb[SHN_A1],
+                                       nb[SHN_E0], nb[SHN_E1], nb[SHN_PSI], nb[SHN_K2T], nb[SHN_K2D], nb[SHN_TRT],
+                                       rb, nb[SHN_DPL], args_i[SH_TWO] != 0, args_i[SH_TCMT] != 0, args_i[SH_MORD],
+                                       cw, fw)
+    return pabs, slope * dlam_dt
+
+
+@njit(cache=True, _nrt=False)
+def selfheat_commit_general(t, k, args_f, args_i):
+    """:func:`selfheat_commit` without the Airy path (:func:`selfheat_pabs_general`): every output of ring k from
+    :func:`ring_lines_nb` with the slope outputs (as the Airy path writes them), then the bus walk."""
+    p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
+    orl, orr, ol = _sh_outputs(args_f, args_i)
+    n = args_i[SH_N]
+    q = args_i[SH_HDR + n + k]
+    _sh_prepare(t, k, q, p_in, pcur, rg, nb)
+    ring_lines_nb(k, pcur, rg[SHR_P1, k], nb[SHN_PHI0], nb[SHN_PHI1], nb[SHN_A0], nb[SHN_A1], nb[SHN_E0],
+                  nb[SHN_E1], nb[SHN_PSI], nb[SHN_K2T], nb[SHN_K2D], nb[SHN_TRT], rb, nb[SHN_DPL],
+                  args_i[SH_TWO] != 0, args_i[SH_TCMT] != 0, args_i[SH_MORD], True, orl, orr, pcur, cw, fw)
+    if q + 1 < n:
+        t2 = rg[SHR_T2, args_i[SH_HDR + q + 1]]
+        for l in range(pcur.shape[0]):
+            pcur[l] *= t2
+    else:
+        o = args_i[SH_O_T2OUT]
+        bus_finalize_nb(p_in, args_i[SH_HDR:SH_HDR + n], rg[SHR_T2], args_f[o], orl, ol)
+
+
+@njit(cache=True, _nrt=False)
+def selfheat_bounds_general(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
+    """:func:`selfheat_bounds` from the separate bound kernels :func:`pabs_bounds_nb` and :func:`pabs_slope_bound_nb`
+    (which :func:`sh_bounds` fuses with the same expressions in the same order; no far-line hold), for the
+    reference engine's independent check. Uses the walk buffer as scratch."""
+    p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
+    n = args_i[SH_N]
+    two = args_i[SH_TWO] != 0
+    for l in range(pcur.shape[0]):
+        pcur[l] = p_in[l]
+    for qpos in range(n):
+        k = args_i[SH_HDR + qpos]
+        t2k = rg[SHR_T2, k]
+        for l in range(pcur.shape[0]):
+            pcur[l] *= t2k
+        pm, cm = pabs_bounds_nb(k, pcur, rg[SHR_P1, k], nb[SHN_A0], nb[SHN_A1], nb[SHN_E0], nb[SHN_E1], nb[SHN_K2T],
+                                nb[SHN_K2D], two)
+        sm = pabs_slope_bound_nb(k, pcur, rg[SHR_P1, k], nb[SHN_A0], nb[SHN_A1], nb[SHN_E0], nb[SHN_E1],
+                                 nb[SHN_K2T], nb[SHN_K2D], two)
+        dmax = 0.0
+        for l in range(pcur.shape[0]):
+            dmax = max(dmax, abs(nb[SHN_DPL, k, l]))
+        s0 = rg[SHR_S0, k]
+        beta = rg[SHR_BETA, k]
+        smax = abs(s0) * (1.0 + abs(beta) * dt_max_k)
+        p_max[k] = pm
+        dpdt_max[k] = sm * dmax * smax
+        d2p_max[k] = cm * (dmax * smax) ** 2 + sm * dmax * abs(s0 * beta)
 
 
 # ---- the Airy path of the adapter: the exact ring without backscatter, with its substep constants hoisted ----------
@@ -1568,13 +1664,13 @@ def selfheat_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
 # g26's self-heating gain, far below the 1e-7 K root tolerance of the solve (test_engine_adapter). The caches are
 # keyed on their inputs (phi_ref, psi, a, t_rt per level and line; K^2 per line), so :func:`selfheat_pabs` /
 # :func:`selfheat_commit` stay correct when a caller rewrites the rows: :func:`_fast_check` recomputes stale entries,
-# and the Airy-path flag of a ring is re-derived from its backscatter row at every call (:func:`_fast_flag`). The engine (mrm.sim.kernel) recomputes every entry once per substep with :func:`sh_fast_precompute` and then
+# and the Airy-path flag of a ring is re-derived from its backscatter row at every call (:func:`_fast_flag`). The
+# engine (mrm.sim.kernel) recomputes every entry once per substep with :func:`sh_fast_precompute` and then
 # evaluates without the check; both run :func:`_fc_entry`, so engine and reference stay bit-identical.
-N_FK = 6
-FK_K2T, FK_K2D, FK_T1, FK_K1, FK_T2, FK_K2 = range(N_FK)
-N_FC = 16
-(FC_PHI, FC_A, FC_TRT, FC_PSI, FC_C, FC_S, FC_TWO_R, FC_RR, FC_K11, FC_SL, FC_A2, FC_BC, FC_CC, FC_DN,
- FC_SE, FC_CNT) = range(N_FC)
+N_FK = 8
+FK_K2T, FK_K2D, FK_T1, FK_K1, FK_T2, FK_K2, FK_K11, FK_A2 = range(N_FK)
+N_FC = 13
+(FC_PHI, FC_A, FC_TRT, FC_PSI, FC_C, FC_S, FC_TWO_R, FC_RR, FC_SL, FC_BC, FC_CC, FC_DN, FC_CNT) = range(N_FC)
 ROT_REFRESH = 4096  # incremental updates of a cached cos/sin before it is recomputed with libm cos/sin
 N_LE = 5
 LE_C, LE_RINV, LE_U2, LE_LOSS, LE_DLOSS = range(N_LE)
@@ -1625,7 +1721,7 @@ def _rot(b):
     return cb, sb
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _fast_flag(k, args_f, args_i):
     """1.0 when ring k takes the Airy path (exact ring, no backscatter for ring k), else 0.0. Derived from the
     current backscatter row at every call (2 M_b compares: a caller may rewrite any row through
@@ -1634,31 +1730,37 @@ def _fast_flag(k, args_f, args_i):
     :func:`sh_fast_precompute` refreshed it for the substep."""
     fast = args_i[SH_TCMT] == 0
     mb = args_i[SH_MB]
-    o_rb = args_i[SH_O_RB]
+    o_rb = args_i[SH_O_RB] + 2 * mb * k
     for i in range(2 * mb):
-        if args_f[o_rb + 2 * mb * k + i] != 0.0:
+        if args_f[_U(o_rb + i)] != 0.0:
             fast = False
     f = 1.0 if fast else 0.0
-    args_f[args_i[SH_O_FF] + k] = f
+    args_f[_U(args_i[SH_O_FF] + k)] = f
     return f
 
 
 @njit(cache=True, error_model="numpy", inline="always")
 def _fk_entry(k, l, args_f, args_i):
-    """Coupler amplitudes of ring k at line l (t1 = sqrt(1 - K^2_th), k1 = sqrt(K^2_th), t2, k2) and their keys."""
+    """Coupler amplitudes of ring k at line l (t1 = sqrt(1 - K^2_th), k1 = sqrt(K^2_th), t2, k2), k1^2 and t1^2, and
+    their keys."""
     n = args_i[SH_N]
     nl = args_i[SH_L]
     nn = n * nl
     o_nl = args_i[SH_O_NL]
-    kt = args_f[o_nl + SHN_K2T * nn + k * nl + l]
-    kd = args_f[o_nl + SHN_K2D * nn + k * nl + l]
+    kt = args_f[_U(o_nl + SHN_K2T * nn + k * nl + l)]
+    kd = args_f[_U(o_nl + SHN_K2D * nn + k * nl + l)]
     q = args_i[SH_O_FK] + (k * nl + l) * N_FK
-    args_f[q + FK_K2T] = kt
-    args_f[q + FK_K2D] = kd
-    args_f[q + FK_T1] = math.sqrt(1.0 - kt)
-    args_f[q + FK_K1] = math.sqrt(kt)
-    args_f[q + FK_T2] = math.sqrt(1.0 - kd)
-    args_f[q + FK_K2] = math.sqrt(kd)
+    t1 = math.sqrt(1.0 - kt)
+    k1 = math.sqrt(kt)
+    args_f[_U(q + FK_K2T)] = kt
+    args_f[_U(q + FK_K2D)] = kd
+    args_f[_U(q + FK_T1)] = t1
+    args_f[_U(q + FK_K1)] = k1
+    args_f[_U(q + FK_T2)] = math.sqrt(1.0 - kd)
+    args_f[_U(q + FK_K2)] = math.sqrt(kd)
+    # constants of the line while K^2 does not change (kept here, not per substep in SH_O_FC; perf.md R2-13)
+    args_f[_U(q + FK_K11)] = k1 * k1
+    args_f[_U(q + FK_A2)] = t1 * t1
 
 
 @njit(cache=True, error_model="numpy", inline="always")
@@ -1668,23 +1770,23 @@ def _afac(a, memo, lvl):
     old forms only round differently). memo (8,) keeps the last a of each level and its factors (a is the same at
     every line of a ring), so the three transcendental functions run once per ring and level."""
     j = 4 * lvl
-    if memo[j] == a:
-        return memo[j + 1], memo[j + 2], memo[j + 3]
+    if memo[_U(j)] == a:
+        return memo[_U(j + 1)], memo[_U(j + 2)], memo[_U(j + 3)]
     y = -0.5 * math.log(a)
     qq = math.sqrt(a)
     lossf = -math.expm1(-y)
     g = lossf / y if y > 1e-300 else 1.0
-    memo[j] = a
-    memo[j + 1] = qq
-    memo[j + 2] = lossf
-    memo[j + 3] = g
+    memo[_U(j)] = a
+    memo[_U(j + 1)] = qq
+    memo[_U(j + 2)] = lossf
+    memo[_U(j + 3)] = g
     return qq, lossf, g
 
 
 @njit(cache=True, error_model="numpy", inline="always")
 def _fc_entry(k, l, two, args_f, args_i, memo):
     """Airy-path constants of ring k at line l for level 0 (and 1 when two): keys, cos/sin of phi_ref + psi, and
-    the factors of :func:`_airy_line` (a, the quarter-ring factor q = sqrt(a), the loss and energy factors of
+    the factors of :func:`_airy_line` (a, the quarter-ring factor q = sqrt(a), the loss factor of
     :func:`_seg_factors`), from the rows and the coupler cache SH_O_FK (which must be current). memo: see
     :func:`_afac` (the result does not depend on it)."""
     n = args_i[SH_N]
@@ -1693,53 +1795,54 @@ def _fc_entry(k, l, two, args_f, args_i, memo):
     o_nl = args_i[SH_O_NL]
     base = k * nl + l
     q = args_i[SH_O_FK] + base * N_FK
-    t1 = args_f[q + FK_T1]
-    k1 = args_f[q + FK_K1]
-    t2 = args_f[q + FK_T2]
-    k2 = args_f[q + FK_K2]
-    psi = args_f[o_nl + SHN_PSI * nn + base]
-    trt = args_f[o_nl + SHN_TRT * nn + base]
+    t1 = args_f[_U(q + FK_T1)]
+    k1 = args_f[_U(q + FK_K1)]
+    t2 = args_f[_U(q + FK_T2)]
+    k2 = args_f[_U(q + FK_K2)]
+    psi = args_f[_U(o_nl + SHN_PSI * nn + base)]
+    trt = args_f[_U(o_nl + SHN_TRT * nn + base)]
     for lvl in range(2 if two else 1):
-        ph = args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
-        a = args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base]
+        ph = args_f[_U(o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base)]
+        a = args_f[_U(o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base)]
         p = args_i[SH_O_FC] + (lvl * nn + base) * N_FC
         # each level's cos/sin is rotated from its own previous value by the change of its reference phase (an
         # exact difference of two floats; typically 1e-5 rad per substep), re-derived with libm every ROT_REFRESH
         # updates, after a jump beyond ROT_MAX and for an empty cache (NaN keys)
         ang = ph + psi
-        d = ang - (args_f[p + FC_PHI] + args_f[p + FC_PSI])
-        cnt = args_f[p + FC_CNT]
+        d = ang - (args_f[_U(p + FC_PHI)] + args_f[_U(p + FC_PSI)])
+        cnt = args_f[_U(p + FC_CNT)]
         if abs(d) <= ROT_MAX and cnt < ROT_REFRESH:
             cb, sb = _rot(d)
-            c = args_f[p + FC_C] * cb - args_f[p + FC_S] * sb
-            s = args_f[p + FC_S] * cb + args_f[p + FC_C] * sb
-            args_f[p + FC_CNT] = cnt + 1.0
+            c0 = args_f[_U(p + FC_C)]
+            s0 = args_f[_U(p + FC_S)]
+            c = c0 * cb - s0 * sb
+            s = s0 * cb + c0 * sb
+            args_f[_U(p + FC_CNT)] = cnt + 1.0
         else:
             c = math.cos(ang)
             s = math.sin(ang)
-            args_f[p + FC_CNT] = 0.0
-        args_f[p + FC_PHI] = ph
-        args_f[p + FC_A] = a
-        args_f[p + FC_TRT] = trt
-        args_f[p + FC_PSI] = psi
-        args_f[p + FC_C] = c
-        args_f[p + FC_S] = s
+            args_f[_U(p + FC_CNT)] = 0.0
+        args_f[_U(p + FC_PHI)] = ph
+        args_f[_U(p + FC_A)] = a
+        args_f[_U(p + FC_TRT)] = trt
+        args_f[_U(p + FC_PSI)] = psi
+        args_f[_U(p + FC_C)] = c
+        args_f[_U(p + FC_S)] = s
         qq, lossf, g = _afac(a, memo, lvl)
         r = t1 * t2 * a
         t22 = t2 * t2
         seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
-        args_f[p + FC_TWO_R] = 2.0 * r
-        args_f[p + FC_RR] = r * r
-        args_f[p + FC_K11] = k1 * k1
-        args_f[p + FC_SL] = seg * lossf
-        args_f[p + FC_A2] = t1 * t1
-        args_f[p + FC_BC] = 2.0 * t1 * t2 * a
-        args_f[p + FC_CC] = t22 * a * a
-        args_f[p + FC_DN] = k1 * k1 * k2 * k2 * a
-        args_f[p + FC_SE] = seg * (0.25 * trt * g)
+        args_f[_U(p + FC_TWO_R)] = 2.0 * r
+        args_f[_U(p + FC_RR)] = r * r
+        args_f[_U(p + FC_SL)] = seg * lossf
+        args_f[_U(p + FC_BC)] = 2.0 * t1 * t2 * a
+        args_f[_U(p + FC_CC)] = t22 * a * a
+        args_f[_U(p + FC_DN)] = k1 * k1 * k2 * k2 * a
+        # (k1^2 and t1^2 live in SH_O_FK; the energy factor seg (0.25 t_rt g) is computed where a full commit needs
+        # it, _le_values: the same expressions, so the same values; perf.md R2-13)
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def _fh_entry(k, l, two, args_f, args_i, memo):
     """Classify line l of ring k (needs a current SH_O_FC entry) and, when it is far at every level, store its hold
     (values and first derivatives in phi and a of T, D, L, U per watt at b = 0, and the per-watt factors of the
@@ -1779,12 +1882,17 @@ def _fh_entry(k, l, two, args_f, args_i, memo):
         a = args_f[p + FC_A]
         trt = args_f[p + FC_TRT]
         den = 1.0 - two_r * c + args_f[p + FC_RR]
+        if den == 0.0:
+            raise ZeroDivisionError("Airy path: den = 0 (lossless ring without coupling, at resonance)")
         rinv = 1.0 / den
-        T = (args_f[p + FC_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
+        T = (args_f[q + FK_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
         D = args_f[p + FC_DN] * rinv
-        u2 = args_f[p + FC_K11] * rinv
+        u2 = args_f[q + FK_K11] * rinv
         L = u2 * args_f[p + FC_SL]
-        U = u2 * args_f[p + FC_SE]
+        qq, lossf, g = _afac(a, memo, lvl)
+        seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
+        se = seg * (0.25 * trt * g)
+        U = u2 * se
         # d/dphi: num = A2 - BC cos + CC, den = 1 - 2r cos + r^2
         dden = two_r * sn_
         u2p = -u2 * dden * rinv
@@ -1794,8 +1902,6 @@ def _fh_entry(k, l, two, args_f, args_i, memo):
         dden_a = 2.0 * dr * (r - c)
         dnum_a = -2.0 * dr * c + 2.0 * t22 * a
         u2a = -u2 * dden_a * rinv
-        qq, lossf, g = _afac(a, memo, lvl)
-        seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
         dq = 0.5 / qq
         dseg = dq * (1.0 + 2.0 * t22 * qq + 3.0 * t22 * qq * qq)
         dlossf = -dq
@@ -1806,7 +1912,6 @@ def _fh_entry(k, l, two, args_f, args_i, memo):
             dg = (dlossf * y + lossf * 0.5 / a) / (y * y)
         else:
             dg = 0.0
-        se = seg * (0.25 * trt * g)
         dse = 0.25 * trt * (dseg * g + seg * dg)
         args_f[h + FH_ANG] = args_f[p + FC_PHI] + args_f[p + FC_PSI]
         args_f[h + FH_A] = a
@@ -1818,7 +1923,7 @@ def _fh_entry(k, l, two, args_f, args_i, memo):
         args_f[h + FH_TP] = (args_f[p + FC_BC] * sn_ - T * dden) * rinv
         args_f[h + FH_DP] = -D * dden * rinv
         args_f[h + FH_LP] = u2p * args_f[p + FC_SL]
-        args_f[h + FH_UP] = u2p * args_f[p + FC_SE]
+        args_f[h + FH_UP] = u2p * se
         args_f[h + FH_TA] = (dnum_a - T * dden_a) * rinv
         args_f[h + FH_DA] = (k1 * k1 * k2 * k2 - D * dden_a) * rinv
         args_f[h + FH_LA] = u2a * sl + u2 * dsl
@@ -1841,7 +1946,7 @@ def _fh_entry(k, l, two, args_f, args_i, memo):
     return True
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def sh_fast_precompute(args_f, args_i):
     """Bring every Airy-path cache entry up to date with the rows (the engine calls this once per substep after
     writing the optics inputs): :func:`_fast_check` of every Airy-path ring, i.e. exactly the updates the optics
@@ -1853,7 +1958,7 @@ def sh_fast_precompute(args_f, args_i):
             _fast_check(k, args_f, args_i)
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False)
 def _fast_check(k, args_f, args_i):
     """Recompute the Airy-path cache entries of ring k whose inputs changed since they were computed (a caller may
     rewrite the rows at any time through :func:`selfheat_views`)."""
@@ -1871,15 +1976,15 @@ def _fast_check(k, args_f, args_i):
     for l in range(nl):
         base = k * nl + l
         q = o_fk + base * N_FK
-        if not (args_f[q + FK_K2T] == args_f[o_nl + SHN_K2T * nn + base]
-                and args_f[q + FK_K2D] == args_f[o_nl + SHN_K2D * nn + base]):
+        if not (args_f[_U(q + FK_K2T)] == args_f[_U(o_nl + SHN_K2T * nn + base)]
+                and args_f[_U(q + FK_K2D)] == args_f[_U(o_nl + SHN_K2D * nn + base)]):
             _fk_entry(k, l, args_f, args_i)
             _fc_entry(k, l, two, args_f, args_i, memo)
             if hold:
                 _fh_entry(k, l, two, args_f, args_i, memo)
             continue
         stale = False
-        if hold and args_f[o_fh + base * N_FH + FH_STATE] != 0.0:
+        if hold and args_f[_U(o_fh + base * N_FH + FH_STATE)] != 0.0:
             # a held line stays held while its phase and loss stay near the hold point (module comment, FAR_*)
             for lvl in range(2 if two else 1):
                 h = o_fh + (lvl * nn + base) * N_FH
@@ -1893,10 +1998,10 @@ def _fast_check(k, args_f, args_i):
         else:
             for lvl in range(2 if two else 1):
                 p = o_fc + (lvl * nn + base) * N_FC
-                if not (args_f[p + FC_PHI] == args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
-                        and args_f[p + FC_A] == args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base]
-                        and args_f[p + FC_TRT] == args_f[o_nl + SHN_TRT * nn + base]
-                        and args_f[p + FC_PSI] == args_f[o_nl + SHN_PSI * nn + base]):
+                if not (args_f[_U(p + FC_PHI)] == args_f[_U(o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base)]
+                        and args_f[_U(p + FC_A)] == args_f[_U(o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base)]
+                        and args_f[_U(p + FC_TRT)] == args_f[_U(o_nl + SHN_TRT * nn + base)]
+                        and args_f[_U(p + FC_PSI)] == args_f[_U(o_nl + SHN_PSI * nn + base)]):
                     stale = True
         if stale:
             _fc_entry(k, l, two, args_f, args_i, memo)
@@ -1904,13 +2009,104 @@ def _fast_check(k, args_f, args_i):
                 _fh_entry(k, l, two, args_f, args_i, memo)
 
 
-@njit(cache=True, error_model="numpy")
+@njit(cache=True, error_model="numpy", _nrt=False, inline="always")
 def sh_fast_pabs(t, k, args_f, args_i):
     """P_abs of an Airy-path ring k at temperature t [W] and dP_abs/dT [W/K], from the caches (no check: the caller
     guarantees they are current); keeps the per-line values of the evaluation in SH_O_LE for the commit. Sums in the
-    order of :func:`dpabs_dlambda_res_nb`. Held far lines (optics_far_hold) contribute their first-order model while
-    the in-solve rotation |b| <= FAR_DB; beyond it the line is released (its cache entry is brought to the current
-    reference phase) and evaluated exactly from then on."""
+    order of :func:`dpabs_dlambda_res_nb`. With the far-line hold on (optics_far_hold): :func:`_sh_fast_pabs_hold`.
+    A zero denominator (den = 1 - 2 r cos + r^2 = 0: r = t1 t2 a = 1, a lossless ring without coupling, at
+    resonance) raises ZeroDivisionError, as the closed forms (:func:`_airy_line`) do; for r < 1, den >= (1 - r)^2."""
+    if args_i[SH_FARHOLD] != 0:
+        return _sh_fast_pabs_hold(t, k, args_f, args_i)
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    two = args_i[SH_TWO] != 0
+    n_lvl = 2 if two else 1
+    o_ring = args_i[SH_O_RING]
+    o_nl = args_i[SH_O_NL]
+    o_pcur = args_i[SH_O_PCUR]
+    o_fc = args_i[SH_O_FC]
+    o_fk = args_i[SH_O_FK]
+    o_le = args_i[SH_O_LE]
+    # _sh_prepare: the rigid shift of ring k at t, and the walk restart at the first ring in bus order
+    dt = t - args_f[_U(o_ring + SHR_TREF * n + k)]
+    s0 = args_f[_U(o_ring + SHR_S0 * n + k)]
+    beta = args_f[_U(o_ring + SHR_BETA * n + k)]
+    shift = s0 * (dt + 0.5 * beta * dt * dt)
+    if args_i[SH_HDR + n + k] == 0:
+        t2 = args_f[_U(o_ring + SHR_T2 * n + k)]
+        o_pin = args_i[SH_O_PIN]
+        for l in range(nl):
+            args_f[_U(o_pcur + l)] = args_f[_U(o_pin + l)] * t2
+    dlam_dt = s0 * (1.0 + beta * dt)
+    q1 = args_f[_U(o_ring + SHR_P1 * n + k)] if two else 0.0
+    q0 = 1.0 - q1
+    base = k * nl
+    r_dpl = o_nl + SHN_DPL * nn + base
+    r_e0 = o_nl + SHN_E0 * nn + base
+    r_e1 = o_nl + SHN_E1 * nn + base
+    pabs = 0.0
+    slope = 0.0
+    for l in range(nl):
+        dpl = args_f[_U(r_dpl + l)]
+        b = dpl * shift
+        ab = 0.0
+        dab = 0.0
+        small = abs(b) <= ROT_MAX
+        cb = 1.0
+        sb = 0.0
+        if small:
+            cb, sb = _rot(b)
+        k11 = args_f[_U(o_fk + (base + l) * N_FK + FK_K11)]
+        for lvl in range(n_lvl):
+            p = o_fc + (lvl * nn + base + l) * N_FC
+            if small:
+                c0 = args_f[_U(p + FC_C)]
+                s0_ = args_f[_U(p + FC_S)]
+                c = c0 * cb - s0_ * sb
+                s = s0_ * cb + c0 * sb
+            else:
+                ang = (args_f[_U(p + FC_PHI)] + args_f[_U(p + FC_PSI)]) + b
+                c = math.cos(ang)
+                s = math.sin(ang)
+            two_r = args_f[_U(p + FC_TWO_R)]
+            den = 1.0 - two_r * c + args_f[_U(p + FC_RR)]
+            if den == 0.0:
+                raise ZeroDivisionError("Airy path: den = 0 (lossless ring without coupling, at resonance)")
+            rinv = 1.0 / den
+            u2 = k11 * rinv
+            du2 = -u2 * (two_r * s) * rinv
+            sl = args_f[_U(p + FC_SL)]
+            loss = u2 * sl
+            dloss = du2 * sl
+            e = o_le + (lvl * nl + l) * N_LE
+            args_f[_U(e + LE_C)] = c
+            args_f[_U(e + LE_RINV)] = rinv
+            args_f[_U(e + LE_U2)] = u2
+            args_f[_U(e + LE_LOSS)] = loss
+            args_f[_U(e + LE_DLOSS)] = dloss
+            if lvl == 0:
+                w = q0 * args_f[_U(r_e0 + l)]
+            else:
+                w = q1 * args_f[_U(r_e1 + l)]
+            ab += w * loss
+            dab += w * dloss
+        pc_ = args_f[_U(o_pcur + l)]
+        pabs += pc_ * ab
+        slope += pc_ * dab * dpl
+    o_last = o_le + 2 * nl * N_LE
+    args_f[_U(o_last)] = k
+    args_f[_U(o_last + 1)] = t
+    args_f[_U(o_last + 2)] = shift
+    return pabs, slope * dlam_dt
+
+
+@njit(cache=True, error_model="numpy", _nrt=False)
+def _sh_fast_pabs_hold(t, k, args_f, args_i):
+    """:func:`sh_fast_pabs` with the far-line hold on (optics_far_hold): held far lines contribute their first-order
+    model while the in-solve rotation |b| <= FAR_DB; beyond it the line is released (its cache entry is brought to
+    the current reference phase) and evaluated exactly from then on."""
     n = args_i[SH_N]
     nl = args_i[SH_L]
     nn = n * nl
@@ -1987,8 +2183,11 @@ def sh_fast_pabs(t, k, args_f, args_i):
                     c = math.cos(ang)
                     s = math.sin(ang)
                 two_r = args_f[p + FC_TWO_R]
-                rinv = 1.0 / (1.0 - two_r * c + args_f[p + FC_RR])
-                u2 = args_f[p + FC_K11] * rinv
+                den = 1.0 - two_r * c + args_f[p + FC_RR]
+                if den == 0.0:
+                    raise ZeroDivisionError("Airy path: den = 0 (lossless ring without coupling, at resonance)")
+                rinv = 1.0 / den
+                u2 = args_f[args_i[SH_O_FK] + (base + l) * N_FK + FK_K11] * rinv
                 du2 = -u2 * (two_r * s) * rinv
                 loss = u2 * args_f[p + FC_SL]
                 dloss = du2 * args_f[p + FC_SL]
@@ -2015,7 +2214,7 @@ def sh_fast_pabs(t, k, args_f, args_i):
 
 
 @njit(cache=True, error_model="numpy", inline="always")
-def _le_values(k, l, lvl, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le):
+def _le_values(k, l, lvl, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le, memo):
     """(T, D, L, U, dL/dphi) per watt of level lvl of ring k at line l at the last evaluation: the Airy closed forms
     from the cached constants and SH_O_LE, or the first-order model of a held line at the evaluation's shift."""
     e = o_le + (lvl * nl + l) * N_LE
@@ -2033,20 +2232,104 @@ def _le_values(k, l, lvl, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_
              * (args_f[o_nl + SHN_TRT * nn + base] / args_f[h + FH_TRT]))
         return T, D, L, U, args_f[h + FH_LP]
     p = o_fc + (lvl * nn + k * nl + l) * N_FC
+    q = args_i[SH_O_FK] + (k * nl + l) * N_FK
     c = args_f[e + LE_C]
     rinv = args_f[e + LE_RINV]
-    T = (args_f[p + FC_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
+    T = (args_f[q + FK_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
     D = args_f[p + FC_DN] * rinv
-    U = args_f[e + LE_U2] * args_f[p + FC_SE]
+    # the CW energy factor seg (0.25 t_rt g) of the entry (a and t_rt as cached in it; _fc_entry's expressions)
+    a = args_f[p + FC_A]
+    qq, lossf, g = _afac(a, memo, lvl)
+    t2 = args_f[q + FK_T2]
+    t22 = t2 * t2
+    seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
+    U = args_f[e + LE_U2] * (seg * (0.25 * args_f[p + FC_TRT] * g))
     return T, D, args_f[e + LE_LOSS], U, args_f[e + LE_DLOSS]
 
 
-@njit(cache=True, error_model="numpy")
-def sh_fast_outputs(k, args_f, args_i):
+@njit(cache=True, error_model="numpy", _nrt=False)
+def sh_fast_outputs(k, args_f, args_i, full=True):
     """Every output of Airy-path ring k from its last evaluation (SH_O_LE), the arithmetic of :func:`ring_lines_nb`
     with with_slope on the per-watt responses of :func:`_airy_line` (R = A = U_ccw = 0; held far lines: their
     first-order model); the NRZ-averaged through power goes to the walk buffer p_cur. Then the caller passes it to the
-    next ring (or finalizes the bus)."""
+    next ring (or finalizes the bus).
+
+    full = False (the engine at every step of a block but its last; docs/handoff/perf.md R2-3): only the outputs a
+    plant tick reads, RL_PIN, RL_THRU, RL_THRU1, RL_THRU0 per line and R_DROP_SUM, R_ABS_SUM, R_DROP_SUM1,
+    R_DROP_SUM0, and the walk buffer, each from the same expression as the full commit (so bit-identical); the other
+    fields keep their values until the next full commit. The engine commits in full at the last step of every block,
+    so every output read after a block (Plant.truth, the reference parity) is the full set of that step."""
+    if full or args_i[SH_FARHOLD] != 0:
+        _sh_fast_outputs_full(k, args_f, args_i)
+        return
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    two = args_i[SH_TWO] != 0
+    o_ring = args_i[SH_O_RING]
+    o_nl = args_i[SH_O_NL]
+    o_pcur = args_i[SH_O_PCUR]
+    o_orl = args_i[SH_O_ORL]
+    o_or = args_i[SH_O_OR]
+    o_fc = args_i[SH_O_FC]
+    o_le = args_i[SH_O_LE]
+    q1 = args_f[_U(o_ring + SHR_P1 * n + k)] if two else 0.0
+    q0 = 1.0 - q1
+    base = k * nl
+    r_e0 = o_nl + SHN_E0 * nn + base
+    r_e1 = o_nl + SHN_E1 * nn + base
+    dsum = 0.0
+    asum = 0.0
+    d1sum = 0.0
+    d0sum = 0.0
+    o_fk = args_i[SH_O_FK]
+    for l in range(nl):
+        P = args_f[_U(o_pcur + l)]
+        a2 = args_f[_U(o_fk + (base + l) * N_FK + FK_A2)]
+        p = o_fc + (base + l) * N_FC
+        e = o_le + l * N_LE
+        c = args_f[_U(e + LE_C)]
+        rinv = args_f[_U(e + LE_RINV)]
+        T0 = (a2 - args_f[_U(p + FC_BC)] * c + args_f[_U(p + FC_CC)]) * rinv
+        D0 = args_f[_U(p + FC_DN)] * rinv
+        L0 = args_f[_U(e + LE_LOSS)]
+        e0 = args_f[_U(r_e0 + l)]
+        if two:
+            p = o_fc + (nn + base + l) * N_FC
+            e = o_le + (nl + l) * N_LE
+            c = args_f[_U(e + LE_C)]
+            rinv = args_f[_U(e + LE_RINV)]
+            T1 = (a2 - args_f[_U(p + FC_BC)] * c + args_f[_U(p + FC_CC)]) * rinv
+            D1 = args_f[_U(p + FC_DN)] * rinv
+            L1 = args_f[_U(e + LE_LOSS)]
+            e1 = args_f[_U(r_e1 + l)]
+        else:
+            T1 = T0
+            D1 = D0
+            L1 = L0
+            e1 = e0
+        thru = P * (q1 * T1 + q0 * T0)
+        drop = P * (q1 * D1 + q0 * D0)
+        absd = P * (q1 * e1 * L1 + q0 * e0 * L0)
+        rl = o_orl + base + l
+        args_f[_U(rl + RL_PIN * nn)] = P
+        args_f[_U(rl + RL_THRU * nn)] = thru
+        args_f[_U(rl + RL_THRU1 * nn)] = P * T1
+        args_f[_U(rl + RL_THRU0 * nn)] = P * T0
+        dsum += drop
+        asum += absd
+        d1sum += P * D1
+        d0sum += P * D0
+        args_f[_U(o_pcur + l)] = thru
+    args_f[_U(o_or + R_DROP_SUM * n + k)] = dsum
+    args_f[_U(o_or + R_ABS_SUM * n + k)] = asum
+    args_f[_U(o_or + R_DROP_SUM1 * n + k)] = d1sum
+    args_f[_U(o_or + R_DROP_SUM0 * n + k)] = d0sum
+
+
+@njit(cache=True, error_model="numpy", _nrt=False)
+def _sh_fast_outputs_full(k, args_f, args_i):
+    """:func:`sh_fast_outputs` with full = True."""
     n = args_i[SH_N]
     nl = args_i[SH_L]
     nn = n * nl
@@ -2073,14 +2356,17 @@ def sh_fast_outputs(k, args_f, args_i):
     slope = 0.0
     hold = args_i[SH_FARHOLD] != 0
     shift = args_f[o_le + 2 * nl * N_LE + 2]
+    o_memo = args_i[SH_O_FF] + n
+    memo = args_f[o_memo:o_memo + 8]
     for l in range(nl):
         P = args_f[o_pcur + l]
         held = hold and args_f[o_fh + (base + l) * N_FH + FH_STATE] != 0.0
-        T0, D0, L0, U0, dL0 = _le_values(k, l, 0, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le)
+        T0, D0, L0, U0, dL0 = _le_values(k, l, 0, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le,
+                                         memo)
         e0 = args_f[r_e0 + l]
         if two:
             T1, D1, L1, U1, dL1 = _le_values(k, l, 1, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh,
-                                             o_le)
+                                             o_le, memo)
             e1 = args_f[r_e1 + l]
         else:
             T1 = T0
@@ -2124,7 +2410,7 @@ def sh_fast_outputs(k, args_f, args_i):
     args_f[o_or + R_DABS_DLAM * n + k] = slope
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
     """The bounds of :func:`selfheat_bounds` (pabs_bounds_nb and pabs_slope_bound_nb fused: the same expressions in
     the same order) from the current rows, except that a line held by the far-line hold (optics_far_hold) uses its
@@ -2142,15 +2428,15 @@ def sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
     hold = args_i[SH_FARHOLD] != 0
     o_ff = args_i[SH_O_FF]
     for l in range(nl):
-        args_f[o_pcur + l] = args_f[o_pin + l]
+        args_f[_U(o_pcur + l)] = args_f[_U(o_pin + l)]
     for qpos in range(n):
         k = args_i[SH_HDR + qpos]
-        t2k = args_f[o_ring + SHR_T2 * n + k]
+        t2k = args_f[_U(o_ring + SHR_T2 * n + k)]
         for l in range(nl):
-            args_f[o_pcur + l] *= t2k
-        p1 = args_f[o_ring + SHR_P1 * n + k]
+            args_f[_U(o_pcur + l)] *= t2k
+        p1 = args_f[_U(o_ring + SHR_P1 * n + k)]
         q1 = p1 if two else 0.0
-        hk = hold and args_f[o_ff + k] == 1.0
+        hk = hold and args_f[_U(o_ff + k)] == 1.0
         pm = 0.0
         cm = 0.0
         sm = 0.0
@@ -2163,26 +2449,28 @@ def sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
             row_kt = o_nl + SHN_K2T * nn + k * nl
             row_kd = o_nl + SHN_K2D * nn + k * nl
             for l in range(nl):
-                eta = args_f[row_e + l]
-                pin = args_f[o_pcur + l]
-                if hk and args_f[o_fh + (k * nl + l) * N_FH + FH_STATE] != 0.0:
+                eta = args_f[_U(row_e + l)]
+                pin = args_f[_U(o_pcur + l)]
+                if hk and args_f[_U(o_fh + (k * nl + l) * N_FH + FH_STATE)] != 0.0:
                     h = o_fh + ((lev if two else 0) * nn + k * nl + l) * N_FH
                     mg = 1.0 + FAR_BOUND_MARGIN
-                    pm += w * pin * eta * (args_f[h + FH_PM] * mg)
-                    cm += w * pin * eta * (args_f[h + FH_CM] * mg)
-                    sm += w * pin * eta * (args_f[h + FH_SM] * mg)
+                    pm += w * pin * eta * (args_f[_U(h + FH_PM)] * mg)
+                    cm += w * pin * eta * (args_f[_U(h + FH_CM)] * mg)
+                    sm += w * pin * eta * (args_f[_U(h + FH_SM)] * mg)
                     continue
-                a = args_f[row_a + l]
+                a = args_f[_U(row_a + l)]
                 q = o_fk + (k * nl + l) * N_FK
-                if args_f[q + FK_K2T] == args_f[row_kt + l] and args_f[q + FK_K2D] == args_f[row_kd + l]:
-                    t1 = args_f[q + FK_T1]                    # the same square roots, cached (_fk_entry)
-                    t2 = args_f[q + FK_T2]
+                kt = args_f[_U(row_kt + l)]
+                kd = args_f[_U(row_kd + l)]
+                if args_f[_U(q + FK_K2T)] == kt and args_f[_U(q + FK_K2D)] == kd:
+                    t1 = args_f[_U(q + FK_T1)]                 # the same square roots, cached (_fk_entry)
+                    t2 = args_f[_U(q + FK_T2)]
                 else:
-                    t1 = math.sqrt(1.0 - args_f[row_kt + l])
-                    t2 = math.sqrt(1.0 - args_f[row_kd + l])
+                    t1 = math.sqrt(1.0 - kt)
+                    t2 = math.sqrt(1.0 - kd)
                 r = t1 * t2 * a
                 om = 1.0 - r
-                c = args_f[row_kt + l] * (1.0 - a) * (1.0 + t2 * t2 * a)
+                c = kt * (1.0 - a) * (1.0 + t2 * t2 * a)
                 pm += w * pin * eta * min(1.05 * c / (om * om), 1.0)
                 cm += w * pin * eta * 2.0 * r * c / (om * om * om * om)
                 if r <= 0.0:
@@ -2195,28 +2483,30 @@ def sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
         cm = 1.25 * cm
         sm = 1.10 * sm
         dmax = 0.0
+        r_dpl = o_nl + SHN_DPL * nn + k * nl
         for l in range(nl):
-            dmax = max(dmax, abs(args_f[o_nl + SHN_DPL * nn + k * nl + l]))
-        s0 = args_f[o_ring + SHR_S0 * n + k]
-        beta = args_f[o_ring + SHR_BETA * n + k]
+            dmax = max(dmax, abs(args_f[_U(r_dpl + l)]))
+        s0 = args_f[_U(o_ring + SHR_S0 * n + k)]
+        beta = args_f[_U(o_ring + SHR_BETA * n + k)]
         smax = abs(s0) * (1.0 + abs(beta) * dt_max_k)
         p_max[k] = pm
         dpdt_max[k] = sm * dmax * smax
         d2p_max[k] = cm * (dmax * smax) ** 2 + sm * dmax * abs(s0 * beta)
 
 
-@njit(cache=True)
-def sh_pass_on(k, args_f, args_i):
+@njit(cache=True, _nrt=False)
+def sh_pass_on(k, args_f, args_i, full=True):
     """After ring k's outputs: its through power (in p_cur) times the bus segment to the next ring in bus order, or,
-    after the last ring, :func:`bus_finalize_nb`."""
+    after the last ring, :func:`bus_finalize_nb` (full = False: only its bus-output part, :func:`_bus_pout_nb`, the
+    part a plant tick reads; see :func:`sh_fast_outputs`)."""
     n = args_i[SH_N]
     nl = args_i[SH_L]
     q = args_i[SH_HDR + n + k]
     o_pcur = args_i[SH_O_PCUR]
     if q + 1 < n:
-        t2 = args_f[args_i[SH_O_RING] + SHR_T2 * n + args_i[SH_HDR + q + 1]]
+        t2 = args_f[_U(args_i[SH_O_RING] + SHR_T2 * n + args_i[SH_HDR + q + 1])]
         for l in range(nl):
-            args_f[o_pcur + l] *= t2
+            args_f[_U(o_pcur + l)] *= t2
     else:
         # only the views bus_finalize_nb needs (_sh_core / _sh_outputs build ten, ~0.15 us)
         o = args_i[SH_O_PIN]
@@ -2227,17 +2517,20 @@ def sh_pass_on(k, args_f, args_i):
         orl = args_f[o:o + N_RL * n * nl].reshape((N_RL, n, nl))
         o = args_i[SH_O_OL]
         ol = args_f[o:o + N_L * nl].reshape((N_L, nl))
-        bus_finalize_nb(p_in, args_i[SH_HDR:SH_HDR + n], t2row, args_f[args_i[SH_O_T2OUT]], orl, ol)
+        if full:
+            bus_finalize_nb(p_in, args_i[SH_HDR:SH_HDR + n], t2row, args_f[args_i[SH_O_T2OUT]], orl, ol)
+        else:
+            _bus_pout_nb(p_in, args_i[SH_HDR:SH_HDR + n], t2row, args_f[args_i[SH_O_T2OUT]], orl, ol)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def sh_last_is(k, t, args_f, args_i):
     """True when the last evaluation (fast path) was ring k at temperature t."""
     o_last = args_i[SH_O_LE] + 2 * args_i[SH_L] * N_LE
     return args_f[o_last] == k and args_f[o_last + 1] == t
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def sh_last_clear(args_f, args_i):
     args_f[args_i[SH_O_LE] + 2 * args_i[SH_L] * N_LE] = -1.0
 

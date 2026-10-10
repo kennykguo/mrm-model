@@ -3,6 +3,43 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-10: engine performance round 2
+
+Details, measurements and the change log R2-1 ... R2-16: docs/handoff/perf.md section 8 (owner: engine). Every
+change is bit-identical: every regression and adversarial scenario, the kernel/reference parity and every number of
+the controller scorecard are the same as at 6b598f7. B = 1 fixed tick 15.5 -> 9.1 us on AC power: **07 P0-9's
+fixed-tick budget (<= 10 us per tick) is met**; B = 64 3.6 -> 2.1 us per world-tick (64 x 1 s Monte Carlo in
+2.1-2.5 min).
+
+- **The tick loop runs without the numba runtime**: `mrm.sim.kernel._world_block` keeps the per-block setup and
+  calls the new `_world_loop` (`@njit(cache=True, _nrt=False)`); the hot leaves of kernel, optics, phase, electrical,
+  sensing, datapath, laser, thermal and metrics are compiled with `_nrt=False` too. Rules for code called from the
+  loop (comment above `_world_block`; test_kernel_releases_every_array): no allocation, no call of a function that
+  returns an array, and a function with the runtime must not make views of its arguments.
+- **Kernel helpers on arrays**: the controller edge, auto policy, oracle and fast kernel run as `_release_a`,
+  `_sync_act_a`, `_push_act_a`, `_advance_edge_a`, `_auto_h_a`, `_oracle_a`, `_fast_tick_a`. `release_row`,
+  `_auto_h`, `_oracle`, `_fast_tick` and `truth_row` stay as wrappers; `_edge`, `_push_act`, `_advance_edge`,
+  `_sync_act_from_registers` and `_edge_tick` (no longer called) are removed. `_heater_split_tables` is replaced by
+  `_heater_split_fill`; `_implicit_step_eng` takes per-lag coefficient tables (new `_th_tables`, `_th_coef`,
+  `_uu_fill`, `_th_dead_init`, `_th_live`, `_th_wake`); `eng_commit(t, k, args_f, args_i, full)` takes a `full`
+  flag.
+- **Self-heating adapter** (`mrm.plant.optics`): `sh_fast_outputs` / `sh_pass_on` take `full=True` (False: only the
+  outputs a tick reads; the engine passes False at every substep but the last of a block); `bus_finalize_nb` =
+  `_bus_pout_nb` + `_bus_refl_nb`; the far-line hold's evaluation moved to `_sh_fast_pabs_hold`. Cache layouts:
+  N_FK 6 -> 8 (new FK_K11, FK_A2), N_FC 16 -> 13 (FC_K11, FC_A2, FC_SE removed), so `pack_selfheat_args` rows are
+  shorter. New `selfheat_pabs_general`, `selfheat_commit_general`, `selfheat_bounds_general` (the general path, an
+  independent implementation).
+- **Reference**: `ReferenceEngine(plant, *, oracle=True, airy=True)`; `airy=False` runs the general optics path, so
+  the parity test also checks the engine against optics code it does not share
+  (test_parity_against_independent_optics). A degenerate ring row (r = t1 t2 a = 1 at resonance) raises
+  ZeroDivisionError on the Airy path and in `_airy_line` (it gave inf/NaN under numba's numpy error model).
+- `mrm.plant.datapath.errors_tick_ber_row` tests the counting period once per tick (same result).
+- `optics_far_hold=True` is now ~10 % slower than the exact engine (it did not get the round-2 changes) and still
+  changes closed-loop trajectories: keep it off.
+- Independent review (docs/handoff/perf.md section 9): results bit-identical to a fresh 6b598f7 tree, timing
+  confirmed (B = 1 fixed 15.4 -> 9.1 us), no engine defect; new test_full_optics_outputs_after_every_block guards
+  R2-3 (every optics output complete after every block).
+
 ## 2026-10-10: g26 aggressor site moved; the old site is a stress scenario
 
 Project owner's decision (Kenny), implemented by the integrator. Details, the old-vs-new comparison and the open

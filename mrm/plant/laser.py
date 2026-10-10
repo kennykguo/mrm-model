@@ -273,7 +273,7 @@ def _fill_w(key, j, depth, n_lines, n_mod, out):
             out[s, i] = levy_bm(key, i, s, j, depth)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def laser_tick_row(k, dt_s, tcomp, grid_s, depth, f0, p0, f_rate, p_rate, f_rw, p_rw, rho_f, rho_p, module, n_mod,
                    rin_per_hz, enable, f_offset, p_scale, tune_hz, key_drift, key_rin, cache_j, w_lo, w_hi,
                    out_f, out_p):

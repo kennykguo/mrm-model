@@ -276,7 +276,7 @@ def thermal_outputs(x, obs_ptr, t_base, out):
         thermal_outputs_b(x[b], obs_ptr, t_base[_row(b, t_base.shape[0])], out[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def thermal_advance_b(x, a, c0, c1, lag_src, obs_ptr, u0, u1, src_scale, t_base, out):
     """thermal_step_b and thermal_outputs_b fused in one pass over the lags (one world): x advanced in place, out (O,)
     the end-of-step observer temperatures t_base + sum x (K). Same equation as thermal_step_b."""

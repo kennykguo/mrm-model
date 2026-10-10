@@ -180,7 +180,7 @@ def q_from_ber(ber: float) -> float:
     return float(math.sqrt(2.0) * erfcinv(2.0 * ber))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def ber_from_oma(oma_rx_w, oma_sens_w, q_ref, ber_floor):
     """BER of an NRZ lane, Gaussian model with Q linear in OMA: 0.5 erfc(Q/sqrt2), Q = q_ref OMA_rx/OMA_sens; never
     below ber_floor (an error floor, default 0). OMA <= 0 gives 0.5."""
@@ -191,7 +191,7 @@ def ber_from_oma(oma_rx_w, oma_sens_w, q_ref, ber_floor):
     return ber if ber > ber_floor else ber_floor
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def p_above(mu, sig, thr):
     """P(code > thr) for a monitor level with mean mu and rms sig (codes): P(x >= thr + 0.5), x ~ N(mu, sig^2)."""
     edge = thr + 0.5
@@ -207,7 +207,7 @@ def _bits_in_tick(k, bpt_i, bpt_f):
     return np.int64(math.floor((k + 1) * bpt_f)) - np.int64(math.floor(k * bpt_f))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _ones(mode, n, rho, words, pre, period, start, key, ring, tick, slot):
     """Ones among n bits of density rho under the pattern mode (exact PRBS window when tabulated and rho = 0.5)."""
     if n <= 0:
@@ -224,7 +224,7 @@ def _ones(mode, n, rho, words, pre, period, start, key, ring, tick, slot):
 
 
 # =============================================================================================== tick kernels
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def pattern_tick_row(k, mode, bpt_i, bpt_f, density, traffic_on, words, pre, period, key, bitpos,
                      out_n1, out_nb, out_rho):
     """Ones count and ones density of interval [k, k+1) for the N lanes of one world (07 P0-11).
@@ -283,7 +283,7 @@ def errors_tick_row(k, oma_tx_w, nbits, link_t, oma_sens_w, q_ref, ber_floor, pe
         _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new):
     if period > 0 and (k + 1) % period == 0:
         cnt = _rng.poisson(key, n, k + 1, _SLOT_ERR, lam[n])
@@ -292,15 +292,19 @@ def _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new):
         out_new[n] = True
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def errors_tick_ber_row(k, ber, nbits, period, lat, key, lam, fv, fr, fm, out_new):
     """:func:`errors_tick_row` with the BER of each lane given (ber (N,) = ber_from_oma(oma_tx_w * link_t,
     oma_sens_w, q_ref, ber_floor), computed once by the caller for the error counter and the Truth BER)."""
+    # whether instant k + 1 closes a counting period is the same for every lane: tested once per tick (the modulo and
+    # the call of _errors_close per lane were ~0.2 us per tick; same values, docs/handoff/perf.md R2-6)
+    close = period > 0 and (k + 1) % period == 0
     for n in range(ber.shape[0]):
         out_new[n] = False
         if nbits[n] > 0:
             lam[n] += ber[n] * nbits[n]
-        _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new)
+        if close:
+            _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new)
 
 
 @njit(cache=True)
@@ -312,7 +316,7 @@ def errors_tick(k, oma_tx_w, nbits, link_t, oma_sens_w, q_ref, ber_floor, period
                         key[b], lam[b], fv[b], fr[b], fm[b], out_new[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def errors_release_row(now, fv, fr, fm, latest, out_valid):
     """Release error counts ready at ``now``; latest (N,) is held, out_valid (N,) marks a delivery (the channel
     rx.error_count_valid)."""
@@ -333,7 +337,7 @@ def errors_release(now, fv, fr, fm, latest, out_valid):
         errors_release_row(now, fv[b], fr[b], fm[b], latest[b], out_valid[b])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def bitstat_window_row(edge, n_win, mode, density, mu1, mu0, sig1, sig0, thr, words, pre, period, bitpos, key,
                        out_above, out_n1, out_a1, out_a0):
     """Bit-statistics sampler of one world at controller edge ``edge`` (07 P0-11, Sun et al.).
