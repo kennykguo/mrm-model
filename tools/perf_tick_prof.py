@@ -5,8 +5,9 @@
 Runs mrm.sim.kernel._world_block (open loop, the plant's substep policy) on the g26 B = 1 plant of
 tools/perf_bench.py and accumulates the time of every section with the arm64 virtual counter cntvct_el0 (24 MHz on
 Apple silicon: 41.7 ns resolution; averaged over many ticks the quantization averages out). The sections are the
-kernel's own source: _world_block is re-compiled from mrm/sim/kernel.py with a counter read inserted at every
-comment line that starts with ``# ---`` (so the breakdown follows the kernel as it changes). arm64 only; the
+kernel's own source: _world_block and its tick loop _world_loop are re-compiled from mrm/sim/kernel.py (with the
+kernel's own runtime flag) with a counter read inserted at every comment line that starts with ``# ---`` (so the
+breakdown follows the kernel as it changes). arm64 only; the
 instrumented copy is compiled on every run (~1-2 min), the kernel itself comes from its cache. The instrumented
 functions receive the accumulator as an extra argument named ``acc``: they must not use a local of that name.
 """
@@ -82,6 +83,7 @@ def instrument(name: str, ns: dict, callees=()):
     are redirected (their time is then itemized and not counted in the caller's section; the caller resumes its
     own clock after the call). Returns an njit function with an extra trailing ``acc`` argument."""
     src = textwrap.dedent(inspect.getsource(getattr(K, name).py_func))
+    nrt = "_nrt=False" not in src.split("def ", 1)[0]      # compile as the kernel does (with or without the runtime)
     ns = dict(ns)
     for cname, cfun in callees:
         src = _add_acc_to_calls(src, cname, cname + "_i")
@@ -135,14 +137,15 @@ def instrument(name: str, ns: dict, callees=()):
         src2 = "\n".join(res)
     ns["cntvct"] = cntvct
     exec(compile(src2, f"<instrumented {name}>", "exec"), ns)
-    return njit(ns[name])
+    return njit(ns[name]) if nrt else njit(_nrt=False)(ns[name])
 
 
 def build():
     ns = dict(K.__dict__)
     imp = instrument("_implicit_step_eng", ns)
     tru = instrument("_truth_a", ns)
-    wb = instrument("_world_block", ns, callees=(("_implicit_step_eng", imp), ("_truth_a", tru)))
+    loop = instrument("_world_loop", ns, callees=(("_implicit_step_eng", imp), ("_truth_a", tru)))
+    wb = instrument("_world_block", ns, callees=(("_world_loop", loop),))
 
     @njit
     def prof_ticks(P, S, b, k0, n, acc):

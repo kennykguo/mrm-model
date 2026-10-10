@@ -73,6 +73,7 @@ __all__ = ["KParams", "KState", "STEP_SIG", "STEP_FT", "null_step", "get_run_blo
            "MODE_OPEN", "MODE_COMPILED", "MODE_PYTHON", "POLICY_FIXED", "POLICY_AUTO",
            "RF", "RI", "R8", "RB", "WI", "WF", "LF", "NRF", "NRI", "NR8", "NRB", "NWI", "NWF", "NLF"]
 
+_U = np.uint64           # unsigned index cast (no negative-index wraparound; mrm.plant.optics._U, perf.md R2-1)
 MODE_OPEN = 0
 MODE_COMPILED = 1
 MODE_PYTHON = 2
@@ -280,13 +281,6 @@ def _sig_off(P, sig):
     return P.sc_sig_i[sig, _SI_OFF]
 
 
-@njit(cache=True)
-def _edge_tick(P, b, j):
-    """Tick of controller edge j of world b: phase + j period + jitter (07 P2-7; mrm.core.timing.edge_jitter)."""
-    e = P.phase + j * P.period
-    if P.jitter > 0:
-        e += edge_jitter(P.key_sched[b], j, P.jitter)
-    return e
 
 
 @njit(cache=True)
@@ -324,7 +318,23 @@ def _sh_blocks(args_f, args_i):
     return rg, nb_
 
 
-@njit(cache=True)
+@njit(cache=True, inline="always")
+def _sh_out_blocks(args_f, args_i):
+    """The output views (out_rl (N_RL, N, L), out_r (N_R, N), out_l (N_L, L)) of the self-heating rows, inlined (the
+    reshapes of mrm.plant.optics._sh_outputs; a function compiled without the runtime must not call a function that
+    returns arrays)."""
+    n = args_i[_op.SH_N]
+    nl = args_i[_op.SH_L]
+    o = args_i[_op.SH_O_ORL]
+    orl = args_f[o:o + _op.N_RL * n * nl].reshape((_op.N_RL, n, nl))
+    o = args_i[_op.SH_O_OR]
+    orr = args_f[o:o + _op.N_R * n].reshape((_op.N_R, n))
+    o = args_i[_op.SH_O_OL]
+    ol = args_f[o:o + _op.N_L * nl].reshape((_op.N_L, nl))
+    return orl, orr, ol
+
+
+@njit(cache=True, _nrt=False)
 def dphi_dlamres(lam_l, shift, t_rt):
     """d phi / d lambda_res (rad/m) at line lam_l (m) of a ring whose cold phase curve is translated rigidly by the
     resonance shift ``shift`` (m), with t_rt (s) the group delay n_g(x) L / c from mrm.plant.phase.ring_optics_row:
@@ -336,7 +346,7 @@ def dphi_dlamres(lam_l, shift, t_rt):
     return _TWO_PI * C0 * t_rt / (x * x)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def cold_coordinate(rp_row, x0, target):
     """The root x (m) of n(x) L / x = target (target = phase / 2 pi) of the phase model's cold curve (mrm.plant.phase
     equation 2: n(x) = n_eff + (n_eff - n_g) D / lam_res - (dn_g/dlambda) D^2 / (2 lam_res), D = x - lam_res), by
@@ -364,7 +374,7 @@ def cold_coordinate(rp_row, x0, target):
     return x
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def resonance_detuning(rp_row, lam_l, shift, m):
     """Exact lambda_res - lam_l (m) of longitudinal order m of a ring whose cold phase curve is translated by
     ``shift`` (m): x_m - (lam_l - shift) with x_m the order-m cold resonance (:func:`cold_coordinate`)."""
@@ -424,7 +434,7 @@ def _eo(args_i, j):
     return args_i[args_i.shape[0] - EXT_I + j]
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def eng_lines_changed(args_f, args_i, lam_l):
     """True when the line wavelengths differ from those the K^2 rows were computed for (or none were); records
     lam_l as the new key. The K^2 at a line depends only on the line wavelength and the world's ring constants
@@ -438,7 +448,7 @@ def eng_lines_changed(args_f, args_i, lam_l):
     return changed
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def eng_precompute(args_f, args_i):
     """Once per substep, after the optics inputs are written: the Airy-path caches and the far-line hold
     (mrm.plant.optics.sh_fast_precompute: exactly the updates the optics adapter makes lazily, so the engine and the
@@ -446,7 +456,7 @@ def eng_precompute(args_f, args_i):
     _op.sh_fast_precompute(args_f, args_i)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _eng_pabs_general(t, k, args_f, args_i):
     """eng_pabs of a TCMT or backscatter ring: mrm.plant.optics.ring_lines_nb with the slope per evaluation."""
     p_in, pcur, rg, nb_, rb, cw, fw = _op._sh_core(args_f, args_i)
@@ -484,7 +494,7 @@ def _eng_pabs_general(t, k, args_f, args_i):
     return pabs, slope * dlam_dt
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def eng_pabs(t, k, args_f, args_i):
     """pabs_fn: absorbed power of ring k at temperature t (W) and dP_abs/dT (W/K), bit-identical to
     mrm.plant.optics.selfheat_pabs; keeps what the commit needs to write every output of ring k without solving it
@@ -494,24 +504,26 @@ def eng_pabs(t, k, args_f, args_i):
     return _eng_pabs_general(t, k, args_f, args_i)
 
 
-@njit(cache=True)
-def eng_commit(t, k, args_f, args_i):
-    """commit_fn: as mrm.plant.optics.selfheat_commit, reusing the last evaluation when it was ring k at t."""
+@njit(cache=True, _nrt=False)
+def eng_commit(t, k, args_f, args_i, full):
+    """commit_fn: as mrm.plant.optics.selfheat_commit, reusing the last evaluation when it was ring k at t. full =
+    False (every step of a block but its last): only the outputs a plant tick reads (optics.sh_fast_outputs; the
+    general path writes everything anyway); the last step of a block commits in full (docs/handoff/perf.md R2-3)."""
     if _op.sh_last_is(k, t, args_f, args_i):
         if args_f[args_i[_op.SH_O_FF] + k] != 0.0:
-            _op.sh_fast_outputs(k, args_f, args_i)
+            _op.sh_fast_outputs(k, args_f, args_i, full)
         else:
             o_thru = _eo(args_i, E_THRU)
             o_pcur = args_i[_op.SH_O_PCUR]
             for l in range(args_i[_op.SH_L]):
                 args_f[o_pcur + l] = args_f[o_thru + l]
-        _op.sh_pass_on(k, args_f, args_i)
+        _op.sh_pass_on(k, args_f, args_i, full)
     else:
         _op.selfheat_commit(t, k, args_f, args_i)
     _op.sh_last_clear(args_f, args_i)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def swing_capacitance_row(v_lo, v_hi, grid, c_col, cum_q, fill, length_m, out_c_eff):
     """Charge-equivalent junction capacitance over the NRZ swing (F): C_eff = f L (Q(V_hi) - Q(V_lo))/(V_hi - V_lo)
     with Q the integral of the piecewise-linear (end-held) c'(V), from a cumulative table cum_q (G,) at the grid
@@ -536,10 +548,12 @@ def _cum_q(x, grid, col, cum, g):
         return col[0] * (x - grid[0])
     if x >= grid[g - 1]:
         return cum[g - 1] + col[g - 1] * (x - grid[g - 1])
-    j = _el.grid_index(x, grid)                # np.searchsorted(grid, x) - 1, without the binary search
-    h = grid[j + 1] - grid[j]
-    d = x - grid[j]
-    return cum[j] + d * (col[j] + 0.5 * (d / h) * (col[j + 1] - col[j]))
+    j = _U(_el.grid_index(x, grid))            # np.searchsorted(grid, x) - 1, without the binary search
+    gj = grid[j]
+    h = grid[j + _U(1)] - gj
+    d = x - gj
+    cj = col[j]
+    return cum[j] + d * (cj + 0.5 * (d / h) * (col[j + _U(1)] - cj))
 
 
 def cumulative_capacitance(grid, c_tab):
@@ -553,7 +567,7 @@ def cumulative_capacitance(grid, c_tab):
 
 
 # ---------------------------------------------------------------------------------------------- implicit step (copy)
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _solve_ring_eng(k, args_f, args_i, t_other, g, t_start, p_max, d2p_max, max_iter, tol_k):
     """mrm.plant.selfheat.solve_ring_temperature with the engine adapter eng_pabs (verbatim otherwise)."""
     if g == 0.0 or g != g:
@@ -687,7 +701,7 @@ def _th_struct(lag_src, lag_kind, obs_ptr, heater_obs, heater_src, src_scale):
     return idx_exo, idx_cross, idx_ax, unit, hs_lo, hs_hi
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _th_gains(c0, c1, lag_src, lag_kind, obs_ptr, heater_obs, heater_src, src_scale, w, gobs, gsplit):
     """For one substep power: w[m] = src_scale[s] (c0[m] + c1[m]); gobs[o] = sum of w over the LAG_OPT_SELF lags of
     observer o and gsplit[n] = sum of w over the lags of heater_src[n] in heater observer n, both in lag order (the
@@ -709,13 +723,14 @@ def _th_gains(c0, c1, lag_src, lag_kind, obs_ptr, heater_obs, heater_src, src_sc
         gsplit[n] = g
 
 
-@njit(cache=True)
-def _heater_split(x, a, c0, c1, lag_src, obs_ptr, obs, self_src, lo_s, hi_s, unit, u0, u1, src_scale):
+@njit(cache=True, _nrt=False)
+def _heater_split(x, a, c0, c1, lag_src, obs_ptr, obs_end, obs, self_src, lo_s, hi_s, unit, u0, u1, src_scale):
     """pre of mrm.plant.thermal.observer_split_b (the gain comes from _th_gains), bit-identical: the same sum in the
-    same order, without the per-lag source test when the self-heater lags form the range [lo_s, hi_s)."""
+    same order, without the per-lag source test when the self-heater lags form the range [lo_s, hi_s). obs_end:
+    the end of each observer's lags without its trailing dead lags (:func:`_th_live`; each would add +0.0)."""
     pre = 0.0
     lo = obs_ptr[obs]
-    hi = obs_ptr[obs + 1]
+    hi = obs_end[obs]
     if lo_s < 0 or not unit:
         for m in range(lo, hi):
             s = lag_src[m]
@@ -729,67 +744,172 @@ def _heater_split(x, a, c0, c1, lag_src, obs_ptr, obs, self_src, lo_s, hi_s, uni
         pre += c0[m] * u0[s] + c1[m] * u1[s]
     for m in range(lo_s, hi_s):
         pre += a[m] * x[m]
-    for m in range(hi_s, hi):
+    for m in range(hi_s, max(hi, hi_s)):
         s = lag_src[m]
         pre += a[m] * x[m]
         pre += c0[m] * u0[s] + c1[m] * u1[s]
     return pre
 
 
-@njit(cache=True)
-def _heater_split_tables(obs_ptr, lag_src, heater_obs, heater_src):
-    """(ln, lo, is_self) for :func:`_heater_split_all`: the common number of lags of the heater observers (-1 when
-    they differ), the first lag of each (N,) and, per ring and lag position, whether the lag is the ring's own
-    heater's (N, ln) bool."""
+@njit(cache=True, _nrt=False)
+def _heater_split_fill(obs_ptr, obs_end, lag_src, heater_obs, heater_src, hs_tab):
+    """The tables of :func:`_heater_split_all` into hs_tab (2 N max-lags,): returns ln, the common number of lags of
+    the heater observers (-1 when they differ; up to obs_end, :func:`_th_live`), and writes per lag position j and
+    ring n the pair (lag, its source, or -1 for the ring's own heater) at hs_tab[2 (j N + n)] (perf.md R2-9)."""
     nr = heater_obs.shape[0]
-    ln = obs_ptr[heater_obs[0] + 1] - obs_ptr[heater_obs[0]] if nr > 0 else 0
-    lo = np.empty(nr, np.int64)
+    ln = obs_end[heater_obs[0]] - obs_ptr[heater_obs[0]] if nr > 0 else 0
     for n in range(nr):
-        lo[n] = obs_ptr[heater_obs[n]]
-        if obs_ptr[heater_obs[n] + 1] - lo[n] != ln:
+        if obs_end[heater_obs[n]] - obs_ptr[heater_obs[n]] != ln:
             ln = -1
-    is_self = np.zeros((nr, max(ln, 0)), np.bool_)
-    for n in range(nr):
-        for j in range(max(ln, 0)):
-            is_self[n, j] = lag_src[lo[n] + j] == heater_src[n]
-    return ln, lo, is_self
+    for j in range(max(ln, 0)):
+        for n in range(nr):
+            m = obs_ptr[heater_obs[n]] + j
+            q = 2 * (j * nr + n)
+            hs_tab[q] = m
+            hs_tab[q + 1] = -1 if lag_src[m] == heater_src[n] else lag_src[m]
+    return ln
 
 
 @njit(cache=True)
-def _heater_split_all(x, a, c0, c1, lag_src, obs_ptr, heater_obs, heater_src, hs_lo, hs_hi, unit, u0, u1, src_scale,
-                      ln, lo, is_self, out_pre):
+def _th_dead_init(x, lag_src, lag_kind, n_src, dead):
+    """dead[s] = True for every source whose lags are all LAG_EXOGENOUS and exactly +0.0 (the sign bit clear), e.g. a
+    second aggressor site that no scenario drives, or a cold driver. Such a lag stays exactly +0.0 while its source
+    has no input (a (+0.0) + (c0 0 + c1 0) = +0.0: the input term is +-0.0, and +0.0 + -0.0 = +0.0 in round to
+    nearest), so the lag pass can skip it and the observer sums can leave it out (adding +0.0 to a sum that starts
+    at the base temperature changes nothing). Returns the number of dead sources. docs/handoff/perf.md R2-5."""
+    for s in range(n_src):
+        dead[s] = False
+    n_lags = np.zeros(n_src, np.int64)
+    ok = np.ones(n_src, np.bool_)
+    for m in range(lag_src.shape[0]):
+        s = lag_src[m]
+        n_lags[s] += 1
+        if lag_kind[m] != LAG_EXOGENOUS or not (x[m] == 0.0 and math.copysign(1.0, x[m]) > 0.0):
+            ok[s] = False
+    nd = 0
+    for s in range(n_src):
+        if ok[s] and n_lags[s] > 0:
+            dead[s] = True
+            nd += 1
+    return nd
+
+
+@njit(cache=True, _nrt=False)
+def _th_live(dead, lag_src, obs_ptr, idx_exo, out_ms, out_obs_end):
+    """The live exogenous lags (idx_exo without the lags of dead sources) as pairs (lag, source) into out_ms,
+    returning their number, and the end of each observer's lags without its trailing dead lags into out_obs_end (a
+    dead lag inside an observer's range stays in its sum: +0.0)."""
+    n = 0
+    for i in range(idx_exo.shape[0]):
+        m = idx_exo[i]
+        if not dead[lag_src[m]]:
+            out_ms[2 * n] = m
+            out_ms[2 * n + 1] = lag_src[m]
+            n += 1
+    for o in range(obs_ptr.shape[0] - 1):
+        e = obs_ptr[o + 1]
+        while e > obs_ptr[o] and dead[lag_src[e - 1]]:
+            e -= 1
+        out_obs_end[o] = e
+    return n
+
+
+@njit(cache=True)
+def _th_tables(idx_cross, opt_lags, lag_src, lag_obs, src_ring):
+    """Per block: the cross-ring lags as pairs (lag, source ring) and the optical lags as triples (lag, observer,
+    source ring), so each lag pass reads its indices with one or two pair loads (perf.md R2-9)."""
+    ms_cross = np.empty(2 * idx_cross.shape[0], np.int64)
+    for i in range(idx_cross.shape[0]):
+        m = idx_cross[i]
+        ms_cross[2 * i] = m
+        ms_cross[2 * i + 1] = src_ring[lag_src[m]]
+    opt_tab = np.empty(3 * opt_lags.shape[0], np.int64)
+    for i in range(opt_lags.shape[0]):
+        m = opt_lags[i]
+        opt_tab[3 * i] = m
+        opt_tab[3 * i + 1] = lag_obs[m]
+        opt_tab[3 * i + 2] = src_ring[lag_src[m]]
+    return ms_cross, opt_tab
+
+
+@njit(cache=True, _nrt=False)
+def _th_coef(a, c0, c1, w, coef):
+    """The lag coefficients of one substep power as structure of arrays per lag: coef[4 m .. 4 m + 3] = (a, c0, c1,
+    w) (one pair load per two coefficients in the lag passes; perf.md R2-9)."""
+    for m in range(a.shape[0]):
+        q = 4 * m
+        coef[q] = a[m]
+        coef[q + 1] = c0[m]
+        coef[q + 2] = c1[m]
+        coef[q + 3] = w[m]
+
+
+@njit(cache=True, _nrt=False)
+def _uu_fill(u0, u1, uu):
+    """uu[2 s], uu[2 s + 1] = u0[s], u1[s] (the inputs of source s at the start and end of the step, side by side)."""
+    for s in range(u0.shape[0]):
+        uu[2 * s] = u0[s]
+        uu[2 * s + 1] = u1[s]
+
+
+@njit(cache=True, _nrt=False)
+def _th_wake(dead, u0, u1):
+    """True when a dead source has an input now (it is then marked live; the caller rebuilds the lag lists)."""
+    woke = False
+    for s in range(dead.shape[0]):
+        if dead[s] and (u0[s] != 0.0 or u1[s] != 0.0):
+            dead[s] = False
+            woke = True
+    return woke
+
+
+@njit(cache=True, _nrt=False, inline="always")
+def _heater_split_all(x, a, c0, c1, lag_src, obs_ptr, obs_end, heater_obs, heater_src, hs_lo, hs_hi, unit, u0, u1,
+                      src_scale, ln, hs_tab, coef, uu, sums, out_pre):
     """_heater_split of every ring into out_pre (N,). When the heater observers have the same number of lags (ln >= 0,
-    tables of :func:`_heater_split_tables`), the N sums run in lockstep (lag j of every ring, then lag j + 1), each in
-    its own order, so the N independent addition chains overlap in the CPU instead of running one after the other.
-    The same additions in the same order per ring as _heater_split, so the values are bit-identical."""
+    tables of :func:`_heater_split_fill`), the N sums run in lockstep (lag j of every ring, then lag j + 1), each in
+    its own order, so the N independent addition chains overlap in the CPU instead of running one after the other;
+    the coefficients come from the per-lag table coef (:func:`_th_coef`) and the inputs from uu (:func:`_uu_fill`).
+    The same additions in the same order per ring as _heater_split, so the values are bit-identical. sums (N,):
+    scratch (no allocation per tick)."""
     nr = heater_obs.shape[0]
     if ln < 0 or not unit:
         for n in range(nr):
-            out_pre[n] = _heater_split(x, a, c0, c1, lag_src, obs_ptr, heater_obs[n], heater_src[n], hs_lo[n],
-                                       hs_hi[n], unit, u0, u1, src_scale)
+            out_pre[n] = _heater_split(x, a, c0, c1, lag_src, obs_ptr, obs_end, heater_obs[n], heater_src[n],
+                                       hs_lo[n], hs_hi[n], unit, u0, u1, src_scale)
         return
-    sums = np.zeros(nr)                 # a local array: the compiler need not assume it aliases the inputs
+    for n in range(nr):
+        sums[n] = 0.0
+    q = 0
     for j in range(ln):
         for n in range(nr):
-            m = lo[n] + j
-            pre = sums[n] + a[m] * x[m]
-            if not is_self[n, j]:
-                s = lag_src[m]
-                pre = pre + (c0[m] * u0[s] + c1[m] * u1[s])
+            m = _U(hs_tab[q])
+            sv = hs_tab[q + 1]
+            q += 2
+            m4 = m * _U(4)
+            pre = sums[n] + coef[m4] * x[m]
+            if sv >= 0:
+                s2 = _U(2 * sv)
+                pre = pre + (coef[m4 + _U(1)] * uu[s2] + coef[m4 + _U(2)] * uu[s2 + _U(1)])
             sums[n] = pre
     for n in range(nr):
         out_pre[n] = sums[n]
 
 
-@njit(cache=True)
-def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_ptr, src_ring, ring_obs, bus_order,
-                       u0, u1, src_scale, t_base, p_prev, t_prev, args_f, args_i, p_max, d2p_max, max_iter, tol_k,
-                       n_outer, g_work, t_obs, p_new, t_ring, n_iter, w, gobs, idx_exo, idx_cross, idx_ax, unit):
+@njit(cache=True, _nrt=False)
+def _implicit_step_eng(x, coef, uu, ms_exo, ms_cross, idx_ax, opt_tab, lag_obs, obs_ptr, obs_end, ring_obs,
+                       bus_order, src_scale, unit, t_base, p_prev, t_prev, args_f, args_i, p_max, d2p_max, max_iter,
+                       tol_k, n_outer, g_work, t_obs, p_new, t_ring, n_iter, gobs, full, p_cross):
     """mrm.plant.selfheat.implicit_step_b (owner: plant_thermal; 07 P0-1) calling the engine adapter eng_pabs /
     eng_commit directly, the same arithmetic otherwise. Why a copy: passing the adapter as a first-class value makes
     numba embed the dispatcher addresses in the code ("dynamic globals"), and then the kernel cannot be cached on disk
     (every process would recompile the plant for minutes). The lag passes run from the tables of _th_struct /
     _th_gains (w, gobs, the index lists, unit) instead of branching per lag: bit-identical (docs/handoff/perf.md P8).
+    The lag coefficients (a, c0, c1, w) come per lag from coef (:func:`_th_coef`), the inputs (u0, u1) per source
+    from uu (:func:`_uu_fill`), the exogenous lags as (lag, source) pairs ms_exo, the cross-ring lags as (lag, source
+    ring) pairs ms_cross and the optical lags as (lag, observer, source ring) triples opt_tab (perf.md R2-9: the same
+    arithmetic). ms_exo may leave out the lags of dead sources and obs_end the trailing ones of each observer
+    (:func:`_th_live`: lags that are exactly +0.0 and have no input stay +0.0 and add +0.0); p_cross (N,): scratch.
     Kept equal to the original by tests/verification/test_kernel_parity.py (the reference engine runs the
     original)."""
     nr = ring_obs.shape[0]
@@ -809,31 +929,38 @@ def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_p
     # two passes (the same values and, per observer, the same summation order as one pass over the observers): every
     # lag with its known input (by kind, from the index lists: a x + input with the input of implicit_step_b, whose
     # src_scale factor is skipped when it is exactly 1.0), then the sums; the implicit gains are the tabled gobs
+    # (indices cast to unsigned: no negative-index wraparound per access, docs/handoff/perf.md R2-1)
+    n_exo = ms_exo.shape[0] // 2
     if unit:
-        for i in range(idx_exo.shape[0]):
-            m = idx_exo[i]
-            s = lag_src[m]
-            x[m] = a[m] * x[m] + (c0[m] * u0[s] + c1[m] * u1[s])
+        for i in range(n_exo):
+            m = _U(ms_exo[2 * i])
+            s2 = _U(2 * ms_exo[2 * i + 1])
+            m4 = m * _U(4)
+            x[m] = coef[m4] * x[m] + (coef[m4 + _U(1)] * uu[s2] + coef[m4 + _U(2)] * uu[s2 + _U(1)])
     else:
-        for i in range(idx_exo.shape[0]):
-            m = idx_exo[i]
-            s = lag_src[m]
-            x[m] = a[m] * x[m] + src_scale[s] * (c0[m] * u0[s] + c1[m] * u1[s])
-    for i in range(idx_cross.shape[0]):
-        m = idx_cross[i]
-        x[m] = a[m] * x[m] + w[m] * p_prev[src_ring[lag_src[m]]]
+        for i in range(n_exo):
+            m = _U(ms_exo[2 * i])
+            sv = _U(ms_exo[2 * i + 1])
+            s2 = sv * _U(2)
+            m4 = m * _U(4)
+            x[m] = coef[m4] * x[m] + src_scale[sv] * (coef[m4 + _U(1)] * uu[s2] + coef[m4 + _U(2)] * uu[s2 + _U(1)])
+    n_cross = ms_cross.shape[0] // 2
+    for i in range(n_cross):
+        m = _U(ms_cross[2 * i])
+        m4 = m * _U(4)
+        x[m] = coef[m4] * x[m] + coef[m4 + _U(3)] * p_prev[_U(ms_cross[2 * i + 1])]
     for i in range(idx_ax.shape[0]):
-        m = idx_ax[i]
-        x[m] = a[m] * x[m]
+        m = _U(idx_ax[i])
+        x[m] = coef[m * _U(4)] * x[m]
     for o in range(n_obs):
         e = t_base
-        for m in range(obs_ptr[o], obs_ptr[o + 1]):
-            e += x[m]
+        for m in range(obs_ptr[o], obs_end[o]):
+            e += x[_U(m)]
         t_obs[o] = e                       # everything except the new optical inputs
         g_work[o] = gobs[o]
     # --- ring solves in bus order
     n_fail = 0
-    p_cross = np.empty(nr)                 # P_abs currently driving the LAG_OPT_CROSS_RING lags
+    # p_cross: the P_abs currently driving the LAG_OPT_CROSS_RING lags
     for k in range(nr):
         p_cross[k] = p_prev[k]
         t_ring[k] = t_prev[k]
@@ -861,7 +988,7 @@ def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_p
                 if gk != 0.0:
                     p_new[k] = (t - t_obs[o]) / gk
             # --- commit (outputs of the ring, through power to the next ring)
-            eng_commit(t, k, args_f, args_i)
+            eng_commit(t, k, args_f, args_i, full)
             # --- ring solves in bus order
         if sweep + 1 >= n_outer:
             break
@@ -873,12 +1000,12 @@ def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_p
             scale = max(scale, abs(p_new[k]))
         if change <= 1e-12 * scale:
             break
-        for i in range(idx_cross.shape[0]):
-            m = idx_cross[i]
-            j = src_ring[lag_src[m]]
-            dx = w[m] * (p_new[j] - p_cross[j])
+        for i in range(n_cross):
+            m = _U(ms_cross[2 * i])
+            j = _U(ms_cross[2 * i + 1])
+            dx = coef[m * _U(4) + _U(3)] * (p_new[j] - p_cross[j])
             x[m] += dx
-            t_obs[lag_obs[m]] += dx
+            t_obs[_U(lag_obs[m])] += dx
         for k in range(nr):
             p_cross[k] = p_new[k]
     # --- optical lags with the new absorbed powers
@@ -886,15 +1013,15 @@ def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_p
     # order as t_obs[lag_obs[m]] += dx, without a store-to-load round trip per lag; bit-identical)
     o_cur = -1
     t_run = 0.0
-    for i in range(opt_lags.shape[0]):
-        m = opt_lags[i]
-        o = lag_obs[m]
+    for i in range(opt_tab.shape[0] // 3):
+        m = _U(opt_tab[3 * i])
+        o = opt_tab[3 * i + 1]
         if o != o_cur:
             if o_cur >= 0:
-                t_obs[o_cur] = t_run
+                t_obs[_U(o_cur)] = t_run
             o_cur = o
-            t_run = t_obs[o]
-        dx = w[m] * p_new[src_ring[lag_src[m]]]
+            t_run = t_obs[_U(o)]
+        dx = coef[m * _U(4) + _U(3)] * p_new[_U(opt_tab[3 * i + 2])]
         x[m] += dx
         t_run += dx
     if o_cur >= 0:
@@ -908,32 +1035,42 @@ def _implicit_step_eng(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_p
 @njit(cache=True)
 def release_row(P, S, b, k):
     """Event-order step 2 at controller edge k for world b: release the monitor, temperature, readback and
-    error-counter FIFOs, run the bit-statistics window, and pack obs_i64 (07 P0-6, P0-7, P0-11)."""
-    n_r = P.n_rings
-    rf = S.rf[b]
-    ri = S.ri[b]
-    rbb = S.rb[b]
-    lost = monitor_release_row(k, _row(P.mo_lat, b), S.mo_fv[b], S.mo_fr[b], S.mo_fm[b], S.mo_samples[b],
-                               S.mo_ticks[b], ri[RI_MO_COUNT], ri[RI_MO_LATEST], rbb[RB_MO_VALID], rbb[RB_MO_OVER],
-                               rbb[RB_MO_NEW])
-    S.wi[b, WI_MON_LOST] += lost
-    if S.ts_latest.shape[1] > 0:
-        temp_release_row(k, S.ts_fv[b], S.ts_fr[b], S.ts_fm[b], S.ts_latest[b], S.ts_new[b])
-    if P.rb_on != 0:
-        readback_release_row(k, S.rb_fv[b], S.rb_fr[b], S.rb_fm[b], ri[RI_RB_V], ri[RI_RB_I], rbb[RB_RB_NEW])
-    errors_release_row(k, S.dp_fv[b], S.dp_fr[b], S.dp_fm[b], ri[RI_DP_ERR], rbb[RB_ERR_VALID])
+    error-counter FIFOs, run the bit-statistics window, and pack obs_i64 (07 P0-6, P0-7, P0-11). :func:`_release_a`
+    on world b's arrays."""
+    _release_a(k, P.n_rings, _row(P.mo_lat, b), S.mo_fv[b], S.mo_fr[b], S.mo_fm[b], S.mo_samples[b], S.mo_ticks[b],
+               S.rf[b], S.ri[b], S.rb[b], S.wi[b], S.ts_fv[b], S.ts_fr[b], S.ts_fm[b], S.ts_latest[b], S.ts_new[b],
+               P.rb_on, S.rb_fv[b], S.rb_fr[b], S.rb_fm[b], S.dp_fv[b], S.dp_fr[b], S.dp_fm[b], S.sh_args_f[b],
+               P.sh_args_i[b], P.mo_pr[b], P.mo_pw[b], P.mo_pga, P.mo_shot, P.dp_bs_tau, P.dp_bs_stia, P.dp_rin[b],
+               P.dp_win_bits, P.dp_mode, P.dp_words, P.dp_pre, P.dp_period, P.dp_key_dp[b], S.obs[b], P.obs_map)
+
+
+@njit(cache=True, _nrt=False)
+def _release_a(k, n_r, mo_lat, mo_fv, mo_fr, mo_fm, mo_samples, mo_ticks, rf, ri, rbb, wi, ts_fv, ts_fr, ts_fm,
+               ts_latest, ts_new, rb_on, rb_fv, rb_fr, rb_fm, dp_fv, dp_fr, dp_fm, args_f, args_i, mo_pr, mo_pw, mo_pga,
+               mo_shot, dp_bs_tau, dp_bs_stia, dp_rin, dp_win_bits, dp_mode, dp_words, dp_pre, dp_period, dp_key,
+               obs, obs_map):
+    """:func:`release_row` on one world's arrays (a call that takes the KParams/KState tuples copies all ~270 array
+    structs, ~0.4 us; docs/handoff/perf.md R2-8). The same calls in the same order."""
+    lost = monitor_release_row(k, mo_lat, mo_fv, mo_fr, mo_fm, mo_samples, mo_ticks, ri[RI_MO_COUNT],
+                               ri[RI_MO_LATEST], rbb[RB_MO_VALID], rbb[RB_MO_OVER], rbb[RB_MO_NEW])
+    wi[WI_MON_LOST] += lost
+    if ts_latest.shape[0] > 0:
+        temp_release_row(k, ts_fv, ts_fr, ts_fm, ts_latest, ts_new)
+    if rb_on != 0:
+        readback_release_row(k, rb_fv, rb_fr, rb_fm, ri[RI_RB_V], ri[RI_RB_I], rbb[RB_RB_NEW])
+    errors_release_row(k, dp_fv, dp_fr, dp_fm, ri[RI_DP_ERR], rbb[RB_ERR_VALID])
     # bit statistics (07 P0-11): level codes of the last interval through the sampler bandwidth, then the window
-    out_rl_, out_r, out_l_ = _op._sh_outputs(S.sh_args_f[b], P.sh_args_i[b])
-    monitor_level_codes_row(out_r[_op.R_DROP_SUM1], out_r[_op.R_DROP_SUM0], rf[RF_P_BG], rf[RF_T_PD], rf[RF_T_PD],
-                            ri[RI_PGA], P.mo_pr[b], P.mo_pw[b], P.mo_pga, P.mo_shot, P.dp_bs_tau, rf[RF_MU1],
-                            rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0], P.dp_bs_stia, P.dp_rin[b])
-    bitstat_window_row(k, P.dp_win_bits, P.dp_mode, rf[RF_RHO], rf[RF_MU1], rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0],
-                       ri[RI_BS_THR], P.dp_words, P.dp_pre, P.dp_period, ri[RI_DP_BITPOS], P.dp_key_dp[b],
+    o = args_i[_op.SH_O_OR]
+    n_sh = args_i[_op.SH_N]
+    monitor_level_codes_row(args_f[o + _op.R_DROP_SUM1 * n_sh:o + (_op.R_DROP_SUM1 + 1) * n_sh],
+                            args_f[o + _op.R_DROP_SUM0 * n_sh:o + (_op.R_DROP_SUM0 + 1) * n_sh], rf[RF_P_BG],
+                            rf[RF_T_PD], rf[RF_T_PD], ri[RI_PGA], mo_pr, mo_pw, mo_pga, mo_shot, dp_bs_tau, rf[RF_MU1],
+                            rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0], dp_bs_stia, dp_rin)
+    bitstat_window_row(k, dp_win_bits, dp_mode, rf[RF_RHO], rf[RF_MU1], rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0],
+                       ri[RI_BS_THR], dp_words, dp_pre, dp_period, ri[RI_DP_BITPOS], dp_key,
                        ri[RI_BS_ABOVE], ri[RI_BS_N1], ri[RI_BS_A1], ri[RI_BS_A0])
-    temp_lat = S.ts_latest[b]
-    temp_new = S.ts_new[b]
-    pack_obs_row(S.obs[b], P.obs_map, k, -1, S.mo_samples[b], S.mo_ticks[b], ri[RI_MO_COUNT], ri[RI_MO_LATEST],
-                 rbb[RB_MO_VALID], rbb[RB_MO_OVER], rbb[RB_MO_NEW], temp_lat, temp_new, ri[RI_RB_V], ri[RI_RB_I],
+    pack_obs_row(obs, obs_map, k, -1, mo_samples, mo_ticks, ri[RI_MO_COUNT], ri[RI_MO_LATEST],
+                 rbb[RB_MO_VALID], rbb[RB_MO_OVER], rbb[RB_MO_NEW], ts_latest, ts_new, ri[RI_RB_V], ri[RI_RB_I],
                  rbb[RB_RB_NEW], ri[RI_DP_ONES], ri[RI_DP_BITS], ri[RI_BS_ABOVE], True, ri[RI_DP_ERR],
                  rbb[RB_ERR_VALID], ri[RI_HE_REG], ri[RI_BI_REG])
     for n in range(n_r):
@@ -947,13 +1084,13 @@ def _fast_tick(fast_fn, P, S, b, k):
     <= k, not yet delivered), before the controller step. fobs = [tick, N, new[N], code[N], sample_tick[N]];
     fact = [heater offset[N], bias offset[N]] (codes, held until the next call; added to the latched registers
     before the DAC FIFOs). The samples stay queued for the edge release."""
-    n_r = P.n_rings
-    lat = _row(P.mo_lat, b)
-    fo = S.fobs[b]
-    ri = S.ri[b]
-    fv = S.mo_fv[b]
-    fr = S.mo_fr[b]
-    fm = S.mo_fm[b]
+    _fast_tick_a(fast_fn, k, P.n_rings, _row(P.mo_lat, b), S.fobs[b], S.ri[b], S.mo_fv[b], S.mo_fr[b], S.mo_fm[b],
+                 _row(S.c_pi, b), _row(S.c_pf, b), S.c_si[b], S.c_sf[b], S.fact[b], S.wi[b])
+
+
+@njit(cache=True, _nrt=False)
+def _fast_tick_a(fast_fn, k, n_r, lat, fo, ri, fv, fr, fm, c_pi, c_pf, c_si, c_sf, fact, wi):
+    """:func:`_fast_tick` on one world's arrays (the tick loop calls it; runtime-free, perf.md R2-11)."""
     cap = fv.shape[1]
     while True:
         any_new = False
@@ -983,74 +1120,69 @@ def _fast_tick(fast_fn, P, S, b, k):
                 break
         if not any_new:
             break
-        fast_fn(_row(S.c_pi, b), _row(S.c_pf, b), S.c_si[b], S.c_sf[b], fo, S.fact[b])
-        S.wi[b, WI_FAST_CALLS] += 1
+        fast_fn(c_pi, c_pf, c_si, c_sf, fo, fact)
+        wi[WI_FAST_CALLS] += 1
 
 
-@njit(cache=True)
-def _edge(step_fn, P, S, b, k, mode):
-    """Controller edge k of world b (event order steps 2-4). Returns True when the Python path must take over."""
-    release_row(P, S, b, k)
-    if mode == MODE_PYTHON:
-        S.wi[b, WI_PENDING_EDGE] = k
-        return True
-    if mode == MODE_COMPILED:
-        if S.wi[b, WI_CTRL_RESET] != 0:                     # scenario fault.controller_reset: back to init state
-            S.c_si[b, :] = S.c_si0[b, :]
-            S.c_sf[b, :] = S.c_sf0[b, :]
-            _sync_act_from_registers(P, S, b)
-            S.wi[b, WI_CTRL_RESET] = 0
-        step_fn(_row(S.c_pi, b), _row(S.c_pf, b), S.c_si[b], S.c_sf[b], S.obs[b], S.act[b])
-        _push_act(P, S, b, k)
-    _advance_edge(P, S, b)
-    return False
 
 
-@njit(cache=True)
-def _sync_act_from_registers(P, S, b):
+
+
+
+
+
+
+@njit(cache=True, _nrt=False)
+def _sync_act_a(act, act_map, he_reg, bi_reg):
     """Pre-fill the held command from the latched DAC registers (the ABI rule of mrm.control.api)."""
-    am = P.act_map
-    for i in range(am.shape[0]):
-        o = am[i, 1]
-        for j in range(am[i, 2]):
-            if am[i, 0] == 0:
-                S.act[b, o + j] = S.ri[b, RI_HE_REG, j]
-            elif am[i, 0] == 1:
-                S.act[b, o + j] = S.ri[b, RI_BI_REG, j]
+    for i in range(act_map.shape[0]):
+        o = act_map[i, 1]
+        for j in range(act_map[i, 2]):
+            if act_map[i, 0] == 0:
+                act[o + j] = he_reg[j]
+            elif act_map[i, 0] == 1:
+                act[o + j] = bi_reg[j]
 
 
-@njit(cache=True)
-def _push_act(P, S, b, k):
+@njit(cache=True, _nrt=False)
+def _push_act_a(act, act_map, sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, latency):
     """Event-order step 4: clip every actuator to its channel range (in the held vector itself, so the controller
     sees the clipped command next time as the applied register does), count the clipped elements, and queue the
     command to latch at k + Controller.latency_ticks."""
-    S.wi[b, WI_SAT_TOTAL] += clip_act_row(S.act[b], P.act_map, S.sat[b])
-    if not pipe_push_row(S.pipe_vals[b], S.pipe_ticks[b], S.pipe_meta[b], S.act[b], k + P.ctrl_latency):
-        S.wi[b, WI_PIPE_OVER] += 1
+    wi[WI_SAT_TOTAL] += clip_act_row(act, act_map, sat)
+    if not pipe_push_row(pipe_vals, pipe_ticks, pipe_meta, act, k + latency):
+        wi[WI_PIPE_OVER] += 1
 
 
-@njit(cache=True)
-def _advance_edge(P, S, b):
-    j = S.wi[b, WI_EDGE_IDX] + 1
-    S.wi[b, WI_EDGE_IDX] = j
-    S.wi[b, WI_EDGE_NEXT] = _edge_tick(P, b, j)
+@njit(cache=True, _nrt=False)
+def _advance_edge_a(wi, phase, period, jitter, key_sched):
+    """Next controller edge: the tick of edge j is phase + j period + jitter (07 P2-7; mrm.core.timing.edge_jitter)."""
+    j = wi[WI_EDGE_IDX] + 1
+    wi[WI_EDGE_IDX] = j
+    e = phase + j * period
+    if jitter > 0:
+        e += edge_jitter(key_sched, j, jitter)
+    wi[WI_EDGE_NEXT] = e
 
 
 # ---------------------------------------------------------------------------------------------- truth and metrics
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def _truth_a(n_r, n_l, rf, ri, rbb, tv, lf, lt, t_base, args_f, args_i, pw, mo_pr, rp, jx, fwhm_b, wrong_window,
-             assign_mode, with_db, dark_known):
+             assign_mode, with_db, dark_known, ws):
     """Truth of one world at the end of the last step (ARCHITECTURE Truth; metrics.TRUTH_FIELDS) into tv, the
     per-line truth lt = [chip input power, bus output power, wavelength] (L,), the detuning rf[RF_DET], the order,
     the line each ring sits on and the wrong-line flag against the declared assignment (07 P1-12). Takes the world's
     arrays (pw = P.mo_pw[b], mo_pr = P.mo_pr[b], rp = P.ph_ring[b], fwhm_b = P.fwhm_hz[b]) instead of the tuples.
     with_db: also er_db and il_db (two log10 per ring; no kernel computation reads them, so the world block asks for
     them only when a record does and at the last step of a block; docs/handoff/perf.md P12). dark_known: the PD dark
-    current of this step is in rf[RF_I_DARK] (the monitor's value, the same expression), else it is computed."""
+    current of this step is in rf[RF_I_DARK] (the monitor's value, the same expression), else it is computed.
+    ws (3, N): scratch. The exact detuning of every ring runs :func:`resonance_detuning`'s Newton iteration for all
+    rings in lockstep (iteration i of every ring, then i + 1), each ring with its own sequence of values and its own
+    stop at a fixed point, so the N dependent division chains overlap (bit-identical; docs/handoff/perf.md R2-10)."""
     rg, nb_ = _sh_blocks(args_f, args_i)
     phi0r, phi1r, dpl = nb_[_op.SHN_PHI0R], nb_[_op.SHN_PHI1R], nb_[_op.SHN_DPL]
     tref, s0v, betav = rg[_op.SHR_TREF], rg[_op.SHR_S0], rg[_op.SHR_BETA]
-    out_rl, out_r, out_l = _op._sh_outputs(args_f, args_i)
+    out_rl, out_r, out_l = _sh_out_blocks(args_f, args_i)
     o_fwhm = _eo(args_i, E_FWHM)
     # --- per ring: line search, exact detuning of the declared line, Truth fields
     for n in range(n_r):
@@ -1060,22 +1192,64 @@ def _truth_a(n_r, n_l, rf, ri, rbb, tv, lf, lt, t_base, args_f, args_i, pw, mo_p
         best = -1
         best_d = _INF
         order_decl = 0
+        o_fw = o_fwhm + n * n_l
         for l in range(n_l):
-            ph = 0.5 * (phi0r[n, l] + phi1r[n, l]) + dpl[n, l] * shift
+            dpl_nl = dpl[n, l]
+            ph = 0.5 * (phi0r[n, l] + phi1r[n, l]) + dpl_nl * shift
             m = math.floor(ph / _TWO_PI + 0.5)
-            d = (ph - _TWO_PI * m) / dpl[n, l]                  # lambda_res - lambda_line (first order in d)
+            num = ph - _TWO_PI * m
             if l == dl:
                 order_decl = np.int64(m)
-            fwhm = args_f[o_fwhm + n * n_l + l]          # lam_l^2 fwhm_hz / c, set when the lines move
-            if abs(d) <= wrong_window * fwhm and abs(d) < best_d:
-                best_d = abs(d)
-                best = l
+            lim = wrong_window * args_f[_U(o_fw + l)]     # window x (lam_l^2 fwhm_hz / c), set when the lines move
+            # d = num / dpl (lambda_res - lambda_line, first order in d), divided only for a line that can be inside
+            # the window: |num| > lim |dpl| (1 + 1e-12) gives fl(|num / dpl|) > lim, so the skipped lines are the
+            # ones the test below rejects (bit-identical; docs/handoff/perf.md R2-7)
+            if abs(num) <= lim * abs(dpl_nl) * (1.0 + 1e-12):
+                d = num / dpl_nl
+                if abs(d) <= lim and abs(d) < best_d:
+                    best_d = abs(d)
+                    best = l
         # the declared line exactly: the mean of the two NRZ level resonances of the order nearest the line, from the
-        # phase model's cold curve translated by the end-of-step mean shift (shifts at T_prev plus the R1 increment)
-        lam_l = lf[LF_LAM, dl]
-        det_decl = resonance_detuning(rp[n], lam_l, 0.5 * (jx[0, n, 0] + jx[0, n, 1]) + shift, order_decl)
+        # phase model's cold curve translated by the end-of-step mean shift (shifts at T_prev plus the R1 increment):
+        # resonance_detuning(rp[n], lam_l, 0.5 (jx0 + jx1) + shift, order) = x_m - x_end, x_m below
         ri[RI_ORDER, n] = order_decl
         ri[RI_LINE_ON, n] = best
+        x_end = lf[LF_LAM, _U(dl)] - (0.5 * (jx[0, n, 0] + jx[0, n, 1]) + shift)
+        ws[0, n] = x_end
+        ws[1, n] = x_end
+        ws[2, n] = 1.0
+    # --- cold_coordinate(rp[n], x_end, order) of every ring, in lockstep
+    for _ in range(5):
+        busy = False
+        for n in range(n_r):
+            if ws[2, n] == 0.0:
+                continue
+            lam_r = rp[n, _ph.RP_LAM_RES]
+            ne = rp[n, _ph.RP_N_EFF]
+            ng = rp[n, _ph.RP_N_G]
+            dng = rp[n, _ph.RP_DNG]
+            ln = rp[n, _ph.RP_LEN]
+            x = ws[1, n]
+            dd = x - lam_r
+            n_x = ne + (ne - ng) * dd / lam_r - 0.5 * dng * dd * dd / lam_r
+            ng_x = ng + dng * dd + 0.5 * dng * dd * dd / lam_r
+            g = n_x * ln / x - float(ri[RI_ORDER, n])
+            x_new = x + g * x * x / (ng_x * ln)
+            if x_new == x:
+                ws[2, n] = 0.0              # an exact fixed point (cold_coordinate stops here)
+            else:
+                ws[1, n] = x_new
+                busy = True
+        if not busy:
+            break
+    # --- Truth fields
+    for n in range(n_r):
+        dl = ri[RI_DECL, n]
+        dlu = _U(dl)
+        lam_l = lf[LF_LAM, dlu]
+        det_decl = ws[1, n] - ws[0, n]
+        order_decl = ri[RI_ORDER, n]
+        best = ri[RI_LINE_ON, n]
         rf[RF_DET, n] = det_decl
         hw = 0.5 * lam_l * lam_l * fwhm_b[n] / C0
         tv[TR_T_RING, n] = rf[RF_T_RING, n]
@@ -1094,9 +1268,9 @@ def _truth_a(n_r, n_l, rf, ri, rbb, tv, lf, lt, t_base, args_f, args_i, pw, mo_p
             tv[TR_I_MON, n] = i_sig + rf[RF_I_DARK, n]
         else:
             tv[TR_I_MON, n] = i_sig + dark_current_a(pw[PW_DARK_I0], rf[RF_T_PD, n], pw[PW_DARK_T0], pw[PW_DARK_EA])
-        pin = out_rl[_op.RL_PIN, n, dl]
-        t1 = out_rl[_op.RL_THRU1, n, dl]
-        t0 = out_rl[_op.RL_THRU0, n, dl]
+        pin = out_rl[_op.RL_PIN, n, dlu]
+        t1 = out_rl[_op.RL_THRU1, n, dlu]
+        t0 = out_rl[_op.RL_THRU0, n, dlu]
         tv[TR_P_IN, n] = pin
         tv[TR_OMA, n] = rf[RF_OMA, n]
         rel = abs(t1 - t0) / pin if pin > 0.0 else 0.0
@@ -1154,7 +1328,7 @@ def truth_row(P, S, b):
     """Truth of world b at the end of the last step (:func:`_truth_a` on world b's arrays)."""
     _truth_a(P.n_rings, P.n_lines, S.rf[b], S.ri[b], S.rb[b], S.tv[b], S.lf[b], S.lt[b], S.wf[b, WF_T_BASE1],
              S.sh_args_f[b], P.sh_args_i[b], P.mo_pw[b], P.mo_pr[b], P.ph_ring[b], S.jx[b], P.fwhm_hz[b],
-             P.wrong_window, P.assign_mode, True, False)
+             P.wrong_window, P.assign_mode, True, False, np.empty((3, P.n_rings)))
 
 
 @njit(cache=True)
@@ -1167,40 +1341,34 @@ def _oracle(P, S, b):
     P.lock_ref_mode = 1 the detuning of the best stable point (of the best point when none is stable), refined by a
     parabola through it and its neighbours, becomes the lock reference S.m_ref (mrm.sim.metrics 'oracle'), converted
     exactly with :func:`cold_coordinate`."""
-    n_r = P.n_rings
-    rf = S.rf[b]
-    ri = S.ri[b]
-    v = _op.selfheat_views(S.sh_args_f[b], P.sh_args_i[b])
+    _oracle_a(P.n_rings, S.rf[b], S.ri[b], S.sh_args_f[b], P.sh_args_i[b], S.or_phi[b], S.or_k2t[b], S.or_k2d[b],
+              S.or_a[b], S.or_trt[b], S.or_psi[b], S.or_res0[b], S.or_res1[b], S.or_cw[b], S.or_fw[b], S.lf[b],
+              P.ph_ring[b], S.jx[b], P.fwhm_hz[b], P.z_opt_self[b], P.use_tcmt, P.m_orders, P.lock_ref_mode,
+              S.m_ref[b])
+
+
+@njit(cache=True, _nrt=False)
+def _oracle_a(n_r, rf, ri, args_f, args_i, phi, rk2t, rk2d, ra, rtrt, rpsi, res0, res1, cw, fw, lf, rp, jx, fwhm_b,
+              z_opt_b, use_tcmt, m_orders, lock_ref_mode, m_ref):
+    """:func:`_oracle` on one world's arrays (the tick loop calls it; runtime-free, docs/handoff/perf.md R2-11)."""
+    v = _op.selfheat_views(args_f, args_i)
     phi0r, phi1r, a0, a1, e0, e1 = v[4], v[5], v[8], v[9], v[10], v[11]
     psi, k2t, k2d, trt, dpl, rb = v[12], v[13], v[14], v[15], v[16], v[20]
     out_rl = v[22]
     s0v, betav, tref = v[18], v[19], v[17]
-    npts = S.or_phi.shape[1]
-    phi = S.or_phi[b]
-    rk2t = S.or_k2t[b]
-    rk2d = S.or_k2d[b]
-    ra = S.or_a[b]
-    rtrt = S.or_trt[b]
-    rpsi = S.or_psi[b]
-    res0 = S.or_res0[b]
-    res1 = S.or_res1[b]
-    cw = S.or_cw[b]
-    fw = S.or_fw[b]
-    lf = S.lf[b]
-    rp = P.ph_ring[b]
-    jx = S.jx[b]
+    npts = phi.shape[0]
     for n in range(n_r):
         dl = ri[RI_DECL, n]
         lam = lf[LF_LAM, dl]
-        fwhm = lam * lam * P.fwhm_hz[b, n] / C0
+        fwhm = lam * lam * fwhm_b[n] / C0
         dphi = phi1r[n, dl] - phi0r[n, dl]
         mean = 0.5 * (phi0r[n, dl] + phi1r[n, dl])
         m = math.floor(mean / _TWO_PI + 0.5)
         dT = rf[RF_T_RING, n] - tref[n]
         s_now = s0v[n] * (1.0 + betav[n] * dT)
-        g_sh = P.z_opt_self[b, n] * s_now                      # m per absorbed W, static
+        g_sh = z_opt_b[n] * s_now                      # m per absorbed W, static
         pin = out_rl[_op.RL_PIN, n, dl]
-        q1 = rf[RF_RHO, n] if P.sh_args_i[b, _op.SH_TWO] != 0 else 0.0
+        q1 = rf[RF_RHO, n] if args_i[_op.SH_TWO] != 0 else 0.0
         for lvl in range(2):
             for i in range(npts):
                 d = (-1.5 + 3.0 * i / (npts - 1)) * fwhm
@@ -1210,7 +1378,7 @@ def _oracle(P, S, b):
                 ra[i] = a0[n, dl] if lvl == 0 else a1[n, dl]
                 rtrt[i] = trt[n, dl]
                 rpsi[i] = psi[n, dl]
-            _op.ring_rows_nb(phi, rpsi, rk2t, rk2d, ra, rtrt, rb[n], P.use_tcmt != 0, P.m_orders, True, cw, fw,
+            _op.ring_rows_nb(phi, rpsi, rk2t, rk2d, ra, rtrt, rb[n], use_tcmt != 0, m_orders, True, cw, fw,
                              res0 if lvl == 0 else res1)
         best = 0.0
         best_u = 0.0
@@ -1228,7 +1396,7 @@ def _oracle(P, S, b):
                 i_best = i
         rf[RF_ORACLE, n] = best
         rf[RF_ORACLE_UNR, n] = best_u
-        if P.lock_ref_mode == 1:
+        if lock_ref_mode == 1:
             ib = i_best if i_best >= 0 else i_best_u
             d_ib = (-1.5 + 3.0 * ib / (npts - 1)) * fwhm
             # the scan step is 0.02 FWHM (~7 pm in g26): refine the maximum by the vertex of the parabola through
@@ -1254,7 +1422,7 @@ def _oracle(P, S, b):
             # scan point d_ib has the mean phase 2 pi m + dpl d_ib at the line: its exact detuning is x_m - x(phase)
             x_now = lam - (0.5 * (jx[0, n, 0] + jx[0, n, 1]) + s0v[n] * (dT + 0.5 * betav[n] * dT * dT))
             x_m = cold_coordinate(rp[n], x_now, float(m))
-            S.m_ref[b, n] = x_m - cold_coordinate(rp[n], x_m, m + dpl[n, dl] * d_ib / _TWO_PI)
+            m_ref[n] = x_m - cold_coordinate(rp[n], x_m, m + dpl[n, dl] * d_ib / _TWO_PI)
 
 
 # ---------------------------------------------------------------------------------------------- auto policy
@@ -1272,41 +1440,58 @@ def _auto_h(P, S, b, k, k_end):
     edge) is resolved tick by tick instead of being interpolated over up to 64 ticks; (b) h at most doubles from
     one step to the next (a fresh transient is entered with 1, 2, 4, ... ticks while the rate criterion learns
     it; the first step after a reset is one tick)."""
-    if P.fast_on != 0:
+    bb = b if P.sc_comp_f.shape[0] > 1 else 0
+    return _auto_h_a(k, k_end, P.n_rings, P.fast_on, P.au_max_pow, P.reset_protocol, P.ramp_ticks, P.oracle_on,
+                     P.he_ripple, P.bi_noise_per, _row(P.bi_noise, b), P.au_max_det, P.au_pabs_tol, S.wi[b], S.wf[b],
+                     S.ri[b], S.r8[b], S.rf[b], S.rb[b], S.pipe_meta[b], S.pipe_ticks[b], S.he_fifo[b], S.bi_fifo[b],
+                     P.sc_sig_i, P.sc_sig_f, P.sc_def, P.sc_comp, P.sc_comp_i, P.sc_comp_f[bb], P.sc_tab[bb],
+                     P.sc_keys[b], S.sc_cache[b], S.sc_vp[b], S.sc_v0[b], S.sc_v1[b], S.sc_va[b], P.rec_i,
+                     S.rec_idx[b], S.rec_cnt[b], P.mp_i, S.m_ai[b])
+
+
+@njit(cache=True, _nrt=False)
+def _auto_h_a(k, k_end, n_rings, fast_on, au_max_pow, reset_protocol, ramp_ticks, oracle_on, he_ripple, bi_noise_per,
+              bi_noise, au_max_det, au_pabs_tol, wi, wf, ri_, r8_, rf_, rbb_, pipe_meta, pipe_ticks, he_fifo, bi_fifo,
+              sc_sig_i, sc_sig_f, sc_def, sc_comp, sc_comp_i, sc_comp_f, sc_tab, sc_keys, sc_cache, sc_vp, sc_v0, sc_v1,
+              sc_va, rec_i, rec_idx, rec_cnt, mp_i, m_ai):
+    """:func:`_auto_h` on one world's arrays (a call that takes the KParams/KState tuples copies ~270 array structs,
+    ~0.4 us; docs/handoff/perf.md R2-8). The same rules in the same order; the held-signal check evaluates the
+    scenario with mrm.scenarios.generators.scen_eval_b as _scen_eval does."""
+    if fast_on != 0:
         return 1
-    hmax = np.int64(1) << P.au_max_pow
+    hmax = np.int64(1) << au_max_pow
     lim = k_end - k
-    e = S.wi[b, WI_EDGE_NEXT] - k
+    e = wi[WI_EDGE_NEXT] - k
     if e > 0 and e < lim:
         lim = e
-    meta = S.pipe_meta[b]
+    meta = pipe_meta
     if meta[1] > 0:
-        t = S.pipe_ticks[b, meta[0]] - k
+        t = pipe_ticks[meta[0]] - k
         if t <= 0:
             return 1
         if t < lim:
             lim = t
-    if P.reset_protocol == 0 and P.ramp_ticks > 0 and k - S.wi[b, WI_K_RESET] < P.ramp_ticks:
+    if reset_protocol == 0 and ramp_ticks > 0 and k - wi[WI_K_RESET] < ramp_ticks:
         return 1
-    if S.wi[b, WI_ORACLE_NEXT] - k > 0 and S.wi[b, WI_ORACLE_NEXT] - k < lim and P.oracle_on != 0:
-        lim = S.wi[b, WI_ORACLE_NEXT] - k
+    if wi[WI_ORACLE_NEXT] - k > 0 and wi[WI_ORACLE_NEXT] - k < lim and oracle_on != 0:
+        lim = wi[WI_ORACLE_NEXT] - k
     # (b) growth limit
-    g2 = 2 * S.wi[b, WI_LAST_H]
+    g2 = 2 * wi[WI_LAST_H]
     if g2 < lim:
         lim = g2
     if lim < 2:
         return 1
-    ri = S.ri[b]
-    r8 = S.r8[b]
-    rf = S.rf[b]
-    if not _el.actuator_quiescent_row(ri[RI_HE_REG], r8[R8_HE_HAS], S.he_fifo[b], rf[RF_HE_YS], rf[RF_HE_YO],
+    ri = ri_
+    r8 = r8_
+    rf = rf_
+    if not _el.actuator_quiescent_row(ri[RI_HE_REG], r8[R8_HE_HAS], he_fifo, rf[RF_HE_YS], rf[RF_HE_YO],
                                       rf[RF_HE_UT], 1e-9):
         return 1
-    if not _el.actuator_quiescent_row(ri[RI_BI_REG], r8[R8_BI_HAS], S.bi_fifo[b], rf[RF_BI_YS], rf[RF_BI_YO],
+    if not _el.actuator_quiescent_row(ri[RI_BI_REG], r8[R8_BI_HAS], bi_fifo, rf[RF_BI_YS], rf[RF_BI_YO],
                                       rf[RF_BI_VT], 1e-9):
         return 1
-    rbb = S.rb[b]
-    for n in range(P.n_rings):
+    rbb = rbb_
+    for n in range(n_rings):
         if ri[RI_HE_ADD, n] != 0:
             return 1
         # a command latched at this tick changes the register: one tick first
@@ -1314,33 +1499,33 @@ def _auto_h(P, S, b, k, k_end):
             return 1
         if rbb[RB_VAL_B, n] and ri[RI_BI_CMD, n] != ri[RI_BI_REG, n]:
             return 1
-    if P.he_ripple != 0:
+    if he_ripple != 0:
         return 1
     # bias-DAC noise: never across a redraw when it is redrawn less often than every tick (with a per-tick redraw
     # the draw of the first tick is held over the substep, a stated approximation)
-    if P.bi_noise_per > 1:
-        nz = _row(P.bi_noise, b)
+    if bi_noise_per > 1:
+        nz = bi_noise
         on = False
         for n in range(nz.shape[0]):
             if nz[n] != 0.0:
                 on = True
         if on:
-            nxt = (k // P.bi_noise_per + 1) * P.bi_noise_per - k
+            nxt = (k // bi_noise_per + 1) * bi_noise_per - k
             if nxt < lim:
                 lim = nxt
     # (a) a scenario event at k: one tick first
-    hp = S.wi[b, WI_LAST_H]
+    hp = wi[WI_LAST_H]
     if hp < 1:
         hp = 1
-    vp = S.sc_vp[b]
-    v0 = S.sc_v0[b]
-    v1 = S.sc_v1[b]
-    for s in range(P.sc_sig_i.shape[0]):
-        if P.sc_sig_i[s, _SI_NC] == 0:
+    vp = sc_vp
+    v0 = sc_v0
+    v1 = sc_v1
+    for s in range(sc_sig_i.shape[0]):
+        if sc_sig_i[s, _SI_NC] == 0:
             continue
-        off = P.sc_sig_i[s, _SI_OFF]
+        off = sc_sig_i[s, _SI_OFF]
         foh = s == _SIG_T_BASE or s == _SIG_XPU or s == _SIG_AGG
-        for j in range(P.sc_sig_i[s, _sg.SI_WIDTH]):
+        for j in range(sc_sig_i[s, _sg.SI_WIDTH]):
             a = vp[off + j]
             c = v0[off + j]
             if foh:
@@ -1356,38 +1541,37 @@ def _auto_h(P, S, b, k, k_end):
                 return 1
     # scenario: FOH signals (base temperature, XPU rise, aggressor power) must stay linear; every other active
     # signal must stay constant (held over the substep)
-    bb = b if P.sc_comp_f.shape[0] > 1 else 0
-    for s in range(P.sc_sig_i.shape[0]):
-        if P.sc_sig_i[s, _SI_NC] == 0:
+    for s in range(sc_sig_i.shape[0]):
+        if sc_sig_i[s, _SI_NC] == 0:
             continue
-        kb = _sg.scen_next_break_b(s, k, P.sc_comp, P.sc_sig_i, P.sc_comp_i, P.sc_comp_f[bb], P.sc_tab[bb])
+        kb = _sg.scen_next_break_b(s, k, sc_comp, sc_sig_i, sc_comp_i, sc_comp_f, sc_tab)
         if kb - k < lim:
             lim = kb - k
         if lim < 2:
             return 1
     # detuning-rate and P_abs criteria from the previous substep
-    rate = S.wf[b, WF_RATE]
+    rate = wf[WF_RATE]
     if rate > 0.0:
-        hr = P.au_max_det / rate
+        hr = au_max_det / rate
         if hr < lim:
             lim = np.int64(hr) if hr >= 1.0 else 1
-    for n in range(P.n_rings):
+    for n in range(n_rings):
         pa = rf[RF_P_ABS, n]
         pp_ = rf[RF_PABS_PREV, n]
         sc = max(abs(pa), abs(pp_))
-        if sc > 0.0 and abs(pa - pp_) > P.au_pabs_tol * sc:
+        if sc > 0.0 and abs(pa - pp_) > au_pabs_tol * sc:
             return 1
     # record windows (while the record still records) and BER windows: a substep never straddles one
-    for r in range(P.rec_i.shape[0]):
-        if S.rec_idx[b, r] >= P.rec_i[r, 4]:
+    for r in range(rec_i.shape[0]):
+        if rec_idx[r] >= rec_i[r, 4]:
             continue
-        dec = P.rec_i[r, 1]
-        left = dec - S.rec_cnt[b, r]
+        dec = rec_i[r, 1]
+        left = dec - rec_cnt[r]
         if left < lim:
             lim = left
-    win = P.mp_i[MPI_BER_WIN]
+    win = mp_i[MPI_BER_WIN]
     if win > 0:
-        left = win - S.m_ai[b, 0, AI_WIN_TICKS]
+        left = win - m_ai[0, AI_WIN_TICKS]
         if left > 0 and left < lim:
             lim = left
     if lim > hmax:
@@ -1397,39 +1581,59 @@ def _auto_h(P, S, b, k, k_end):
         h *= 2
     if h > 1:
         # held scenario signals must not change over [k, k + h]: compare the values at k + h with those at k
-        va = S.sc_va[b]
+        va = sc_va
         for i in range(va.shape[0]):
-            va[i] = S.sc_v1[b, i]
-        _scen_eval(P, S, b, k + h, va)
+            va[i] = sc_v1[i]
+        _sg.scen_eval_b(k + h, sc_comp, sc_sig_i, sc_sig_f, sc_def, sc_comp_i, sc_comp_f, sc_tab, sc_keys,
+                        sc_cache, va)
         while h > 1:
             ok = True
-            for s in range(P.sc_sig_i.shape[0]):
-                if P.sc_sig_i[s, _SI_NC] == 0 or s == _SIG_T_BASE or s == _SIG_XPU or s == _SIG_AGG:
+            for s in range(sc_sig_i.shape[0]):
+                if sc_sig_i[s, _SI_NC] == 0 or s == _SIG_T_BASE or s == _SIG_XPU or s == _SIG_AGG:
                     continue
-                off = P.sc_sig_i[s, _SI_OFF]
-                for e in range(P.sc_sig_i[s, _sg.SI_WIDTH]):
-                    a = S.sc_v0[b, off + e]
+                off = sc_sig_i[s, _SI_OFF]
+                for e in range(sc_sig_i[s, _sg.SI_WIDTH]):
+                    a = sc_v0[off + e]
                     c = va[off + e]
                     if not (a == c or (a != a and c != c)):
                         ok = False
             if ok:
                 break
             h //= 2
-            _scen_eval(P, S, b, k + h, va)
+            _sg.scen_eval_b(k + h, sc_comp, sc_sig_i, sc_sig_f, sc_def, sc_comp_i, sc_comp_f, sc_tab, sc_keys,
+                            sc_cache, va)
     return h
 
 
+@njit(cache=True, _nrt=False)
+def _bus_walk(args_f, args_i, bus_order, use_tcmt, m_orders):
+    """The explicit bus pass of a plant without self-heating (mrm.plant.optics.bus_propagate_nb on the packed rows).
+    A function with the runtime: it builds the views it needs and returns nothing, so the runtime-free tick loop can
+    call it (a runtime-free function must not hold views made by a function with the runtime; perf.md R2-11)."""
+    vv = _op.selfheat_views(args_f, args_i)
+    _op.bus_propagate_nb(vv[0], bus_order, vv[1], vv[2][0], vv[3], vv[4], vv[5], vv[8], vv[9], vv[10], vv[11],
+                         vv[12], vv[13], vv[14], vv[15], vv[20], vv[16], args_i[_op.SH_TWO] != 0, use_tcmt != 0,
+                         m_orders, False, vv[22], vv[23], vv[24], vv[21], vv[25], vv[26])
+
+
 # ---------------------------------------------------------------------------------------------- world block
-# One function holds the whole tick (docs/handoff/perf.md P3). A numba function that receives the KParams / KState
-# tuples (~270 arrays) and calls any other compiled function increments and decrements the reference count of every
-# array in them on entry and exit (numba's reference-count pruning cannot remove the pairs around a call): ~0.4 us
-# per call. The tick used to be ~15 such calls (_prepare_interval, _bias_step, _thermal_and_sensors, _heater_step,
-# _account, truth_row, eight _declared_line); now the tick's code lives in _world_block, which takes the tuples once
-# per block of ticks, and the helpers it calls take arrays. Only the controller edge (release_row, _edge, every
-# controller period), the auto-policy decision (_auto_h) and the oracle (every oracle period) still take the tuples.
+# The tick (docs/handoff/perf.md P3, R2-8, R2-11). A call that passes the KParams / KState tuples (~270 arrays) copies
+# every array struct (~0.4 us), so the tuples are taken once per block: _world_block takes them, makes this world's
+# views, tables and scratch arrays (it allocates; it runs with the numba runtime), and passes them to _world_loop,
+# the tick loop, whose helpers all take arrays (the controller edge, the auto-policy decision and the oracle
+# included: _release_a, _auto_h_a, _oracle_a; the tuple forms release_row, _auto_h, _oracle remain for callers
+# outside the kernel). _world_loop and the hot leaves it calls are compiled without the numba runtime
+# (_nrt=False): a function with the runtime increfs and decrefs every array it passes to a call, ~500 runtime calls
+# per tick here. Rules for a runtime-free function (tests/verification/test_kernel_parity.py
+# test_kernel_releases_every_array): it must not allocate (numba refuses to compile that); it must not call a
+# function that returns arrays (it would never release that reference; use inline="always" view helpers such as
+# _sh_blocks, _sh_out_blocks, optics._sh_core / _sh_outputs / selfheat_views); and a function with the runtime that
+# it calls must not make views of its arguments (numba 0.68 then leaks one reference per block, measured): such a
+# callee is made runtime-free too, or takes the views from its caller.
 @njit(cache=True)
 def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
-    """Advance world b from tick k0 by up to n_ticks ticks (module docstring). Returns the ticks advanced.
+    """Advance world b from tick k0 by up to n_ticks ticks (module docstring). Returns the ticks advanced. The setup
+    of the block (views, tables, scratch), then :func:`_world_loop`.
 
     Each step [k, k + h) (h = 1 at the fixed policy; a power of two at the auto policy, :func:`_auto_h`):
     controller edge (events of 07 P0-6 at instant k), then the interval inputs (commands latched at k, scenario at
@@ -1527,7 +1731,24 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
     th_gsplit = np.empty((th_npow, n_r))
     th_ok = np.zeros(th_npow, np.bool_)
     th_pre = np.empty(n_r)
-    th_hln, th_hlo, th_hself = _heater_split_tables(P.th_obs_ptr, P.th_lag_src, P.th_heater_obs, P.th_heater_src)
+    th_sums = np.empty(n_r)
+    th_pcross = np.empty(n_r)
+    # sources without input whose lags are all +0.0 stay so and are skipped while that lasts (perf.md R2-5)
+    th_dead = np.empty(P.th_src_scale.shape[0], np.bool_)
+    th_ndead = _th_dead_init(x_th, P.th_lag_src, P.th_lag_kind, P.th_src_scale.shape[0], th_dead)
+    th_exo_buf = np.empty(2 * th_idx_exo.shape[0], np.int64)
+    th_obs_end = np.empty(P.th_obs_ptr.shape[0] - 1, np.int64)
+    th_nexo = _th_live(th_dead, P.th_lag_src, P.th_obs_ptr, th_idx_exo, th_exo_buf, th_obs_end)
+    th_exo = th_exo_buf[:2 * th_nexo]
+    th_hs_max = 0
+    for n in range(n_r):
+        th_hs_max = max(th_hs_max, P.th_obs_ptr[P.th_heater_obs[n] + 1] - P.th_obs_ptr[P.th_heater_obs[n]])
+    th_hs_tab = np.empty(2 * th_hs_max * n_r, np.int64)
+    th_hln = _heater_split_fill(P.th_obs_ptr, th_obs_end, P.th_lag_src, P.th_heater_obs, P.th_heater_src, th_hs_tab)
+    # per-lag coefficient tables (a, c0, c1, w) per substep power, index pairs, source inputs side by side (R2-9)
+    th_coef = np.empty((th_npow, 4 * th_a.shape[1]))
+    th_ms_cross, th_opt_tab = _th_tables(th_idx_cross, P.th_opt_lags, P.th_lag_src, P.th_lag_obs, P.th_src_ring)
+    th_uu = np.empty(2 * u0.shape[0])
     fact = S.fact[b]
     # bias DAC
     bi_code_max = (1 << P.bi_bits) - 1
@@ -1559,25 +1780,92 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
     ts_in = S.ts_in[b]
     mo_lat = _row(P.mo_lat, b)
     mo_pw = P.mo_pw[b]
+    en_b = np.empty(n_l, np.bool_)                 # laser line enable of the step (no allocation per tick)
+    truth_ws = np.empty((3, n_r))                  # scratch of _truth_a
+    # controller edge: this world's controller state, obs/act vectors and pipeline
+    c_pi = _row(S.c_pi, b)
+    c_pf = _row(S.c_pf, b)
+    c_si = S.c_si[b]
+    c_sf = S.c_sf[b]
+    c_obs = S.obs[b]
+    c_act = S.act[b]
+    c_sat = S.sat[b]
+    pipe_vals = S.pipe_vals[b]
+    pipe_ticks = S.pipe_ticks[b]
+    pipe_meta = S.pipe_meta[b]
+    key_sched = P.key_sched[b]
     rec_db = False                                 # a record reads er_db / il_db (else Truth skips their log10)
     for r in range(P.rec_i.shape[0]):
         if P.rec_i[r, 0] == TR_ER or P.rec_i[r, 0] == TR_IL:
             rec_db = True
+    return _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, rf, ri, r8, rbb, lf, wi, wf,
+                       tv, args_f, args_i, p_in, p1, tref, s0v, betav, phi0r, phi1r, a0, a1, e0, e1, k2t, k2d, trt,
+                       dpl, out_rl, out_r, o_fwhm, fwhm_b, v0, v1, vp, sc_comp_f, sc_tab, sc_keys, sc_cache,
+                       o_creset, o_en, o_df, o_pd, o_loss, o_dn, o_td, o_sw, o_de, o_bo, o_bv, o_fd, o_fs, o_fa,
+                       o_fg, o_ag, o_tb, o_xpu, swing, tin, rp, jt_dn, jt_al, jt_c, jt_rs, jt_cum, rp_fill, rp_len,
+                       ph_ws, jx, u0, u1, x_th, t_obs, th_g, th_a, th_c0, th_c1, th_idx_exo, th_idx_ax, th_unit,
+                       th_hs_lo, th_hs_hi, th_w, th_gobs, th_gsplit, th_ok, th_pre, th_sums, th_pcross, th_dead,
+                       th_ndead, th_exo_buf, th_obs_end, th_nexo, th_exo, th_hs_tab, th_hln, th_coef, th_ms_cross,
+                       th_opt_tab, th_uu, fact, bi_code_max, bi_vmin, bi_vmax, bi_bit_err, bi_bow, bi_noise, bi_key,
+                       bi_lat, bi_fifo, bi_slew, bi_settle, he_full, he_law, he_bit_err, he_bow, he_lat, he_fifo,
+                       he_slew, he_settle, assign, r2l, link_t, oma_sens, nts, ts_in, mo_lat, mo_pw, en_b,
+                       truth_ws, c_pi, c_pf, c_si, c_sf, c_obs, c_act, c_sat, pipe_vals, pipe_ticks, pipe_meta,
+                       key_sched, rec_db)
+
+
+@njit(cache=True, _nrt=False)
+def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, rf, ri, r8, rbb, lf, wi, wf, tv,
+                args_f, args_i, p_in, p1, tref, s0v, betav, phi0r, phi1r, a0, a1, e0, e1, k2t, k2d, trt, dpl, out_rl,
+                out_r, o_fwhm, fwhm_b, v0, v1, vp, sc_comp_f, sc_tab, sc_keys, sc_cache, o_creset, o_en, o_df, o_pd,
+                o_loss, o_dn, o_td, o_sw, o_de, o_bo, o_bv, o_fd, o_fs, o_fa, o_fg, o_ag, o_tb, o_xpu, swing, tin,
+                rp, jt_dn, jt_al, jt_c, jt_rs, jt_cum, rp_fill, rp_len, ph_ws, jx, u0, u1, x_th, t_obs, th_g, th_a,
+                th_c0, th_c1, th_idx_exo, th_idx_ax, th_unit, th_hs_lo, th_hs_hi, th_w, th_gobs, th_gsplit, th_ok,
+                th_pre, th_sums, th_pcross, th_dead, th_ndead, th_exo_buf, th_obs_end, th_nexo, th_exo, th_hs_tab,
+                th_hln, th_coef, th_ms_cross, th_opt_tab, th_uu, fact, bi_code_max, bi_vmin, bi_vmax, bi_bit_err,
+                bi_bow, bi_noise, bi_key, bi_lat, bi_fifo, bi_slew, bi_settle, he_full, he_law, he_bit_err, he_bow,
+                he_lat, he_fifo, he_slew, he_settle, assign, r2l, link_t, oma_sens, nts, ts_in, mo_lat, mo_pw, en_b,
+                truth_ws, c_pi, c_pf, c_si, c_sf, c_obs, c_act, c_sat, pipe_vals, pipe_ticks, pipe_meta,
+                key_sched, rec_db):
+    """The tick loop of :func:`_world_block` (its setup passes every view, table and scratch array). Compiled
+    without the numba runtime: a function with the runtime increfs and decrefs every array it passes to a call
+    (~500 runtime calls per tick here); this one creates views and calls leaves without any (it allocates
+    nothing; the setup does). docs/handoff/perf.md R2-11."""
     k = k0
     k_end = k0 + n_ticks
     first = True
     while k < k_end:
-        # --- controller edge (07 P0-6 event order steps 1-4; takes the tuples, once per controller period)
+        # --- controller edge (07 P0-6 event order steps 1-4; once per controller period), on this world's arrays:
+        #     a call that takes the KParams/KState tuples copies ~270 array structs (~0.4 us each;
+        #     docs/handoff/perf.md R2-8)
         if first and resume != 0:
             # Python path: obs of edge k was packed by the previous call and the Python step wrote S.act
-            _push_act(P, S, b, k)
-            _advance_edge(P, S, b)
+            _push_act_a(c_act, P.act_map, c_sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, P.ctrl_latency)
+            _advance_edge_a(wi, P.phase, P.period, P.jitter, key_sched)
         else:
             if P.fast_on != 0:
-                _fast_tick(fast_fn, P, S, b, k)
+                _fast_tick_a(fast_fn, k, n_r, mo_lat, S.fobs[b], ri, S.mo_fv[b], S.mo_fr[b], S.mo_fm[b], c_pi, c_pf,
+                             c_si, c_sf, fact, wi)
             if k == wi[WI_EDGE_NEXT]:
-                if _edge(step_fn, P, S, b, k, mode):
+                _release_a(k, n_r, mo_lat, S.mo_fv[b], S.mo_fr[b], S.mo_fm[b], S.mo_samples[b], S.mo_ticks[b], rf, ri,
+                           rbb, wi, S.ts_fv[b], S.ts_fr[b], S.ts_fm[b], S.ts_latest[b], S.ts_new[b], P.rb_on,
+                           S.rb_fv[b], S.rb_fr[b], S.rb_fm[b], S.dp_fv[b], S.dp_fr[b], S.dp_fm[b], args_f, args_i,
+                           P.mo_pr[b], mo_pw, P.mo_pga, P.mo_shot, P.dp_bs_tau, P.dp_bs_stia, P.dp_rin[b],
+                           P.dp_win_bits, P.dp_mode, P.dp_words, P.dp_pre, P.dp_period, P.dp_key_dp[b], c_obs,
+                           P.obs_map)
+                if mode == MODE_PYTHON:
+                    wi[WI_PENDING_EDGE] = k
                     return k - k0
+                if mode == MODE_COMPILED:
+                    if wi[WI_CTRL_RESET] != 0:                     # scenario fault.controller_reset: init state
+                        for i in range(c_si.shape[0]):
+                            c_si[i] = S.c_si0[b, i]
+                        for i in range(c_sf.shape[0]):
+                            c_sf[i] = S.c_sf0[b, i]
+                        _sync_act_a(c_act, P.act_map, ri[RI_HE_REG], ri[RI_BI_REG])
+                        wi[WI_CTRL_RESET] = 0
+                    step_fn(c_pi, c_pf, c_si, c_sf, c_obs, c_act)
+                    _push_act_a(c_act, P.act_map, c_sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, P.ctrl_latency)
+                _advance_edge_a(wi, P.phase, P.period, P.jitter, key_sched)
         first = False
         # --- commands latched at k (07 P0-6 step 4)
         for n in range(n_r):
@@ -1613,7 +1901,8 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
                 lf[LF_PDB_POW, l] = 10.0 ** (pdb / 10.0)
             lf[LF_PS, l] = lf[LF_PDB_POW, l] * ef
             lf[LF_TUNE_HZ, l] = S.tune[b, l] * P.las_tune_lsb
-        en_b = lf[LF_EN_B] > 0.5
+        for l in range(n_l):
+            en_b[l] = lf[LF_EN_B, l] > 0.5
         laser_tick_row(k, P.dt, P.las_tcomp, P.las_grid_s, P.las_depth, P.las_f0[b], P.las_p0[b], P.las_frate[b],
                        P.las_prate[b], P.las_frw[b], P.las_prw[b], P.las_rho_f[b], P.las_rho_p[b], P.las_module,
                        P.las_nmod, P.las_rin[b], en_b, lf[LF_DF], lf[LF_PS], lf[LF_TUNE_HZ], P.las_key_drift[b],
@@ -1766,7 +2055,11 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
         # --- substep length h (07 P0-10): 1 at the fixed policy; the auto rules otherwise
         h = np.int64(1)
         if P.policy == POLICY_AUTO:
-            h = _auto_h(P, S, b, k, k_end)
+            h = _auto_h_a(k, k_end, n_r, P.fast_on, P.au_max_pow, P.reset_protocol, P.ramp_ticks, P.oracle_on,
+                          P.he_ripple, P.bi_noise_per, bi_noise, P.au_max_det, P.au_pabs_tol, wi, wf, ri, r8, rf, rbb,
+                          pipe_meta, pipe_ticks, he_fifo, bi_fifo, P.sc_sig_i, P.sc_sig_f, P.sc_def, P.sc_comp,
+                          P.sc_comp_i, sc_comp_f, sc_tab, sc_keys, sc_cache, vp, v0, v1, S.sc_va[b], P.rec_i,
+                          S.rec_idx[b], S.rec_cnt[b], P.mp_i, S.m_ai[b])
         pw2 = 0
         n_outer = P.sh_n_outer
         if h > 1:
@@ -1786,7 +2079,9 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
         if not th_ok[pw2]:
             _th_gains(tc0, tc1, P.th_lag_src, P.th_lag_kind, P.th_obs_ptr, P.th_heater_obs, P.th_heater_src,
                       P.th_src_scale, th_w[pw2], th_gobs[pw2], th_gsplit[pw2])
+            _th_coef(ta, tc0, tc1, th_w[pw2], th_coef[pw2])
             th_ok[pw2] = True
+        tcoef = th_coef[pw2]
         for n in range(n_r):
             rf[RF_LAMRES_PREV, n] = tv[TR_LAM_RES, n]
             rf[RF_PABS_PREV, n] = rf[RF_P_ABS, n]
@@ -1795,8 +2090,20 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
         t_base_end = v1[o_tb] + v1[o_xpu]
         wf[WF_T_BASE1] = t_base_end
         # --- heater: implicit TCR split on the heater-resistor observer (07 P1-2), then the DAC path
-        _heater_split_all(x_th, ta, tc0, tc1, P.th_lag_src, P.th_obs_ptr, P.th_heater_obs, P.th_heater_src, th_hs_lo,
-                          th_hs_hi, th_unit, u0, u1, P.th_src_scale, th_hln, th_hlo, th_hself, th_pre)
+        if th_ndead > 0 and _th_wake(th_dead, u0, u1):
+            # a dead source received an input: its lags (still exactly +0.0) are live again from here on
+            th_ndead = 0
+            for s in range(th_dead.shape[0]):
+                if th_dead[s]:
+                    th_ndead += 1
+            th_nexo = _th_live(th_dead, P.th_lag_src, P.th_obs_ptr, th_idx_exo, th_exo_buf, th_obs_end)
+            th_exo = th_exo_buf[:2 * th_nexo]
+            th_hln = _heater_split_fill(P.th_obs_ptr, th_obs_end, P.th_lag_src, P.th_heater_obs, P.th_heater_src,
+                                        th_hs_tab)
+        _uu_fill(u0, u1, th_uu)
+        _heater_split_all(x_th, ta, tc0, tc1, P.th_lag_src, P.th_obs_ptr, th_obs_end, P.th_heater_obs,
+                          P.th_heater_src, th_hs_lo, th_hs_hi, th_unit, u0, u1, P.th_src_scale, th_hln, th_hs_tab,
+                          tcoef, th_uu, th_sums, th_pre)
         for n in range(n_r):
             rf[RF_HE_TPRE, n] = t_base_end + th_pre[n]
             rf[RF_HE_G, n] = th_gsplit[pw2, n]
@@ -1844,14 +2151,26 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
             sh = P.th_heater_src[n]
             u0[sh] = rf[RF_HE_P, n]
             u1[sh] = rf[RF_HE_P, n]
+        # the last step of the block (the block returns after it): the optics commit every output there (Plant.truth
+        # and the parity read them after the block); before it only the outputs a tick reads (perf.md R2-3)
+        last_step = k + h >= k_end or (mode == MODE_PYTHON and k + h >= wi[WI_EDGE_NEXT])
         # --- implicit thermal + self-heating step (07 P0-1); the optics walk runs inside (commit_fn)
+        if th_ndead > 0 and _th_wake(th_dead, u0, u1):
+            th_ndead = 0
+            for s in range(th_dead.shape[0]):
+                if th_dead[s]:
+                    th_ndead += 1
+            th_nexo = _th_live(th_dead, P.th_lag_src, P.th_obs_ptr, th_idx_exo, th_exo_buf, th_obs_end)
+            th_exo = th_exo_buf[:2 * th_nexo]
+            th_hln = _heater_split_fill(P.th_obs_ptr, th_obs_end, P.th_lag_src, P.th_heater_obs, P.th_heater_src,
+                                        th_hs_tab)
         if P.self_heating != 0:
-            nf = _implicit_step_eng(x_th, ta, tc0, tc1, P.th_lag_src, P.th_lag_obs, P.th_lag_kind, P.th_opt_lags,
-                                    P.th_obs_ptr, P.th_src_ring, P.th_ring_obs, P.bus_order, u0, u1, P.th_src_scale,
+            _uu_fill(u0, u1, th_uu)
+            nf = _implicit_step_eng(x_th, tcoef, th_uu, th_exo, th_ms_cross, th_idx_ax, th_opt_tab, P.th_lag_obs,
+                                    P.th_obs_ptr, th_obs_end, P.th_ring_obs, P.bus_order, P.th_src_scale, th_unit,
                                     t_base_end, rf[RF_P_PREV], rf[RF_T_BRANCH], args_f, args_i, rf[RF_PMAX],
                                     rf[RF_D2P], P.sh_max_iter, P.sh_tol, n_outer, th_g, t_obs, rf[RF_P_NEW],
-                                    rf[RF_T_NEW], ri[RI_N_ITER], th_w[pw2], th_gobs[pw2], th_idx_exo,
-                                    th_idx_cross, th_idx_ax, th_unit)
+                                    rf[RF_T_NEW], ri[RI_N_ITER], th_gobs[pw2], last_step, th_pcross)
             wi[WI_N_FAIL] += nf
             for n in range(n_r):
                 wi[WI_SH_ITER] += ri[RI_N_ITER, n]
@@ -1859,10 +2178,7 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
                 rf[RF_T_BRANCH, n] = rf[RF_T_NEW, n]
                 rf[RF_T_RING, n] = rf[RF_T_NEW, n]
         else:
-            vv = _op.selfheat_views(args_f, args_i)
-            _op.bus_propagate_nb(vv[0], P.bus_order, vv[1], vv[2][0], vv[3], vv[4], vv[5], vv[8], vv[9], vv[10],
-                                 vv[11], vv[12], vv[13], vv[14], vv[15], vv[20], vv[16], args_i[_op.SH_TWO] != 0,
-                                 P.use_tcmt != 0, P.m_orders, False, vv[22], vv[23], vv[24], vv[21], vv[25], vv[26])
+            _bus_walk(args_f, args_i, P.bus_order, P.use_tcmt, P.m_orders)
             for n in range(n_r):
                 sw = P.th_wg_src[n]
                 if sw >= 0:
@@ -1947,12 +2263,13 @@ def _world_block(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S):
             _el.settle_advance_row(rf[RF_HE_UT], rf[RF_HE_YS], rf[RF_HE_YO], he_settle, P.dt, h - 1)
             _el.settle_advance_row(rf[RF_BI_VT], rf[RF_BI_YS], rf[RF_BI_YO], bi_settle, P.dt, h - 1)
         # --- Truth of the state at k + h
-        last_step = k + h >= k_end or (mode == MODE_PYTHON and k + h >= wi[WI_EDGE_NEXT])
         _truth_a(n_r, n_l, rf, ri, rbb, tv, lf, S.lt[b], t_base_end, args_f, args_i, P.mo_pw[b], P.mo_pr[b], rp, jx,
-                 fwhm_b, P.wrong_window, P.assign_mode, rec_db or last_step, True)
-        # --- oracle (on its period; takes the tuples)
+                 fwhm_b, P.wrong_window, P.assign_mode, rec_db or last_step, True, truth_ws)
+        # --- oracle (on its period)
         if P.oracle_on != 0 and k + h > wi[WI_ORACLE_NEXT]:
-            _oracle(P, S, b)
+            _oracle_a(n_r, rf, ri, args_f, args_i, S.or_phi[b], S.or_k2t[b], S.or_k2d[b], S.or_a[b], S.or_trt[b],
+                      S.or_psi[b], S.or_res0[b], S.or_res1[b], S.or_cw[b], S.or_fw[b], lf, rp, jx, fwhm_b,
+                      P.z_opt_self[b], P.use_tcmt, P.m_orders, P.lock_ref_mode, S.m_ref[b])
             wi[WI_ORACLE_NEXT] = k + P.oracle_period
             for n in range(n_r):
                 tv[TR_ORACLE, n] = rf[RF_ORACLE, n]

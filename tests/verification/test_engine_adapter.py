@@ -84,7 +84,7 @@ def test_engine_adapter_is_bit_identical(ovr):
                 po = op.selfheat_pabs(float(t), int(k), a_old, ai_slope)
                 assert pn[0] == po[0] and pn[1] == po[1], (b, k, t, pn, po)
             tc = float(ts[-1]) if q % 2 == 0 else float(t_ring[k] + 0.2)
-            K.eng_commit(tc, int(k), a_new, ai)
+            K.eng_commit(tc, int(k), a_new, ai, True)
             op.selfheat_commit(tc, int(k), a_old, ai_slope if q % 2 == 0 else ai)
             on, oo = _outputs(a_new, ai), _outputs(a_old, ai)
             for x, y in zip(on, oo):
@@ -319,3 +319,63 @@ def test_far_line_hold_error_is_within_its_bound(phase_step):
     assert frac > 0.5                                         # the hold is in use (14 of 16 lines are far in g26)
     assert worst_p <= 3e-9, worst_p
     assert worst_o <= 1e-6, worst_o
+
+
+def test_degenerate_row_raises_on_both_paths():
+    """A ring without coupling and without loss (K^2 = 0, a = 1) at resonance has den = 1 - 2 r cos(phi) + r^2 = 0:
+    the closed forms of the general path (_airy_line) and the Airy path (with or without the far-line hold) both raise
+    ZeroDivisionError there, explicitly (review of performance round 1, docs/handoff/perf.md section 6, item 4: the
+    Airy path returned inf/NaN; _airy_line raised or returned NaN depending on which caller's numba error model it
+    was first compiled and cached for). Every ring with r = t1 t2 a < 1 has den >= (1 - r)^2 > 0."""
+    plant, ref = _reference(n=5)
+    for hold in (0, 1):
+        ai = np.ascontiguousarray(ref.args_i[0]).copy()
+        ai[op.SH_FARHOLD] = hold
+        af = np.ascontiguousarray(ref.args_f[0]).copy()
+        k = int(np.asarray(plant.P.bus_order)[0])
+        v = op.selfheat_views(af, ai)
+        for row in (13, 14):                                  # K^2 through and drop
+            v[row][k, :] = 0.0
+        for row in (8, 9):                                    # round-trip amplitude, both levels
+            v[row][k, :] = 1.0
+        for row in (4, 5, 12):                                # reference phases and coupler phase: cos = 1
+            v[row][k, :] = 0.0
+        t = float(v[17][k])                                   # the reference temperature: no in-solve rotation
+        with pytest.raises(ZeroDivisionError):
+            op.selfheat_pabs(t, k, af, ai)
+        with pytest.raises(ZeroDivisionError):
+            op.selfheat_pabs_general(t, k, af.copy(), ai)
+
+
+def test_general_adapter_functions_match_the_airy_path():
+    """The independent general-path adapter functions (selfheat_pabs_general / selfheat_commit_general /
+    selfheat_bounds_general, which mrm.sim.kernel_ref.ReferenceEngine(airy=False) runs) against the Airy path on real
+    g26 rows: P_abs to 1e-11 relative, its slope to 1e-11 of P_abs per K, every committed output to 1e-11 of its
+    field's largest value, the bounds bit for bit (sh_bounds fuses the same expressions in the same order)."""
+    plant, ref = _reference(n=60)
+    order = np.asarray(plant.P.bus_order)
+    for b in range(plant.B):
+        ai = np.ascontiguousarray(ref.args_i[b]).copy()
+        a_air = np.ascontiguousarray(ref.args_f[b]).copy()
+        a_gen = a_air.copy()
+        N = plant.N
+        bn = [np.zeros(N) for _ in range(3)]
+        bo = [np.zeros(N) for _ in range(3)]
+        op.selfheat_bounds(a_air, ai, 3.0, *bn)
+        op.selfheat_bounds_general(a_gen, ai, 3.0, *bo)
+        for x, y in zip(bn, bo):
+            np.testing.assert_array_equal(x, y)
+        t_ring = ref.t_ring[b]
+        for q, k in enumerate(order):
+            for t in (t_ring[k] - 0.2, t_ring[k], t_ring[k] + 1e-4, t_ring[k] + 0.5):
+                pa = op.selfheat_pabs(float(t), int(k), a_air, ai)
+                pg = op.selfheat_pabs_general(float(t), int(k), a_gen, ai)
+                np.testing.assert_allclose(pa[0], pg[0], rtol=1e-11, atol=0)
+                # the slope sums terms of both signs: relative to |P_abs| per K
+                np.testing.assert_allclose(pa[1], pg[1], rtol=1e-11, atol=1e-11 * abs(pg[0]))
+            tc = float(t_ring[k] + 1e-4)
+            op.selfheat_commit(tc, int(k), a_air, ai)
+            op.selfheat_commit_general(tc, int(k), a_gen, ai)
+            for x, y in zip(_outputs(a_air, ai), _outputs(a_gen, ai)):
+                scale = np.max(np.abs(y), axis=tuple(range(1, y.ndim)), keepdims=True)
+                np.testing.assert_array_less(np.abs(x - y), np.broadcast_to(1e-11 * scale + 1e-300, x.shape))

@@ -160,13 +160,13 @@ class PhaseParams:
                    r_series=np.ascontiguousarray(tab.r_series_ohm_m))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def thermal_shift_m(t_k, t_ref_k, s0, beta, t0):
     """R1 resonance shift (m) from T_ref to T: s0 [(T - T_ref) + beta ((T - T0)^2 - (T_ref - T0)^2)/2]."""
     return s0 * ((t_k - t_ref_k) + 0.5 * beta * ((t_k - t0) ** 2 - (t_ref_k - t0) ** 2))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def local_thermo_optic(t_prev_k, s0, beta, t0):
     """(s_local, beta_local) of R1 expanded about t_prev: s(t_prev) = s0 (1 + beta (t_prev - T0)) and
     beta / (1 + beta (t_prev - T0)), so s_local [dT + beta_local dT^2/2] = F(t_prev + dT) - F(t_prev) exactly.
@@ -186,7 +186,7 @@ def resonance_shift_row(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, ou
                        out_flags, np.empty(rp.shape[0]))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def resonance_shift_ws(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, out_shift, out_fal, out_cj, out_rs,
                        out_flags, fdn):
     """:func:`resonance_shift_row` with the scratch fdn (N,) passed in (no allocation per call)."""
@@ -205,7 +205,7 @@ def _loss_temperature_factor(rp, k, t_ring, t_heater):
     return math.exp(rp[k, RP_CT_RING] * (t_ring - t_ref) + rp[k, RP_CT_HEATER] * (t_heater - t_ref))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _fill_level(rp, k, lam_l, shift, fal, tfac, out_phi, out_a, out_eta, out_trt, with_trt):
     """Phases, loss, heat fraction (and group delay) of ring k at one level; tfac = _loss_temperature_factor."""
     lam_r = rp[k, RP_LAM_RES]
@@ -246,7 +246,7 @@ def ring_optics_levels_row(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab
                           np.empty((6, rp.shape[0])))
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def ring_optics_levels_ws(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab,
                           out_phi0, out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_trt, out_shift, out_cj, out_rs,
                           out_flags, ws):
@@ -273,7 +273,7 @@ def ring_optics_levels_ws(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab,
                 _fill_level(rp, k, lam_l, shift[k], fal[k], tf[k], out_phi1, out_a1, out_eta1, out_trt, False)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def coupling_row(rp, lam_l, out_k2t, out_k2d):
     """Per-pass K^2 of the through and drop couplers at every line (equation 4; 07 P1-5): a function of the line
     wavelengths and the ring constants only, so a caller may skip it while lam_l is unchanged (the kernel does)."""

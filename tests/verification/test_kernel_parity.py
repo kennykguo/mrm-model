@@ -253,3 +253,112 @@ def test_kernel_is_disk_cacheable():
     for chunk in K._RUN_CHUNKS.values():
         for cres in chunk.overloads.values():
             assert not cres.library.has_dynamic_globals
+
+
+def test_parity_against_independent_optics():
+    """The bit-for-bit parity above runs the reference with the engine's own Airy path of the self-heating optics
+    (shared code, mrm.plant.optics sh_fast_*), so it does not check that path against an independent implementation
+    (review of performance round 1, docs/handoff/perf.md section 6, item 4). Here the reference runs the general ring
+    kernels instead (ReferenceEngine(airy=False): the closed forms of _airy_line and the separate bound kernels), and
+    the engine agrees with it to floating-point rounding: every Truth field within 1e-9 of the field's largest value
+    (measured ~1e-11; the Newton root tolerance is 1e-7 K), every heater code, order and line identical, and the
+    controller observations (ADC codes) of the last edge identical."""
+    n = 400
+    cfg, spec, plant = _setup(n_ticks=n)
+    ref = ReferenceEngine(plant, airy=False)
+    ref.run(n)
+    plant.advance(None, n)
+    tr = plant.traces()
+    exact = ("heater_code", "order", "line_on", "declared_line")
+    for f in COMPARED:
+        k = tr[f"{f}@1:last"]["value"]
+        r = ref.stacked(f)
+        if f in exact:
+            np.testing.assert_array_equal(k, r, err_msg=f)
+            continue
+        scale = np.max(np.abs(r[np.isfinite(r)])) if np.isfinite(r).any() else 0.0
+        np.testing.assert_allclose(k, r, rtol=0, atol=1e-9 * scale + 1e-300, err_msg=f)
+    np.testing.assert_array_equal(ref.obs_log[max(ref.obs_log)], plant.S.obs)
+
+
+
+@njit(cache=True)
+def _fast_count(p, pf, s, sf, fobs, fact):
+    n = fobs[1]
+    for i in range(n):
+        if fobs[2 + i] != 0:
+            s[i] += 1
+            fact[i] = 40 if s[i] % 2 == 0 else -40
+
+
+def _refcounts(pl):
+    return [sys.getrefcount(a) for a in (*pl.P, *pl.S) if isinstance(a, np.ndarray)]
+
+
+@pytest.mark.parametrize("ovr,plant_kw", [
+    ((), {}),                                                       # Airy path, oracle every 50 ticks
+    ((), {"substep_policy": "auto"}),                               # auto policy (_auto_h_a)
+    (('fidelity.backscatter="on"', "fidelity.optics_model=tcmt"), {}),   # the general optics path
+    (('fidelity.self_heating="off"',), {}),                        # explicit bus pass
+], ids=["airy", "auto", "tcmt_backscatter", "selfheat_off"])
+def test_kernel_releases_every_array(ovr, plant_kw):
+    """The tick loop and the hot leaves are compiled without the numba runtime (docs/handoff/perf.md R2-11). Such a
+    function must not allocate (numba refuses to compile that) and must not call a function that returns an array:
+    it would never release that reference, and the plant's arrays would outlive the Plant. A function with the
+    runtime called from it must not create views of its arguments either (measured: numba 0.68 then leaks one
+    reference per block). Every KParams / KState array keeps its Python reference count over blocks of ticks: open
+    loop (oracle every 50 ticks), with a compiled controller (edges, the controller step), with a Python controller
+    (the kernel stops and resumes at every edge) and with a fast_kernel, and over Truth."""
+    n = 300
+    cfg, spec, plant = _setup(n_ticks=n, ovr=ovr, plant_kw=plant_kw)
+    plant.advance(None, 20)                                         # compile and warm up
+    before = _refcounts(plant)
+    plant.advance(None, n)
+    plant.truth()
+    assert _refcounts(plant) == before
+    if plant_kw or ovr:
+        return
+    cfg, spec, plant = _setup(n_ticks=n, plant_kw={"fast_kernel": True})
+    c = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3], fast_fn=_fast_count)
+    c.reset(spec)
+    plant.bind_compiled(c)
+    plant.run(20, mode=K.MODE_COMPILED, step_fn=c.step_fn, fast_fn=c.fast_fn)
+    before = _refcounts(plant)
+    plant.run(n, mode=K.MODE_COMPILED, step_fn=c.step_fn, fast_fn=c.fast_fn)
+    assert _refcounts(plant) == before
+    assert int(plant.S.wi[0, K.WI_FAST_CALLS]) > 0
+    cfg, spec, plant = _setup(n_ticks=n, lat=1)
+    py = PyStair()
+    py.reset(spec)
+    _run_python(plant, py, spec, 20, None)
+    before = _refcounts(plant)
+    _run_python(plant, py, spec, n, None)
+    assert _refcounts(plant) == before
+
+
+@pytest.mark.parametrize("ovr", [(), ('fidelity.backscatter="on"',)], ids=["airy", "backscatter"])
+def test_full_optics_outputs_after_every_block(ovr):
+    """docs/handoff/perf.md R2-3: inside a block the engine commits only the optics outputs a tick reads, and the last
+    step of every block commits in full. After every block, every optics output (out_rl, out_r, out_l, also the
+    fields no tick reads: RL_DROP, RL_REFL, RL_UCW, RL_DABS_DPHI, R_LOSS_SUM, R_DABS_DLAM, L_REFL_IN, L_BOUND, ...)
+    must equal the reference's (which commits in full at every step) bit for bit, for blocks of irregular length
+    (1 tick to 64 ticks; Plant.truth() reads these arrays after a block). The one known difference: with backscatter
+    (the general path) the engine also writes the slope outputs RL_DABS_DPHI / R_DABS_DLAM, which the optics adapter
+    the reference runs leaves at zero (kernel.py, comment above EXT_I); they are compared on the Airy path only."""
+    from mrm.plant import optics as op
+    blocks = (1, 2, 7, 13, 1, 64, 3, 29)
+    cfg, spec, plant = _setup(n_ticks=sum(blocks), ovr=ovr)
+    ref = ReferenceEngine(plant)
+    general = bool(ovr)
+    for m in blocks:
+        ref.run(m)
+        plant.advance(None, m)
+        for b in range(plant.B):
+            vk = op.selfheat_views(plant.S.sh_args_f[b], plant.P.sh_args_i[b])
+            vr = op.selfheat_views(ref.args_f[b], ref.args_i[b])
+            for i, name, skip in ((22, "out_rl", op.RL_DABS_DPHI), (23, "out_r", op.R_DABS_DLAM), (24, "out_l", -1)):
+                for f in range(vk[i].shape[0]):
+                    if general and f == skip:
+                        continue
+                    np.testing.assert_array_equal(vk[i][f], vr[i][f],
+                                                  err_msg=f"{name}[{f}] after a block of {m} ticks (world {b})")

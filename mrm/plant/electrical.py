@@ -106,6 +106,7 @@ JUNCTION_GRID_V_MIN = -0.5   # contract, ARCHITECTURE 5.4 and 07 P1-7: grid from
 JUNCTION_GRID_V_MAX = 4.0    # ... to 4.0 V reverse
 
 _NEVER = -(1 << 62)  # "last update" tick before any update: makes the first register write always pass
+_U = np.uint64       # unsigned index cast of the per-tick lookups (no negative-index wraparound; perf.md R2-1)
 
 
 # ============================================================================================ small helpers
@@ -115,7 +116,7 @@ def _ix(a, i):
     return i if a.shape[0] > 1 else 0
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def dac_frac(code, n_bits, err_row, bow_lsb):
     """Endpoint-referenced transfer of a binary-weighted DAC: integer code -> fraction of full scale in [0, 1].
 
@@ -148,7 +149,7 @@ def _pwm_high_clocks(c, d, period_clocks):
 
 
 # ============================================================================================ register and FIFO
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def latch_row(cmd, cmd_valid, reg, pending, has_pending, last_update, tick, min_update_ticks, code_lo, code_hi):
     """DAC register latch for one world (07 P0-6 item 4; P1-10 dac_max_update_hz).
 
@@ -173,7 +174,7 @@ def latch_row(cmd, cmd_valid, reg, pending, has_pending, last_update, tick, min_
             has_pending[n] = 0
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def fifo_row(reg, fifo, tick, latency_ticks, out_code):
     """DAC latency FIFO for one world: out_code(k) = reg(k - latency_ticks), exactly (07 P0-6 item 5).
 
@@ -213,7 +214,7 @@ def heater_target_row(code, law, bits, pwm_bits, bit_err, bow, pwm_ripple, tick,
         out_ripple[n] = rip
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def heater_target_one(c, law, bits, pwm_bits, er, bw, pwm_ripple, tick, dt_clk):
     """One channel of :func:`heater_target_row`: (u, ripple) for code c, bit errors er (K,) and bow bw (LSB). Without
     the PWM ripple the result depends on the code alone (a caller may keep it while the code holds)."""
@@ -247,7 +248,7 @@ def bias_target_row(code, bits, bit_err, bow, v_min, v_max, out_v):
                                    v_max[_ix(v_max, n)])
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def bias_target_one(c, bits, er, bw, lo, hi):
     """One channel of :func:`bias_target_row` (a function of the code alone)."""
     return lo + (hi - lo) * dac_frac(c, bits, er, bw)
@@ -262,7 +263,7 @@ def _x_plus_expm1_neg(x):
     return x + math.expm1(-x)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def slew_settle_row(target, y_slew, y_out, rate, tau, dt, out_avg):
     """Slew limit, then first-order settle filter, solved exactly over one tick (07 P0-6 item 5).
 
@@ -321,7 +322,7 @@ def slew_settle_row(target, y_slew, y_out, rate, tau, dt, out_avg):
         out_avg[n] = integ / dt
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def actuator_quiescent_row(reg, has_pending, fifo, y_slew, y_out, target, tol):
     """True when every ring's actuator path is at rest, so that P0-10 multi-tick stepping may skip ticks.
 
@@ -343,7 +344,7 @@ def actuator_quiescent_row(reg, has_pending, fifo, y_slew, y_out, target, tol):
     return True
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def settle_advance_row(target, y_slew, y_out, tau, dt, n_ticks):
     """Exact advance of the settle filter over n_ticks ticks with a constant, already-reached slew target:
     y <- target + (y - target) * exp(-n_ticks*dt/tau)  (tau <= 0: y <- target)."""
@@ -370,7 +371,7 @@ def _p_from_v2(v2, r_o, k):
     return 2.0 * v2 / (r_o + math.sqrt(disc)), 0
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False, inline="always")
 def heater_power_row(u, law, t_pre, g_self, r0, alpha, t0, v_fs, i_fs, p_fs, v_comp,
                      out_p, out_v, out_i, out_r, out_flags):
     """Driver law with the heater TCR, for one world (07 P1-11, P1-2 bullet 3, P1-10 compliance; 06 E1).
@@ -478,7 +479,7 @@ def heater_power_row(u, law, t_pre, g_self, r0, alpha, t0, v_fs, i_fs, p_fs, v_c
         out_flags[n] = out_flags[n] | fl
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def supply_limit_row(p, v, i, p_max, i_max, flags):
     """Array heater supply limit for one world (07 P1-12): clip and flag.
 
@@ -645,7 +646,7 @@ def bias_bank_step(tick, cmd, cmd_valid,
 
 
 # ============================================================================================ NRZ levels
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def nrz_levels_row(v_bias, swing_vpp, mode, v_floor, v_ceil, out_lo, out_hi, out_flags):
     """Junction reverse voltage of the two NRZ levels for one world (07 P1-7; forward bias is negative).
 
@@ -699,22 +700,23 @@ def grid_index(x, grid):
     else the binary search. The same index without the ~9-step search on the 10 mV junction grid (docs/handoff/perf.md
     P10)."""
     g = grid.shape[0]
-    span = grid[g - 1] - grid[0]
+    span = grid[_U(g - 1)] - grid[0]
     j = np.int64(0)
     if span > 0.0:
         u = (x - grid[0]) * ((g - 1) / span)
         if u > 0.0:
             j = np.int64(u) if u < g - 2 else np.int64(g - 2)
-    if grid[j] < x and x <= grid[j + 1]:
+    # (j >= 0 here: unsigned indices, no wraparound code; docs/handoff/perf.md R2-1)
+    if grid[_U(j)] < x and x <= grid[_U(j + 1)]:
         return j
-    if j + 2 < g and grid[j + 1] < x and x <= grid[j + 2]:
+    if j + 2 < g and grid[_U(j + 1)] < x and x <= grid[_U(j + 2)]:
         return j + 1
-    if j >= 1 and grid[j - 1] < x and x <= grid[j]:
+    if j >= 1 and grid[_U(j - 1)] < x and x <= grid[_U(j)]:
         return j - 1
     return np.int64(np.searchsorted(grid, x) - 1)
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def _interp_lin(x, grid, col):
     """Linear interpolation on an increasing grid; outside it the end value is held. Returns (value, clipped).
     A NaN input returns (NaN, True), so it is flagged instead of indexing past the end of the grid."""
@@ -726,8 +728,10 @@ def _interp_lin(x, grid, col):
     if x >= grid[g - 1]:
         return col[g - 1], x > grid[g - 1]
     j = grid_index(x, grid)
-    w = (x - grid[j]) / (grid[j + 1] - grid[j])
-    return col[j] + w * (col[j + 1] - col[j]), False
+    gj = grid[_U(j)]
+    w = (x - gj) / (grid[_U(j + 1)] - gj)
+    cj = col[_U(j)]
+    return cj + w * (col[_U(j + 1)] - cj), False
 
 
 @njit(cache=True, inline="always")
@@ -741,7 +745,8 @@ def _interp_bracket(x, grid):
     if x >= grid[g - 1]:
         return np.int64(-1), 0.0, x > grid[g - 1]
     j = grid_index(x, grid)
-    return j, (x - grid[j]) / (grid[j + 1] - grid[j]), False
+    gj = grid[_U(j)]
+    return j, (x - gj) / (grid[_U(j + 1)] - gj), False
 
 
 @njit(cache=True, inline="always")
@@ -751,7 +756,8 @@ def _interp_at(x, j, w, grid, col):
         return np.nan
     if j < 0:
         return col[0] if x <= grid[0] else col[grid.shape[0] - 1]
-    return col[j] + w * (col[j + 1] - col[j])
+    cj = col[_U(j)]
+    return cj + w * (col[_U(j + 1)] - cj)
 
 
 @njit(cache=True)
@@ -791,7 +797,7 @@ def _integ_lin(a, b, grid, col):
     return sgn * total
 
 
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def junction_eval_row(v, grid, dneff_col, alpha_col, c_col, rs_col, fill, length_m,
                       out_dneff, out_alpha, out_c_f, out_rs_ohm, out_flags):
     """Junction LUT lookup for one world, scaled to the ring (ARCHITECTURE 5.4; 07 P1-7).
@@ -870,7 +876,7 @@ def junction_swing_capacitance(v_lo, v_hi, grid, c_tab, fill, length_m, out_c_ef
 
 
 # ============================================================================================ data-activity heat
-@njit(cache=True)
+@njit(cache=True, _nrt=False)
 def data_activity_heat_row(c_eff, swing_vpp, bitrate_hz, transition_density, enable, r_s, r_drv,
                            p_static_w, e_tr_j, add_load_share, out_pj, out_pd):
     """Data-activity heat for one world (07 P1-8; docs/research/03 section 6.2).

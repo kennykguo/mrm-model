@@ -60,10 +60,22 @@ def _cold_x(rp_row, x0, target):
 class ReferenceEngine:
     """NumPy reference of B worlds of a Plant (module docstring). ``step(controller)`` advances one tick;
     ``run(n, controller)`` advances n ticks. Per-tick traces of Truth are kept in ``self.trace`` (list of dicts)
-    and the obs vector of every controller edge in ``self.obs_log`` ({tick: (B, obs_size)})."""
+    and the obs vector of every controller edge in ``self.obs_log`` ({tick: (B, obs_size)}).
 
-    def __init__(self, plant, *, oracle: bool = True):
+    airy (default True): the self-heating optics adapter the engine uses (mrm.plant.optics selfheat_pabs /
+    selfheat_commit / selfheat_bounds, whose exact ring without backscatter runs the engine's own Airy path, so the
+    parity can be bit for bit). airy=False: the general ring kernels for every ring (selfheat_pabs_general /
+    selfheat_commit_general: the closed forms of _airy_line; selfheat_bounds_general: the separate bound kernels),
+    an implementation independent of the engine's self-heating optics, which agrees with the engine to rounding and
+    the self-heating root tolerance instead of bit for bit (tests/verification/test_kernel_parity.py;
+    docs/handoff/perf.md section 6, item 4)."""
+
+    def __init__(self, plant, *, oracle: bool = True, airy: bool = True):
         self.plant = plant
+        self.airy = bool(airy)
+        self._pabs_fn = op.selfheat_pabs if airy else op.selfheat_pabs_general
+        self._commit_fn = op.selfheat_commit if airy else op.selfheat_commit_general
+        self._bounds_fn = op.selfheat_bounds if airy else op.selfheat_bounds_general
         pp, P = plant.pp, plant.P
         self.pp, self.P = pp, P
         B, N, L = plant.B, plant.N, plant.L
@@ -259,8 +271,8 @@ class ReferenceEngine:
             # tests/verification/test_kernel_parity.py), so that the parity can be bit for bit
             K.swing_capacitance_row(v_lo[b], v_hi[b], Ph.grid, Ph.capacitance[r], P.jt_cum[r], rp[:, ph.RP_FILL],
                                     rp[:, ph.RP_LEN], cj_eff[b])
-            op.selfheat_bounds(self.args_f[b], self.args_i[b], float(P.dt_max_k), self.p_max[b], self.d2p_max[b],
-                               self.dpdt_max[b])
+            self._bounds_fn(self.args_f[b], self.args_i[b], float(P.dt_max_k), self.p_max[b], self.d2p_max[b],
+                            self.dpdt_max[b])
         # data-activity heat
         pj, pd = np.zeros((B, N)), np.zeros((B, N))
         for b in range(B):
@@ -297,8 +309,8 @@ class ReferenceEngine:
         if P.self_heating:
             nf = shm.implicit_step(self.x, a, c0, c1, sysm.lag_src, sysm.lag_obs, sysm.lag_kind, sysm.opt_lags,
                                    sysm.obs_ptr, sysm.src_ring, sysm.ring_obs, np.asarray(P.bus_order), u0, u1,
-                                   self.src_scale, t_base_end, self.p_prev, self.t_branch, op.selfheat_pabs,
-                                   op.selfheat_commit, self.args_f, self.args_i, self.p_max, self.d2p_max,
+                                   self.src_scale, t_base_end, self.p_prev, self.t_branch, self._pabs_fn,
+                                   self._commit_fn, self.args_f, self.args_i, self.p_max, self.d2p_max,
                                    int(P.sh_max_iter), float(P.sh_tol), int(P.sh_n_outer), self.g_work, self.t_obs,
                                    self.p_new, self.t_new, self.n_iter)
             self.p_prev[:] = self.p_new
