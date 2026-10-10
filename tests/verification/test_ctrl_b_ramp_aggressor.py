@@ -5,12 +5,14 @@ the ring above the hottest chip temperature so the heater can back off): line 0 
 line 4 one order down (8.74 nm) for A1 (about 101 K, 7 nm, under resonance referencing). The search window comes from
 the nominal design (07 P1-1 knowledge): w = offset / (dlambda/dw) with the heater droop, +-0.035.
 
-Layout finding (reported in docs/handoff/controllers_b.md): in g26 the aggressor site (0, 30 um) sits 5 um from ring
-0's monitor PD at its default offset (0, 25 um), so the interim thermal model heats PD0 six times more than the ring
-(100 mW: +205 K at the PD, +34 K at the ring). Under A2 the PD observer passes 300 degC after ~25 ms and its
-Arrhenius dark current reaches ~10 uA, half the lock current: any monitor lock is dragged off the line. The
-controller claims below therefore use ``ring.thermal.pd_offset_um = [0, -25]`` (the PD on the far side of the ring,
-55 um from the aggressor); :func:`test_a2_default_layout_pd_dark_current` documents the default-layout outcome.
+Layout (docs/handoff/controllers_b.md, docs/handoff/integrator.md section 7): the g26 default aggressor site is
+(0, -30 um), 55 um from ring 0's monitor PD at its default offset (0, 25 um), so the controller claims below run the
+default layout. Until 2026-10-10 the default site was (0, 30 um), 5 um from that PD: the interim thermal model then
+heats PD0 six times more than the ring (100 mW: +205 K at the PD, +34 K at the ring), the PD observer passes 300 degC
+after ~25 ms of A2 and its Arrhenius dark current reaches ~10 uA, half the lock current: any monitor lock is dragged
+off the line. These tests then used ``ring.thermal.pd_offset_um = [0, -25]`` (the PD on the far side). That old site
+is now the STRESS scenario a2_808_aggressor_pd_adjacent (not a realistic layout);
+:func:`test_a2_pd_adjacent_stress_dark_current` documents its outcome.
 
 Reported (printed): lock error during the aggressor (deviation from the steady detuning, pm), heater range used.
 """
@@ -30,7 +32,6 @@ from test_ctrl_b_plant import CtrlBPlant, excursions, load_g26, make_spec, reali
 
 pytestmark = pytest.mark.slow
 KNOW = ["line_grid", "ring_to_line", "heater_nominal", "optics_nominal", "dlambda_dt_nominal"]
-PD_FAR = ["ring.thermal.pd_offset_um=[0.0,-25.0]"]
 T_ON = 3e-3
 
 
@@ -61,7 +62,7 @@ def _env(trace, stat):
 def test_a2_reference_plant():
     """A2 on the reference plant: the aggressor (calibrated, delayed to start after the lock) ramps 1616 degC/s for
     12 ms."""
-    cfg = load_g26(overrides=PD_FAR, knowledge=KNOW)
+    cfg = load_g26(knowledge=KNOW)
     pp = realize(cfg, 1, nominal=True)
     spec = make_spec(cfg, 1)
     lo, hi = _window(spec)
@@ -83,7 +84,7 @@ def test_a2_reference_plant():
 
 def test_a2_full_cycle_engine():
     """A2 through one full 100 ms cycle on the engine (rise and fall at 1616 degC/s, the reversal at the top)."""
-    cfg = load_g26(overrides=PD_FAR, knowledge=KNOW)
+    cfg = load_g26(knowledge=KNOW)
     spec = make_spec(cfg, 1)
     lo, hi = _window(spec)
     ctrl = RampAcquire(rings=[0], w_start=max(lo - 0.04, 0.0), w_lo=lo, w_hi=hi)
@@ -113,7 +114,7 @@ def test_a1_through_the_cusp_engine(which):
     runner = pytest.importorskip("mrm.sim.runner")
     from mrm.plant.plant import prepare_scenario
     from test_ctrl_b_engine import WithAssignment
-    cfg = load_g26(overrides=PD_FAR + ["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
+    cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
     spec = make_spec(cfg, 1)
     _, pp, _ = runner.load_inputs(cfg, batch=1, uncertainty="nominal", variation="off")
     with warnings.catch_warnings():
@@ -144,16 +145,21 @@ def test_a1_through_the_cusp_engine(which):
     assert dev < 30.0
 
 
-@pytest.mark.xfail(strict=False, reason="plant input: g26 puts the aggressor 5 um from monitor PD0; the PD observer "
-                                        "passes 300 degC under A2 and its dark current drags any monitor lock off "
+@pytest.mark.xfail(strict=False, reason="stress scenario (not a realistic layout): the aggressor site "
+                                        "aggressor_pd_adjacent is 5 um from monitor PD0; the PD observer passes "
+                                        "300 degC under A2 and its dark current drags any monitor lock off "
                                         "(docs/handoff/controllers_b.md)")
-def test_a2_default_layout_pd_dark_current():
+def test_a2_pd_adjacent_stress_dark_current():
+    """A2 in the STRESS scenario a2_808_aggressor_pd_adjacent (the former g26 default site, 5 um from PD0): the
+    lock is expected to fail (xfail) through the PD dark current, not through the rings' heat, which equals A2's."""
     cfg = load_g26(knowledge=KNOW)
     spec = make_spec(cfg, 1)
     lo, hi = _window(spec)
     ctrl = RampAcquire(rings=[0], w_start=max(lo - 0.04, 0.0), w_lo=lo, w_hi=hi)
-    res = _engine(ctrl, cfg, lib.a2_808_aggressor(), 45e-3, [("detuning_m", 100, "mean"), ("t_pd_k", 100, "max")])
+    res = _engine(ctrl, cfg, lib.a2_808_aggressor_pd_adjacent(), 45e-3,
+                  [("detuning_m", 100, "mean"), ("t_pd_k", 100, "max")])
     mean = _env(res.trace, "mean")["value"][:, 0, 0] * 1e12
     t_pd = [v for k, v in res.trace.items() if k.startswith("t_pd_k")][0]["value"][:, 0, 0] - 273.15
-    print(f"\nA2 default layout: PD0 up to {t_pd.max():.0f} degC; detuning {mean[50]:.0f} -> {mean[-1]:.0f} pm")
+    print(f"\nA2 stress (site 5 um from PD0): PD0 up to {t_pd.max():.0f} degC; detuning {mean[50]:.0f} -> "
+          f"{mean[-1]:.0f} pm")
     assert ctrl.fsm.state[0, 0] == ST_LOCK and abs(mean[-1] - mean[50]) < 20.0

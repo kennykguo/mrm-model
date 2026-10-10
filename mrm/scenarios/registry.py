@@ -45,6 +45,10 @@ for _name, _fn, _al in (
         ("static", lib.static, ("none",)),
         ("a1_slide10_aggressor", lib.a1_slide10_aggressor, ("a1",)),
         ("a2_808_aggressor", lib.a2_808_aggressor, ("a2",)),
+        # STRESS scenarios (monitor dark-current runaway), not a realistic layout: A1 / A2 at the layout site
+        # aggressor_pd_adjacent (g26: 5 um from ring 0's monitor PD)
+        ("a1_slide10_aggressor_pd_adjacent", lib.a1_slide10_aggressor_pd_adjacent, ("a1_pd_adjacent",)),
+        ("a2_808_aggressor_pd_adjacent", lib.a2_808_aggressor_pd_adjacent, ("a2_pd_adjacent",)),
         ("laser_sweep_emulation", lib.laser_sweep_emulation, ("a3",)),
         ("soak", lib.soak, ("a4",)),
         ("connector_remate", lib.connector_remate, ("a6",)),

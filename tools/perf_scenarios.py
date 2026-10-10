@@ -9,7 +9,10 @@ compared with the baseline signal by signal (tools/perf_compare.py).
 
 Scenarios (g26, B = 1 nominal world unless stated, fixed 1 us ticks, seeds 0):
   steady_pi       compiled PI lock (pi_lock_c) from the settled warm start at the quasi-static codes, static, 40 ms
-  a1_pi           pi_lock_c under the A1 slide-10 aggressor (phase P/2, PD on the far side), one period (130.7 ms)
+  a1_pi           pi_lock_c under the A1 slide-10 aggressor (phase P/2, default g26 site: 55 um from ring 0's PD),
+                  one period (130.7 ms). runs/perf_baseline was recorded with the former site (0, 30) um and the PD
+                  moved to the far side (ring.thermal.pd_offset_um=[0,-25]); record a new baseline before comparing
+                  a1_pi again (docs/handoff/perf.md section 7)
   laser_step      open loop at the settled quasi-static codes, +10 % laser power on every line at 5 ms, 25 ms
   heater_sweep    cold start (branch_low, settled at code 0), heater ramp 0 -> 1.15 x lock code over 40 ms per
                   ring (Python ramp controller): crosses the self-heating fold (and foreign lines)
@@ -43,7 +46,6 @@ from mrm.sim.metrics import RecordSpec, envelope  # noqa: E402
 FIELDS = ("t_ring_k", "t_heater_k", "t_pd_k", "p_heater_w", "p_abs_w", "lam_res_m", "detuning_m", "p_drop_w",
           "i_monitor_a", "p_in_w", "oma_w", "reloma", "heater_code", "bias_v", "monitor_code", "oracle_reloma",
           "ber", "line_on")
-PD_FAR = ("ring.thermal.pd_offset_um=[0.0,-25.0]",)
 SCENARIOS = ("steady_pi", "a1_pi", "laser_step", "heater_sweep", "idle_traffic", "mc8_pi")
 
 
@@ -90,7 +92,7 @@ def run_one(name: str, plant_kw: dict):
                          record=_rec(1), heater_code="quasi_static", reset_protocol="branch_high", settle=True,
                          **common)
     elif name == "a1_pi":
-        cfg = _cfg(PD_FAR)
+        cfg = _cfg()
         res = runner.run(cfg, registry.create("pi_lock_c", {}), lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2),
                          duration_s=lib.A1_PERIOD_S, record=_rec(10, "mean"), heater_code="quasi_static",
                          reset_protocol="branch_high", settle=True, **common)

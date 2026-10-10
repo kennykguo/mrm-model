@@ -11,6 +11,7 @@ POWER (A1, A2, direct waveforms), XPU power events (B3), laser-only wavelength (
 """
 from __future__ import annotations
 
+import inspect
 import math
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -21,7 +22,9 @@ from mrm.scenarios import generators as g
 from mrm.scenarios.calibrate import LAMBDA_REF_M, LM_DLAMBDA_DT_M_PER_K, AggressorTarget
 
 __all__ = [
-    "static", "a1_slide10_aggressor", "a2_808_aggressor", "soak", "xpu_power_step", "laser_drift",
+    "static", "a1_slide10_aggressor", "a2_808_aggressor", "a1_slide10_aggressor_pd_adjacent",
+    "a2_808_aggressor_pd_adjacent", "AGGRESSOR_SITE", "AGGRESSOR_PD_ADJACENT_SITE", "soak", "xpu_power_step",
+    "laser_drift",
     "laser_sweep_emulation", "connector_remate", "fibre_loss_step", "traffic_start_stop", "squelch", "idle",
     "training_pattern",
     "ones_density_steps", "bias_ripple", "bias_step", "laser_failover", "line_enable", "cold_start", "warm_start",
@@ -33,6 +36,12 @@ __all__ = [
     "SWEEP_SPAN_NM", "SWEEP_PERIOD_S", "REMATE_N", "REMATE_MEAN_DB", "REMATE_MEAN_PLUS_3SIGMA_DB",
     "SUN_STEP_S", "SQUELCH_OMA_DBM", "JUNCTION_RANGE_C", "BIAS_RANGE_V",
 ]
+
+#: Layout site names of kind aggressor (g26 ``layout.sites``). AGGRESSOR_SITE is the default site of A1, A2 and
+#: aggressor_direct; g26 puts it at (0, -30) um, 55 um from ring 0's monitor PD. AGGRESSOR_PD_ADJACENT_SITE is the
+#: former g26 default (0, 30) um, 5 um from that PD: a STRESS site for the *_pd_adjacent scenarios only.
+AGGRESSOR_SITE = "aggressor"
+AGGRESSOR_PD_ADJACENT_SITE = "aggressor_pd_adjacent"
 
 _C0 = 299_792_458.0       # speed of light, m/s (exact)
 _T0 = 273.15              # 0 degC in K (exact)
@@ -238,6 +247,58 @@ def a2_808_aggressor(*, site: str = "aggressor", victim_ring: int = 0, referenci
         description=f"A2 808 degC/s aggressor, reading {reading}, dT {dT:.4g} K, period {period_s} s",
         provenance=({"item": "A2", "value": [rate_k_per_s, t_low_c, period_s], "provenance": "printed",
                      "source": "LM26-P", "note": f"reading {reading} (hypothesis)"},))
+
+
+_PD_ADJACENT_NOTE = ("STRESS test of monitor dark-current runaway, not a realistic layout: the aggressor at the layout "
+                     f"site {AGGRESSOR_PD_ADJACENT_SITE!r} (g26: (0, 30) um, 5 um from ring 0's monitor PD, the former "
+                     "default). Every ring sees the same aggressor as in the default scenario (same ring-to-site "
+                     "distances, same calibrated power); only the monitor-PD paths differ (the die sensor's too under "
+                     "the FEM ROM, by ~2 %): the calibrated power heats ring 0's PD to hundreds of degC and its "
+                     "Arrhenius dark current drags every monitor lock")
+
+
+def a1_slide10_aggressor_pd_adjacent(**kw) -> g.Scenario:
+    """[A1 stress] :func:`a1_slide10_aggressor` (same keyword arguments, except ``site``) at the layout site
+    ``aggressor_pd_adjacent``. A STRESS scenario for monitor dark-current runaway, not a realistic layout: in g26 that
+    site is the former default (0, 30) um, 5 um from ring 0's monitor PD (``ring.thermal.pd_offset_um`` (0, 25) um),
+    and the calibrated A1 power heats the PD observer past ~600 degC (interim thermal model). The rings see exactly
+    the default A1 (every ring-to-site distance is the same as for the default site ``aggressor`` at (0, -30) um, so
+    the power calibration is the same); only the monitor-PD paths differ (in the interim model the die sensor,
+    ~1 mm away, sees both sites alike)."""
+    if "site" in kw:
+        raise g.ScenarioError("a1_slide10_aggressor_pd_adjacent fixes the site; use a1_slide10_aggressor(site=...)")
+    sc = a1_slide10_aggressor(site=AGGRESSOR_PD_ADJACENT_SITE, **kw)
+    return sc.replace(name="a1_slide10_aggressor_pd_adjacent",
+                      description=f"{sc.description} at site {AGGRESSOR_PD_ADJACENT_SITE} [{_PD_ADJACENT_NOTE}]",
+                      provenance=sc.provenance + ({"item": "aggressor site", "value": AGGRESSOR_PD_ADJACENT_SITE,
+                                                   "provenance": "assumed", "source": "MODEL",
+                                                   "note": _PD_ADJACENT_NOTE},))
+
+
+def a2_808_aggressor_pd_adjacent(**kw) -> g.Scenario:
+    """[A2 stress] :func:`a2_808_aggressor` (same keyword arguments, except ``site``) at the layout site
+    ``aggressor_pd_adjacent``: the STRESS test of monitor dark-current runaway of
+    :func:`a1_slide10_aggressor_pd_adjacent` with the 808 degC/s trajectory (g26, symmetric-triangle reading: PD0
+    passes 300 degC after ~25 ms). Not a realistic layout."""
+    if "site" in kw:
+        raise g.ScenarioError("a2_808_aggressor_pd_adjacent fixes the site; use a2_808_aggressor(site=...)")
+    sc = a2_808_aggressor(site=AGGRESSOR_PD_ADJACENT_SITE, **kw)
+    return sc.replace(name="a2_808_aggressor_pd_adjacent",
+                      description=f"{sc.description} at site {AGGRESSOR_PD_ADJACENT_SITE} [{_PD_ADJACENT_NOTE}]",
+                      provenance=sc.provenance + ({"item": "aggressor site", "value": AGGRESSOR_PD_ADJACENT_SITE,
+                                                   "provenance": "assumed", "source": "MODEL",
+                                                   "note": _PD_ADJACENT_NOTE},))
+
+
+def _without_site(fn, base):
+    """Give the stress builder the base builder's signature minus ``site`` (registry.create checks params on it)."""
+    sig = inspect.signature(base)
+    fn.__signature__ = sig.replace(parameters=[p for p in sig.parameters.values() if p.name != "site"])
+    return fn
+
+
+_without_site(a1_slide10_aggressor_pd_adjacent, a1_slide10_aggressor)
+_without_site(a2_808_aggressor_pd_adjacent, a2_808_aggressor)
 
 
 def aggressor_direct(*, site: str = "aggressor", waveform: str = "square", power_w: float = 0.1,

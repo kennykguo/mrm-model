@@ -174,7 +174,8 @@ critical coupling).
    `test_ctrl_c_kalman_lqg.py::test_a1_toward_the_cusp_dark_current_runaway` assert the runaway, and
    `test_ctrl_b_ramp_aggressor.py` uses `pd_offset_um=[0,-25]`. Recommendation for the plant/config owner: move the
    aggressor site to (0, -30 um) (every ring-aggressor distance unchanged, the A1 calibration unchanged, PD0 55 um
-   away), then update those three tests. The scorecard reports both layouts meanwhile.
+   away), then update those three tests. The scorecard reports both layouts meanwhile. **Resolved 2026-10-10 by
+   the project owner's decision: section 7.**
 5. **Knowledge vocabularies not unified.** docs/ENGINE.md section 2 lists both and `model_nominal`; the scorecard
    grants all tokens. One canonical list needs code changes in calibration.py, pi_lock.py and models.py (owners).
 
@@ -194,9 +195,9 @@ critical coupling).
 
 ### 6.4 Requests still open (owner named)
 
-- **plant/config owner**: the PD / aggressor layout (6.2 item 4); the monitor ADC full scale (clips in some sampled
-  worlds, controllers_a 6, controllers_b 6.5); the bias physics check (FCA heat cancels most of the electro-optic
-  shift, controllers_a 5).
+- **plant/config owner**: the PD / aggressor layout (6.2 item 4; resolved 2026-10-10, section 7); the monitor ADC
+  full scale (clips in some sampled worlds, controllers_a 6, controllers_b 6.5); the bias physics check (FCA heat
+  cancels most of the electro-optic shift, controllers_a 5).
 - **engine owner**: `quasi_static` own-line heat and no upstream bus filtering (replicas 6b; the settled engine
   lock sits 3-16 pm from the quasi-static target in g26); `run_lock_request(LockRunRequest)` for the replicas (the
   warm-state part is now `settle`; a monitor-current set-point controller `drop_setpoint_pi` is also missing, so
@@ -210,8 +211,9 @@ critical coupling).
 - **params**: one knowledge vocabulary and the 07 D13 knowledge-filtered `spec.nominal` view; the waveform keys
   `driver.rise_time_ps`, `driver.pad_capacitance_ff` and a LUT artefact key (waveform handoff 6).
 - **engine + waveform**: `fidelity.data_modulation: lut` in the kernel (waveform handoff section 3).
-- **controllers**: the scorecard's failures (A1 default layout; feedforward_pi loses every ring under A1 even with the
-  PD far, its die sensor sees the aggressor; dither_lockin and midranging jitter at the 5 pm level in steady state;
+- **controllers**: the scorecard's failures (A1 default layout, since 2026-10-10 the stress scenario of section 7;
+  feedforward_pi loses every ring under A1 even with the PD far (now: the default site), its die sensor sees the
+  aggressor; dither_lockin and midranging jitter at the 5 pm level in steady state;
   es_po loses one ring in steady state); register `drop_setpoint_pi`, `bias_dither_lockin`,
   `dual_actuator_midrange` or rename them in BND-3a/b. **controllers_b**:
   `test_ctrl_b_wdm_slow.py::test_online_barrel_shift_when_the_chip_cools` is now `xfail(strict=False)`: it passes
@@ -237,3 +239,189 @@ critical coupling).
 - `tests/verification/test_engine_warm_start.py`: 6 passed in 9 s; the settle also runs under NUMBA_DISABLE_JIT=1
   (same 18 iterations, same detuning).
 - Not run: the extraction and thermal-ROM slow tests (file boundaries).
+
+## 7. Aggressor site moved; the old site is a stress scenario (2026-10-10)
+
+Scope: the project owner's decision (Kenny) on the open item of 6.2 item 4 / 6.4: the g26 default aggressor site
+moves from (0, 30) um to (0, -30) um, and the old layout is kept as a named stress scenario. CHANGELOG entry of the
+same date. No solver was re-run.
+
+### 7.1 Files
+
+- Preset and schema: `mrm/params/presets/g26.yaml` (`layout.sites`: `aggressor` (0, -30) um, new
+  `aggressor_pd_adjacent` (0, 30) um, both kind aggressor with a per-site note; the leaf note says why the default
+  moved; provenance still `assumed`), `mrm/params/schema.py` (optional `note` field of a site record).
+- Scenarios: `mrm/scenarios/library.py` (`AGGRESSOR_SITE`, `AGGRESSOR_PD_ADJACENT_SITE`,
+  `a1_slide10_aggressor_pd_adjacent`, `a2_808_aggressor_pd_adjacent`: A1 / A2 with the same arguments except `site`;
+  their signature hides `site`, so `create(..., site=...)` is refused), `mrm/scenarios/registry.py` (registered, aliases
+  `a1_pd_adjacent`, `a2_pd_adjacent`).
+- `mrm/validation/replicas.py`: `_aggressor_src` picks the site named `aggressor` (was: the first aggressor source,
+  which depended on the YAML order).
+- Tools: `tools/perf_scenarios.py` (`PD_FAR` removed; `a1_pi` runs the default layout), `tools/scorecard_compare.py`
+  (`--rename OLD=NEW` for scorecards from before and after this change), `tools/perf_scenarios_adv.py` (docstring:
+  `agg_edge_pi` now runs the new default site; re-record its baseline).
+- Tests: `tests/validation/test_controllers_on_engine.py` (keys `a1` and `a1_pd_adjacent`; `PD_FAR` removed; notes),
+  `tests/verification/test_ctrl_b_ramp_aggressor.py` (`PD_FAR` removed; `test_a2_default_layout_pd_dark_current`
+  -> `test_a2_pd_adjacent_stress_dark_current` on the stress scenario, still xfail), `tests/verification/
+  test_ctrl_a_scenarios.py` (`test_a1_full_on_the_25c_base_monitor_dark_current` on the stress site),
+  `tests/verification/test_ctrl_a_harness.py` (`a1_rate_scenario` / `a2_rate_scenario` take `site=`),
+  `tests/verification/test_ctrl_c_kalman_lqg.py` (`test_a1_toward_the_cusp_dark_current_runaway` on
+  `a1_pd_adjacent`; module findings), `tests/verification/test_scenarios.py` (stress builders), new
+  `tests/verification/test_aggressor_layout.py` (sites, provenance, identical ring/heater/sensor lags, a 3 ms engine
+  run near the A1 cusp on both sites: same calibrated power, rings bit-identical, PD0 > 100 K hotter on the stress
+  site).
+- Regenerated: `docs/PARAMETERS.md`, the PARAMETERS_FORMAT.md key appendix, `mrm/validation/latest_predictions.json`,
+  `docs/handoff/controller_scorecard.md` / `.json`.
+- Docs: `docs/ENGINE.md` (sections 2, 5, 10), `docs/CHANGELOG.md`, `docs/handoff/perf.md` (section 7),
+  `docs/handoff/controllers_a.md` (section 8: the A1/A2-rate re-run, old vs new site), resolution notes and re-run
+  rows in `docs/handoff/{controllers_a,controllers_b,controllers_c,extract_thermal,scenarios}.md`,
+  `docs/PARAMETERS_FORMAT.md` (the site `note` field), `examples/controllers/README.md`.
+
+### 7.2 Geometry: what changes and what does not (interim thermal model, g26 nominal)
+
+Ring i sits at (50 i, 0) um; the sites are mirror images in y, so every ring-to-site distance is the same (30, 58.3,
+104.4, 153.0, 202.2, 251.8, 301.5, 351.3 um). The thermal system has 970 lags (945 before): the 25 new ones are the
+stress site's paths to every observer, with zero input unless a stress scenario drives it.
+
+| observer | distance to (0, 30) [stress] / (0, -30) [default] (um) | DC from the site (K/W), stress / default | effect |
+|---|---|---|---|
+| ring i, heater resistor i | equal | equal, bit for bit (ring 0: 341.8, 1.03 ms) | A1/A2 calibrated power and every ring trajectory unchanged |
+| monitor PD 0 (0, 25) | 5.0 / 55.0 | 2050.6 (0.1 ms) / 186.4 (3.4 ms) | PD0 under A1: 624 -> 93 degC (open loop) |
+| monitor PD 1 | 50.2 / 74.3 | 203.4 / 137.5 | 100 -> 81 degC |
+| monitor PD 2 | 100.1 / 114.1 | 101.7 / 89.3 | 72 -> 69 degC |
+| monitor PD 3-7 | 150-350 / 160-354 | equal DC (site-law floor 83.6-84.6), poles 0.4-2.7 % longer | < 0.08 K |
+| die sensor `die0` ('die': 1 mm from the bank centroid, (175, 1000) um) | 985.7 / 1044.8 | 84.49 / 84.49 (8.99 ms), bit for bit | none: both distances sit on the site-law floor (1.5 % of Z_heater->ring) and beyond the printed X2 tau table |
+
+- **Die sensor and feedforward_pi.** The die sensor's aggressor path is identical in the interim model, so
+  feedforward_pi sees exactly the same aggressor heat as before (its reading moves by ~20 K over A1 open loop, 315
+  codes of 0.0625 K). Its A1 failure (every ring lost) is unchanged by the move. Its docstring says the die sensor
+  "sees neither a local aggressor": in the interim model it does, through the long-range floor (controllers_a owner).
+  Under the FEM ROM (not the g26 default) the die path would change by -2.5 % (2.641 -> 2.576 K/W, `cross_res` at the
+  actual distance).
+- **Drivers.** g26 places a monolithic driver per ring at `ring.thermal.driver_offset_um` (0, -30) um, so ring 0's
+  driver site is at the new aggressor site. Both are heat sources and no observer sits there, so the linear model
+  superposes them and nothing is singular; but a real layout cannot put both at one point. Not changed (the site is
+  the owner's decision; both positions are assumed): **open for the content owner** (move the driver offset, e.g. to
+  (30, -30) um, or the site, after checking the ring distances).
+- **Old PD-far geometry vs the new default.** The former `ring.thermal.pd_offset_um=[0,-25]` override had the same
+  PD-to-aggressor distances as the new default (mirror image), but it put every PD 5 um from its own ring's driver:
+  own driver -> PD 2005-2051 K/W (now 182-186), all drivers -> PD 2731-2898 K/W (now 831-889). With ~4.5 mW of
+  driver data heat per ring (2 mW static + 100 fJ x 25e9 transitions/s, assumed) the PD-far PDs ran 8.5-9.0 K warmer
+  (open loop), i.e. 10-23 nA more Arrhenius dark current per monitor (17-38 codes of the 40 uA / 16-bit monitor).
+  Independent check (review): with the driver heat set to zero (`driver.static_power_mw=0`,
+  `driver.energy_per_transition_fj=0`) the old PD-far geometry and the new default give bit-identical PD
+  temperatures, monitor currents and codes over one A1 period (open loop), so the driver heat is the whole
+  difference. With the new site that override would put the PD 5 um from the aggressor, so it was removed
+  everywhere.
+
+### 7.3 Thermal ROM artefacts (`mrm/data/extracted/thermal_rom_*.npz`)
+
+All six store `site_offsets_um` monitor_pd (0, 25), temp_sensor (40, 0), driver (0, -30), aggressor (60, 0) um. The
+runtime (`mrm.plant.thermal.assemble` / `_rom_lags`) uses an offset only for a SAME-RING pair: a driver source or a
+monitor_pd / temp_sensor observer whose layout position is within 1 um of the stored offset takes `self_res`;
+otherwise `cross_res` at the actual distance, with a warning. Aggressor sites are free sites (ring -1), so every
+aggressor pair always uses `cross_res` at the actual site-to-observer distance; the stored aggressor offset (60, 0)
+is the extraction's own placement for its self table and is never read. So no stored offset conflicts with the new
+site, and the loader conventions are unchanged. In ROM mode g26 has no drivers (only layout driver sites or an
+explicit `driver` source create them), so the stored driver offset, which equals the new site relative to ring 0,
+does not collide at runtime; a future FEM extraction that places both must not overlap them. Checked without a
+solver by assembling `thermal_rom_inring_noundercut_160` with the g26 sites (14 180 lags; 13 630 with one site):
+default site -> PD0 37.6 K/W at 55 um, inside the 20-2000 um `cross_r_um` grid; stress site -> PD0 110.4 K/W,
+clamped to 20 um with the existing out-of-grid RuntimeWarning (as the old default did). The FEM aggressor is a 10 um
+radius disk, so a PD 5 um from its centre is inside it: the stress scenario is a test of the interim model, not of
+the ROM, and every ROM-mode assembly of g26 will warn about that pair (no g26_rom preset exists yet).
+
+### 7.4 Results
+
+**Open loop** (scratch runs, heaters held at the quasi-static codes, settled, one A1 period from phase P/2 and one
+A2 period, old tree vs new tree):
+
+- default A1 / A2, old site vs new site: ring detuning, ring and heater temperatures, absorbed power, the calibrated
+  aggressor power (A1 peak 0.2837 W, A2 0.2598 W) and the die-sensor codes are **bit-identical**; only the PD
+  temperatures (table above) and the monitor currents change (ring 0: up to 75 uA less under A1).
+- old default vs the new stress scenarios (A1 and A2): **bit-identical** in every recorded signal.
+- old PD-far vs new default A1: rings bit-identical; PDs 8.5-9.0 K cooler on every ring; monitor current 10-23 nA
+  lower.
+- Every regression scenario of tools/perf_scenarios.py and perf_scenarios_adv.py without an aggressor is
+  bit-identical to the recorded final tree (`runs/perf_final_r1`, `runs/review_r1/fix_adv`) apart from the length of
+  the lag state; `a1_pi` and `agg_edge_pi` change (perf.md section 7).
+
+**Scorecard** (closed loop, `test_controllers_on_engine.py`, 19 passed). Steady runs: identical to the previous
+scorecard (largest change 1.2e-8 pm, the perf round's rounding; every discrete metric equal). `a1_pd_adjacent`
+(stress) reproduces the previous default-layout `a1` table (largest change 6.4e-7 pm; every discrete metric equal).
+New `a1` against the old `a1_pd_far` (`tools/scorecard_compare.py --rename a1=a1_pd_adjacent a1_pd_far=a1`):
+
+- PD0 max 8.7-9.8 K lower for every controller (and 8-10 K on the other PDs): the driver heat above.
+- **Controllers that hold their lock** (pi_lock, pi_lock_c, composite, midranging, kalman_lqg(_c), mpc(_c)): max
+  |e| within 0.09 pm, rms within 0.017 pm, OMA penalty within 0.0006 dB, the same excursions, lines and heater-rail
+  times (to 0.03 ms). The ~20 nA less dark current moves a monitor set-point lock by ~0.1 pm. The table shows the same
+  numbers to one decimal (pi_lock ring 0 348.5 pm, rings 1-7 6.0 pm; kalman_lqg / mpc 363.6 / 6.5 pm).
+- **Controllers that lose a ring or wander by their own dither** (dither_lockin(_c), bias_dither, es_po, es_sine,
+  feedforward_pi, ramp_acquire, acquire_then_lock, bitstat_lock, wdm_supervisor): the same outcome class (every
+  locked-at-the-end count equal, except acquire_then_lock 0 -> 2 of 8), but once a ring is lost the trajectory is
+  sensitive to any perturbation, and the 10-23 nA offset changes which foreign line a lost ring falls onto and when:
+  feedforward_pi ring 0 max 5193 -> 5103 pm and three rings end on other lines; es_sine rings 1-7 max 2446 -> 2441
+  pm but another line for two rings; acquire_then_lock ring 5 rms 6972 -> 1466 pm and two rings locked at the end
+  instead of none; wdm_supervisor rings 1-7 max 1337 -> 2284 pm, ring 6 ends on line 4 instead of none and its
+  heater sits at code 0 for 22.4 ms instead of 7.3 ms; dither_lockin rings 1-7 max 386 -> 561 pm with the same
+  ring-0 rms (604.6 -> 604.9 pm) and 2405 -> 2335 excursions on rings 1-7 (a dither lock that never holds 5 pm).
+  Also (reviewer, complete list of the remaining differences): es_po rings 4 and 7 end on other lines (none -> 0,
+  7 -> 3; ring rms up to 149 pm different); bitstat_lock rings 2 and 4 end on other lines (4 -> 3, 6 -> 1; ring rms
+  up to 1190 pm different; rings 6 and 7 at heater code 0 for 15.2 / 10.2 ms instead of 10.1 / 5.1 ms);
+  acquire_then_lock ring 0 ends on line 0 (was 4) and ring 5 on none (was 7); bias_dither max within 5.7 pm, rms
+  within 0.27 pm, 8/8 locked at the end in both, excursion counts within +-90 per ring; ramp_acquire max within
+  3.0 pm, rms within 42 pm, lines unchanged. In the table's 'off declared line' column: es_po 4 -> 5, es_sine 5 -> 6,
+  wdm_supervisor 6 -> 5, acquire_then_lock 8 -> 7. None of these is a systematic effect of the layout.
+
+**Other closed-loop tests on the default site** (old numbers = the old default site, which the stress site
+reproduces):
+
+- controllers_a harness at the A1 / A2 peak rates (victim ring 0; controllers_a section 8): pi_lock max 8.4 -> 2.0
+  pm and 7.3 -> 1.8 pm, type-2 PI 6.8 -> 2.7 and 6.1 -> 2.2 pm, no excursion; the type-2 PI on four corners 4.5-9.7
+  -> 2.0-2.9 pm. The old cusp error was mostly the PD's dark-current transient (PD pole 0.1 ms at 5 um), so the
+  fraction-of-peak PI now meets the 5 pm budget at the cusp. A scratch run of the current code on the stress site
+  reproduces the old numbers (8.30, 7.21, 6.76, 6.04 pm).
+- controllers_c windows (kalman_lqg A1 / A2): total error against the oracle 0.45 / 0.75 pm max (39 pm before, the
+  dark offset); mpc A2 tracking 0.19 pm; oracle A2 0.47 pm.
+- controllers_b ramp_acquire / bitstat_lock under A1 and A2 (no PD override now): within 0.43 pm of the old
+  geometry (old site + PD far) on the same code; the operating points (168.5, 167.4, 141.6, 86.8 pm) differ from
+  the handoff's older table (172, 173, 143 pm) through earlier plant changes (probably the 2026-10-09 loss-budget
+  re-solve; not checked), not through the layout.
+
+### 7.5 Requests still open
+
+- **content**: ring 0's driver site (0, -30) um coincides with the new aggressor site (7.2).
+- **perf**: record a new baseline before comparing `a1_pi` or `agg_edge_pi` (perf.md section 7).
+- **controllers_a**: the feedforward_pi docstring's "the die sensor sees no local aggressor" does not hold in the
+  interim model (7.2).
+- **params**: a `g26_rom` child preset (the `unset:` request of section 3); its realize will warn about the stress
+  site's 5 um PD pair (7.3).
+
+### 7.6 Test status
+
+All through tools/memguard.py; no kernel or njit source changed, so the warm numba cache was valid (no recompile).
+
+- Fast suite (`-m "not slow"`): 1479 passed, 73 skipped, 3 xfailed, 3 failed in 189 s. The 3 failures are VAL-8a,
+  VAL-8b, VAL-8c (test_thermal_replication.py), as before this change (perf.md section 6; extraction file
+  boundaries). 4 tests are new (test_aggressor_layout.py: 3; test_scenarios.py: 1).
+- Every slow test that uses the aggressor: `test_controllers_on_engine.py` 19 passed (run twice, identical
+  scorecards); `test_ctrl_a_scenarios.py` 17 passed; `test_ctrl_a_corners.py` 14 passed;
+  `test_ctrl_b_ramp_aggressor.py` 4 passed, 1 xfailed (the stress test: PD0 up to 527 degC, ring 0 dragged from
+  168 to -3700 pm); `test_ctrl_c_kalman_lqg.py -m slow` 4 passed, 1 xfailed (the known model-mismatch limitation;
+  the cusp runaway on the stress scenario reproduces the documented dark codes 26 714 -> 50 263 against the 46 743
+  net set-point). Also `tests/closure -m slow` and `test_replicas_static.py -m slow`: 18 passed.
+- NUMBA_DISABLE_JIT=1: A1 with pi_lock_c on the engine, both sites, 500 ticks at the hot cusp and 4000 ticks from the
+  cool minimum: every recorded signal (detuning, ring and PD temperatures, monitor and heater codes) and the
+  calibrated power are bit-identical to the compiled run.
+- Old vs new on the interim thermal model (7.4): the A1/A2 calibration and every ring trajectory bit-identical; only
+  the PD (and monitor) paths change; the stress scenarios reproduce the old default bit for bit.
+- `mrm params validate` passes for g26, g25_test_vehicle and teaching_basic (the preset tests cover all 15).
+- Independent review (same day): fast suite 1479 passed, 3 failed (the same VAL-8a/b/c); the aggressor slow files
+  (ctrl_a scenarios + corners, ctrl_b ramp_aggressor, ctrl_c kalman_lqg + mpc + oracle, test_aggressor_layout) 69
+  passed, 2 xfailed, with the numbers quoted above; closure + replicas + warm start + ctrl_a nojit slow 19 passed;
+  the scorecard re-run twice into a scratch file: every number and the Markdown identical to this one. Open loop,
+  old layout rebuilt in the current tree with a `layout.sites` override (one site at (0, 30) um): A1 and A2 ring
+  detuning, ring and heater temperatures, absorbed power and calibrated power bit-identical on the new default site;
+  the stress scenarios bit-identical in every signal (PD0 624.2 / 575.2 degC under A1 / A2); new default PD0 93.4 /
+  89.7 degC. NUMBA_DISABLE_JIT=1: pi_lock_c under A1, 300 ticks, both sites, bit-identical to the compiled run.
+  ROM check (no solver): PD0 37.6 / 110.4 K/W and die sensor 2.576 / 2.641 K/W from the default / stress site.

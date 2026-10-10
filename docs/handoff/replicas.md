@@ -154,7 +154,7 @@ BND-4. A NaN prediction is written as null with `predicted_nonfinite: true` (VAL
    it; a calibration that matches VAL-5 needs another mechanism (e.g. a heater-temperature loss term or a different
    reading of the map) and must not use VAL-5 to choose it. At P_in -> 0 the line is single-valued and wider on the
    cold side than at 0 dBm.
-2. **Slide-10 lane uniformity (CAL-9).** The ROM's aggressor site sits 20 um from ring 0: under resonance referencing
+2. **Slide-10 lane uniformity (CAL-9).** The g26 aggressor site sits 30 um from ring 0: under resonance referencing
    it heats ring 0 by ~95 K and ring 7 by ~21 K, so the nominal die (no variation) gives lane offsets of 1.0k codes at
    the code maxima and 32.5k at the minima, and ring 0 needs negative heater power at the cusp (code 0, infeasible).
    The slide shows ~20k swings on all 8 lanes, i.e. an aggressor that heats every lane alike (variant
@@ -234,7 +234,7 @@ BND-4. A NaN prediction is written as null with `predicted_nonfinite: true` (VAL
   broadcasting.
 - **scenarios**: `laser_drift` converts the 0.02 nm limit to one frequency drift at 1310 nm for every line, so the
   1318.6 nm line drifts 0.0203 nm in 24 h, above the printed limit (CAL-12c fails by 1.3 %). Convert per line.
-  The aggressor site of g26 (20 um from ring 0) makes the slide-10 lanes non-uniform (4.2).
+  The aggressor site of g26 (30 um from ring 0) makes the slide-10 lanes non-uniform (4.2).
 - **report**: read `latest_predictions.json` (schema `mrm.validation.predictions/1`: per record id, role, target_status,
   scored, replica, preset, value, unit, sigma, tolerance, replica_status, predicted, predicted_nonfinite, variants,
   conditions, notes, detail, evaluation, runtime_s; top level frozen_sha256, git_commit, counts). Score with

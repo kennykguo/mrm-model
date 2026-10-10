@@ -557,6 +557,28 @@ def test_a2_readings():
     assert rs.peak_rate_k_per_s() == pytest.approx(math.pi * 80.8 / 0.1)   # ~2538 degC/s (01 D7)
 
 
+def test_pd_adjacent_stress_scenarios_are_a1_a2_at_the_stress_site():
+    """The stress scenarios of monitor dark-current runaway (not a realistic layout) are A1 / A2 unchanged except the
+    site: aggressor_pd_adjacent instead of the default aggressor (docs/handoff/integrator.md section 7)."""
+    assert (L.AGGRESSOR_SITE, L.AGGRESSOR_PD_ADJACENT_SITE) == ("aggressor", "aggressor_pd_adjacent")
+    t = np.linspace(0.0, 0.3, 61)
+    for short, full, base in (("a1_pd_adjacent", "a1_slide10_aggressor_pd_adjacent", "a1"),
+                              ("a2_pd_adjacent", "a2_808_aggressor_pd_adjacent", "a2")):
+        assert full in S.available() and S.resolve(short) is S.resolve(full)
+        kw = {"victim_ring": 1, **({"phase_s": 0.01} if base == "a1" else {})}
+        sc, ref = S.create(short, **kw), S.create(base, **kw)
+        assert sc.name == full and "STRESS" in sc.description
+        assert sc.aggressor_sites == (L.AGGRESSOR_PD_ADJACENT_SITE,) and ref.aggressor_sites == (L.AGGRESSOR_SITE,)
+        a, b = sc.aggressors[0], ref.aggressors[0]
+        assert a.victim_ring == b.victim_ring == 1 and a.pending and b.pending
+        assert np.array_equal(a.target.printed_k(t), b.target.printed_k(t))
+        assert a.target.period_s == b.target.period_s and a.target.units == b.target.units
+        assert sc.defaults == ref.defaults
+        with pytest.raises(S.ScenarioError, match="site"):        # the stress builders fix the site
+            S.create(short, site="aggressor")
+        assert "site" not in S.describe(short).split("\n")[0]
+
+
 def test_soak_profile():
     sc = S.create("a4")
     assert sc.duration_s == pytest.approx(90 * 20.3 * 60) and sc.duration_s / 3600 == pytest.approx(30.45)

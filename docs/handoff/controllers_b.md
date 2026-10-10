@@ -96,6 +96,10 @@ line_confident 0 holds a lock on a line the supervisor could not verify.
   controllers-A locks) is dragged red and lost after ~35-40 ms of A2. Both positions are `assumed`; please choose
   non-colliding defaults (or clamp the dark-current model at a physical PD temperature). My aggressor tests use
   `ring.thermal.pd_offset_um=[0,-25]`; `test_a2_default_layout_pd_dark_current` (xfail, non-strict) documents it.
+  **Resolved 2026-10-10** (docs/handoff/integrator.md section 7): the g26 default site moved to (0, -30 um), 55 um
+  from PD0 with every ring distance unchanged; the aggressor tests now run the default layout without the PD
+  override (which also put each PD 5 um from its own driver site), and the old layout is the stress scenario
+  `a2_808_aggressor_pd_adjacent`, run by `test_a2_pd_adjacent_stress_dark_current` (renamed, still xfail).
 - **engine (metrics)**: `locked` / `excursion_count` / `time_to_lock_s` of mrm.sim.metrics are |d| <= 5 pm about the
   LINE. A side-of-fringe lock sits by design 0.3-0.5 FWHM red of the line (G26: half maximum, ~150-190 pm), so
   these metrics read "never locked" for every set-point lock. Suggest measuring the 5 pm budget about the oracle's
@@ -132,7 +136,9 @@ against ~4 s on the bench at low load); the WDM cold start ends at the same detu
 | ramp_acquire, A2 (PD far), bench, 12 ms of the 1616 degC/s ramp | rms 0.88 pm, max 1.79 pm | 172 pm | - | 0 | - |
 | ramp_acquire, A2 (PD far), engine, full 100 ms cycle | max deviation 6.4 pm | 173 pm | - | - | - |
 | ramp_acquire, A1 (PD far, line 4), engine, through the cusp | max deviation 5.9 pm (at the cusp) | 143 pm | - | - | - |
-| ramp_acquire, A2, default g26 layout | lost after ~38 ms (PD0 dark current, section 2) | - | - | - | - |
+| re-run 2026-10-10, default layout (site (0, -30) um, no PD override): A2 bench ; A2 engine ; A1 ramp ; A1 bitstat | rms 0.86 / max 1.74 pm ; 6.26 pm ; 5.94 pm ; 9.11 pm | 168.5 ; 167.4 ; 141.6 ; 86.8 pm | - | 0 ; - ; - ; - | - |
+| the same with the old geometry (site (0, 30) um + PD far) on the same code | rms 0.87 / max 1.73 pm ; 6.17 pm ; 5.85 pm ; 9.54 pm | 168.5 ; 167.4 ; 141.6 ; 86.9 pm | - | 0 ; - ; - ; - | - |
+| ramp_acquire, A2, default g26 layout before 2026-10-10 (now the stress scenario a2_808_aggressor_pd_adjacent) | lost after ~38 ms (PD0 dark current, section 2; re-run: PD0 up to 527 degC, detuning 168 -> -3700 pm) | - | - | - | - |
 | acquire_then_lock -> pi_lock(0.7) | jitter 0.8 pm (still converging at 4.5 ms) | 125 pm | - | - | - |
 | bitstat_lock (ratio mode), steady | wander 0.3 pm p-p | 90.6 pm (eye max) | 0.02 dB | - | ~1.5 ms |
 | bitstat_lock, ones density 1 / 0 plateaus | -0.6 / -1.1 pm | 90.6 pm | - | - | - |

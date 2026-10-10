@@ -2,8 +2,9 @@
 Truth inside the test only (CTRL_A_METRIC lines; run with -s -m slow).
 
 - A1 at its printed peak rate (2127 degC/s, 183 pm/ms of resonance target at the victim ring 0) with a 20 K swing so
-  the cusp arrives within 15 ms, and the full printed A1 (88.5 K, 130.7 ms) on the 25 degC base (the aggressor heats
-  the monitor PD so much that its dark current moves the lock: measured);
+  the cusp arrives within 15 ms (g26 default aggressor site, 55 um from ring 0's monitor PD), and the full printed A1
+  (88.5 K, 130.7 ms) on the 25 degC base at the STRESS site aggressor_pd_adjacent, 5 um from that PD (the aggressor
+  heats the monitor PD so much that its dark current moves the lock: measured; not a realistic layout);
 - A2 (808 degC/s run, symmetric-triangle reading: 1616 degC/s edges) with a 20 K swing;
 - a -1 dB laser power step for the normalized locks (fraction-of-peak PI against the inflection dither lock);
 - the PI in two sampled worlds (uncertainty and variation drawn).
@@ -20,6 +21,7 @@ from mrm.control.baselines.extremum_seeking import ExtremumSeekingSine
 from mrm.control.baselines.feedforward import FeedForwardPI
 from mrm.control.baselines.midranging import MidRanging
 from mrm.control.baselines.pi_lock import ST_LOCK, PiLock, PiLockCompiled
+from mrm.scenarios import library as lib
 
 pytestmark = pytest.mark.slow
 KNOW = ["controller_interface.knowledge=[line_grid, ring_to_line, heater_law, heater_efficiency, dlambda_dt_nominal]"]
@@ -91,8 +93,10 @@ def test_aggressor_at_the_printed_rates(name, which):
 
 
 def test_a1_full_on_the_25c_base_monitor_dark_current():
-    """The printed trajectory on the printed 25 degC base. Measured: the heater does not saturate (it bottoms out
-    near 22 k codes), but in the interim layout the aggressor heats the victim's monitor PD ~6x more than the ring
+    """The printed trajectory on the printed 25 degC base, at the STRESS site aggressor_pd_adjacent (the g26 default
+    until 2026-10-10, 5 um from ring 0's monitor PD; not a realistic layout: a stress test of monitor dark-current
+    runaway). Measured: the heater does not saturate (it bottoms out near 22 k codes), but at this site the
+    aggressor heats the victim's monitor PD ~6x more than the ring
     (205 K vs 34 K per 100 mW at steady state: the PD site sits nearer the aggressor), so the PD dark current
     (Arrhenius, 0.37 eV) grows to microamps near the top. The fraction-of-peak set-point then corresponds to a
     larger detuning: the lock drifts red from ~25 ms and is lost near the cusp (~52 ms). After the loss the PI
@@ -103,7 +107,7 @@ def test_a1_full_on_the_25c_base_monitor_dark_current():
     loop = H.ClosedLoop(plant, spec, pi)
     loop.run(5500)
     t_min = (plant.k_next + 1000) * plant.dt
-    sc, period = H.a1_rate_scenario(cfg, pp, t_min, t_base_c=25.0, full=True)
+    sc, period = H.a1_rate_scenario(cfg, pp, t_min, t_base_c=25.0, full=True, site=lib.AGGRESSOR_PD_ADJACENT_SITE)
     plant.set_scenario(sc)
     rec = loop.run(int((period / 2 + 0.005) / plant.dt) + 1000)
     h = rec["heater"][:, 0, 0]
@@ -112,7 +116,8 @@ def test_a1_full_on_the_25c_base_monitor_dark_current():
     m = victim(H.lock_metrics(rec, slice(0, 900), slice(1000, None)))
     d = rec["delta_pm"][:, 0, 0].astype(float)
     lost = np.flatnonzero(np.abs(d - m.delta_ref_pm[0, 0]) > 50.0)
-    report("pi_lock_type2 A1 full (88.5 K, 25 degC base, victim ring 0)", m, heater_min_code=float(h.min()),
+    report("pi_lock_type2 A1 full stress (88.5 K, 25 degC base, site 5 um from PD0, victim ring 0)", m,
+           heater_min_code=float(h.min()),
            first_tick_err_above_50pm=float(lost[0] if lost.size else -1),
            neighbour_falls=float(pi.telemetry()["fall_count"][0, 1:].sum()))
 

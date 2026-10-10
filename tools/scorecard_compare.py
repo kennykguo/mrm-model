@@ -1,7 +1,12 @@
 """Compare two controller scorecards (tests/validation/test_controllers_on_engine.py JSON) number by number.
 
     .venv/bin/python tools/scorecard_compare.py runs/perf_baseline/controller_scorecard_8646691.json \
-        runs/perf_scorecard/controller_scorecard.json [--json out.json]
+        runs/perf_scorecard/controller_scorecard.json [--json out.json] [--rename OLD=NEW ...]
+
+``--rename OLD=NEW`` renames a scenario key of the REFERENCE scorecard before comparing (keys left without a
+partner are not compared). Example: the scorecards before 2026-10-10 hold ``a1`` (aggressor 5 um from ring 0's
+monitor PD) and ``a1_pd_far``; the later ones hold ``a1`` (default site, 55 um) and ``a1_pd_adjacent`` (the stress
+site), so ``--rename a1=a1_pd_adjacent a1_pd_far=a1`` compares like with like (docs/handoff/integrator.md 7).
 
 For every metric (key path ending in a number or a list of numbers; wall times and notes excluded) prints the
 largest absolute change over the controllers, scenarios and rings, and where it occurs; booleans and integers
@@ -39,9 +44,14 @@ def main(argv=None):
     ap.add_argument("ref")
     ap.add_argument("new")
     ap.add_argument("--json", default="")
+    ap.add_argument("--rename", nargs="*", default=[], metavar="OLD=NEW",
+                    help="rename scenario keys of the reference scorecard (e.g. a1_pd_far=a1)")
     a = ap.parse_args(argv)
     ref = json.loads(Path(a.ref).read_text())
     new = json.loads(Path(a.new).read_text())
+    if a.rename:
+        ren = dict(r.split("=", 1) for r in a.rename)
+        ref = {name: {ren.get(k, k): v for k, v in r.items()} for name, r in ref.items()}
     rows = []
     _walk(ref, new, (), rows)
     by_metric = defaultdict(lambda: {"max_abs": 0.0, "where": None, "n": 0, "n_changed": 0, "kind": None})

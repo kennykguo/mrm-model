@@ -3,6 +3,42 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-10: g26 aggressor site moved; the old site is a stress scenario
+
+Project owner's decision (Kenny), implemented by the integrator. Details, the old-vs-new comparison and the open
+items: docs/handoff/integrator.md section 7.
+
+- **g26 `layout.sites.aggressor` moved from (0, 30) um to (0, -30) um** (provenance still `assumed`; the note says
+  why). Ring i sits at (50 i, 0) um, so every ring-to-site distance is unchanged: the A1/A2 power calibrations (in
+  ring units) and every ring and heater-resistor trajectory are the same bit for bit. Ring 0's monitor PD
+  (`ring.thermal.pd_offset_um` (0, 25) um) is now 55 um from the site instead of 5 um: at 5 um the calibrated A1
+  heats it past ~600 degC (624 degC open loop), which is not physical for a real layout; now 93 degC.
+- **New site `aggressor_pd_adjacent`** (0, 30) um, kind aggressor, and **registered stress scenarios**
+  `a1_slide10_aggressor_pd_adjacent` (alias `a1_pd_adjacent`) and `a2_808_aggressor_pd_adjacent` (`a2_pd_adjacent`)
+  in `mrm.scenarios.library` / `registry` (constants `AGGRESSOR_SITE`, `AGGRESSOR_PD_ADJACENT_SITE`): A1 / A2 with
+  the same arguments at that site. A stress test of monitor dark-current runaway, not a realistic layout; they
+  reproduce the former default layout bit for bit.
+- Every g26-derived config now has two aggressor sources: 25 more thermal lags (945 -> 970 in the interim model,
+  13 630 -> 14 180 with the FEM ROM). The second source has zero power unless a stress scenario drives it, so every
+  other result is bit-identical (checked: all regression scenarios of tools/perf_scenarios*.py except the two that
+  run an aggressor); only the length of the lag-state arrays (Truth `x`) changes.
+- **Schema**: `layout.sites` records take an optional free-text `note` (not read by the model). PARAMETERS.md and
+  the PARAMETERS_FORMAT.md key appendix regenerated.
+- **PD-far overrides removed** (`ring.thermal.pd_offset_um=[0,-25]` in tools/perf_scenarios.py,
+  tests/validation/test_controllers_on_engine.py, tests/verification/test_ctrl_b_ramp_aggressor.py): with the new
+  site they would put the PD 5 um from it. The dark-current runaway tests run the stress scenario
+  (test_ctrl_a_scenarios.py::test_a1_full_on_the_25c_base_monitor_dark_current,
+  test_ctrl_c_kalman_lqg.py::test_a1_toward_the_cusp_dark_current_runaway,
+  test_ctrl_b_ramp_aggressor.py::test_a2_pd_adjacent_stress_dark_current, renamed from
+  test_a2_default_layout_pd_dark_current). Scorecard keys: `a1` (default site) and `a1_pd_adjacent` (stress; the
+  former keys were `a1` = old default and `a1_pd_far`); `tools/scorecard_compare.py --rename` compares across the
+  change. The test harness helpers `a1_rate_scenario` / `a2_rate_scenario` take `site=`. New
+  tests/verification/test_aggressor_layout.py.
+- `mrm.validation.replicas` picks the aggressor site named `aggressor` (was: the first aggressor source).
+  latest_predictions.json regenerated: every predicted value unchanged (only the config hashes).
+- runs/perf_baseline (a1_pi) and the review's adversarial runs (agg_edge_pi) were recorded with the old layout:
+  record a new performance baseline before comparing those scenarios (docs/handoff/perf.md section 7).
+
 ## 2026-10-09: engine performance round 1
 
 Details, measurements and error bounds: docs/handoff/perf.md (owner: engine).

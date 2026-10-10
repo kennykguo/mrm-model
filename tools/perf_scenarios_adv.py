@@ -9,7 +9,10 @@ engine writes only when a record reads them or at the end of a block).
     .venv/bin/python tools/perf_scenarios_adv.py runs/x --only laser_move_pi,auto_pi10k
 
 Scenarios (g26 nominal world, B = 1 unless stated, fixed 1 us ticks unless stated, seeds 0):
-  agg_edge_pi      pi_lock_c under a direct square aggressor (0.5 W, 4 ms period: instantaneous edges), 16 ms
+  agg_edge_pi      pi_lock_c under a direct square aggressor (0.5 W, 4 ms period: instantaneous edges), 16 ms, at
+                   the default g26 site (0, -30) um. runs/review_r1/*_adv were recorded with the former site
+                   (0, 30) um, 5 um from ring 0's PD: record a new baseline before comparing agg_edge_pi again
+                   (docs/handoff/perf.md section 7)
   laser_move_pi    pi_lock_c while the lines move: a 5 GHz ramp of every line over 8 ms, then a 10 GHz step of
                    line 0 (in-solve rotation up to ROT_MAX), a 30 GHz step of line 3 (beyond ROT_MAX: the libm path)
                    and a line switched off and on again (K^2 cache, Truth FWHM cache, incremental cos/sin cache)

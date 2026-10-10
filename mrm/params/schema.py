@@ -125,6 +125,7 @@ _SITE_FIELDS = (
     P("x_um", doc="site x position", level="global"),
     P("y_um", doc="site y position", level="global"),
     S("kind", "enum", "site kind", enum=("ring", "heater", "aggressor", "monitor_pd", "temp_sensor", "driver", "other")),
+    S("note", "str", "free text: why the site is there (not read by the model)"),
 )
 _LINE_FIELDS = (
     P("freq_thz", doc="line optical frequency", level="global"),

@@ -74,7 +74,11 @@ comparison (docs/handoff/perf.md).
   (`mrm.scenarios.library` builders). Aggressor scenarios (A1, A2, `aggressor_direct`) are calibrated against the
   plant before compiling (`prepare_scenario`: the aggressor power that produces the stated victim-ring trajectory,
   recorded in `manifest_inputs["aggressor_calibration"]`). A1 has its hot cusp at t = 0; pass `phase_s = P/2` to
-  start at the cool minimum.
+  start at the cool minimum. They heat the layout site `aggressor` (g26: (0, -30) um, 30 um from ring 0 and 55 um
+  from its monitor PD). `a1_slide10_aggressor_pd_adjacent` / `a2_808_aggressor_pd_adjacent` (aliases
+  `a1_pd_adjacent`, `a2_pd_adjacent`) are STRESS scenarios, not a realistic layout: the same A1 / A2 at the site
+  `aggressor_pd_adjacent` (0, 30) um, 5 um from ring 0's monitor PD, a test of monitor dark-current runaway. The
+  rings see the same heat on both sites (same distances, same calibrated power); only the PD paths differ.
 - **Controller.** None (open loop), a registry name with `controller_params=` (mrm.control.registry.create), a
   `module:Class` path, an object with the Controller protocol (Python path), or a `CompiledController` (compiled
   path). Section 5.
@@ -169,14 +173,15 @@ The thermal step is exact for any h; per-tick sensors still run every tick. Deta
 | model based (C) | `kalman_lqg`, `kalman_lqg_c`, `mpc`, `mpc_c` | `start='warm'`: at the lock (settled warm start); `start='cold'` ramps (Python versions only) | `model_nominal` token |
 
 docs/handoff/controller_scorecard.md has every one of them on the engine (g26 nominal, steady lock and A1, from
-`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (2026-10-09): from the settled warm
+`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (2026-10-10): from the settled warm
 start, pi_lock (Python, compiled, composite), feedforward_pi, kalman_lqg and mpc (Python and compiled) hold all 8
 rings with < 0.1 pm rms jitter (each compiled version gives the same metrics as its Python version); the dither
 locks jitter at the 5 pm level by their own dither; the acquisition controllers without the supervisor lock every
-ring on a foreign line; wdm_supervisor locks all 8 on their lines in 23 ms from a cold start. Under A1 with the PD
-far from the aggressor, pi_lock, midranging, kalman_lqg and mpc hold rings 1-7 within 6-8 pm, while ring 0 leaves
-its point by 350-365 pm at the hot cusp with its heater at code 0 for 14-15 ms (heater authority). In the default g26
-layout every controller loses ring 0 (PD0 above 600 degC).
+ring on a foreign line; wdm_supervisor locks all 8 on their lines in 23 ms from a cold start. Under A1 (default
+site, 55 um from PD0), pi_lock, midranging, kalman_lqg and mpc hold rings 1-7 within 6-8 pm, while ring 0 leaves
+its point by 350-365 pm at the hot cusp with its heater at code 0 for 14-15 ms (heater authority); feedforward_pi
+loses every ring (its die sensor sees the aggressor; integrator handoff 6.4). In the stress scenario
+a1_slide10_aggressor_pd_adjacent every controller loses ring 0 (PD0 above 600 degC).
 
 ## 6. Outputs
 
@@ -295,11 +300,12 @@ the sensors (~1.8 us, mostly counter-based noise draws). Battery power or Low Po
 
 ## 10. Physics to expect, and open items for the next stage
 
-- **Monitor PD next to the A1/A2 aggressor (g26 layout).** The aggressor site (0, 30 um) is 5 um from ring 0's
-  monitor PD (`ring.thermal.pd_offset_um` [0, 25]); under the calibrated A1/A2 power the PD observer reaches
-  300-500 degC and its Arrhenius dark current (microamps) moves every monitor-based lock. Both positions are
-  assumed; the scorecard runs A1 in the default layout and with the PD on the far side. Open for the plant/config
-  owner (docs/handoff/integrator.md section 6).
+- **Monitor PD next to the A1/A2 aggressor: a stress scenario only (resolved 2026-10-10).** The g26 aggressor site
+  moved from (0, 30) to (0, -30) um: 55 um from ring 0's monitor PD (`ring.thermal.pd_offset_um` [0, 25]) instead
+  of 5 um, with every ring-to-site distance unchanged. At 5 um the calibrated A1/A2 power heats the PD observer to
+  500-600+ degC and its Arrhenius dark current (microamps) moves every monitor-based lock; that layout is kept as the
+  stress scenarios `a1_slide10_aggressor_pd_adjacent` / `a2_808_aggressor_pd_adjacent` (section 2). Both positions
+  are assumed. docs/handoff/integrator.md section 7.
 - **Wrong-line capture at power-up.** Each g26 ring's cold resonance sits ~2 FWHM blue of line n+3; a cold ring can
   self-heat onto it, and a heater ramp crosses foreign lines. Acquisition controllers lock on the first line they
   meet unless a supervisor assigns lines.

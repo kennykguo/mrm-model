@@ -1,7 +1,7 @@
 {
  "schema": "mrm.validation.predictions/1",
- "created_utc": "2026-10-09T19:24:16Z",
- "git_commit": "812fd1c",
+ "created_utc": "2026-10-10T06:16:44Z",
+ "git_commit": "d2328b4",
  "python": "3.12.8",
  "frozen_sha256": {
   "validation": "49c8a7f182666f0824dfd00871da86653abeca7a8fc39809f7d99d69831a0f02",
@@ -47,7 +47,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "topology": "add_drop",
@@ -147,7 +147,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "topology": "add_drop",
@@ -296,7 +296,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "statistic": "median",
     "rings": [
@@ -332,7 +332,7 @@
     "z": 1.1184752777865015,
     "detail": "max |pred - value| = 0.05592 mw"
    },
-   "runtime_s": 0.17
+   "runtime_s": 0.15
   },
   {
    "id": "CAL-3b",
@@ -362,7 +362,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "statistic": "median",
     "rings": [
@@ -398,7 +398,7 @@
     "z": 0.660437819914339,
     "detail": "max |pred - value| = 0.003302 v"
    },
-   "runtime_s": 0.13
+   "runtime_s": 0.14
   },
   {
    "id": "CAL-4",
@@ -491,7 +491,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "heater_v": [
@@ -653,7 +653,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "bias_v": [
@@ -700,7 +700,7 @@
     "z": 3.1289810570547942,
     "detail": "max |pred - value| = 15.64 pm"
    },
-   "runtime_s": 1.16
+   "runtime_s": 1.11
   },
   {
    "id": "CAL-6",
@@ -757,7 +757,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "t_grid_c": [
@@ -1168,7 +1168,7 @@
     "z": null,
     "detail": "tolerance none"
    },
-   "runtime_s": 2.59
+   "runtime_s": 2.57
   },
   {
    "id": "CAL-7",
@@ -1198,7 +1198,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "heater_v": 0.0,
@@ -1251,7 +1251,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "method": "quasi_static",
@@ -1315,7 +1315,7 @@
     "z": 6.162757318721937,
     "detail": "max |pred - value| = 3.081 ua"
    },
-   "runtime_s": 0.58
+   "runtime_s": 0.53
   },
   {
    "id": "CAL-9a",
@@ -1376,7 +1376,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "method": "quasi_static",
     "output": "swing",
@@ -1984,7 +1984,7 @@
     "z": 53.58342183822795,
     "detail": "max |pred - value| = 1.608e+04 codes"
    },
-   "runtime_s": 6.66
+   "runtime_s": 6.21
   },
   {
    "id": "CAL-9b",
@@ -2040,7 +2040,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "method": "quasi_static",
     "output": "lane_offsets",
@@ -2648,7 +2648,7 @@
     "z": 124.16515420944332,
     "detail": "max |pred - value| = 2.857e+04 codes"
    },
-   "runtime_s": 4.59
+   "runtime_s": 4.46
   },
   {
    "id": "CAL-9c",
@@ -2709,7 +2709,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "method": "quasi_static",
     "output": "code_range",
@@ -3317,7 +3317,7 @@
     "z": 82.31025539438485,
     "detail": "max |pred - value| = 1.646e+04 codes"
    },
-   "runtime_s": 6.61
+   "runtime_s": 6.17
   },
   {
    "id": "CAL-10",
@@ -3350,7 +3350,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "bias_v": 1.0,
@@ -3439,7 +3439,7 @@
     },
     "overrides": {},
     "batch": 256,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "uncertainty": "sample",
     "variation": "sample",
@@ -3465,7 +3465,7 @@
     "z": null,
     "detail": "prediction range [0.88, 1.012] against [0.88, 1.04]"
    },
-   "runtime_s": 0.12
+   "runtime_s": 0.13
   },
   {
    "id": "CAL-12a",
@@ -3492,7 +3492,7 @@
     "alts": {},
     "overrides": {},
     "batch": 256,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "sign": "line frequency minus grid",
     "lines": "tx"
@@ -3512,7 +3512,7 @@
     "z": null,
     "detail": "worst prediction 20 <= 20 (margin +0 ghz)"
    },
-   "runtime_s": 0.13
+   "runtime_s": 0.14
   },
   {
    "id": "CAL-12b",
@@ -3550,7 +3550,7 @@
     "alts": {},
     "overrides": {},
     "batch": 256,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "sign": "line frequency minus grid",
     "lines": "tx"
@@ -3572,7 +3572,7 @@
     "z": 3.5637686672265625,
     "detail": "max |pred - value| = 3.564 ghz"
    },
-   "runtime_s": 0.13
+   "runtime_s": 0.14
   },
   {
    "id": "CAL-12c",
@@ -3599,7 +3599,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "scenario": "laser_drift(linear)",
     "window_s": 86400.0,
@@ -3644,7 +3644,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "scenario": "laser_drift(linear)",
     "window_s": 86400.0,
@@ -4734,7 +4734,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "aggressor": "A1 slide-10",
     "waveform": "rectified_sine",
@@ -4797,7 +4797,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "aggressor": "A2 808 degC/s",
     "primary": "delta_t_per_period/symmetric_triangle",
@@ -4845,7 +4845,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "oracle",
@@ -5004,7 +5004,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "heater_v": 1.5,
@@ -5065,7 +5065,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "topology": "add_drop",
@@ -5109,7 +5109,7 @@
     "z": 37.78867662271335,
     "detail": "max |pred - value| = 18.89 db"
    },
-   "runtime_s": 0.16
+   "runtime_s": 0.15
   },
   {
    "id": "VAL-2b",
@@ -5139,7 +5139,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "topology": "add_drop",
@@ -5216,7 +5216,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "bias_v": 2.0,
@@ -5270,7 +5270,7 @@
     "z": 14.533654358218026,
     "detail": "max |pred - value| = 10.17 ghz"
    },
-   "runtime_s": 0.13
+   "runtime_s": 0.12
   },
   {
    "id": "VAL-3b",
@@ -5303,7 +5303,7 @@
     },
     "overrides": {},
     "batch": 1,
-    "config_hash": "8fbcc71a0a8a05e5e46175612e22aacffbb56208a694ee7d2b475770a9b72af9",
+    "config_hash": "0cf6b6b4ca97bf00ddb6351e1b788633c8f6becab5195fa1a7d2f3c55e30c931",
     "artefact_fallbacks": 0,
     "ring": 0,
     "bias_v": [
@@ -5414,7 +5414,7 @@
     "z": 2.612575948260132,
     "detail": "max |pred - value| = 0.05225 1"
    },
-   "runtime_s": 0.15
+   "runtime_s": 0.14
   },
   {
    "id": "VAL-4a",
@@ -5444,7 +5444,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "oracle",
@@ -5499,7 +5499,7 @@
     "z": null,
     "detail": "non-finite prediction (replica failed?)"
    },
-   "runtime_s": 0.46
+   "runtime_s": 0.41
   },
   {
    "id": "VAL-4b",
@@ -5529,7 +5529,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "oracle",
@@ -5584,7 +5584,7 @@
     "z": null,
     "detail": "non-finite prediction (replica failed?)"
    },
-   "runtime_s": 0.49
+   "runtime_s": 0.43
   },
   {
    "id": "VAL-4c",
@@ -5613,7 +5613,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "oracle",
@@ -5654,7 +5654,7 @@
     "z": 23.33327791954876,
     "detail": "max |pred - value| = 2.333 db"
    },
-   "runtime_s": 0.56
+   "runtime_s": 0.5
   },
   {
    "id": "VAL-5",
@@ -5724,7 +5724,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "fixed_code",
@@ -5956,7 +5956,7 @@
     "z": 12.925374009854266,
     "detail": "max offset error 9.05 K; asymmetry WRONG"
    },
-   "runtime_s": 0.29
+   "runtime_s": 0.33
   },
   {
    "id": "VAL-6",
@@ -5986,7 +5986,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "method": "quasi_static",
     "output": "excursion",
@@ -6158,7 +6158,7 @@
     "z": null,
     "detail": "tolerance pending"
    },
-   "runtime_s": 5.28
+   "runtime_s": 5.06
   },
   {
    "id": "VAL-7a",
@@ -6631,7 +6631,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "lines": "tx bank at realized frequencies",
     "orders": "all inside span +- 2 FWHM",
@@ -6700,7 +6700,7 @@
     "z": null,
     "detail": "worst prediction 2.792 >= 2 (margin +0.7918 1)"
    },
-   "runtime_s": 0.65
+   "runtime_s": 0.6
   },
   {
    "id": "BND-2",
@@ -6731,7 +6731,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "t_hot_c": 105.0,
     "bias_v": 3.75,
@@ -6764,7 +6764,7 @@
     "z": null,
     "detail": "worst prediction 0.2828 >= 0 (margin +0.2828 nm)"
    },
-   "runtime_s": 0.93
+   "runtime_s": 0.87
   },
   {
    "id": "BND-3a",
@@ -6805,7 +6805,7 @@
    ],
    "detail": {},
    "evaluation": null,
-   "runtime_s": 0.11
+   "runtime_s": 0.08
   },
   {
    "id": "BND-3b",
@@ -6874,7 +6874,7 @@
     "alts": {},
     "overrides": {},
     "batch": 1,
-    "config_hash": "f88524a6fa212cd9c27284e8cbe35a92180156fb7aeec2defe535b87b89266d4",
+    "config_hash": "f37f1dbd70dd855e497efec3bca0104f4f42be3e489545af49d295b7435d554c",
     "artefact_fallbacks": 0,
     "ring": 0,
     "mode": "oracle",
@@ -6912,7 +6912,7 @@
     "z": null,
     "detail": "worst prediction 0 <= 1 (margin +1 db)"
    },
-   "runtime_s": 0.39
+   "runtime_s": 0.4
   }
  ]
 }

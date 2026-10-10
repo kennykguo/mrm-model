@@ -335,3 +335,28 @@ loops turn any perturbation into another trajectory: it must stay an opt-in.
    implementation; that check lives in `test_engine_adapter` (closed forms to 2e-13 / 4e-12 relative). The Airy-path
    leaves use numba's numpy error model, so degenerate rows (K^2 = 0 and a = 1 at resonance) give inf/NaN instead of
    ZeroDivisionError, unlike the general path (P14's reason for reverting the same change elsewhere).
+
+## 7. Layout change of 2026-10-10: the baselines above are of the old layout
+
+The g26 default aggressor site moved from (0, 30) to (0, -30) um, and the old site stays in g26 as the stress site
+`aggressor_pd_adjacent` (docs/handoff/integrator.md section 7, CHANGELOG). For this file:
+
+- **`runs/perf_baseline` (and `ref2`, `perf_r1`, `perf_final_r1`) recorded `a1_pi` with the old site plus the PD
+  moved to the far side** (`ring.thermal.pd_offset_um=[0,-25]`, the former `PD_FAR` of tools/perf_scenarios.py).
+  `PD_FAR` is gone: with the new site it would put the PD 5 um from the aggressor. `a1_pi` now runs the default
+  layout, whose PD-to-aggressor distances equal the old PD-far ones (mirror image) but whose PDs sit 55 um from
+  their own ring's driver site (driver_offset_um (0, -30) um) instead of 5 um. Against `runs/perf_final_r1`
+  (`runs/perf_layout_site/compare_vs_final_r1.json`): PD temperatures 8.5-9.0 K lower on every ring (the driver's
+  ~4.5 mW of data heat no longer 5 um away), monitor current up to 19 nA lower, monitor codes up to 29, heater codes
+  up to 43, detuning up to 0.18 pm, lock-error metrics up to 0.09 pm. **Record a new baseline before any further A/B
+  comparison of `a1_pi`.**
+- The adversarial `agg_edge_pi` (tools/perf_scenarios_adv.py: a 0.5 W square aggressor at the default site, no PD
+  override) ran with the PD 5 um from the site in `runs/review_r1/base_adv`, `cur_adv`, `fix_adv`; it is now a
+  different scenario (PD0 up to ~1000 K cooler, another closed-loop trajectory). Re-record it too.
+- Every other scenario of both tools is bit-identical to `runs/perf_final_r1` / `runs/review_r1/fix_adv` (the
+  second aggressor source has zero power), except the final lag state `final/x`, which has 970 lags instead of 945.
+- **Timing**: the 25 extra lags (aggressor_pd_adjacent -> every observer) are in every g26 run, including the
+  timing cases of section 5 (`perf_bench.py`). Measured (b1lock method, 5 alternating rounds of 7 x 3000 ticks,
+  AC power, load average 4.6 / 2.6 / 2.4): 15.50 us per tick with both sites against 15.38 us with only the
+  default site, i.e. +0.1 us (+0.8 %), at the noise level. Timing comparisons with the trees of sections 2-6 therefore compare 970
+  against 945 lags; re-time the baseline tree with the same layout, or accept the 0.1 us.
