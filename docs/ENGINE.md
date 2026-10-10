@@ -59,6 +59,9 @@ to an njit function in another file that the kernel calls (`mrm/sim/metrics.py`,
 `mrm/scenarios/generators.py`, `mrm/core/*.py`) does NOT, and the cached kernel silently keeps the old code. After
 such an edit delete the kernel's cache files (`rm mrm/sim/__pycache__/kernel.*.nbi mrm/sim/__pycache__/kernel.*.nbc`)
 before running anything (docs/handoff/engine.md says the opposite; this is the checked behaviour).
+`.venv/bin/python tools/clear_numba_cache.py [module ...]` deletes the cache files of the kernel and of every leaf
+module it calls (or of the named modules); run it after every edit of njit code, and before any timing or exact
+comparison (docs/handoff/perf.md).
 
 ## 2. Inputs
 
@@ -124,10 +127,12 @@ Tick k is the instant at the end of the interval [k-1, k). At instant k, for eve
    controller steps, every actuator command is clipped to its channel range and pushed into the controller pipeline
    to latch at k + `Controller.latency_ticks`.
 
-Then the plant interval [k, k+1): commands latched at k reach the DAC registers; scenario values at k and k+1 (FOH);
+Then the plant interval [k, k+1) (all of it in `kernel._world_block`, docs/handoff/perf.md P3): commands latched at
+k reach the DAC registers; scenario values at k and k+1 (FOH);
 laser lines (and the laser_ramp factor); ones density; bias DAC (+ fast offset, latency FIFO, noise, slew, settle,
-scenario offset); NRZ levels; optics inputs at the previous ring temperature (`mrm.plant.phase`); self-heating
-bounds; data-activity heat; heater TCR split and heater DAC path (+ fast offset, dac_glitch); the implicit thermal +
+scenario offset); NRZ levels; optics inputs at the previous ring temperature (`mrm.plant.phase`; K^2 at the lines
+only when the line wavelengths move) and the substep caches of the self-heating adapter; self-heating bounds;
+data-activity heat; heater TCR split and heater DAC path (+ fast offset, dac_glitch); the implicit thermal +
 self-heating step (`kernel._implicit_step_eng`, a line-for-line mirror of `mrm.plant.selfheat.implicit_step_b`; the
 optics walk runs inside it); sensors of the interval (monitor, error counter, temperature sensors, readback); Truth,
 metrics and records of the state at k + 1. Every analog or converter delay lives in its leaf module; the engine owns
@@ -219,6 +224,29 @@ FSR-hop and wrong-line risk; no time stepping (~0.1 s for one point of g26).
   directly (`eng_pabs` / `eng_commit`), which is why `_implicit_step_eng` mirrors `selfheat.implicit_step_b`. Any
   change to the selfheat solver must be copied there; `tests/verification/test_kernel_parity.py` fails bit for bit
   otherwise, and `test_kernel_is_disk_cacheable` guards the cache.
+- The whole tick lives in `_world_block` (performance, docs/handoff/perf.md P3): a numba function that receives the
+  KParams/KState tuples and calls another compiled function pays a reference-count increment and decrement of all
+  ~270 arrays in them on entry and exit (0.2-0.4 us per call). Keep per-tick helpers on arrays (as `_truth_a`,
+  `_decl`, the leaf `*_row` kernels); only the controller edge (`release_row`, `_edge`), `_auto_h` and `_oracle`
+  take the tuples, once per controller period / auto step / oracle period.
+- The self-heating adapter's exact-ring path (no backscatter; the g26 default) lives in `mrm.plant.optics`
+  (`sh_fast_precompute`, `sh_fast_pabs`, `sh_fast_outputs`, `sh_bounds`) and is shared by the engine and the
+  reference (through `selfheat_pabs` / `selfheat_commit` / `selfheat_bounds`), so the parity stays bit for bit: per
+  substep it caches cos/sin of each line's reference phase (updated by rotation) and the constants of the Airy
+  closed forms; an evaluation rotates by the small in-solve angle and divides once. Equal to the closed forms up to
+  floating-point rounding (tests/verification/test_engine_adapter.py). The caches are keyed on their inputs, so the
+  optics adapter stays correct for any caller that rewrites the rows; the engine refreshes them once per substep
+  (`kernel.eng_precompute`) and evaluates without checks.
+- `Plant(optics_far_hold=True)` / `run(..., optics_far_hold=True)` (default False): the far-line hold, a bounded
+  approximation (lines >= 8 half-widths from every resonance held to first order in phase and loss between
+  refreshes; P_abs error <= 3e-9 W per ring, ~1e-3 pm), 5-9 % faster. Not a default: the closed loops amplify it
+  into other trajectories (up to 0.35 pm and 17 monitor codes in the regression scenarios, perf.md 5.4); use it for
+  Monte Carlo throughput only. `Plant(sh_tol_k=...)` (default 1e-7 K) is the self-heating root tolerance. Both are
+  also `run()` options.
+- The kernel's thermal pass runs from tables built at the start of each block (lag indices by kind, per-lag gains
+  src_scale (c0 + c1), implicit gains per observer, heater-split gains, the lockstep layout of the heater observers;
+  perf.md P8, P13): bit-identical to `selfheat.implicit_step_b` / `thermal.observer_split_b`. Tables that depend on
+  KParams are rebuilt per block, never cached across calls (Plant.settle swaps the coefficient tables).
 - `kernel_ref.ReferenceEngine` is the NumPy tick built from the leaf modules' public functions (07 P1-18). Parity:
   every Truth field, every observation vector and the metrics, bit for bit, open loop and with Python and compiled
   controllers, also under `NUMBA_DISABLE_JIT=1`.
@@ -231,10 +259,13 @@ FSR-hop and wrong-line risk; no time stepping (~0.1 s for one point of g26).
 - **A Truth field / record channel**: append to `TRUTH_FIELDS` (never reorder), write it in `kernel.truth_row` and
   in `kernel_ref`, extend the parity test.
 - **A sensor or actuator channel**: declare it in `mrm/core/channels.py` (ids are append-only), produce it in
-  `kernel.release_row` (sensor) or consume it in `_prepare_interval` / `apply_act_row` (actuator), and in
-  `kernel_ref`. `ChannelMaps.from_spec` maps names to kernel slots.
-- **A scenario signal**: add it to `mrm.scenarios.generators` (signal ids append-only), read it in
-  `_prepare_interval` with `_sig_off`, and decide its auto-substep class (linear FOH or held).
+  `kernel.release_row` (sensor) or consume it in `_world_block` (the interval inputs) / `apply_act_row` (actuator),
+  and in `kernel_ref`. `ChannelMaps.from_spec` maps names to kernel slots.
+- **A scenario signal**: add it to `mrm.scenarios.generators` (signal ids append-only), read it in `_world_block`
+  (offset from `_sig_off`, taken once per block), and decide its auto-substep class (linear FOH or held).
+- **A cache in the kernel** (a value kept across ticks because its inputs did not change): key it on its inputs and
+  invalidate it in `Plant._reset` (as `RI_HE_TCODE`, `LF_PDB_KEY`, the optics adapter's NaN keys); never assume
+  that an input is constant.
 - **A fidelity switch**: an integer field in `KParams` (from PlantParams flags), branched inside the kernel; never a
   module-level constant.
 - **A controller**: copy a template in `examples/controllers/` (Python, per-ring, compiled), register it with
@@ -244,20 +275,23 @@ FSR-hop and wrong-line risk; no time stepping (~0.1 s for one point of g26).
   first, section 1): `test_kernel_parity.py`, `test_engine_timing.py`, `test_metrics.py`, `test_engine_physics.py`,
   `test_engine_warm_start.py` (the first run recompiles: use `memguard --heavy`).
 
-## 9. Performance (07 P0-9 budget not met on this machine)
+## 9. Performance (07 P0-9: the fixed-tick budget is not met; the Monte Carlo budget is)
 
-Shared 8-core M2, g26, N = L = 8, warm cache (engine.md section 4 has the breakdown):
+8-core M2 on AC power (Low Power Mode off), g26, N = L = 8, warm cache, after performance round 1
+(docs/handoff/perf.md section 5; engine.md section 4 has the breakdown):
 
 | case | us per world-tick | simulated s per wall s |
 |---|---|---|
-| B = 1, fixed | 94-103 (load 8-14), 133-143 (load 15-22) | 0.007-0.011 (07 target >= 0.1) |
-| B = 1, auto, 10 kHz controller | 21-39 | 0.026-0.047 (07 target >= 20) |
-| B = 1, auto, 100 kHz controller | 53-74 | 0.013-0.019 |
-| B = 64, fixed, 8 threads | 27-40 | 0.0004-0.0005 for the bank |
-| B = 1, 100 kHz controller, fixed (scorecard runs, load ~3-5) | ~75 (Python path), ~55 (compiled) including the controller | 0.012-0.013 (Python path), 0.017-0.019 (compiled) |
+| B = 1, fixed | 15.5-16.0 (load 2-3) | 0.063-0.065 (07 target >= 0.1) |
+| B = 1, auto, 10 kHz controller | 4.5 | 0.22 (07 target >= 20) |
+| B = 1, auto, 100 kHz controller | 9.0-9.1 | 0.11 |
+| B = 64, fixed, 8 threads | 3.3-3.7 | 0.0044-0.0048 for the bank: 64 x 1 s in 3.5-3.9 min (07: 5 min) |
 
-The implicit self-heating solve (~52 us at B = 1) dominates, then `_prepare_interval` (~20 us) and the sensors
-(~17 us). A 64 x 1 s Monte Carlo takes ~35-43 min (07: 5 min). Levers not taken are in engine.md section 4.
+Commit 8646691 ran 54-55 us per B = 1 tick under the same conditions; round 1 changed results only at floating-point
+rounding level (perf.md 5.3). The self-heating optics (~6.8 us at B = 1) dominate, then the thermal ROM (~2.7 us) and
+the sensors (~1.8 us, mostly counter-based noise draws). Battery power or Low Power Mode is ~1.7x slower. Options:
+`Plant(optics_far_hold=True)` (an approximation that changes closed-loop trajectories, perf.md 5.4) ~6 % faster;
+`sh_tol_k=1e-6` ~3 % faster.
 
 ## 10. Physics to expect, and open items for the next stage
 

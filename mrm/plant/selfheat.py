@@ -213,21 +213,24 @@ def implicit_step_b(x, a, c0, c1, lag_src, lag_obs, lag_kind, opt_lags, obs_ptr,
             raise ValueError("implicit_step needs the ring_mode_weighted observer of every ring")
         n_iter[k] = 1
     n_obs = obs_ptr.shape[0] - 1
+    # two passes (the same values and, per observer, the same summation order as one pass over the observers; the
+    # lag update without the observer sums runs ~20 % faster): every lag with its known input, then the sums
+    for m in range(lag_kind.shape[0]):
+        s = lag_src[m]
+        kd = lag_kind[m]
+        xm = a[m] * x[m]
+        if kd == LAG_EXOGENOUS:
+            xm += src_scale[s] * (c0[m] * u0[s] + c1[m] * u1[s])
+        elif kd == LAG_OPT_CROSS_RING:
+            xm += src_scale[s] * (c0[m] + c1[m]) * p_prev[src_ring[s]]
+        x[m] = xm
     for o in range(n_obs):
         e = t_base
         g = 0.0
         for m in range(obs_ptr[o], obs_ptr[o + 1]):
-            s = lag_src[m]
-            kd = lag_kind[m]
-            xm = a[m] * x[m]
-            if kd == LAG_EXOGENOUS:
-                xm += src_scale[s] * (c0[m] * u0[s] + c1[m] * u1[s])
-            elif kd == LAG_OPT_CROSS_RING:
-                xm += src_scale[s] * (c0[m] + c1[m]) * p_prev[src_ring[s]]
-            elif kd == LAG_OPT_SELF:
-                g += src_scale[s] * (c0[m] + c1[m])
-            x[m] = xm
-            e += xm
+            if lag_kind[m] == LAG_OPT_SELF:
+                g += src_scale[lag_src[m]] * (c0[m] + c1[m])
+            e += x[m]
         t_obs[o] = e                       # everything except the new optical inputs
         g_work[o] = g
     n_fail = 0

@@ -53,6 +53,13 @@ DEFAULT_SH_DT_MAX_K = 50.0
 #: resonance at 70 pm/K) saves about one Newton evaluation per ring and tick (design choice; tested in
 #: tests/verification/test_engine_physics.py against 1e-10 K).
 DEFAULT_SH_TOL_K = 1e-7
+#: far-line hold of the self-heating optics (mrm.plant.optics FAR_*; docs/handoff/perf.md P5): a bounded approximation
+#: (P_abs error <= ~3e-9 W per ring, measured <= 6e-11 W; ~1e-3 pm of resonance) that saves ~7 % of the tick. Off by
+#: default: it is far below the ADC LSB and the noise floor, but like any perturbation it changes which ADC codes a
+#: closed loop sees, and one controller test (test_ctrl_b_robust swing-loss, a creeping ratio loop) then ended
+#: outside its p-p bound (5.1 pm against 4 pm; 2.98 pm exact). Plant(optics_far_hold=True) /
+#: run(..., optics_far_hold=True) turns it on (Monte Carlo throughput)
+DEFAULT_OPTICS_FAR_HOLD = False
 _NEVER = -(1 << 62)
 
 
@@ -152,9 +159,10 @@ class Plant:
                  metrics: MetricsSpec | None = None, record=None, record_ticks: int = 0,
                  substep_policy: str | None = None, auto_max_ticks: int = 64, fast_kernel: bool = False,
                  oracle: bool = True, histogram: bool | None = None, calibrate_aggressors: bool = True,
-                 sh_tol_k: float = DEFAULT_SH_TOL_K):
+                 sh_tol_k: float = DEFAULT_SH_TOL_K, optics_far_hold: bool = DEFAULT_OPTICS_FAR_HOLD):
         self.pp = pp
         self.sh_tol_k = float(sh_tol_k)
+        self.optics_far_hold = bool(optics_far_hold)
         B, N, L = int(pp.batch), int(pp.n_rings), int(pp.n_lines)
         self.B, self.N, self.L = B, N, L
         self.dt = float(pp.timing.dt_s)
@@ -225,7 +233,7 @@ class Plant:
                 bus_order=np.asarray(pp.layout.bus_order), rb=np.asarray(pp.optics.backscatter_rb[b]),
                 nrz={"p1": np.full(N, 0.5), "phi1": np.zeros((N, L)), "a1": np.full((N, L), 0.99),
                      "eta1": np.full((N, L), 0.5)},
-                method=method, m_orders=int(pp.optics.tcmt_orders)))
+                method=method, m_orders=int(pp.optics.tcmt_orders), far_hold=self.optics_far_hold))
         args_f0, args_i = K.extend_selfheat_rows(np.stack([r[0] for r in rows]), np.stack([r[1] for r in rows]))
         self._args_f0 = args_f0
         # actuator paths
@@ -540,6 +548,11 @@ class Plant:
             a[...] = 0
         S.las_cache_j[...] = -1
         S.sh_args_f[...] = self._args_f0
+        # kernel caches keyed on their inputs (docs/handoff/perf.md): no key matches after a reset
+        S.ri[:, K.RI_HE_TCODE] = -1
+        S.ri[:, K.RI_BI_TCODE] = -1
+        S.lf[:, K.LF_PDB_KEY] = np.nan
+        S.wf[:, K.WF_LOSS_KEY] = np.nan
         S.sc_cache[...] = self.scen_arrays.new_cache()
         # scenario values at k0 (signals without components keep their defaults)
         arr = self.scen_arrays

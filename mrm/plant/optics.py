@@ -1281,10 +1281,15 @@ def bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l):
             pk = out_rl[RL_PIN, k, l]
             g2 *= bus_t2[k] * bus_t2[k]
             if pk > 0.0 and p_in_w[l] > 0.0:
-                rr = out_rl[RL_REFL, k, l] / pk
-                ret += rr * p_in_w[l] * g2
-                tot += math.sqrt(rr)
-                sq += rr
+                refl = out_rl[RL_REFL, k, l]
+                if refl == 0.0:
+                    # rr = 0 / pk = 0: no division and no square root (the same sums, bit for bit)
+                    ret += 0.0 * p_in_w[l] * g2
+                else:
+                    rr = refl / pk
+                    ret += rr * p_in_w[l] * g2
+                    tot += math.sqrt(rr)
+                    sq += rr
                 th = out_rl[RL_THRU, k, l]
                 th0 = out_rl[RL_THRU0, k, l]
                 th1 = out_rl[RL_THRU1, k, l]
@@ -1360,7 +1365,15 @@ SH_O_OR = 14      # out_r (N_R, N)
 SH_O_OL = 15      # out_l (N_L, L)
 SH_O_CW = 16      # complex workspace (N_CW, L), stored as 2 N_CW L float64
 SH_O_FW = 17      # float workspace (N_FW, L)
-SH_HDR = 18       # args_i[SH_HDR:SH_HDR+N] = bus_order; args_i[SH_HDR+N:SH_HDR+2N] = bus position of each ring
+SH_O_FK = 18      # Airy-path cache per (ring, line) (N, L, N_FK): K^2 keys and coupler amplitudes
+SH_O_FC = 19      # Airy-path cache per (level, ring, line) (2, N, L, N_FC): input keys, cos/sin of the reference phase
+                  # and the per-substep constants
+SH_O_FF = 20      # Airy-path flag per ring (N,): 1.0 exact ring without backscatter (the hoisted path), else 0.0;
+                  # then 8 floats of scratch (the memo of _afac)
+SH_O_LE = 21      # last Airy evaluation: per (level, line) N_LE values (2, L, N_LE), then (ring, temperature, shift)
+SH_O_FH = 22      # far-line hold per (level, ring, line) (2, N, L, N_FH) (fidelity optics_far_hold)
+SH_FARHOLD = 23   # 1: hold far lines to first order between refreshes (pack_selfheat_args(far_hold=...))
+SH_HDR = 24       # args_i[SH_HDR:SH_HDR+N] = bus_order; args_i[SH_HDR+N:SH_HDR+2N] = bus position of each ring
 # rows of the per-ring block
 SHR_T2 = 0        # bus power transmission of the segment before the ring [-]
 SHR_P1 = 1        # ones density [-]
@@ -1470,6 +1483,9 @@ def selfheat_pabs(t, k, args_f, args_i):
     P_abs,k sums every line, both directions and every order (exact ring) at the input left by the rings before k in
     bus order (07 P0-1). dP_abs/dT = (dP_abs/dlambda_res)(dlambda_res/dT), analytic (:func:`dpabs_dlambda_res_nb`).
     """
+    if _fast_flag(k, args_f, args_i) != 0.0:
+        _fast_check(k, args_f, args_i)
+        return sh_fast_pabs(t, k, args_f, args_i)
     p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
     n = args_i[SH_N]
     dlam_dt = _sh_prepare(t, k, args_i[SH_HDR + n + k], p_in, pcur, rg, nb)
@@ -1485,7 +1501,16 @@ def selfheat_commit(t, k, args_f, args_i):
     """commit_fn for mrm.plant.selfheat: write every output of ring k at its solved temperature t [K] into the packed
     out_rl / out_r, pass its through power to the next ring in bus order, and after the last ring fill out_l
     (:func:`bus_finalize_nb`). The walk restarts by itself at the first ring, so Gauss-Seidel sweeps (n_outer > 1)
-    and later substeps need no reset."""
+    and later substeps need no reset. Airy-path rings (exact ring, no backscatter): the outputs of the evaluation at t
+    (the last one when it was ring k at t, else a new one), with the slope outputs always filled."""
+    if _fast_flag(k, args_f, args_i) != 0.0:
+        if not sh_last_is(k, t, args_f, args_i):
+            _fast_check(k, args_f, args_i)
+            sh_fast_pabs(t, k, args_f, args_i)
+        sh_fast_outputs(k, args_f, args_i)
+        sh_pass_on(k, args_f, args_i)
+        sh_last_clear(args_f, args_i)
+        return
     p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
     orl, orr, ol = _sh_outputs(args_f, args_i)
     n = args_i[SH_N]
@@ -1514,43 +1539,721 @@ def selfheat_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
         p_max [W];  dpdt_max = dp_max_phi * D * S [W/K];  d2p_max = d2p_max_phi (D S)^2 + dp_max_phi D |s0 beta|
     [W/K^2], with D = max_l |dphi/dlambda_res| and S = |s0| (1 + |beta| dt_max_k). Fills p_max, d2p_max, dpdt_max (N,).
     Valid for |r_b| <= RB_MAX_BOUNDS. Uses the walk buffer as scratch: call it between substeps, not inside a walk.
+    Brings the Airy-path caches up to date first (:func:`_fast_check`), then :func:`sh_bounds`.
     """
-    p_in, pcur, rg, nb, rb, cw, fw = _sh_core(args_f, args_i)
     n = args_i[SH_N]
+    for k in range(n):
+        if _fast_flag(k, args_f, args_i) != 0.0:
+            _fast_check(k, args_f, args_i)
+    sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max)
+
+
+# ---- the Airy path of the adapter: the exact ring without backscatter, with its substep constants hoisted ----------
+# docs/handoff/perf.md (P1, P4). Within one implicit step only the round-trip phase of a ring depends on the trial
+# temperature (a rigid shift b = dphi/dlambda_res * shift(T) of every line); the loss, the couplings and the group delay
+# are held. So per (level, ring, line) the cache SH_O_FC keeps cos/sin of the reference phase phi_ref + psi and the
+# constants of the Airy closed forms (:func:`_airy_line`: r = t1 t2 a, the numerator terms, the energy and loss
+# factors), and an evaluation rotates (cos, sin) by the small angle b (a Taylor polynomial whose truncation error is
+# below 1e-17 for |b| <= 0.05 rad, :func:`_rot`; libm cos/sin beyond) and divides once. This is the same function as
+# _airy_line up to floating-point rounding: the differences are of the size of the rounding of the absolute phase
+# phi_ref (~2e-14 rad at phi ~ 200 rad), measured below 1e-12 relative in P_abs and its slope
+# (tests/verification/test_engine_adapter.py).
+# The cached cos/sin of each level is updated incrementally from one substep to the next: rotated by the change of its
+# (floating-point) reference phase, an exact difference, so only the rounding of each rotation accumulates (reset by an
+# exact libm cos/sin every ROT_REFRESH updates or when the phase jumps by more than ROT_MAX). Per update that rounding
+# is <= ~4 ulp(1) (cos b rounded, two products and a sum); with random phase steps it adds up as a random walk (~1e-14
+# after ROT_REFRESH updates), but a constant step (a steady drift of the ring temperature or the laser) repeats the
+# same rounding every update, so the cache drifts systematically: <= ROT_REFRESH x 4 ulp = 1.8e-12 (measured 3e-13).
+# At resonance (den >= (1 - r)^2 ~ 5e-3 in g26) that is <= ~7e-10 relative in P_abs, ~5e-9 K of ring temperature at
+# g26's self-heating gain, far below the 1e-7 K root tolerance of the solve (test_engine_adapter). The caches are
+# keyed on their inputs (phi_ref, psi, a, t_rt per level and line; K^2 per line), so :func:`selfheat_pabs` /
+# :func:`selfheat_commit` stay correct when a caller rewrites the rows: :func:`_fast_check` recomputes stale entries,
+# and the Airy-path flag of a ring is re-derived from its backscatter row at every call (:func:`_fast_flag`). The engine (mrm.sim.kernel) recomputes every entry once per substep with :func:`sh_fast_precompute` and then
+# evaluates without the check; both run :func:`_fc_entry`, so engine and reference stay bit-identical.
+N_FK = 6
+FK_K2T, FK_K2D, FK_T1, FK_K1, FK_T2, FK_K2 = range(N_FK)
+N_FC = 16
+(FC_PHI, FC_A, FC_TRT, FC_PSI, FC_C, FC_S, FC_TWO_R, FC_RR, FC_K11, FC_SL, FC_A2, FC_BC, FC_CC, FC_DN,
+ FC_SE, FC_CNT) = range(N_FC)
+ROT_REFRESH = 4096  # incremental updates of a cached cos/sin before it is recomputed with libm cos/sin
+N_LE = 5
+LE_C, LE_RINV, LE_U2, LE_LOSS, LE_DLOSS = range(N_LE)
+ROT_MAX = 0.05     # largest rotation angle (rad) evaluated with the Taylor polynomial
+
+# ---- far-line hold (fidelity optics_far_hold; docs/handoff/perf.md P5) ----------------------------------------------
+# A line far from every resonance of a ring changes that ring's outputs only slowly. With far_hold on, a line whose
+# Lorentzian-equivalent detuning u = sqrt(den/(1 - r)^2 - 1) (den = 1 - 2 r cos(phi) + r^2 of the Airy forms) is at
+# least FAR_U half-widths at both NRZ levels is held: its per-watt responses X in {T (through), D (drop), L (loss),
+# U (CW energy)} and their first derivatives in the phase and in the round-trip amplitude a are stored at the hold
+# point (phase phi_h = phi_ref + psi, amplitude a_h), and every evaluation and commit uses
+#     X = X_h + X_phi (phi - phi_h) + X_a (a - a_h)     (U also times t_rt / t_rt,h, exactly; P_in and eta exactly)
+# while |phi_ref + psi - phi_h| <= FAR_DPHI and |a - a_h| <= FAR_DA (else the line is refreshed at the next substep's
+# cache update), and while the in-solve rotation |b| <= FAR_DB (else that line is evaluated exactly from then on).
+# Error: every X has the form const + K/den(phi) (T = 1 - k1^2 (1 - t2^2 a^2)/den, D = k1^2 k2^2 a/den, L and U
+# = u2 * const with u2 = k1^2/den), and |d^2(1/den)/dphi^2| <= 10 r/den^2 (from den = (1 - r)^2 + 4 r sin^2(phi/2) and
+# sin^2 phi <= (den - (1 - r)^2)/r), so the phase remainder is at most 5 r (K/den)/den dphi^2 <= 5 r |X - const|
+# dphi^2 / den with dphi <= FAR_DPHI + FAR_DB = 1e-3 rad and den >= (1 - r)^2 (1 + FAR_U^2); for g26 (r ~ 0.93,
+# (1 - r)^2 ~ 5e-3) that is <= 1.5e-5 of a far line's own (small) response; the a remainder (d ln X/da <= ~2/(1 - a)
+# ~ 40, (1/2) X_aa FAR_DA^2) and the cross term are below 1e-6 of it. A far line absorbs <= 1/(1 + FAR_U^2) of the
+# line's peak, so the P_abs error of a ring is <= 14 lines x 1.5e-5 x (P_peak / 65) ~ 3e-9 W at 2 mW per line,
+# i.e. <= ~1.5e-5 K of ring temperature (~1e-3 pm) through g26's ~4800 K/W self-heating gain; the monitor drop error
+# is ~1e-6 of the monitor input. Measured against far_hold off: tests/verification/test_engine_adapter.py.
+FAR_U = 8.0        # far: >= 8 half-widths from every resonance at both levels
+FAR_DPHI = 5e-4    # rad: largest drift of the reference phase from the hold point before a refresh
+FAR_DB = 5e-4      # rad: largest in-solve rotation evaluated with the held model (else that line goes exact)
+FAR_DA = 3e-5      # largest drift of the round-trip amplitude a from the hold point before a refresh
+FAR_BOUND_MARGIN = 1e-3   # held bound factors are inflated by this (a moves by <= FAR_DA: ~6e-4 relative)
+N_FH = 19
+(FH_STATE, FH_ANG, FH_A, FH_TRT, FH_T, FH_D, FH_L, FH_U, FH_TP, FH_DP, FH_LP, FH_UP, FH_TA, FH_DA, FH_LA, FH_UA,
+ FH_PM, FH_CM, FH_SM) = range(N_FH)
+
+
+@njit(cache=True, inline="always")
+def _rot(b):
+    """(cos b, sin b) for |b| <= ROT_MAX by Taylor polynomials of the lowest degree whose truncation stays below
+    1e-17: to b^2 / b^3 for |b| <= 1e-4 (truncation b^4/24 <= 4e-18), to b^4 / b^5 for |b| <= 3e-3 (b^6/720 <= 1e-18),
+    to b^8 / b^9 otherwise (b^10/10! <= 3e-20 at 0.05). Most rotations of a substep are below 1e-4 rad."""
+    b2 = b * b
+    ab = abs(b)
+    if ab <= 1e-4:
+        return 1.0 - 0.5 * b2, b * (1.0 - b2 * (1.0 / 6.0))
+    if ab <= 3e-3:
+        return (1.0 - b2 * (0.5 - b2 * (1.0 / 24.0)),
+                b * (1.0 - b2 * (1.0 / 6.0 - b2 * (1.0 / 120.0))))
+    cb = 1.0 - b2 * (0.5 - b2 * (1.0 / 24.0 - b2 * (1.0 / 720.0 - b2 * (1.0 / 40320.0))))
+    sb = b * (1.0 - b2 * (1.0 / 6.0 - b2 * (1.0 / 120.0 - b2 * (1.0 / 5040.0 - b2 * (1.0 / 362880.0)))))
+    return cb, sb
+
+
+@njit(cache=True)
+def _fast_flag(k, args_f, args_i):
+    """1.0 when ring k takes the Airy path (exact ring, no backscatter for ring k), else 0.0. Derived from the
+    current backscatter row at every call (2 M_b compares: a caller may rewrite any row through
+    :func:`selfheat_views`, rb included, and a flag kept from an earlier call would then run the ring without its
+    backscatter) and stored in SH_O_FF, which the engine's eng_pabs / eng_commit read after
+    :func:`sh_fast_precompute` refreshed it for the substep."""
+    fast = args_i[SH_TCMT] == 0
+    mb = args_i[SH_MB]
+    o_rb = args_i[SH_O_RB]
+    for i in range(2 * mb):
+        if args_f[o_rb + 2 * mb * k + i] != 0.0:
+            fast = False
+    f = 1.0 if fast else 0.0
+    args_f[args_i[SH_O_FF] + k] = f
+    return f
+
+
+@njit(cache=True, error_model="numpy", inline="always")
+def _fk_entry(k, l, args_f, args_i):
+    """Coupler amplitudes of ring k at line l (t1 = sqrt(1 - K^2_th), k1 = sqrt(K^2_th), t2, k2) and their keys."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    o_nl = args_i[SH_O_NL]
+    kt = args_f[o_nl + SHN_K2T * nn + k * nl + l]
+    kd = args_f[o_nl + SHN_K2D * nn + k * nl + l]
+    q = args_i[SH_O_FK] + (k * nl + l) * N_FK
+    args_f[q + FK_K2T] = kt
+    args_f[q + FK_K2D] = kd
+    args_f[q + FK_T1] = math.sqrt(1.0 - kt)
+    args_f[q + FK_K1] = math.sqrt(kt)
+    args_f[q + FK_T2] = math.sqrt(1.0 - kd)
+    args_f[q + FK_K2] = math.sqrt(kd)
+
+
+@njit(cache=True, error_model="numpy", inline="always")
+def _afac(a, memo, lvl):
+    """(q, lossfrac, g) of :func:`_airy_line` / :func:`_seg_factors` for round-trip amplitude a (xi = -ln a:
+    exp(-xi) = a, q = exp(-xi/2) = sqrt(a), y = xi/2, lossfrac = -expm1(-y), g = lossfrac / y; exact identities, the
+    old forms only round differently). memo (8,) keeps the last a of each level and its factors (a is the same at
+    every line of a ring), so the three transcendental functions run once per ring and level."""
+    j = 4 * lvl
+    if memo[j] == a:
+        return memo[j + 1], memo[j + 2], memo[j + 3]
+    y = -0.5 * math.log(a)
+    qq = math.sqrt(a)
+    lossf = -math.expm1(-y)
+    g = lossf / y if y > 1e-300 else 1.0
+    memo[j] = a
+    memo[j + 1] = qq
+    memo[j + 2] = lossf
+    memo[j + 3] = g
+    return qq, lossf, g
+
+
+@njit(cache=True, error_model="numpy", inline="always")
+def _fc_entry(k, l, two, args_f, args_i, memo):
+    """Airy-path constants of ring k at line l for level 0 (and 1 when two): keys, cos/sin of phi_ref + psi, and
+    the factors of :func:`_airy_line` (a, the quarter-ring factor q = sqrt(a), the loss and energy factors of
+    :func:`_seg_factors`), from the rows and the coupler cache SH_O_FK (which must be current). memo: see
+    :func:`_afac` (the result does not depend on it)."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    o_nl = args_i[SH_O_NL]
+    base = k * nl + l
+    q = args_i[SH_O_FK] + base * N_FK
+    t1 = args_f[q + FK_T1]
+    k1 = args_f[q + FK_K1]
+    t2 = args_f[q + FK_T2]
+    k2 = args_f[q + FK_K2]
+    psi = args_f[o_nl + SHN_PSI * nn + base]
+    trt = args_f[o_nl + SHN_TRT * nn + base]
+    for lvl in range(2 if two else 1):
+        ph = args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
+        a = args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base]
+        p = args_i[SH_O_FC] + (lvl * nn + base) * N_FC
+        # each level's cos/sin is rotated from its own previous value by the change of its reference phase (an
+        # exact difference of two floats; typically 1e-5 rad per substep), re-derived with libm every ROT_REFRESH
+        # updates, after a jump beyond ROT_MAX and for an empty cache (NaN keys)
+        ang = ph + psi
+        d = ang - (args_f[p + FC_PHI] + args_f[p + FC_PSI])
+        cnt = args_f[p + FC_CNT]
+        if abs(d) <= ROT_MAX and cnt < ROT_REFRESH:
+            cb, sb = _rot(d)
+            c = args_f[p + FC_C] * cb - args_f[p + FC_S] * sb
+            s = args_f[p + FC_S] * cb + args_f[p + FC_C] * sb
+            args_f[p + FC_CNT] = cnt + 1.0
+        else:
+            c = math.cos(ang)
+            s = math.sin(ang)
+            args_f[p + FC_CNT] = 0.0
+        args_f[p + FC_PHI] = ph
+        args_f[p + FC_A] = a
+        args_f[p + FC_TRT] = trt
+        args_f[p + FC_PSI] = psi
+        args_f[p + FC_C] = c
+        args_f[p + FC_S] = s
+        qq, lossf, g = _afac(a, memo, lvl)
+        r = t1 * t2 * a
+        t22 = t2 * t2
+        seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
+        args_f[p + FC_TWO_R] = 2.0 * r
+        args_f[p + FC_RR] = r * r
+        args_f[p + FC_K11] = k1 * k1
+        args_f[p + FC_SL] = seg * lossf
+        args_f[p + FC_A2] = t1 * t1
+        args_f[p + FC_BC] = 2.0 * t1 * t2 * a
+        args_f[p + FC_CC] = t22 * a * a
+        args_f[p + FC_DN] = k1 * k1 * k2 * k2 * a
+        args_f[p + FC_SE] = seg * (0.25 * trt * g)
+
+
+@njit(cache=True, error_model="numpy")
+def _fh_entry(k, l, two, args_f, args_i, memo):
+    """Classify line l of ring k (needs a current SH_O_FC entry) and, when it is far at every level, store its hold
+    (values and first derivatives in phi and a of T, D, L, U per watt at b = 0, and the per-watt factors of the
+    bounds of :func:`pabs_bounds_nb` / :func:`pabs_slope_bound_nb`). Returns True when the line is held."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    base = k * nl + l
+    o_fc = args_i[SH_O_FC]
+    o_fh = args_i[SH_O_FH]
+    n_lvl = 2 if two else 1
+    far = True
+    for lvl in range(n_lvl):
+        p = o_fc + (lvl * nn + base) * N_FC
+        two_r = args_f[p + FC_TWO_R]
+        den = 1.0 - two_r * args_f[p + FC_C] + args_f[p + FC_RR]
+        om = 1.0 - 0.5 * two_r
+        if not (den >= om * om * (1.0 + FAR_U * FAR_U)):
+            far = False
+    h0 = o_fh + base * N_FH
+    if not far:
+        args_f[h0 + FH_STATE] = 0.0
+        return False
+    q = args_i[SH_O_FK] + base * N_FK
+    kt = args_f[q + FK_K2T]
+    t1 = args_f[q + FK_T1]
+    k1 = args_f[q + FK_K1]
+    t2 = args_f[q + FK_T2]
+    k2 = args_f[q + FK_K2]
+    t22 = t2 * t2
+    for lvl in range(n_lvl):
+        p = o_fc + (lvl * nn + base) * N_FC
+        h = o_fh + (lvl * nn + base) * N_FH
+        c = args_f[p + FC_C]
+        sn_ = args_f[p + FC_S]
+        two_r = args_f[p + FC_TWO_R]
+        a = args_f[p + FC_A]
+        trt = args_f[p + FC_TRT]
+        den = 1.0 - two_r * c + args_f[p + FC_RR]
+        rinv = 1.0 / den
+        T = (args_f[p + FC_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
+        D = args_f[p + FC_DN] * rinv
+        u2 = args_f[p + FC_K11] * rinv
+        L = u2 * args_f[p + FC_SL]
+        U = u2 * args_f[p + FC_SE]
+        # d/dphi: num = A2 - BC cos + CC, den = 1 - 2r cos + r^2
+        dden = two_r * sn_
+        u2p = -u2 * dden * rinv
+        # d/da at fixed phi: r = t1 t2 a
+        r = 0.5 * two_r
+        dr = t1 * t2
+        dden_a = 2.0 * dr * (r - c)
+        dnum_a = -2.0 * dr * c + 2.0 * t22 * a
+        u2a = -u2 * dden_a * rinv
+        qq, lossf, g = _afac(a, memo, lvl)
+        seg = 1.0 + qq + t22 * qq * qq + t22 * qq * qq * qq
+        dq = 0.5 / qq
+        dseg = dq * (1.0 + 2.0 * t22 * qq + 3.0 * t22 * qq * qq)
+        dlossf = -dq
+        sl = seg * lossf
+        dsl = dseg * lossf + seg * dlossf
+        y = -0.5 * math.log(a)
+        if y > 1e-300:
+            dg = (dlossf * y + lossf * 0.5 / a) / (y * y)
+        else:
+            dg = 0.0
+        se = seg * (0.25 * trt * g)
+        dse = 0.25 * trt * (dseg * g + seg * dg)
+        args_f[h + FH_ANG] = args_f[p + FC_PHI] + args_f[p + FC_PSI]
+        args_f[h + FH_A] = a
+        args_f[h + FH_TRT] = trt
+        args_f[h + FH_T] = T
+        args_f[h + FH_D] = D
+        args_f[h + FH_L] = L
+        args_f[h + FH_U] = U
+        args_f[h + FH_TP] = (args_f[p + FC_BC] * sn_ - T * dden) * rinv
+        args_f[h + FH_DP] = -D * dden * rinv
+        args_f[h + FH_LP] = u2p * args_f[p + FC_SL]
+        args_f[h + FH_UP] = u2p * args_f[p + FC_SE]
+        args_f[h + FH_TA] = (dnum_a - T * dden_a) * rinv
+        args_f[h + FH_DA] = (k1 * k1 * k2 * k2 - D * dden_a) * rinv
+        args_f[h + FH_LA] = u2a * sl + u2 * dsl
+        args_f[h + FH_UA] = u2a * se + u2 * dse
+        # per-watt factors of the bounds (pabs_bounds_nb / pabs_slope_bound_nb with the raw a)
+        rb_ = t1 * t2 * a
+        om = 1.0 - rb_
+        cb_ = kt * (1.0 - a) * (1.0 + t22 * a)
+        args_f[h + FH_PM] = min(1.05 * cb_ / (om * om), 1.0)
+        args_f[h + FH_CM] = 2.0 * rb_ * cb_ / (om * om * om * om)
+        smf = 0.0
+        if rb_ > 0.0:
+            aa = 1.0 + rb_ * rb_
+            cs = (math.sqrt(aa * aa + 32.0 * rb_ * rb_) - aa) / (4.0 * rb_)
+            snb = math.sqrt(max(1.0 - cs * cs, 0.0))
+            denb = aa - 2.0 * rb_ * cs
+            smf = 2.0 * rb_ * cb_ * snb / (denb * denb)
+        args_f[h + FH_SM] = smf
+    args_f[h0 + FH_STATE] = 1.0
+    return True
+
+
+@njit(cache=True)
+def sh_fast_precompute(args_f, args_i):
+    """Bring every Airy-path cache entry up to date with the rows (the engine calls this once per substep after
+    writing the optics inputs): :func:`_fast_check` of every Airy-path ring, i.e. exactly the updates the optics
+    adapter makes lazily (the incremental cos/sin update makes the cache a state, so both must update the same
+    entries at the same times)."""
+    n = args_i[SH_N]
+    for k in range(n):
+        if _fast_flag(k, args_f, args_i) != 0.0:
+            _fast_check(k, args_f, args_i)
+
+
+@njit(cache=True, error_model="numpy")
+def _fast_check(k, args_f, args_i):
+    """Recompute the Airy-path cache entries of ring k whose inputs changed since they were computed (a caller may
+    rewrite the rows at any time through :func:`selfheat_views`)."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
     two = args_i[SH_TWO] != 0
-    nl = p_in.shape[0]
+    o_nl = args_i[SH_O_NL]
+    o_fk = args_i[SH_O_FK]
+    o_fc = args_i[SH_O_FC]
+    o_memo = args_i[SH_O_FF] + n
+    memo = args_f[o_memo:o_memo + 8]
+    hold = args_i[SH_FARHOLD] != 0
+    o_fh = args_i[SH_O_FH]
     for l in range(nl):
-        pcur[l] = p_in[l]
-    for q in range(n):
-        k = args_i[SH_HDR + q]
+        base = k * nl + l
+        q = o_fk + base * N_FK
+        if not (args_f[q + FK_K2T] == args_f[o_nl + SHN_K2T * nn + base]
+                and args_f[q + FK_K2D] == args_f[o_nl + SHN_K2D * nn + base]):
+            _fk_entry(k, l, args_f, args_i)
+            _fc_entry(k, l, two, args_f, args_i, memo)
+            if hold:
+                _fh_entry(k, l, two, args_f, args_i, memo)
+            continue
+        stale = False
+        if hold and args_f[o_fh + base * N_FH + FH_STATE] != 0.0:
+            # a held line stays held while its phase and loss stay near the hold point (module comment, FAR_*)
+            for lvl in range(2 if two else 1):
+                h = o_fh + (lvl * nn + base) * N_FH
+                ang = (args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
+                       + args_f[o_nl + SHN_PSI * nn + base])
+                da = args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base] - args_f[h + FH_A]
+                if not (abs(ang - args_f[h + FH_ANG]) <= FAR_DPHI and abs(da) <= FAR_DA):
+                    stale = True
+            if not stale:
+                continue
+        else:
+            for lvl in range(2 if two else 1):
+                p = o_fc + (lvl * nn + base) * N_FC
+                if not (args_f[p + FC_PHI] == args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
+                        and args_f[p + FC_A] == args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base]
+                        and args_f[p + FC_TRT] == args_f[o_nl + SHN_TRT * nn + base]
+                        and args_f[p + FC_PSI] == args_f[o_nl + SHN_PSI * nn + base]):
+                    stale = True
+        if stale:
+            _fc_entry(k, l, two, args_f, args_i, memo)
+            if hold:
+                _fh_entry(k, l, two, args_f, args_i, memo)
+
+
+@njit(cache=True, error_model="numpy")
+def sh_fast_pabs(t, k, args_f, args_i):
+    """P_abs of an Airy-path ring k at temperature t [W] and dP_abs/dT [W/K], from the caches (no check: the caller
+    guarantees they are current); keeps the per-line values of the evaluation in SH_O_LE for the commit. Sums in the
+    order of :func:`dpabs_dlambda_res_nb`. Held far lines (optics_far_hold) contribute their first-order model while
+    the in-solve rotation |b| <= FAR_DB; beyond it the line is released (its cache entry is brought to the current
+    reference phase) and evaluated exactly from then on."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    two = args_i[SH_TWO] != 0
+    n_lvl = 2 if two else 1
+    o_ring = args_i[SH_O_RING]
+    o_nl = args_i[SH_O_NL]
+    o_pcur = args_i[SH_O_PCUR]
+    o_fc = args_i[SH_O_FC]
+    o_le = args_i[SH_O_LE]
+    o_fh = args_i[SH_O_FH]
+    hold = args_i[SH_FARHOLD] != 0
+    # _sh_prepare: the rigid shift of ring k at t, and the walk restart at the first ring in bus order
+    dt = t - args_f[o_ring + SHR_TREF * n + k]
+    s0 = args_f[o_ring + SHR_S0 * n + k]
+    beta = args_f[o_ring + SHR_BETA * n + k]
+    shift = s0 * (dt + 0.5 * beta * dt * dt)
+    if args_i[SH_HDR + n + k] == 0:
+        t2 = args_f[o_ring + SHR_T2 * n + k]
+        o_pin = args_i[SH_O_PIN]
         for l in range(nl):
-            pcur[l] *= rg[SHR_T2, k]
-        pm, cm = pabs_bounds_nb(k, pcur, rg[SHR_P1, k], nb[SHN_A0], nb[SHN_A1], nb[SHN_E0], nb[SHN_E1], nb[SHN_K2T],
-                                nb[SHN_K2D], two)
-        sm = pabs_slope_bound_nb(k, pcur, rg[SHR_P1, k], nb[SHN_A0], nb[SHN_A1], nb[SHN_E0], nb[SHN_E1],
-                                 nb[SHN_K2T], nb[SHN_K2D], two)
+            args_f[o_pcur + l] = args_f[o_pin + l] * t2
+    dlam_dt = s0 * (1.0 + beta * dt)
+    q1 = args_f[o_ring + SHR_P1 * n + k] if two else 0.0
+    q0 = 1.0 - q1
+    base = k * nl
+    r_dpl = o_nl + SHN_DPL * nn + base
+    r_e0 = o_nl + SHN_E0 * nn + base
+    r_e1 = o_nl + SHN_E1 * nn + base
+    pabs = 0.0
+    slope = 0.0
+    for l in range(nl):
+        dpl = args_f[r_dpl + l]
+        b = dpl * shift
+        held = False
+        if hold and args_f[o_fh + (base + l) * N_FH + FH_STATE] != 0.0:
+            if abs(b) <= FAR_DB:
+                held = True
+            else:
+                # outside the held model's range in this solve: release the line (cache to the current reference)
+                o_memo = args_i[SH_O_FF] + n
+                _fc_entry(k, l, two, args_f, args_i, args_f[o_memo:o_memo + 8])
+                args_f[o_fh + (base + l) * N_FH + FH_STATE] = 0.0
+        ab = 0.0
+        dab = 0.0
+        if held:
+            # the first-order model; nothing is stored (the commit recomputes it from the stored shift)
+            for lvl in range(n_lvl):
+                h = o_fh + (lvl * nn + base + l) * N_FH
+                dphi = ((args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base + l]
+                         + args_f[o_nl + SHN_PSI * nn + base + l]) - args_f[h + FH_ANG]) + b
+                da = args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base + l] - args_f[h + FH_A]
+                loss = args_f[h + FH_L] + args_f[h + FH_LP] * dphi + args_f[h + FH_LA] * da
+                dloss = args_f[h + FH_LP]
+                if lvl == 0:
+                    w = q0 * args_f[r_e0 + l]
+                else:
+                    w = q1 * args_f[r_e1 + l]
+                ab += w * loss
+                dab += w * dloss
+        else:
+            small = abs(b) <= ROT_MAX
+            cb = 1.0
+            sb = 0.0
+            if small:
+                cb, sb = _rot(b)
+            for lvl in range(n_lvl):
+                p = o_fc + (lvl * nn + base + l) * N_FC
+                if small:
+                    c = args_f[p + FC_C] * cb - args_f[p + FC_S] * sb
+                    s = args_f[p + FC_S] * cb + args_f[p + FC_C] * sb
+                else:
+                    ang = (args_f[p + FC_PHI] + args_f[p + FC_PSI]) + b
+                    c = math.cos(ang)
+                    s = math.sin(ang)
+                two_r = args_f[p + FC_TWO_R]
+                rinv = 1.0 / (1.0 - two_r * c + args_f[p + FC_RR])
+                u2 = args_f[p + FC_K11] * rinv
+                du2 = -u2 * (two_r * s) * rinv
+                loss = u2 * args_f[p + FC_SL]
+                dloss = du2 * args_f[p + FC_SL]
+                e = o_le + (lvl * nl + l) * N_LE
+                args_f[e + LE_C] = c
+                args_f[e + LE_RINV] = rinv
+                args_f[e + LE_U2] = u2
+                args_f[e + LE_LOSS] = loss
+                args_f[e + LE_DLOSS] = dloss
+                if lvl == 0:
+                    w = q0 * args_f[r_e0 + l]
+                else:
+                    w = q1 * args_f[r_e1 + l]
+                ab += w * loss
+                dab += w * dloss
+        pc_ = args_f[o_pcur + l]
+        pabs += pc_ * ab
+        slope += pc_ * dab * dpl
+    o_last = o_le + 2 * nl * N_LE
+    args_f[o_last] = k
+    args_f[o_last + 1] = t
+    args_f[o_last + 2] = shift
+    return pabs, slope * dlam_dt
+
+
+@njit(cache=True, error_model="numpy", inline="always")
+def _le_values(k, l, lvl, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le):
+    """(T, D, L, U, dL/dphi) per watt of level lvl of ring k at line l at the last evaluation: the Airy closed forms
+    from the cached constants and SH_O_LE, or the first-order model of a held line at the evaluation's shift."""
+    e = o_le + (lvl * nl + l) * N_LE
+    if held:
+        h = o_fh + (lvl * nn + k * nl + l) * N_FH
+        base = k * nl + l
+        dphi = (((args_f[o_nl + (SHN_PHI0R if lvl == 0 else SHN_PHI1R) * nn + base]
+                  + args_f[o_nl + SHN_PSI * nn + base]) - args_f[h + FH_ANG])
+                + args_f[o_nl + SHN_DPL * nn + base] * shift)
+        da = args_f[o_nl + (SHN_A0 if lvl == 0 else SHN_A1) * nn + base] - args_f[h + FH_A]
+        T = args_f[h + FH_T] + args_f[h + FH_TP] * dphi + args_f[h + FH_TA] * da
+        D = args_f[h + FH_D] + args_f[h + FH_DP] * dphi + args_f[h + FH_DA] * da
+        L = args_f[h + FH_L] + args_f[h + FH_LP] * dphi + args_f[h + FH_LA] * da
+        U = ((args_f[h + FH_U] + args_f[h + FH_UP] * dphi + args_f[h + FH_UA] * da)
+             * (args_f[o_nl + SHN_TRT * nn + base] / args_f[h + FH_TRT]))
+        return T, D, L, U, args_f[h + FH_LP]
+    p = o_fc + (lvl * nn + k * nl + l) * N_FC
+    c = args_f[e + LE_C]
+    rinv = args_f[e + LE_RINV]
+    T = (args_f[p + FC_A2] - args_f[p + FC_BC] * c + args_f[p + FC_CC]) * rinv
+    D = args_f[p + FC_DN] * rinv
+    U = args_f[e + LE_U2] * args_f[p + FC_SE]
+    return T, D, args_f[e + LE_LOSS], U, args_f[e + LE_DLOSS]
+
+
+@njit(cache=True, error_model="numpy")
+def sh_fast_outputs(k, args_f, args_i):
+    """Every output of Airy-path ring k from its last evaluation (SH_O_LE), the arithmetic of :func:`ring_lines_nb`
+    with with_slope on the per-watt responses of :func:`_airy_line` (R = A = U_ccw = 0; held far lines: their
+    first-order model); the NRZ-averaged through power goes to the walk buffer p_cur. Then the caller passes it to the
+    next ring (or finalizes the bus)."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    two = args_i[SH_TWO] != 0
+    o_ring = args_i[SH_O_RING]
+    o_nl = args_i[SH_O_NL]
+    o_pcur = args_i[SH_O_PCUR]
+    o_orl = args_i[SH_O_ORL]
+    o_or = args_i[SH_O_OR]
+    o_fc = args_i[SH_O_FC]
+    o_le = args_i[SH_O_LE]
+    o_fh = args_i[SH_O_FH]
+    q1 = args_f[o_ring + SHR_P1 * n + k] if two else 0.0
+    q0 = 1.0 - q1
+    base = k * nl
+    r_e0 = o_nl + SHN_E0 * nn + base
+    r_e1 = o_nl + SHN_E1 * nn + base
+    r_dpl = o_nl + SHN_DPL * nn + base
+    dsum = 0.0
+    asum = 0.0
+    lsum = 0.0
+    d1sum = 0.0
+    d0sum = 0.0
+    slope = 0.0
+    hold = args_i[SH_FARHOLD] != 0
+    shift = args_f[o_le + 2 * nl * N_LE + 2]
+    for l in range(nl):
+        P = args_f[o_pcur + l]
+        held = hold and args_f[o_fh + (base + l) * N_FH + FH_STATE] != 0.0
+        T0, D0, L0, U0, dL0 = _le_values(k, l, 0, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh, o_le)
+        e0 = args_f[r_e0 + l]
+        if two:
+            T1, D1, L1, U1, dL1 = _le_values(k, l, 1, held, shift, args_f, args_i, n, nl, nn, o_nl, o_fc, o_fh,
+                                             o_le)
+            e1 = args_f[r_e1 + l]
+        else:
+            T1 = T0
+            D1 = D0
+            L1 = L0
+            U1 = U0
+            dL1 = dL0
+            e1 = e0
+        thru = P * (q1 * T1 + q0 * T0)
+        drop = P * (q1 * D1 + q0 * D0)
+        loss = P * (q1 * L1 + q0 * L0)
+        absd = P * (q1 * e1 * L1 + q0 * e0 * L0)
+        rl = o_orl + base + l
+        args_f[rl + RL_PIN * nn] = P
+        args_f[rl + RL_THRU * nn] = thru
+        args_f[rl + RL_DROP * nn] = drop
+        args_f[rl + RL_ADD * nn] = 0.0
+        args_f[rl + RL_REFL * nn] = 0.0
+        args_f[rl + RL_LOSS * nn] = loss
+        args_f[rl + RL_ABS * nn] = absd
+        args_f[rl + RL_UCW * nn] = P * (q1 * U1 + q0 * U0)
+        args_f[rl + RL_UCCW * nn] = 0.0
+        args_f[rl + RL_THRU1 * nn] = P * T1
+        args_f[rl + RL_THRU0 * nn] = P * T0
+        args_f[rl + RL_DROP1 * nn] = P * D1
+        args_f[rl + RL_DROP0 * nn] = P * D0
+        g = P * (q1 * e1 * dL1 + q0 * e0 * dL0)
+        args_f[rl + RL_DABS_DPHI * nn] = g
+        slope += g * args_f[r_dpl + l]
+        dsum += drop
+        asum += absd
+        lsum += loss
+        d1sum += P * D1
+        d0sum += P * D0
+        args_f[o_pcur + l] = thru
+    args_f[o_or + R_DROP_SUM * n + k] = dsum
+    args_f[o_or + R_ABS_SUM * n + k] = asum
+    args_f[o_or + R_LOSS_SUM * n + k] = lsum
+    args_f[o_or + R_DROP_SUM1 * n + k] = d1sum
+    args_f[o_or + R_DROP_SUM0 * n + k] = d0sum
+    args_f[o_or + R_DABS_DLAM * n + k] = slope
+
+
+@njit(cache=True)
+def sh_bounds(args_f, args_i, dt_max_k, p_max, d2p_max, dpdt_max):
+    """The bounds of :func:`selfheat_bounds` (pabs_bounds_nb and pabs_slope_bound_nb fused: the same expressions in
+    the same order) from the current rows, except that a line held by the far-line hold (optics_far_hold) uses its
+    per-watt factors stored at the hold point, inflated by FAR_BOUND_MARGIN (its a moved by <= FAR_DA since)."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    nn = n * nl
+    two = args_i[SH_TWO] != 0
+    o_ring = args_i[SH_O_RING]
+    o_nl = args_i[SH_O_NL]
+    o_pin = args_i[SH_O_PIN]
+    o_pcur = args_i[SH_O_PCUR]
+    o_fh = args_i[SH_O_FH]
+    o_fk = args_i[SH_O_FK]
+    hold = args_i[SH_FARHOLD] != 0
+    o_ff = args_i[SH_O_FF]
+    for l in range(nl):
+        args_f[o_pcur + l] = args_f[o_pin + l]
+    for qpos in range(n):
+        k = args_i[SH_HDR + qpos]
+        t2k = args_f[o_ring + SHR_T2 * n + k]
+        for l in range(nl):
+            args_f[o_pcur + l] *= t2k
+        p1 = args_f[o_ring + SHR_P1 * n + k]
+        q1 = p1 if two else 0.0
+        hk = hold and args_f[o_ff + k] == 1.0
+        pm = 0.0
+        cm = 0.0
+        sm = 0.0
+        for lev in range(2):
+            w = (1.0 - q1) if lev == 0 else q1
+            if w == 0.0:
+                continue
+            row_a = o_nl + (SHN_A0 if lev == 0 else SHN_A1) * nn + k * nl
+            row_e = o_nl + (SHN_E0 if lev == 0 else SHN_E1) * nn + k * nl
+            row_kt = o_nl + SHN_K2T * nn + k * nl
+            row_kd = o_nl + SHN_K2D * nn + k * nl
+            for l in range(nl):
+                eta = args_f[row_e + l]
+                pin = args_f[o_pcur + l]
+                if hk and args_f[o_fh + (k * nl + l) * N_FH + FH_STATE] != 0.0:
+                    h = o_fh + ((lev if two else 0) * nn + k * nl + l) * N_FH
+                    mg = 1.0 + FAR_BOUND_MARGIN
+                    pm += w * pin * eta * (args_f[h + FH_PM] * mg)
+                    cm += w * pin * eta * (args_f[h + FH_CM] * mg)
+                    sm += w * pin * eta * (args_f[h + FH_SM] * mg)
+                    continue
+                a = args_f[row_a + l]
+                q = o_fk + (k * nl + l) * N_FK
+                if args_f[q + FK_K2T] == args_f[row_kt + l] and args_f[q + FK_K2D] == args_f[row_kd + l]:
+                    t1 = args_f[q + FK_T1]                    # the same square roots, cached (_fk_entry)
+                    t2 = args_f[q + FK_T2]
+                else:
+                    t1 = math.sqrt(1.0 - args_f[row_kt + l])
+                    t2 = math.sqrt(1.0 - args_f[row_kd + l])
+                r = t1 * t2 * a
+                om = 1.0 - r
+                c = args_f[row_kt + l] * (1.0 - a) * (1.0 + t2 * t2 * a)
+                pm += w * pin * eta * min(1.05 * c / (om * om), 1.0)
+                cm += w * pin * eta * 2.0 * r * c / (om * om * om * om)
+                if r <= 0.0:
+                    continue
+                aa = 1.0 + r * r
+                cs = (math.sqrt(aa * aa + 32.0 * r * r) - aa) / (4.0 * r)
+                sn = math.sqrt(max(1.0 - cs * cs, 0.0))
+                den = aa - 2.0 * r * cs
+                sm += w * pin * eta * 2.0 * r * c * sn / (den * den)
+        cm = 1.25 * cm
+        sm = 1.10 * sm
         dmax = 0.0
         for l in range(nl):
-            dmax = max(dmax, abs(nb[SHN_DPL, k, l]))
-        s0 = rg[SHR_S0, k]
-        beta = rg[SHR_BETA, k]
+            dmax = max(dmax, abs(args_f[o_nl + SHN_DPL * nn + k * nl + l]))
+        s0 = args_f[o_ring + SHR_S0 * n + k]
+        beta = args_f[o_ring + SHR_BETA * n + k]
         smax = abs(s0) * (1.0 + abs(beta) * dt_max_k)
         p_max[k] = pm
         dpdt_max[k] = sm * dmax * smax
         d2p_max[k] = cm * (dmax * smax) ** 2 + sm * dmax * abs(s0 * beta)
 
 
+@njit(cache=True)
+def sh_pass_on(k, args_f, args_i):
+    """After ring k's outputs: its through power (in p_cur) times the bus segment to the next ring in bus order, or,
+    after the last ring, :func:`bus_finalize_nb`."""
+    n = args_i[SH_N]
+    nl = args_i[SH_L]
+    q = args_i[SH_HDR + n + k]
+    o_pcur = args_i[SH_O_PCUR]
+    if q + 1 < n:
+        t2 = args_f[args_i[SH_O_RING] + SHR_T2 * n + args_i[SH_HDR + q + 1]]
+        for l in range(nl):
+            args_f[o_pcur + l] *= t2
+    else:
+        # only the views bus_finalize_nb needs (_sh_core / _sh_outputs build ten, ~0.15 us)
+        o = args_i[SH_O_PIN]
+        p_in = args_f[o:o + nl]
+        o = args_i[SH_O_RING] + SHR_T2 * n
+        t2row = args_f[o:o + n]
+        o = args_i[SH_O_ORL]
+        orl = args_f[o:o + N_RL * n * nl].reshape((N_RL, n, nl))
+        o = args_i[SH_O_OL]
+        ol = args_f[o:o + N_L * nl].reshape((N_L, nl))
+        bus_finalize_nb(p_in, args_i[SH_HDR:SH_HDR + n], t2row, args_f[args_i[SH_O_T2OUT]], orl, ol)
+
+
+@njit(cache=True)
+def sh_last_is(k, t, args_f, args_i):
+    """True when the last evaluation (fast path) was ring k at temperature t."""
+    o_last = args_i[SH_O_LE] + 2 * args_i[SH_L] * N_LE
+    return args_f[o_last] == k and args_f[o_last + 1] == t
+
+
+@njit(cache=True)
+def sh_last_clear(args_f, args_i):
+    args_f[args_i[SH_O_LE] + 2 * args_i[SH_L] * N_LE] = -1.0
+
+
 def pack_selfheat_args(p_in_w, phi_ref, k2_th, k2_dr, a_rt, t_rt_s, eta, lam_m, t_ref_k, s0_m_per_k, beta_per_k=0.0,
                        bus_order=None, bus_t2=None, bus_t2_out=1.0, psi=None, rb=None, nrz=None, method="exact",
-                       m_orders=3, commit_slope=False):
+                       m_orders=3, commit_slope=False, far_hold=False):
     """Pack one world for :func:`selfheat_pabs` / :func:`selfheat_commit` / :func:`selfheat_bounds`.
 
     Arguments as :func:`bus_propagate` (phi_ref and nrz["phi1"] are the round-trip phases at T_ref,k, without the
     coupler phase), plus lam_m (L,) or (N, L) line wavelengths [m], t_ref_k (N,) [K], s0_m_per_k (N,) and beta_per_k
     (N,) of lambda_res,k(T) - lambda_res,k(T_ref) = s0 [dT + beta dT^2/2], and commit_slope (also fill the slope
-    outputs at commit). Returns (args_f (nf,) float64, args_i (ni,) int64). Per substep the plant updates inputs
-    through :func:`selfheat_views` (for example phi0_ref/phi1_ref after a bias change, a0/a1 and eta0/eta1 at the
-    previous ring temperature, p_in after a laser step) and reads the outputs there after the solve.
+    outputs at commit), far_hold (the far-line hold of the Airy path, fidelity optics_far_hold: see the module
+    comment above :data:`FAR_U`). Returns (args_f (nf,) float64, args_i (ni,) int64). Per substep the plant updates
+    inputs through :func:`selfheat_views` (for example phi0_ref/phi1_ref after a bias change, a0/a1 and eta0/eta1 at
+    the previous ring temperature, p_in after a laser step) and reads the outputs there after the solve.
     """
     args = _prepare_bus(p_in_w, phi_ref, k2_th, k2_dr, a_rt, t_rt_s, eta, bus_order, bus_t2, bus_t2_out, psi, rb, nrz)
     (p_in, order, t2, t2o, p1, phi0, phi1, a0, a1, eta0, eta1, psi_, k2t, k2d, trt, rb_, two) = args
@@ -1567,11 +2270,13 @@ def pack_selfheat_args(p_in_w, phi_ref, k2_th, k2_dr, a_rt, t_rt_s, eta, lam_m, 
     beta = _nl(beta_per_k, (n,), "beta_per_k")
     sizes = ((SH_O_PIN, nl), (SH_O_PCUR, nl), (SH_O_T2OUT, 1), (SH_O_RING, N_SHR * n), (SH_O_NL, N_SHN * n * nl),
              (SH_O_RB, 2 * n * mb), (SH_O_ORL, N_RL * n * nl), (SH_O_OR, N_R * n), (SH_O_OL, N_L * nl),
-             (SH_O_CW, 2 * N_CW * nl), (SH_O_FW, N_FW * nl))
+             (SH_O_CW, 2 * N_CW * nl), (SH_O_FW, N_FW * nl), (SH_O_FK, n * nl * N_FK), (SH_O_FC, 2 * n * nl * N_FC),
+             (SH_O_FF, n + 8), (SH_O_LE, 2 * nl * N_LE + 3), (SH_O_FH, 2 * n * nl * N_FH))
     args_i = np.zeros(SH_HDR + 2 * n, np.int64)
     args_i[SH_N], args_i[SH_L], args_i[SH_MB] = n, nl, mb
     args_i[SH_TWO], args_i[SH_TCMT], args_i[SH_MORD] = int(two), int(method == "tcmt"), int(m_orders)
     args_i[SH_SLOPE] = int(bool(commit_slope))
+    args_i[SH_FARHOLD] = int(bool(far_hold))
     off = 0
     for key, size in sizes:
         off += off % 2                   # even offsets: the complex views stay 16-byte aligned
@@ -1585,6 +2290,15 @@ def pack_selfheat_args(p_in_w, phi_ref, k2_th, k2_dr, a_rt, t_rt_s, eta, lam_m, 
                      (9, a1), (10, eta0), (11, eta1), (12, psi_), (13, k2t), (14, k2d), (15, trt), (16, dpl),
                      (17, tref), (18, s0), (19, beta), (20, rb_)):
         v[dst][...] = src
+    # the Airy-path caches start invalid (NaN keys never compare equal); no last evaluation
+    o = args_i[SH_O_FK]
+    args_f[o:o + n * nl * N_FK] = np.nan
+    o = args_i[SH_O_FC]
+    args_f[o:o + 2 * n * nl * N_FC] = np.nan
+    o = args_i[SH_O_FF]
+    args_f[o:o + n + 8] = np.nan
+    o = args_i[SH_O_LE] + 2 * nl * N_LE
+    args_f[o] = -1.0                                   # (the far-line hold block starts zero: no line held)
     return args_f, args_i
 
 
