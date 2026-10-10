@@ -57,7 +57,9 @@ Physical keys need a leaf mapping in every strict kind.
 
 **Open subtrees** are validated by their own owners, not by the schema: `controller.params`, `scenario.params`,
 `scenario.aggressor`, `scenario.target`, `scenario.external_reflection`, `experiment.grid`,
-`experiment.controllers`, `meta.sources`.
+`experiment.controllers`, `meta.sources`, and the experiment layer's `experiment.record`, `experiment.corners`,
+`experiment.self_reference`, `experiment.acceptance` (validated by `mrm.sim.experiment`, which also checks every
+other `experiment.*` key again; docs/handoff/experiments.md section 3).
 
 **Unknown keys are errors** everywhere else, with a did-you-mean suggestion; keys deleted by 07 give the reason
 (for example `ring.optics.absorbed_fraction` -> "deleted by 07 P0-2"). An override typo such as
@@ -985,6 +987,16 @@ is current.
 | `experiment.variation` | enum |  |  | setting; enum: off, sample; default sample | per-device variation on or off |
 | `experiment.grid` | map |  |  | setting | sweep grid {path: [values]} |
 | `experiment.controllers` | list_str |  |  | setting | controllers of a compare experiment |
+| `experiment.start` | enum |  |  | setting; enum: cold, cold_settled, warm | start state: cold (code_min, reset protocol, cold lags), cold_settled (code_min, settled, branch_low), warm (quasi-static lock codes, settled, branch_high); default: the scenario's ResetSpec |
+| `experiment.n_threads` | int |  |  | setting | kernel worker threads (default os.cpu_count()) |
+| `experiment.score_from_s` | float |  | s | setting | the metrics accumulate from this time (runner score_from_s) |
+| `experiment.convergence_certificate` | str |  |  | setting | run directory whose 07 P0-10 convergence certificate covers this compressed scenario and plant |
+| `experiment.compression_factors` | list_float |  |  | setting; default (1.0, 10.0, 100.0) | time-compression factors of the 07 P0-10 convergence experiment |
+| `experiment.histogram` | bool |  |  | setting; default False | detuning histogram accumulators (07 P0-8) |
+| `experiment.oracle` | bool |  |  | setting; default True | in-kernel oracle (OMA penalty, lock_reference oracle) |
+| `experiment.p_in_w` | float |  | w | setting | quasi_static: power per line at the chip (default the plant's own) |
+| `experiment.max_worlds_per_plant` | int |  |  | setting; default 512 | largest B in one Plant (Monte Carlo chunk) |
+| `experiment.rank_metrics` | list_str |  |  | setting | compare: world metrics to rank by (lower is better; mrm.sim.experiment.RANKABLE) |
 | `datapath.bitrate_gbps` | float | die | gbps |  | line rate (G26: 50 Gb/s NRZ) |
 | `datapath.bitstat_window_bits` | int | die |  |  | bit-statistics window (07 P0-11) |
 | `datapath.error_count_period_s` | float | die | s | whole ticks (period) | error-counter period (G26: 2.0 s) |

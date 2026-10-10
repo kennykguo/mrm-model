@@ -132,9 +132,12 @@ def test_quasi_static_codes_fall_back_to_code_min_in_sampled_worlds(cfg):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         r = runner.run(cfg, None, None, duration_s=50e-6, batch=8, seeds=7, heater_code="quasi_static", settle=True)
-    msg = [str(x.message) for x in w if "warm_start_codes" in str(x.message)]
+    msg = [str(x.message) for x in w if "no quasi-static lock code" in str(x.message)]
     assert len(msg) == 1, msg
     ws = r.manifest_inputs["warm_start"]
+    # since 2026-10-10 a world whose lock powers exceed the array heater supply limit is flagged too (07 P1-12)
+    sup = [str(x.message) for x in w if "supply limit" in str(x.message)]
+    assert len(sup) == int(np.sum(ws["supply_limited"]) > 0), sup
     assert ws["settle"]["converged"], ws["settle"]
     codes = np.asarray(ws["heater_code"])
     assert codes.shape == (8, 8) and np.any(codes == 0) and np.any(codes > 20000)

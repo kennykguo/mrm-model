@@ -1,0 +1,21 @@
+# Example (kind robust, 07 4.8): one controller over the nominal world, the 12 named corners and 128 Latin-hypercube
+# worlds under A1; the claim "every ring held within 5 pm of its operating point, on its line" is published only if
+# it holds in every world.
+extends: g26
+meta: {name: robust_pi_lock, kind: experiment}
+controller: {name: pi_lock_c}
+scenario: {name: a1, params: {phase_s: 0.06535}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: robust
+  duration_s: 0.1357
+  n_mc: 128
+  seeds: {device: 10, uncertainty: 20, noise: 30, scenario: 40}
+  uncertainty: lhs
+  variation: "off"            # epistemic worlds only (07 P0-4): device variation would add warm-start failures
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 lock budget"}
+    - {id: line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}

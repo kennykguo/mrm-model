@@ -425,3 +425,133 @@ All through tools/memguard.py; no kernel or njit source changed, so the warm num
   the stress scenarios bit-identical in every signal (PD0 624.2 / 575.2 degC under A1 / A2); new default PD0 93.4 /
   89.7 degC. NUMBA_DISABLE_JIT=1: pi_lock_c under A1, 300 ticks, both sites, bit-identical to the compiled run.
   ROM check (no solver): PD0 37.6 / 110.4 K/W and die sensor 2.576 / 2.641 K/W from the default / stress site.
+
+## 8. Experiments, hardware and RL stage integration (2026-10-10)
+
+Scope: integrate the experiments, hardware and rl tasks after their builds and reviews; run the fast suite and fix
+cross-module failures; resolve the handoffs that can be resolved now; add the compressed-soak golden; run every
+acceptance and example experiment end to end; update the docs. CHANGELOG entry "2026-10-10: experiments, hardware and
+RL stage integration". Nothing was committed.
+
+### 8.1 Files changed by the integrator
+
+- `mrm/params/schema.py`: the experiment-layer keys (`experiment.{start, n_threads, score_from_s,
+  convergence_certificate, compression_factors, histogram, oracle, p_in_w, max_worlds_per_plant, rank_metrics}`) and
+  the open subtrees `experiment.{record, corners, self_reference, acceptance}`; `mrm/params/config.py`:
+  `parse_overrides` maps a YAML 1.1 boolean to an enum word (`_enum_word`); docs/PARAMETERS_FORMAT.md (open subtrees,
+  regenerated key appendix).
+- `mrm/sim/experiment.py`: `config_hash_without_options` (the experiment hash), `_options_from_cfg` (dotted
+  overrides of a map option merge into the file's map; integer floats), strict checks of extension overrides in both
+  states, `start: warm` -> `heater_code="quasi_static_reachable"`, warm-start flags in the metrics and world summaries
+  (`warm_start_supply_limited`, `warm_start_order_hopped`), supply-limit columns in the quasi_static kind, docstrings.
+- `mrm/sim/runner.py`: `quasi_static` checks the array heater supply limit (`supply_scale`, `supply_limited`;
+  `_heater_drive`) and takes `order="heater_up" | "reachable"` (`order_hopped`); `WARM_START_MODES`,
+  `heater_code="quasi_static_reachable"`; `warm_start_codes(..., return_no_code=)`; `_warm_start_codes` returns
+  (codes, no_code, supply_limited, order_hopped) and warns about supply-limited worlds; `manifest_inputs["warm_start"]`
+  gains `supply_limited`, `mode`, `order_hopped`; the scoring split calls `MetricsState.restart`; `_run_python`
+  clips a CompiledController's new held command after a scenario controller reset (hardware review finding).
+- `mrm/sim/metrics.py`: `MetricsState.restart(k0, reg)` (the runner's scoring-start workaround moved here, same
+  values; a Python method, no njit code changed).
+- `mrm/sim/__init__.py` (lazy `record_vectors`), `mrm/__init__.py` (docstring), `mrm/sim/gym_env.py` (public
+  `warm_start_codes`), `mrm/control/fxp.py` (docstring), `mrm/control/baselines/__init__.py` (`fxp_pi`),
+  `mrm/control/cli.py` (the compressed-soak golden case, `CONFIG_SCENARIO`), `pyproject.toml` (h5py, `hdl` extra).
+- Tests: new `tests/verification/test_warm_start_orders.py` (4) and `tests/verification/test_runner_fault_reset.py`
+  (1); `tests/verification/test_experiment.py` (the schema state and every shipped file through mrm.params: 4 new
+  tests, one rewritten), `tests/verification/test_engine_warm_start.py` (the supply warning),
+  `tests/golden/test_golden.py` (the soak case: slow mark, content test, pending test on a fake case).
+- New golden file `tests/golden/g26__soak_compressed.npz`; tests/golden/README.md.
+- Docs: docs/ENGINE.md (sections 1, 2, 3, 5, 6, 10; new 11 experiments, 12 bridge / vectors / golden traces, 13 RL
+  env), docs/ARCHITECTURE.md section 2 (the files that exist), docs/CHANGELOG.md, this section, and integration
+  notes in docs/handoff/{experiments (section 12), hardware (section 9), rl (section 10)}.md.
+
+### 8.2 Decisions
+
+1. **Experiment keys in the schema, hash unchanged.** With the keys in mrm/params/schema.py the Config holds them, so
+   `Config.hash()` of an experiment file changed. The experiment hash now uses the config hash without them
+   (`config_hash_without_options`) plus the resolved options, which is byte for byte the hash of the stripped config
+   the experiments task used. Checked: every acceptance file keeps its recorded experiment hash (A4: 383b0daa, the
+   review's edit), and three new acceptance runs rerun bit for bit. The A4 certificate's plant fingerprint is
+   unchanged (8e979786...).
+2. **The stacked_eic warm-start "disagreement" (experiments request 10.4a) is the array heater supply limit**, not an
+   engine error. Diagnosis: in the stacked_eic world the engine's heater power at the quasi-static codes is 7-9 % below
+   the driver law at its own Truth heater temperature, while in side_by_side the two agree to 6e-8; the kernel and the
+   NumPy reference agree bit for bit in that world (400 ticks); the plant's `supply_limit_row` (07 P1-12) scales every
+   heater because the lock currents (~155 mA at 25 degC) exceed the assumed 150 mA (`array.heater_supply_current_max_a`,
+   assumed, source D07). quasi_static now checks the same limit; at a supply-limited point no ring counts as
+   reachable (coverage drops), the codes are kept, and the warm start warns. Not changed: the limit itself (assumed;
+   content owner) and the plant.
+3. **Reachable order (request 10.4b) is an opt-in runner mode.** Moving no-code rings one order bluer changes the
+   warm start of sampled worlds, and the regression scenario mc8_pi (sampled worlds, seeds 1000) has 10 such rings,
+   so a default change would break the bit-identity rule. `heater_code="quasi_static"` is unchanged (bit for bit);
+   `"quasi_static_reachable"` is new, and the experiments' `start: warm` uses it (identical in the nominal world).
+   The gym env keeps 'quasi_static' (rl owner's choice, rl.md section 10).
+4. **Compressed-soak golden = the certified case only** (pi_lock_c, the c = 100 convergence case of A4). The open
+   loop and fxp_pi are left out: no convergence experiment covers them (07 P0-10). Its scenario is built from the
+   config (`CONFIG_SCENARIO`), because a registry name loses the config's signal defaults (finding 8.4.4).
+5. **MetricsState.restart** holds the scoring-start logic (request 10.10); results unchanged (regression scenarios
+   and test_experiment_runs' per-tick comparison).
+6. fxp_pi registered by its "module:Class" path (hardware request 4); not added to the scorecard.
+
+### 8.3 Requests: resolved and still open
+
+Resolved here: experiments 10.1 (schema), 10.2 (h5py), 10.3 (docs), 10.4a (diagnosed: supply limit; quasi_static
+checks it), 10.4b (opt-in reachable order, used by experiments), 10.8 (`--set` enum words in mrm.params), 10.10
+(`MetricsState.restart`); hardware 7.1-7.6 except the scorecard entry of FxpPi and the lock file; rl 7.4 and the
+public part of 7.2.
+
+Still open (owner):
+- **content / params**: the array heater supply limit (0.2 W, 0.15 A, both assumed) binds in ~1/3 of the g26 LHS
+  worlds at 25 degC (128 worlds, variation off: 42, of which 29 of the 32 stacked_eic worlds and 27 of 43 FSR
+  window-A worlds) and in the g26_low_eta and g26_fsr_edge corners at 0 degC; in compare_locks 82 of 256 worlds start
+  supply-limited. It dominates every LHS quantile; it needs a source or a range (and a hypothesis if it stays
+  uncertain). Also experiments 10.9 (more corner presets).
+- **engine / perf**: rl 7.1 (Python-path per-call cost), 7.3 (per-world reset), 7.5 (per-world settle stop: changes
+  settled starts for B > 1, so it needs a regression baseline refresh); runner: rl 7.2 (vectorized quasi_static).
+- **controllers owners**: experiments 10.5; the sampled-world losses of 8.4.3 (worlds without any warm-start flag);
+  FxpPi in the scorecard.
+- **scenarios owner**: experiments 10.6, 10.11. **validation / textbook owner**: 10.7, 10.12.
+- **runner owner**: the named-scenario signal defaults (8.4.4). The Python path resets the controller of every
+  world when any world's `fault.controller_reset` fires (the kernel restarts per world); B = 1 is exact. (The
+  held-command clip after such a reset, hardware.md section 8 item 10, is fixed here.)
+- **rl owner**: report `warm_start_supply_limited` in the env's info; decide on the reachable warm start.
+
+### 8.4 Findings
+
+1. Acceptance table (g26 nominal, pi_lock_c; B5 wdm_supervisor): see docs/handoff/experiments.md section 12. The nine
+   quick experiments give the same verdicts and values as the review runs (every shared array bit-identical, A7 apart
+   from two corners' coverage, below).
+2. The supply limit (8.2 item 2): A7's nominal plane is never supply-limited (coverage 1, PASS unchanged); the
+   g26_low_eta corner's coverage drops 1 -> 0.92 and g26_fsr_edge 0.92 -> 0.83 (both at 0 degC, droop 0.985-0.989).
+3. Sampled worlds lose rings under pi_lock_c without any warm-start flag: mc_pi_lock (64 sampled worlds, static,
+   variation on, lock about each ring's own operating point): 26 worlds have a ring off by > 5 pm, 10 of them with no
+   no-code ring, no order hop and no supply limit (worlds 1, 3, 11, 13, 30, 32, 33, 39, 43, 48 of seeds
+   {1000, 2000, 3000, 4000}). compare_locks under A1 without the supply-limited worlds (174 of 256): median wrong-line
+   rings 1 (pi_lock_c) and 5 (kalman_lqg_c / mpc_c), median worst-lane OMA penalty 3.6 / 17-18 dB.
+4. **A named scenario does not get the config's signal defaults.** `runner.run(cfg, ctrl, "static")` (or a Scenario
+   object) runs g26 with the bias not driven, at the bias DAC's initial 1.0 V; `runner.run(cfg, ctrl, None)` and every
+   experiment file use `scenario.bias_v` 1.05 V. The warm-start codes differ by ~4 codes and closed-loop trajectories
+   differ (up to ~100 pm during pi_lock's peak map). The golden static / A1 cases, the scorecard and many tests use
+   names (1.0 V); the acceptance runs use the config (1.05 V). Both are valid plants, but results from the two paths
+   are not comparable number for number. Documented in ENGINE.md section 2; changing the runner would change every
+   result that passes a name (not done).
+
+### 8.5 Test status and checks (all through tools/memguard.py)
+
+- Fast suite (`-m "not slow"`) at the start of this stage: 1683 passed, 74 skipped, 3 xfailed, 4 failed (VAL-8a/b/c
+  and test_every_golden_file_is_in_the_changelog). At the end: **1694 passed, 73 skipped, 3 xfailed, 3 failed in
+  335 s** (peak RSS 0.81 GB); the 3 failures are VAL-8a/b/c (tests/validation/test_thermal_replication.py, the known
+  thermal-artefact targets, extraction owner; unchanged since section 6.5).
+- Slow: tests/golden `-m slow` (the compressed-soak golden): 1 passed (217 s under load).
+- Engine bit-identity (no njit code changed; the kernel cache stayed valid): tools/perf_scenarios.py and
+  perf_scenarios_adv.py against runs/perf_r2/final3 and final3_adv, after the quasi_static / warm-start changes and
+  again after the runner fix: 0 of 476 + 1132 signals differ in 6 + 11 scenarios (runs/integrator_exp/reg2*).
+- tools/perf_bench.py (7 x 3000 ticks, load 5.2, AC): b1 9.41 us (min 9.09), b1lock 9.47 us, b64 2.37 us per
+  world-tick (min 1.99); Newton iterations 1.704 / 1.817 per ring and tick, as in perf.md 8.5 (b1 9.12, b1lock
+  9.37, b64 1.95 at load 2.4). Unchanged engine.
+- Experiments end to end: every file of experiments/acceptance and experiments/examples (docs/handoff/experiments.md
+  section 12): A4, A7, B3, B5 pass; A1, A2, A3, A6, B1, B2 fail as before; the nine quick acceptance runs equal the
+  review runs bit for bit in every shared array (A7 apart from two corners' coverage, the supply limit); the A4 main
+  case equals the builder's recorded A4 bit for bit (48 + 18 arrays). `mrm rerun` of the new A1, A7 and B5 runs:
+  identical.
+- Every experiment file loads through `mrm.params.load` and gives the same options and experiment hash as
+  `mrm.sim.experiment.load` (new test).

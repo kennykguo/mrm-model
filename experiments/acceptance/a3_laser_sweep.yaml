@@ -1,0 +1,21 @@
+# Acceptance A3 (textbook Ch17 group A, scenario a3): Lightmatter's optical emulation of an 800 degC/s aggressor
+# (SIB 2025: a tunable laser swept at 50 nm/s over 4 nm, printed; trapezoid period ~0.44 s, read-off; 0.14 s
+# plateaus, inferred). Optical only: every line moves, the die is not heated. One period, starting 10 ms after the
+# start so the lock is up. Criteria: as A1 (lock, line, hop, BER).
+extends: g26
+meta: {name: acc_a3_laser_sweep, kind: experiment, description: "A3 laser-sweep emulation, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: a3, params: {t0_s: 0.01}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.455
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: A3-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: A3-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A3-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: A3-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "SIB / Ayar: no errors during the sweep"}

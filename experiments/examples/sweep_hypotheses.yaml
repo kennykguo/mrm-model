@@ -1,0 +1,17 @@
+# Example (kind sweep): the plant hypotheses that move a lock most (07 D2, P1-6, 4.8): thermo-optic hypothesis x
+# FSR window, with pi_lock_c under A1. alt:<path> selects an alternative (here: pins an uncertainty entry).
+extends: g26
+meta: {name: sweep_hypotheses, kind: experiment}
+controller: {name: pi_lock_c}
+scenario: {name: a1, params: {phase_s: 0.06535}}
+experiment:
+  kind: sweep
+  duration_s: 0.1357
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  grid:
+    "alt:uncertainty.thermo_optic": [H_solver, H86]
+    "alt:uncertainty.fsr": [default, window_a]

@@ -1,0 +1,20 @@
+# Acceptance B3 (textbook Ch17 group B, scenario b3): an XPU power-state change seen at the PIC, 120 degC/s within
+# ~30 ms ([MRVL] via the textbook, secondary; raised-cosine shape assumed: a 4.6 K die-wide rise) from 10 ms.
+# Criteria: as A1 (lock, line, hop, BER).
+extends: g26
+meta: {name: acc_b3_xpu_power_step, kind: experiment, description: "B3 XPU power step, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: b3, params: {t0_s: 0.01}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: B3-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: B3-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: B3-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: B3-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}

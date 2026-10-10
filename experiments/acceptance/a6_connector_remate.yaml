@@ -1,0 +1,22 @@
+# Acceptance A6 (textbook Ch17 group A, scenario a6): ten connector re-mates (count printed, LM26-S via the textbook);
+# each insertion redraws the facet loss N(0.43, 0.35) dB ([ECTC] via textbook Ch18, literature), a common step on
+# every line. Interval 50 ms (assumed; > 5x the slowest crosstalk pole), from 10 ms. A set-point lock that does not
+# normalize its monitor moves its operating point with every power step (textbook Ch17 parameter table).
+# Criteria: as A1 (lock about the operating point, line, hop, BER).
+extends: g26
+meta: {name: acc_a6_connector_remate, kind: experiment, description: "A6 connector re-mates, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: a6, params: {t0_s: 0.01, interval_s: 0.05}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.52
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: A6-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: A6-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A6-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: A6-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}

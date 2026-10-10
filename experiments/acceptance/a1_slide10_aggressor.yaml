@@ -1,0 +1,31 @@
+# Acceptance A1 (textbook Ch17 group A, scenario a1): the G26 slide-10 on-die aggressor, >2000 degC/s (LM26-S slide
+# 10: 113.6 - 88.5 |sin(pi t/130.7 ms)| degC at ring 0, peak 2127 degC/s; power calibrated by resonance referencing
+# at the g26 default site, 30 um from ring 0 and 55 um from its monitor PD).
+# Controller: pi_lock_c, the drop-monitor set-point lock (the most likely G26 scheme, 06 C1; swap with
+# --set controller.name=...). Start warm (quasi-static lock codes, settled); scored after its 3 ms peak map; one full
+# aggressor period from the cool minimum. Lock error about each ring's own steady operating point (self_reference).
+# Criteria and their sources:
+#   lock     every ring within 5 pm of its operating point (04 section 4 lock budget; G26 shows the lock held)
+#   line     no ring on a foreign line (07 P1-12; the G26 link stayed up)
+#   hop      no FSR hop (BND-2)
+#   ber      mean BER of every lane <= 1e-9 over the run (LM26-P: BER < 1e-9; the run is shorter than the 2 s window)
+#   monitor  drop-monitor signed error inside [-1.9, +3.0] % +- 0.3 % read-off slack, either sign (BND-3a, LM26-S
+#            slide 10 error panel)
+extends: g26
+meta: {name: acc_a1_slide10_aggressor, kind: experiment, description: "A1 slide-10 aggressor, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: a1, params: {phase_s: 0.06535}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.1357
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: A1-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: A1-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A1-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: A1-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}
+    - {id: A1-monitor, metric: monitor_error_pct, op: band_either_sign, value: [-2.2, 3.3], source: "BND-3a"}

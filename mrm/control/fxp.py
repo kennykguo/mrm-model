@@ -22,8 +22,9 @@ arguments are the integer values of :class:`Rounding` and :class:`Overflow`):
 - ``fx_round_shift(x, s, rnd)``: x * 2**-s rounded with FLOOR (arithmetic shift, what ``>>>`` does), HALF_UP
   (add half then floor), HALF_EVEN (convergent), TOWARD_ZERO (truncate) or HALF_AWAY (away from zero);
 - ``fx_from_float``, ``fx_to_float``, ``fx_add``, ``fx_sub``, ``fx_neg``, ``fx_mul`` (exact int64 product, then one
-  rounding, then one overflow step), ``fx_cast`` (re-quantize between formats), ``fx_matvec`` (dense layer with a
-  declared accumulator width: the fixed-point MLP helper of 07 P1-22).
+  rounding, then one overflow step), ``fx_cast`` (re-quantize between formats), ``fx_matvec`` (one dense layer
+  with a declared accumulator width; the fixed-point MLP inference helper of 07 P1-22 is mrm.control.fxp_mlp,
+  which uses the scalar kernels of this module but not fx_matvec).
 
 ``fx_mul`` raises ValueError if the exact product does not fit an int64 (|a*b| >= 2**62); that is a limitation of
 the toolkit, not an RTL overflow, so it raises in every mode. Keep total_a + total_b <= 62 bits.
@@ -45,6 +46,8 @@ __all__ = [
     "fx_raw_min", "fx_raw_max", "fx_overflow", "fx_round_shift", "fx_from_float", "fx_to_float", "fx_add", "fx_sub",
     "fx_neg", "fx_mul", "fx_cast", "fx_matvec",
     "quantize", "to_float", "add", "sub", "mul", "cast",
+    # reference fixed-point PI controller (added by the hardware task; 07 P1-21)
+    "fx_pi_update", "fxp_pi_init", "fxp_pi_step", "FxpPi", "pi_float_bound_codes",
 ]
 
 MAX_BITS = 62   # widest format: keeps every sum and every exact product of the allowed operands inside an int64
@@ -433,3 +436,228 @@ def cast(x, fin: QFormat, fout: QFormat, rounding="half_even", overflow="saturat
     _cast_arr(np.ascontiguousarray(arr).ravel(), fin.frac_bits, fout.bits, fout.frac_bits, fout.signed,
               _mode(rounding, Rounding), _mode(overflow, Overflow), res.ravel())
     return _scalar_or(res, x)
+
+
+# =================================================================================================================
+# Reference fixed-point PI controller (07 P1-21). Added by the hardware task: new functions only, nothing above
+# changed. It is the controller of the golden vectors (mrm.sim.vectors), of the binary bridge reference
+# (mrm.sim.bridge, whose C twin is C_FXP_PI_SOURCE) and of the Verilog twin in tests/hdl/.
+# =================================================================================================================
+
+from mrm.control import api as _api                        # noqa: E402  (api never imports fxp: no cycle)
+from mrm.core.channels import ActId as _ActId, ObsId as _ObsId  # noqa: E402
+
+_E_BITS = 17          # e = y - y_set for a 16-bit ADC: [-65535, 65535] needs 17 signed bits
+
+
+@nb.njit(cache=True)
+def fx_pi_update(e, integ, kp, ki, u0, frac, acc_bits, lo, hi, rnd):
+    """One positional PI update in declared fixed-point formats. Returns ``(u, integ_new)`` (int64).
+
+    Raw operands (int64): ``e`` = y - y_set in ADC codes (Q16.0: 17-bit signed for a 16-bit ADC); ``kp``, ``ki``
+    gains at ``frac`` fraction bits (heater codes per ADC code, per step for ki); ``integ`` the integrator at
+    ``frac`` fraction bits in an ``acc_bits``-wide signed register; ``u0`` the hand-off heater code; ``lo``, ``hi``
+    the heater code range. With F = frac:
+
+        a      = sat_acc(integ + ki * e)                              exact product and sum, one saturation
+        integ' = clamp(a, (lo - u0) 2^F, (hi - u0) 2^F)               integrator clamping (anti-windup, 04 C3)
+        v      = u0 2^F + kp * e + integ'                             exact
+        u      = clamp(round_F(v), lo, hi)                            one rounding (``rnd``), one clamp
+
+    Every product and sum is exact in int64 (the FxpPi constructor checks 17 + gain bits <= 62 and
+    acc_bits + 1 <= 62); only the accumulator saturation, the integrator clamp, the output rounding and the
+    output clamp lose information, and the C and Verilog twins do exactly these four steps.
+    """
+    a = fx_overflow(np.int64(integ) + np.int64(e) * np.int64(ki), acc_bits, True, _SATURATE)
+    i_lo = (np.int64(lo) - np.int64(u0)) << frac
+    i_hi = (np.int64(hi) - np.int64(u0)) << frac
+    if a < i_lo:
+        a = i_lo
+    elif a > i_hi:
+        a = i_hi
+    v = (np.int64(u0) << frac) + np.int64(e) * np.int64(kp) + a
+    u = fx_round_shift(v, frac, rnd)
+    if u < lo:
+        u = np.int64(lo)
+    elif u > hi:
+        u = np.int64(hi)
+    return u, a
+
+
+# p_i64 of the compiled controller (indices)
+_PI_N, _PI_LATEST, _PI_NEW, _PI_VALID, _PI_APPLIED, _PI_ACT = 0, 1, 2, 3, 4, 5
+_PI_KP, _PI_KI, _PI_FRAC, _PI_ACC, _PI_LO, _PI_HI, _PI_RND, _PI_NSET = 6, 7, 8, 9, 10, 11, 12, 13
+_PI_SP = 14                                    # N set-points follow (filled from the user list)
+# s_i64: [started] then blocks of N: captured, y_set, u0, integrator, last output
+_SI_CAP, _SI_YSET, _SI_U0, _SI_INT, _SI_U = 0, 1, 2, 3, 4
+_LATEST_ID, _VALID_ID = int(_ObsId.TX_MONITOR_LATEST), int(_ObsId.MONITOR_VALID)
+_APPLIED_ID, _HEATER_ID = int(_ObsId.TX_HEATER_APPLIED), int(_ActId.TX_HEATER)
+
+
+@nb.njit(cache=True)
+def fxp_pi_init(spec_i64, spec_f64):
+    """Compiled-ABI init of :class:`FxpPi` (07 P0-9). User integers: [kp, ki, frac, acc_bits, rnd, n_set, sp...]."""
+    n = spec_i64[_api.SPEC_I_N_RINGS]
+    p = np.zeros(_PI_SP + n, dtype=np.int64)
+    p[_PI_N] = n
+    p[_PI_LATEST] = _api.obs_offset(spec_i64, _LATEST_ID)
+    p[_PI_NEW] = _api.new_offset(spec_i64, _LATEST_ID)
+    p[_PI_VALID] = _api.obs_offset(spec_i64, _VALID_ID)
+    p[_PI_APPLIED] = _api.obs_offset(spec_i64, _APPLIED_ID)
+    p[_PI_ACT] = _api.act_offset(spec_i64, _HEATER_ID)
+    if p[_PI_LATEST] < 0 or p[_PI_NEW] < 0 or p[_PI_ACT] < 0:
+        raise ValueError("FxpPi needs tx.monitor.latest (with its new-sample flags) and tx.heater")
+    p[_PI_KP] = _api.user_i64(spec_i64, 0)
+    p[_PI_KI] = _api.user_i64(spec_i64, 1)
+    p[_PI_FRAC] = _api.user_i64(spec_i64, 2)
+    p[_PI_ACC] = _api.user_i64(spec_i64, 3)
+    p[_PI_RND] = _api.user_i64(spec_i64, 4)
+    n_set = _api.user_i64(spec_i64, 5)
+    if n_set != 0 and n_set != 1 and n_set != n:
+        raise ValueError("FxpPi: setpoint_codes must be None, one value or one per ring")
+    p[_PI_NSET] = n_set
+    for i in range(n):
+        if n_set == 1:
+            p[_PI_SP + i] = _api.user_i64(spec_i64, 6)
+        elif n_set == n:
+            p[_PI_SP + i] = _api.user_i64(spec_i64, 6 + i)
+    p[_PI_LO] = spec_i64[_api.SPEC_I_HEATER_MIN]
+    p[_PI_HI] = spec_i64[_api.SPEC_I_HEATER_MAX]
+    s = np.zeros(1 + 5 * n, dtype=np.int64)
+    return p, np.zeros(0), s, np.zeros(0)
+
+
+@nb.njit(cache=True)
+def fxp_pi_step(p, pf, s, sf, obs, act):
+    """Compiled-ABI step of :class:`FxpPi`: per ring, one :func:`fx_pi_update` per new valid monitor sample.
+
+    First step: u0 = the latched heater register (``tx.heater.applied``, else the held command), the integrator 0,
+    the set-point from the user list or (capture mode) the first new valid sample, which is not used for an update.
+    A ring without a new sample on ``tx.monitor.latest``, or with ``monitor_valid`` false, holds its command. The
+    heater command of every ring is written at every step (the held output register, like the C and Verilog twins),
+    so the actions do not depend on the ABI's pre-fill of the held command.
+    """
+    n = p[_PI_N]
+    if s[0] == 0:
+        for i in range(n):
+            u0 = obs[p[_PI_APPLIED] + i] if p[_PI_APPLIED] >= 0 else act[p[_PI_ACT] + i]
+            s[1 + _SI_U0 * n + i] = u0
+            s[1 + _SI_U * n + i] = u0
+            s[1 + _SI_INT * n + i] = 0
+            if p[_PI_NSET] > 0:
+                s[1 + _SI_CAP * n + i] = 1
+                s[1 + _SI_YSET * n + i] = p[_PI_SP + i]
+        s[0] = 1
+    for i in range(n):
+        upd = obs[p[_PI_NEW] + i] != 0 and (p[_PI_VALID] < 0 or obs[p[_PI_VALID] + i] != 0)
+        if upd:
+            y = obs[p[_PI_LATEST] + i]
+            if s[1 + _SI_CAP * n + i] == 0:
+                s[1 + _SI_YSET * n + i] = y
+                s[1 + _SI_CAP * n + i] = 1
+            else:
+                e = y - s[1 + _SI_YSET * n + i]
+                u, a = fx_pi_update(e, s[1 + _SI_INT * n + i], p[_PI_KP], p[_PI_KI], s[1 + _SI_U0 * n + i],
+                                    p[_PI_FRAC], p[_PI_ACC], p[_PI_LO], p[_PI_HI], p[_PI_RND])
+                s[1 + _SI_INT * n + i] = a
+                s[1 + _SI_U * n + i] = u
+        act[p[_PI_ACT] + i] = s[1 + _SI_U * n + i]      # the output register is driven every step (as in C / RTL)
+
+
+def pi_float_bound_codes(abs_e_sum: float, abs_e: float, frac_bits: int) -> float:
+    """Largest |u_fixed - u_float| (heater codes) of :class:`FxpPi` against its float64 twin on the SAME inputs.
+
+    The fixed-point PI quantizes only its gains (|kp_q - kp|, |ki_q - ki| <= 2^-(F+1) with round-to-nearest) and
+    its output; its products and sums are exact, and the saturations and clamps are 1-Lipschitz. Before the output
+    rounding the two outputs therefore differ by at most d = 2^-(F+1) (sum_j |e_j| + |e_k|) (sum over the updates
+    so far); the two roundings add at most 1 code: |u_fixed - u_float| <= 1 + d. ``abs_e_sum`` is sum_j |e_j|
+    including step k, ``abs_e`` = |e_k|, both in ADC codes. Premises: the same u0 and set-point; a float twin with
+    the same integrator clamp and no accumulator width, which is equivalent as long as the clamp range
+    (hi - lo) 2^F lies inside the accumulator (true for the default Q19.20 with a 16-bit heater; a narrower
+    accumulator saturates first and the bound no longer applies); float64 rounding of the twin (~1e-11 code)
+    neglected. (Derived here; the docs/research files state no
+    numeric float-vs-fixed rule; 07 P1-21 cites Ch17 only for the failure mode of too few integrator fraction
+    bits, which tests/verification/test_vectors_equivalence.py demonstrates.)
+    """
+    return 1.0 + 2.0 ** (-(int(frac_bits) + 1)) * (float(abs_e_sum) + float(abs_e))
+
+
+class FxpPi(_api.CompiledController):
+    """Reference fixed-point set-point PI heater lock (07 P1-21), compiled ABI + Python path (same functions).
+
+    Error e = y - y_set (monitor ADC codes, ``tx.monitor.latest``), positional PI of :func:`fx_pi_update` per ring,
+    output the heater DAC code. Positive gains lock on the red (open-loop stable) side of the drop peak, where
+    dy/dcode < 0 (mrm.control.baselines.pi_lock docstring). It holds the operating point it starts at (capture mode)
+    or the given set-points; it does NOT acquire, map the peak or recapture after a fall-off: start it at a lock
+    (``run(..., heater_code='quasi_static', settle=True)``).
+
+    Parameters
+    ----------
+    kp, ki: gains in heater codes per ADC code (ki per controller step). Defaults (design choice, assumed, for g26
+        nominal only): pi_lock's loop (crossover 2.5 kHz, PI zero 13 us: k_c = 2 pi 2500 13e-6 = 0.204 codes per
+        code of heater error, T/T_i = 10/13) divided by the measured g26 nominal lock slope |dy/dcode| = 10.6 ADC
+        codes per heater code (static, with the self-heating relief): kp = 0.0193, ki = 0.0148.
+    gain_format: Q format of kp and ki ('Q3.20': 24-bit signed, LSB 2^-20); acc_format: the integrator register
+        ('Q19.20': 40-bit signed); both must have the same fraction bits F.
+    rounding: output rounding ('half_up' = (v + 2^(F-1)) >>> F, what RTL does); setpoint_codes: None (capture the
+        first valid sample of each ring), one code, or one per ring; latency_ticks: digital pipeline (07 P0-6).
+    """
+
+    def __init__(self, kp: float = 0.0193, ki: float = 0.0148, *, gain_format: str = "Q3.20",
+                 acc_format: str = "Q19.20", rounding: str = "half_up", setpoint_codes=None, latency_ticks: int = 0,
+                 name: str = "fxp_pi"):
+        gf, af = QFormat.parse(gain_format), QFormat.parse(acc_format)
+        if not (gf.signed and af.signed):
+            raise ValueError("FxpPi: gain and accumulator formats must be signed (Qm.n)")
+        if gf.frac_bits != af.frac_bits:
+            raise ValueError(f"FxpPi: gain {gf} and accumulator {af} must have the same fraction bits")
+        if _E_BITS + gf.bits > MAX_BITS or af.bits + 1 > MAX_BITS or gf.frac_bits > 40:
+            raise ValueError(f"FxpPi: {gf} x 17-bit error or {af} would not stay exact in int64")
+        self.gain_format, self.acc_format = gf, af
+        self.frac_bits = gf.frac_bits
+        self.rounding = Rounding[rounding.upper()] if isinstance(rounding, str) else Rounding(rounding)
+        self.kp, self.ki = float(kp), float(ki)
+        # CHECKED: a gain outside its format is a design error, not something to saturate silently
+        self.kp_raw = int(quantize(self.kp, gf, "half_even", "checked"))
+        self.ki_raw = int(quantize(self.ki, gf, "half_even", "checked"))
+        if setpoint_codes is None:
+            sp: list[int] = []
+        else:
+            sp = [int(x) for x in np.atleast_1d(np.asarray(setpoint_codes)).ravel()]
+        self.setpoint_codes = None if setpoint_codes is None else tuple(sp)
+        user = [self.kp_raw, self.ki_raw, self.frac_bits, af.bits, int(self.rounding), len(sp), *sp]
+        super().__init__(name, fxp_pi_init, fxp_pi_step, params_i64=user, latency_ticks=latency_ticks)
+
+    @classmethod
+    def from_params(cls, params) -> "FxpPi":
+        """Registry entry point (``mrm.control.registry.create('mrm.control.fxp:FxpPi', params)``)."""
+        return cls(**dict(params or {}))
+
+    def reset(self, spec) -> None:
+        """CompiledController.reset, after checking the exactness premise of :func:`fx_pi_update` on this spec:
+        the monitor codes span < 2^16, so e = y - y_set fits the 17 signed bits the constructor sized the int64
+        products for (an 18-bit ADC would need a narrower gain format)."""
+        mon = spec.channels.get("tx.monitor.latest")
+        if mon is None or "tx.heater" not in spec.channels:
+            raise ValueError("FxpPi needs tx.monitor.latest exposed and tx.heater bound to the controller")
+        if int(mon.max) - int(mon.min) >= 1 << (_E_BITS - 1):
+            raise ValueError(f"FxpPi: monitor range [{mon.min}, {mon.max}] needs errors wider than {_E_BITS} bits")
+        super().reset(spec)
+
+    @property
+    def kp_q(self) -> float:
+        """The quantized kp (real value)."""
+        return self.kp_raw * 2.0 ** -self.frac_bits
+
+    @property
+    def ki_q(self) -> float:
+        """The quantized ki (real value)."""
+        return self.ki_raw * 2.0 ** -self.frac_bits
+
+    def describe(self) -> dict:
+        """Formats and raw parameters (for the vectors' metadata and the C / Verilog twins)."""
+        return {"controller": "fxp_pi", "kp": self.kp, "ki": self.ki, "kp_raw": self.kp_raw, "ki_raw": self.ki_raw,
+                "frac_bits": self.frac_bits, "gain_format": str(self.gain_format),
+                "acc_format": str(self.acc_format), "acc_bits": self.acc_format.bits,
+                "rounding": self.rounding.name.lower(), "setpoint_codes": self.setpoint_codes,
+                "latency_ticks": self.latency_ticks}
