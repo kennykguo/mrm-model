@@ -33,7 +33,9 @@ Public API (stable for the next agents)
   controller has that method: the warm start of 07 P1-1), ``path`` ('auto' | 'compiled' | 'python'), ``n_threads``,
   ``oracle``, ``histogram``, ``chunk_ticks`` (ticks per kernel call on the compiled path, default 1e5),
   ``controller_params`` (a mapping, passed to mrm.control.registry.create when ``controller`` is a name), ``cfg``,
-  ``auto_max_ticks``, ``oracle_period_ticks``.
+  ``auto_max_ticks``, ``oracle_period_ticks``, and the engine numerics ``sh_tol_k`` (self-heating root tolerance, K)
+  and ``optics_far_hold`` (the far-line hold of the self-heating optics, a bounded approximation, default off;
+  mrm.plant.plant.Plant, docs/handoff/perf.md).
 - Truth-fed controllers (``truth_fed = True``: the oracle of mrm.validation.oracle; the registry refuses them) are
   called as ``step(obs, truth=plant.truth())``; every other controller sees only the released sensor channels.
 
@@ -171,7 +173,8 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
     plant = Plant(pp, sc, spec, controller_latency_ticks=lat, noise_seed=sd["noise"], scenario_seed=sd["scenario"],
                   metrics=mspec, record=record, record_ticks=n_ticks, substep_policy=options.get("substep_policy"),
                   auto_max_ticks=int(options.get("auto_max_ticks", 64)), fast_kernel=fast is not None,
-                  oracle=options.get("oracle", True), histogram=options.get("histogram"))
+                  oracle=options.get("oracle", True), histogram=options.get("histogram"),
+                  **{k: options[k] for k in ("sh_tol_k", "optics_far_hold") if k in options})
     settle = bool(options.get("settle", False))
     protocol = options.get("reset_protocol") or ("branch_high" if settle else None)
     heater_code = options.get("heater_code")

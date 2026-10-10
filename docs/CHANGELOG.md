@@ -3,6 +3,50 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-09: engine performance round 1
+
+Details, measurements and error bounds: docs/handoff/perf.md (owner: engine).
+
+- **The tick runs in one function** (`mrm.sim.kernel._world_block`): `_prepare_interval`, `_thermal_and_sensors`,
+  `_account`, `_auto_substep`, `_heater_step` and `_bias_step` are gone (their code moved into the world block in
+  the same order); `truth_row(P, S, b)` stays as a wrapper of `_truth_a` (array arguments). Reason: a numba call
+  that takes the KParams/KState tuples costs a reference-count update of every one of their ~270 arrays. No result
+  changed (bit-identical, kernel/reference parity and the regression scenarios).
+- **Self-heating adapter**: the exact ring without backscatter (g26) evaluates from substep caches (cos/sin of the
+  reference phase, rotated; the Airy constants) in `mrm.plant.optics` (`sh_fast_precompute`, `sh_fast_pabs`,
+  `sh_fast_outputs`, `sh_bounds`), used by both the engine and `optics.selfheat_pabs` / `selfheat_commit` /
+  `selfheat_bounds`. Equal to `_airy_line` up to floating-point rounding (P_abs 2e-13 relative); the optics adapter
+  now also fills the slope outputs (RL_DABS_DPHI, R_DABS_DLAM) for these rings. `pack_selfheat_args` layout: new
+  blocks SH_O_FK, SH_O_FC, SH_O_FF, SH_O_LE, SH_O_FH and the flag SH_FARHOLD (SH_HDR 18 -> 24); new keyword
+  `far_hold`.
+- **Phase model** (`mrm.plant.phase`): `ring_optics_row` = `ring_optics_levels_row` + `coupling_row`; the engine
+  recomputes K^2 at the lines only when the line wavelengths change (exact).
+- `mrm.plant.electrical.heater_target_one` / `bias_target_one`, `mrm.plant.datapath.errors_tick_ber_row`
+  (per-channel / given-BER forms of the row kernels; the engine caches the DAC transfer per code and computes the
+  BER once per tick).
+- `mrm.plant.selfheat.implicit_step_b` (and its kernel mirror) updates the lags in two passes (bit-identical).
+- **New fidelity switch** `Plant(optics_far_hold=...)` / `run(..., optics_far_hold=...)`, default False: the
+  far-line hold, a bounded approximation (perf.md P5); off by default because the closed loops turn its small P_abs
+  error into other trajectories (perf.md 5.4). No schema key yet (params owner: `fidelity.optics_far_hold` if
+  wanted). `run(..., sh_tol_k=...)` passes the self-heating tolerance through.
+- Second session (perf.md P8-P13, all bit-identical to the first session's engine): the kernel's thermal pass from
+  per-block tables (`kernel._th_struct`, `_th_gains`, `_heater_split_all`; `_implicit_step_eng` takes the tables as
+  extra arguments); bus finalize without the full view set and without a division for a zero reflection; the junction
+  table bracket found once per voltage from the uniform spacing (`mrm.plant.electrical.grid_index`, used by
+  `_interp_lin`); the phase model without heap allocations (`mrm.plant.phase.ring_optics_levels_ws`,
+  `resonance_shift_ws`, scratch passed in); `kernel.cold_coordinate` stops at an exact fixed point; Truth computes
+  er_db / il_db only when a record reads them and at the last step of a block (`_truth_a(..., with_db, dark_known)`);
+  the PD dark current once per tick (`mrm.plant.sensing.monitor_tick_row(..., i_dark_in=None)`, new optional
+  argument; new state row `RF_I_DARK`).
+- Engine accuracy against commit 8646691: every regression scenario and the controller scorecard agree to
+  floating-point rounding (largest change 2.2e-6 pm of detuning in the scenarios, 2.6e-6 pm in the scorecard; no ADC
+  code, heater code, lock state or line changed; perf.md section 5). B = 1 fixed tick 54-55 -> 15.5 us on AC power;
+  07 P0-9's 10 us is not met (perf.md 5.6); its 64 x 1 s Monte Carlo in 5 min is (3.5-3.9 min).
+- Review of round 1 (perf.md section 6): `mrm.plant.optics._fast_flag` derives a ring's Airy-path flag from its
+  backscatter row at every adapter call (it was kept from the first call, so a caller that rewrote rb through
+  `selfheat_views` afterwards ran the ring without its backscatter; the plant never does, results unchanged);
+  the incremental cos/sin cache's error bound corrected for constant phase steps (systematic, <= 1.8e-12; ~5e-9 K).
+
 ## 2026-10-09: engine and controllers stage integration
 
 Integrator changes (details in docs/handoff/integrator.md section 6 and docs/ENGINE.md):

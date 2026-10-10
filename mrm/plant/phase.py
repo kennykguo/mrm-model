@@ -58,7 +58,8 @@ from mrm.units import C0
 __all__ = ["RP_LAM_RES", "RP_N_EFF", "RP_N_G", "RP_DNG", "RP_LEN", "RP_T_REF", "RP_S0", "RP_BETA", "RP_T0",
            "RP_K2T", "RP_K2D", "RP_DLNK2T", "RP_DLNK2D", "RP_ALPHA_I", "RP_ALPHA_NONHEAT", "RP_CT_RING",
            "RP_CT_HEATER", "RP_FILL", "RP_V_REF", "RP_FDN_REF", "RP_FAL_REF", "N_RP", "PhaseParams",
-           "ring_optics_row", "resonance_shift_row", "local_thermo_optic", "thermal_shift_m"]
+           "ring_optics_row", "ring_optics_levels_row", "coupling_row", "resonance_shift_row", "local_thermo_optic",
+           "thermal_shift_m"]
 
 # column indices of PhaseParams.ring (B, N, N_RP); all SI
 RP_LAM_RES = 0       # cold resonance lambda_res (m)
@@ -181,8 +182,15 @@ def resonance_shift_row(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, ou
     (equation 1 of the module docstring), with the ring-level junction FCA f alpha_fca(V) (1/m), the junction
     capacitance C_j (F) and series resistance R_s (ohm) at that bias. rp (N, N_RP). out_flags gets the junction
     FLAG_GRID_CLIP bit (mrm.plant.electrical) when v leaves the table."""
+    resonance_shift_ws(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, out_shift, out_fal, out_cj, out_rs,
+                       out_flags, np.empty(rp.shape[0]))
+
+
+@njit(cache=True)
+def resonance_shift_ws(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, out_shift, out_fal, out_cj, out_rs,
+                       out_flags, fdn):
+    """:func:`resonance_shift_row` with the scratch fdn (N,) passed in (no allocation per call)."""
     n = rp.shape[0]
-    fdn = np.empty(n)
     junction_eval_row(v, grid, dn_tab, al_tab, c_tab, rs_tab, rp[:, RP_FILL], rp[:, RP_LEN], fdn, out_fal, out_cj,
                       out_rs, out_flags)
     for k in range(n):
@@ -190,16 +198,23 @@ def resonance_shift_row(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, ou
         out_shift[k] = dth + rp[k, RP_LAM_RES] * (fdn[k] - rp[k, RP_FDN_REF]) / rp[k, RP_N_G]
 
 
+@njit(cache=True, inline="always")
+def _loss_temperature_factor(rp, k, t_ring, t_heater):
+    """exp(c_ring (T - T_ref) + c_heater (T_H - T_ref)) of equation 5 (the same for both NRZ levels)."""
+    t_ref = rp[k, RP_T_REF]
+    return math.exp(rp[k, RP_CT_RING] * (t_ring - t_ref) + rp[k, RP_CT_HEATER] * (t_heater - t_ref))
+
+
 @njit(cache=True)
-def _fill_level(rp, k, lam_l, shift, fal, t_ring, t_heater, out_phi, out_a, out_eta, out_trt, with_trt):
+def _fill_level(rp, k, lam_l, shift, fal, tfac, out_phi, out_a, out_eta, out_trt, with_trt):
+    """Phases, loss, heat fraction (and group delay) of ring k at one level; tfac = _loss_temperature_factor."""
     lam_r = rp[k, RP_LAM_RES]
     ne = rp[k, RP_N_EFF]
     ng = rp[k, RP_N_G]
     dng = rp[k, RP_DNG]
     ln = rp[k, RP_LEN]
-    t_ref = rp[k, RP_T_REF]
     alpha = rp[k, RP_ALPHA_I] + fal - rp[k, RP_FAL_REF]
-    alpha *= math.exp(rp[k, RP_CT_RING] * (t_ring - t_ref) + rp[k, RP_CT_HEATER] * (t_heater - t_ref))
+    alpha *= tfac
     if alpha < 0.0:
         alpha = 0.0
     a_rt = math.exp(-0.5 * alpha * ln)
@@ -221,6 +236,59 @@ def _fill_level(rp, k, lam_l, shift, fal, t_ring, t_heater, out_phi, out_a, out_
 
 
 @njit(cache=True)
+def ring_optics_levels_row(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab,
+                           out_phi0, out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_trt, out_shift, out_cj, out_rs,
+                           out_flags):
+    """The part of :func:`ring_optics_row` that depends on the ring state (equations 1-3 and 5): phases, loss, heat
+    fraction, group delay, level shifts and junction values. Arguments as :func:`ring_optics_row`."""
+    ring_optics_levels_ws(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab, out_phi0,
+                          out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_trt, out_shift, out_cj, out_rs, out_flags,
+                          np.empty((6, rp.shape[0])))
+
+
+@njit(cache=True)
+def ring_optics_levels_ws(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab,
+                          out_phi0, out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_trt, out_shift, out_cj, out_rs,
+                          out_flags, ws):
+    """:func:`ring_optics_levels_row` with the scratch ws (6, N) passed in (the per-tick call of the kernel allocates
+    nothing; docs/handoff/perf.md P10)."""
+    n = rp.shape[0]
+    shift = ws[0]
+    fal = ws[1]
+    cj = ws[2]
+    rs = ws[3]
+    tf = ws[5]
+    for lvl in range(2):
+        v = v0 if lvl == 0 else v1
+        resonance_shift_ws(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, shift, fal, cj, rs, out_flags,
+                           ws[4])
+        for k in range(n):
+            out_shift[k, lvl] = shift[k]
+            out_cj[k, lvl] = cj[k]
+            out_rs[k, lvl] = rs[k]
+            if lvl == 0:
+                tf[k] = _loss_temperature_factor(rp, k, t_ring_k[k], t_heater_k[k])     # one exp for both levels
+                _fill_level(rp, k, lam_l, shift[k], fal[k], tf[k], out_phi0, out_a0, out_eta0, out_trt, True)
+            else:
+                _fill_level(rp, k, lam_l, shift[k], fal[k], tf[k], out_phi1, out_a1, out_eta1, out_trt, False)
+
+
+@njit(cache=True)
+def coupling_row(rp, lam_l, out_k2t, out_k2d):
+    """Per-pass K^2 of the through and drop couplers at every line (equation 4; 07 P1-5): a function of the line
+    wavelengths and the ring constants only, so a caller may skip it while lam_l is unchanged (the kernel does)."""
+    n = rp.shape[0]
+    for k in range(n):
+        lam_r = rp[k, RP_LAM_RES]
+        for li in range(lam_l.shape[0]):
+            dl = lam_l[li] - lam_r
+            kt = rp[k, RP_K2T] * math.exp(rp[k, RP_DLNK2T] * dl)
+            kd = rp[k, RP_K2D] * math.exp(rp[k, RP_DLNK2D] * dl)
+            out_k2t[k, li] = kt if kt < 1.0 else 1.0 - 1e-15
+            out_k2d[k, li] = kd if kd < 1.0 else 1.0 - 1e-15
+
+
+@njit(cache=True)
 def ring_optics_row(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab,
                     out_phi0, out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_k2t, out_k2d, out_trt,
                     out_shift, out_cj, out_rs, out_flags):
@@ -232,30 +300,8 @@ def ring_optics_row(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_ta
     pass v1 = v0 for CW or a squelched driver); the junction table row of this world. Outputs (N, L): phi0/phi1
     (rad, absolute, no coupler phase), a0/a1, eta0/eta1, k2t/k2d (at the line), t_rt (s, level 0); (N, 2):
     out_shift (resonance shift per level, m), out_cj (C_j per level, F), out_rs (R_s per level, ohm); out_flags (N,)
-    int8 junction flags (FLAG_GRID_CLIP)."""
-    n = rp.shape[0]
-    shift = np.empty(n)
-    fal = np.empty(n)
-    cj = np.empty(n)
-    rs = np.empty(n)
-    for lvl in range(2):
-        v = v0 if lvl == 0 else v1
-        resonance_shift_row(rp, t_ring_k, v, grid, dn_tab, al_tab, c_tab, rs_tab, shift, fal, cj, rs, out_flags)
-        for k in range(n):
-            out_shift[k, lvl] = shift[k]
-            out_cj[k, lvl] = cj[k]
-            out_rs[k, lvl] = rs[k]
-            if lvl == 0:
-                _fill_level(rp, k, lam_l, shift[k], fal[k], t_ring_k[k], t_heater_k[k], out_phi0, out_a0, out_eta0,
-                            out_trt, True)
-            else:
-                _fill_level(rp, k, lam_l, shift[k], fal[k], t_ring_k[k], t_heater_k[k], out_phi1, out_a1, out_eta1,
-                            out_trt, False)
-    for k in range(n):
-        lam_r = rp[k, RP_LAM_RES]
-        for li in range(lam_l.shape[0]):
-            dl = lam_l[li] - lam_r
-            kt = rp[k, RP_K2T] * math.exp(rp[k, RP_DLNK2T] * dl)
-            kd = rp[k, RP_K2D] * math.exp(rp[k, RP_DLNK2D] * dl)
-            out_k2t[k, li] = kt if kt < 1.0 else 1.0 - 1e-15
-            out_k2d[k, li] = kd if kd < 1.0 else 1.0 - 1e-15
+    int8 junction flags (FLAG_GRID_CLIP). Equals :func:`ring_optics_levels_row` followed by :func:`coupling_row`."""
+    ring_optics_levels_row(rp, lam_l, t_ring_k, t_heater_k, v0, v1, grid, dn_tab, al_tab, c_tab, rs_tab, out_phi0,
+                           out_phi1, out_a0, out_a1, out_eta0, out_eta1, out_trt, out_shift, out_cj, out_rs,
+                           out_flags)
+    coupling_row(rp, lam_l, out_k2t, out_k2d)

@@ -68,22 +68,27 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
   fields) and `KState` (90 fields); every array is a writeable C-contiguous copy so that the numba types never
   depend on the config (a read-only view is another type and would recompile the plant; `_check_kernel_arrays`
   raises instead).
-- The per-world tick lives in `kernel._world_block` (one world, the whole block of ticks). The event order is the
-  module docstring of `kernel.py` (= ENGINE_BRIEF section 3 with the controller edge first). Helpers:
-  `_prepare_interval` (commands latched at k, scenario k / k+1, laser + laser_ramp, ones density, fault mask and
-  dac_glitch, bias DAC with the fast offset, NRZ levels, optics inputs into the self-heating rows, bounds,
-  data-activity heat, thermal inputs), `_thermal_and_sensors` (heater TCR split + heater DAC path, implicit thermal
-  + self-heating step, sensors), `release_row` (event-order step 2 and obs packing), `_edge` / `_push_act`
-  (step 3, clip, latch FIFO), `truth_row`, `_oracle`, `_account` (metrics, records), `_auto_h` / `_auto_substep`.
+- The per-world tick lives in `kernel._world_block` (one world, the whole block of ticks), in sections marked
+  `# ---` (commands latched at k, scenario k / k+1, laser + laser_ramp, ones density, fault mask and dac_glitch, bias
+  DAC with the fast offset, NRZ levels, optics inputs into the self-heating rows and their substep caches, bounds,
+  data-activity heat, thermal inputs, substep length, heater TCR split + heater DAC path, implicit thermal +
+  self-heating step, sensor inputs, sensors, Truth (`_truth_a`), oracle, metrics and records). Performance round 1
+  (docs/handoff/perf.md P3) merged the former `_prepare_interval`, `_thermal_and_sensors`, `_account`,
+  `_auto_substep`, `_heater_step`, `_bias_step` into it: a call that takes the KParams/KState tuples costs a
+  reference-count update of all ~270 arrays. The event order is the module docstring of `kernel.py` (= ENGINE_BRIEF
+  section 3 with the controller edge first). Tuple-taking helpers left: `release_row` (event-order step 2 and obs
+  packing), `_edge` / `_push_act` (step 3, clip, latch FIFO), `_oracle`, `_auto_h`, and the public `truth_row`.
 - Controllers: `step_fn` / `fast_fn` are typed as the first-class `STEP_FT` (the mrm.control.api ABI), so one
   compiled kernel serves every controller and is disk-cached (a Dispatcher argument would recompile the whole
   plant per controller and per process).
 - Delays: the controller pipeline (Controller.latency_ticks) is `io.pipe_*` (one push per edge, capacity
   `fifo_capacity(latency, period, 1)`); every analog/converter delay stays in its leaf module (07 P0-6).
 - The self-heating adapter `eng_pabs` / `eng_commit` is bit-identical to `optics.selfheat_pabs` /
-  `selfheat_commit` (same P_abs and slope summation order) but writes the ring's outputs during the evaluation and
-  reuses them at the commit when the solver commits the temperature it evaluated last; it saves one ring evaluation
-  in three. The rows are `pack_selfheat_args` rows extended by `extend_selfheat_rows` (2 ints, 3 + L floats).
+  `selfheat_commit` (same P_abs and slope summation order; since performance round 1 the exact ring without
+  backscatter runs the shared Airy path of `mrm.plant.optics`, `sh_fast_*`, with substep caches: perf.md P1, P4)
+  and reuses the last evaluation at the commit when the solver commits the temperature it evaluated last; it saves
+  one ring evaluation in three. The rows are `pack_selfheat_args` rows (with the optics adapter's cache blocks)
+  extended by `extend_selfheat_rows` (EXT_I ints: the general path's through power, the K^2 key, the Truth FWHM).
 
 ## 3. Decisions and deviations (please review)
 
@@ -170,7 +175,12 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
     first-class function value made numba embed the dispatcher address ("dynamic globals") and refuse `cache=True`
     for the whole kernel, so every process recompiled the plant (~7 min). Any change to selfheat must be mirrored;
     `test_kernel_parity` (the reference runs `selfheat.implicit_step` with `optics.selfheat_pabs/commit`) fails bit
-    for bit if the two drift. `test_kernel_is_disk_cacheable` guards the cache.
+    for bit if the two drift. `test_kernel_is_disk_cacheable` guards the cache. (Performance round 1 kept the
+    mirror: the lag update in two passes went into both, docs/handoff/perf.md P6; since P8 the kernel runs the
+    same arithmetic from tables built once per block (lag indices by kind, per-lag gains, the implicit gain per
+    observer), bit-identical to `implicit_step_b`, which the reference still runs. A factory that binds the adapter
+    at compile time as a closure would remove the copy, but numba's cache index does not distinguish closures of
+    one factory, so two adapters could share a cache entry; not done.)
 17. **Optics rows lag one tick in temperature.** Loss, coupling, level phases and the junction shift of the
     self-heating rows are prepared from the ring (and heater) temperature at the start of the interval; only the
     thermo-optic shift is inside the implicit solve. The explicit part is ~1 % of dP_abs/dT; near a fold it changes
@@ -208,40 +218,50 @@ Record specs: `[(channel, decimation_ticks, reducer)]` with reducer mean | min |
 
 ## 4. Performance (07 P0-9)
 
-Measured on the shared 8-core M2 (other agents running; load average in parentheses), N = L = 8, g26, warm disk
-cache, `tests/perf/test_perf.py` (`pytest tests/perf -s`) and the earlier profiling runs:
+Performance round 1 (docs/handoff/perf.md: change log P1-P13, error bounds, tests, raw numbers) took the B = 1 fixed
+tick from 54-55 us to 15.5 us on AC power (x3.5), with results equal to commit 8646691 up to floating-point rounding
+(largest scenario difference 2.2e-6 pm of detuning; no ADC, heater or bias code, lock state or line changed; the
+controller scorecard agrees to 2.6e-6 pm). Measured on the 8-core M2 on AC power, Low Power Mode off, load average in
+parentheses (`tools/perf_ab.py`: alternating runs, median of 5 x 7 x 3000 ticks; `pytest tests/perf -m slow -s`):
 
-| case | us per world-tick | sim-s / wall-s (bank) | notes |
-|---|---|---|---|
-| B = 1, fixed | 94 (load 8-10); 133-143 (load 15-22) | 0.0106; 0.007 | 07 target >= 0.1: not met |
-| B = 1, auto, 100 kHz controller | 53 (load 8-10); 74 (load 22) | 0.019; 0.0135 | 0.42 substeps per tick (edges every 10 ticks) |
-| B = 1, auto, 10 kHz controller | 38.6 (load 8-10); 28 (load 22, 20 000 ticks) | 0.026-0.035 | 0.14-0.30 substeps per tick; 07 target >= 20: not met |
-| B = 64, fixed, 8 threads | 33.3 (load 8-10); 40 (load 22) | 0.00047; 0.0004 | 64 x 1 s Monte Carlo ~35-43 min (07: 5 min) |
-| B = 64, auto | 30.5 (load 8-10); 41 (load 22, 200 ticks only) | 0.0005 | |
+| case | 8646691 | round 1 | sim-s / wall-s (round 1) | notes |
+|---|---|---|---|---|
+| B = 1, fixed | 54.3-55.4 us (2.5-3.1) | **15.5-16.0 us** (1.9-3.1) | 0.063-0.065 | 07 target >= 0.1 (<= 10 us per tick): **not met** |
+| B = 1, auto, 100 kHz controller | 29.2 us (2.5) | 9.0-9.1 us (1.9) | 0.110 | 0.42 substeps per tick |
+| B = 1, auto, 10 kHz controller | 12.2 us (2.5) | 4.5 us (1.9) | 0.221 | 0.16 substeps per tick; 07 target >= 20: not met |
+| B = 64, fixed, 8 threads | 11.1-12.1 us (2.5-3.1) | 3.3-3.7 us (1.9-3.1) | 0.0044-0.0048 (bank) | 64 x 1 s Monte Carlo 3.5-3.9 min: 07 target (5 min) met |
+| B = 64, auto | 10.1 us (2.5) | 3.2-3.5 us (1.9) | 0.0045-0.0049 | |
 
-Where the time goes at B = 1 (fixed, per tick, ~94 us at load 8-10): the implicit self-heating solve ~52 us (exact
-NRZ ring with slope for 8 lines x 2 levels, ~2.1 us per ring evaluation, ~2.7-2.9 evaluations per ring and tick
-after the commit reuse, ~1.7 Newton iterations at sh_tol_k = 1e-7 K); `_prepare_interval` ~20 us
-(`phase.ring_optics_row` 5.4 us: 128 exp for K^2 every tick; `selfheat_bounds` 3.4 us); sensors ~17 us (monitor
-with 14 flicker poles per ring, ADC, temperature sensors, readbacks); accounting (metrics, records, oracle) ~6 us;
-thermal pass (945 lags) ~2.5 us. A looser tolerance (1e-5 K) gives ~0.98 iterations and ~15 % less time; not taken
-(changes results beyond the tested bounds). The auto policy saves less than 07 hoped because the g26 controller edge
-(100 kHz) and ADC (250 kHz) cap a substep and the sensors still run per tick.
+The earlier figures of this section (94 us at load 8-10, 133-143 us at load 15-22) were taken with other agents
+running and on battery or Low Power Mode at times; on a quiet machine on AC the 8646691 engine runs 54-55 us. Battery
+or Low Power Mode makes every number ~1.7x slower: compare only runs under the same power state (perf_bench records
+it).
 
-Levers not taken (they change results or other owners' files): CW optics when the data is idle, K^2 cached while
-the laser does not move (phase owner), lag merging per (source, tau) (thermal owner), evaluating only near lines
-in the Newton iterations (an approximation), a reduced-order monitor noise model (sensor owner).
+Where the time goes at B = 1 (fixed, ~15.5 us; tools/perf_tick_prof.py, perf.md 5.5): the self-heating optics 6.8 us
+(Newton solves 2.7: 22.5 ring evaluations of 8 lines x 2 NRZ levels per tick at ~1.82 iterations per ring and
+sh_tol_k = 1e-7 K; commit 1.5; the substep caches 1.6; the solver's bounds 1.0), the thermal ROM 2.7 us (945 lags,
+optical lags, heater TCR split), sensors 1.8 us (mostly the counter-based normal draws of the 14 flicker poles per ring
+at every ADC sample), the phase model 1.15 us, Truth 0.9 us, the controller edge 0.5 us, the DACs, laser, data,
+scenario and metrics 1.4 us. ~44 normal draws per tick (Philox + Box-Muller, 35 ns each) are ~1.5 us of it.
 
-Re-measured after the review (load 11-14; `pytest tests/perf -m slow -s`): B = 1 fixed 99-103 us per tick
-(0.010 sim-s/wall-s); B = 1 auto with a 10 kHz controller 21 us (0.047; 0.16 substeps per tick); B = 1 auto at
-100 kHz 55 us (0.018; 0.43); B = 64 fixed 27-31 us per world-tick. The review's auto guards (forced tick at
-scenario events, doubling limit) cost nothing measurable here: the steady parts still reach 64-tick substeps. A
-closed loop under A1 (PiLockCompiled, 10 kHz, 25 ms) ran 0.61 substeps per tick in auto (largest 8 ticks: the
-loop moves the heater at every edge) against 1.0 fixed.
+Options that trade accuracy for speed (perf.md 5.2, 5.4): `optics_far_hold=True` (the far-line hold, P5; default off)
+gives 14.6-14.8 us, but changes closed-loop trajectories (up to 0.35 pm, 17 monitor codes in the regression
+scenarios); `sh_tol_k=1e-6` gives 15.2 us. Neither reaches 10 us; perf.md 5.6 lists what would (far lines nearly free
+as an opt-in, a kernel outside numba's scalar model for the per-line work, cheaper noise draws in mrm/core/rng.py, a
+smaller thermal ROM), and estimates that even the opt-in far-line hold with cheaper noise lands near, not below,
+10 us on this machine.
 
-First use in a fresh environment compiles the kernel (~5-8 min on this machine, ~2.3 GB peak RSS); afterwards it
-is loaded from numba's disk cache in < 1 s per process (any edit to `mrm/sim/kernel.py` or a module it calls
-invalidates the cache).
+Levers taken in round 1 that earlier rounds listed as not taken: K^2 cached while the laser lines do not move (P1,
+exact); the far-line hold (P5, opt-in); the flicker poles were already updated per ADC sample, not per tick. Not
+taken: CW optics when the data is idle (rounding-level, only helps idle scenarios, not the benchmark), lag merging per
+(source, tau) (~0.3 us, changes the thermal state representation of the reference too), evaluating only near lines in
+the Newton iterations (an approximation; its error can be held at rounding level, but the commit still needs every
+line, so it saves ~0.6 us at most), a reduced-order monitor noise model (changes every noise realization).
+
+First use in a fresh environment compiles the kernel (~2-5 min on this machine now, ~1.9 GB peak RSS; 5-8 min was
+measured under load); afterwards it is loaded from numba's disk cache in < 1 s per process. Any edit to
+`mrm/sim/kernel.py` recompiles it; an edit to a leaf module it calls does NOT (numba keys the cache on the function's
+own file): run `tools/clear_numba_cache.py` after every edit of njit code (docs/ENGINE.md section 1).
 
 ## 5. Tests
 

@@ -278,9 +278,10 @@ def monitor_tick_row(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault,
                      pr, pw, lat, phase, pga_gains, fl_coef,
                      afe_type, window_ticks, period_ticks, code_max, shot_on, stuck_flagged, slot_base,
                      key_adc, key_shot, key_dnl,
-                     sf, si, fx, fc, fv, fr, fm, out_sampled):
+                     sf, si, fx, fc, fv, fr, fm, out_sampled, i_dark_in=None):
     """Integrate plant interval [k, k+1) for the N monitor channels of one world; take, convert and queue the samples
-    whose sample tick is k + 1.
+    whose sample tick is k + 1. i_dark_in (N,), optional: the PD dark currents dark_current_a(pw[PW_DARK_I0], t_pd_k,
+    pw[PW_DARK_T0], pw[PW_DARK_EA]) already computed by the caller (the engine shares them with Truth).
 
     Inputs (N,): p_pd_w optical power at the PD (W; the drop port sums every line and order, 07 P1-9), p_bg_w the
     bus power that the background fraction applies to (W), t_pd_k PD temperature (K, ROM observer monitor_pd),
@@ -307,7 +308,10 @@ def monitor_tick_row(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault,
     for n in range(n_rings):
         out_sampled[n] = 0
         i_sig = gs * pr[n, PR_RESP] * (p_pd_w[n] + pr[n, PR_BG] * p_bg_w[n])
-        i_dark = dark_current_a(i0, t_pd_k[n], t0, ea)
+        if i_dark_in is None:
+            i_dark = dark_current_a(i0, t_pd_k[n], t0, ea)
+        else:
+            i_dark = i_dark_in[n]
         i_tot = i_sig + i_dark
         s_shot = 2.0 * Q_E * (abs(i_sig) + i_dark) if shot_on else 0.0    # one-sided shot-noise PSD, A^2/Hz
         s = next_edge(k + 1, period_ticks, phase[n])                       # next sample tick (>= k + 1)

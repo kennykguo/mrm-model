@@ -62,7 +62,8 @@ __all__ = [
     "PAT2_PWM_PERIOD_S", "PAT2_PWM_BITS", "PAT2_DAC_BITS", "G26_BIAS_V_MIN", "G26_BIAS_V_MAX",
     "JUNCTION_GRID_V_MIN", "JUNCTION_GRID_V_MAX",
     # row kernels
-    "latch_row", "fifo_row", "dac_frac", "heater_target_row", "bias_target_row", "slew_settle_row",
+    "latch_row", "fifo_row", "dac_frac", "heater_target_row", "heater_target_one", "bias_target_row", "bias_target_one",
+    "slew_settle_row",
     "actuator_quiescent_row", "settle_advance_row",
     "heater_power_row", "supply_limit_row", "heater_bank_step_row", "bias_bank_step_row", "nrz_levels_row",
     "junction_eval_row", "junction_swing_capacitance_row", "data_activity_heat_row",
@@ -205,30 +206,34 @@ def heater_target_row(code, law, bits, pwm_bits, bit_err, bow, pwm_ripple, tick,
     clock does not attenuate it (overestimate); the slew limit acts on the period-average power fraction u, so a
     slew in codes/s maps to u only approximately (du/dcode ~ 2*code/code_max^2 varies across the range).
     """
-    nbc = bits - pwm_bits
-    cmax_c = (1 << nbc) - 1
-    pclk = 1 << pwm_bits
     for n in range(code.shape[0]):
-        er = bit_err[_ix(bit_err, n)]
-        bw = bow[_ix(bow, n)]
-        c = code[n]
-        if law == LAW_DAC_PWM:
-            nc = c >> pwm_bits
-            d = c - (nc << pwm_bits)
-            f = d / pclk
-            x0 = dac_frac(nc, nbc, er, bw)
-            n1 = nc + 1 if nc < cmax_c else cmax_c
-            x1 = dac_frac(n1, nbc, er, bw)
-            out_u[n] = (1.0 - f) * x0 * x0 + f * x1 * x1
-            if pwm_ripple != 0:
-                c0 = tick * dt_clk
-                h = (_pwm_high_clocks(c0 + dt_clk, d, pclk) - _pwm_high_clocks(c0, d, pclk)) / dt_clk
-                out_ripple[n] = (x1 * x1 - x0 * x0) * (h - f)
-            else:
-                out_ripple[n] = 0.0
-        else:
-            out_u[n] = dac_frac(c, bits, er, bw)
-            out_ripple[n] = 0.0
+        u, rip = heater_target_one(code[n], law, bits, pwm_bits, bit_err[_ix(bit_err, n)], bow[_ix(bow, n)],
+                                   pwm_ripple, tick, dt_clk)
+        out_u[n] = u
+        out_ripple[n] = rip
+
+
+@njit(cache=True)
+def heater_target_one(c, law, bits, pwm_bits, er, bw, pwm_ripple, tick, dt_clk):
+    """One channel of :func:`heater_target_row`: (u, ripple) for code c, bit errors er (K,) and bow bw (LSB). Without
+    the PWM ripple the result depends on the code alone (a caller may keep it while the code holds)."""
+    if law == LAW_DAC_PWM:
+        nbc = bits - pwm_bits
+        cmax_c = (1 << nbc) - 1
+        pclk = 1 << pwm_bits
+        nc = c >> pwm_bits
+        d = c - (nc << pwm_bits)
+        f = d / pclk
+        x0 = dac_frac(nc, nbc, er, bw)
+        n1 = nc + 1 if nc < cmax_c else cmax_c
+        x1 = dac_frac(n1, nbc, er, bw)
+        u = (1.0 - f) * x0 * x0 + f * x1 * x1
+        if pwm_ripple != 0:
+            c0 = tick * dt_clk
+            h = (_pwm_high_clocks(c0 + dt_clk, d, pclk) - _pwm_high_clocks(c0, d, pclk)) / dt_clk
+            return u, (x1 * x1 - x0 * x0) * (h - f)
+        return u, 0.0
+    return dac_frac(c, bits, er, bw), 0.0
 
 
 @njit(cache=True)
@@ -238,9 +243,14 @@ def bias_target_row(code, bits, bit_err, bow, v_min, v_max, out_v):
     v_min/v_max (Nx,): the printed G26 bias axis is 1.0 to 3.75 V (07 P0-7, ring.bias_dac; LM26-S slide 9).
     """
     for n in range(code.shape[0]):
-        lo = v_min[_ix(v_min, n)]
-        hi = v_max[_ix(v_max, n)]
-        out_v[n] = lo + (hi - lo) * dac_frac(code[n], bits, bit_err[_ix(bit_err, n)], bow[_ix(bow, n)])
+        out_v[n] = bias_target_one(code[n], bits, bit_err[_ix(bit_err, n)], bow[_ix(bow, n)], v_min[_ix(v_min, n)],
+                                   v_max[_ix(v_max, n)])
+
+
+@njit(cache=True)
+def bias_target_one(c, bits, er, bw, lo, hi):
+    """One channel of :func:`bias_target_row` (a function of the code alone)."""
+    return lo + (hi - lo) * dac_frac(c, bits, er, bw)
 
 
 # ============================================================================================ slew and settle
@@ -682,6 +692,28 @@ def nrz_levels(v_bias, swing_vpp, mode, v_floor, v_ceil, out_lo, out_hi, out_fla
 
 
 # ============================================================================================ junction runtime
+@njit(cache=True, inline="always")
+def grid_index(x, grid):
+    """np.searchsorted(grid, x) - 1 for grid[0] < x < grid[-1] on a non-decreasing grid, i.e. the unique j with
+    grid[j] < x <= grid[j + 1]: guessed from the mean spacing and confirmed by that test (or one step either side),
+    else the binary search. The same index without the ~9-step search on the 10 mV junction grid (docs/handoff/perf.md
+    P10)."""
+    g = grid.shape[0]
+    span = grid[g - 1] - grid[0]
+    j = np.int64(0)
+    if span > 0.0:
+        u = (x - grid[0]) * ((g - 1) / span)
+        if u > 0.0:
+            j = np.int64(u) if u < g - 2 else np.int64(g - 2)
+    if grid[j] < x and x <= grid[j + 1]:
+        return j
+    if j + 2 < g and grid[j + 1] < x and x <= grid[j + 2]:
+        return j + 1
+    if j >= 1 and grid[j - 1] < x and x <= grid[j]:
+        return j - 1
+    return np.int64(np.searchsorted(grid, x) - 1)
+
+
 @njit(cache=True)
 def _interp_lin(x, grid, col):
     """Linear interpolation on an increasing grid; outside it the end value is held. Returns (value, clipped).
@@ -693,9 +725,33 @@ def _interp_lin(x, grid, col):
         return col[0], x < grid[0]
     if x >= grid[g - 1]:
         return col[g - 1], x > grid[g - 1]
-    j = np.searchsorted(grid, x) - 1
+    j = grid_index(x, grid)
     w = (x - grid[j]) / (grid[j + 1] - grid[j])
     return col[j] + w * (col[j + 1] - col[j]), False
+
+
+@njit(cache=True, inline="always")
+def _interp_bracket(x, grid):
+    """(j, w, clipped) of :func:`_interp_lin` at x; j = -1 outside the grid interior (end value held) and for NaN."""
+    g = grid.shape[0]
+    if x != x:
+        return np.int64(-1), 0.0, True
+    if x <= grid[0]:
+        return np.int64(-1), 0.0, x < grid[0]
+    if x >= grid[g - 1]:
+        return np.int64(-1), 0.0, x > grid[g - 1]
+    j = grid_index(x, grid)
+    return j, (x - grid[j]) / (grid[j + 1] - grid[j]), False
+
+
+@njit(cache=True, inline="always")
+def _interp_at(x, j, w, grid, col):
+    """The value of :func:`_interp_lin` at x from its bracket (j, w) of :func:`_interp_bracket`."""
+    if x != x:
+        return np.nan
+    if j < 0:
+        return col[0] if x <= grid[0] else col[grid.shape[0] - 1]
+    return col[j] + w * (col[j + 1] - col[j])
 
 
 @njit(cache=True)
@@ -758,10 +814,12 @@ def junction_eval_row(v, grid, dneff_col, alpha_col, c_col, rs_col, fill, length
         vv = v[_ix(v, n)]
         f = fill[_ix(fill, n)]
         ln = length_m[_ix(length_m, n)]
-        dn, c1 = _interp_lin(vv, grid, dneff_col)
-        al, _ = _interp_lin(vv, grid, alpha_col)
-        cp, _ = _interp_lin(vv, grid, c_col)
-        rsp, _ = _interp_lin(vv, grid, rs_col)
+        # one bracket for the four columns: the values of four _interp_lin calls (docs/handoff/perf.md P10)
+        j, w, c1 = _interp_bracket(vv, grid)
+        dn = _interp_at(vv, j, w, grid, dneff_col)
+        al = _interp_at(vv, j, w, grid, alpha_col)
+        cp = _interp_at(vv, j, w, grid, c_col)
+        rsp = _interp_at(vv, j, w, grid, rs_col)
         out_dneff[n] = f * dn
         out_alpha[n] = f * al
         out_c_f[n] = f * ln * cp

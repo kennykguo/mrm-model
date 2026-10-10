@@ -47,7 +47,7 @@ __all__ = [
     "BER_REF_G26", "G26_RX_SENS_OMA_DBM", "G26_RX_SENS_OMA_DBM_REREAD", "G26_LINK_LOSS_DB",
     "ERROR_COUNT_PERIOD_S_G26", "BITSTAT_WINDOW_BITS_DEFAULT",
     "prbs_bits", "prbs_table", "popcount32", "prbs_ones_before", "prbs_window_ones",
-    "q_from_ber", "ber_from_oma", "p_above", "pattern_tick_row", "pattern_tick", "errors_tick_row", "errors_tick",
+    "q_from_ber", "ber_from_oma", "p_above", "pattern_tick_row", "pattern_tick", "errors_tick_row", "errors_tick_ber_row", "errors_tick",
     "errors_release_row", "errors_release", "bitstat_window_row", "bitstat_window",
     "DatapathHw", "DatapathBank", "pattern_mode_from_name",
 ]
@@ -280,11 +280,27 @@ def errors_tick_row(k, oma_tx_w, nbits, link_t, oma_sens_w, q_ref, ber_floor, pe
         out_new[n] = False
         if nbits[n] > 0:
             lam[n] += ber_from_oma(oma_tx_w[n] * link_t, oma_sens_w[n], q_ref, ber_floor) * nbits[n]
-        if period > 0 and (k + 1) % period == 0:
-            cnt = _rng.poisson(key, n, k + 1, _SLOT_ERR, lam[n])
-            lam[n] = 0.0
-            fifo_push(fv, fr, fm, n, cnt, k + 1 + lat)
-            out_new[n] = True
+        _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new)
+
+
+@njit(cache=True)
+def _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new):
+    if period > 0 and (k + 1) % period == 0:
+        cnt = _rng.poisson(key, n, k + 1, _SLOT_ERR, lam[n])
+        lam[n] = 0.0
+        fifo_push(fv, fr, fm, n, cnt, k + 1 + lat)
+        out_new[n] = True
+
+
+@njit(cache=True)
+def errors_tick_ber_row(k, ber, nbits, period, lat, key, lam, fv, fr, fm, out_new):
+    """:func:`errors_tick_row` with the BER of each lane given (ber (N,) = ber_from_oma(oma_tx_w * link_t,
+    oma_sens_w, q_ref, ber_floor), computed once by the caller for the error counter and the Truth BER)."""
+    for n in range(ber.shape[0]):
+        out_new[n] = False
+        if nbits[n] > 0:
+            lam[n] += ber[n] * nbits[n]
+        _errors_close(k, n, period, lat, key, lam, fv, fr, fm, out_new)
 
 
 @njit(cache=True)

@@ -69,7 +69,7 @@ class PyStair:
         return {"tx.heater": h.astype(np.int64)}
 
 
-def _setup(B=2, n_ticks=400, lat=0, ovr=(), **metrics_kw):
+def _setup(B=2, n_ticks=400, lat=0, ovr=(), plant_kw=None, **metrics_kw):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cfg = params.load("g26", overrides=["sim.reset_ramp_s=2e-4", *ovr])
@@ -79,7 +79,7 @@ def _setup(B=2, n_ticks=400, lat=0, ovr=(), **metrics_kw):
                                       scenario_offsets=sc.offsets)
     plant = Plant(pp, sc, spec, noise_seed=3, scenario_seed=5, controller_latency_ticks=lat,
                   record=[(f, 1, "last") for f in TRUTH_FIELDS], record_ticks=n_ticks,
-                  metrics=MetricsSpec.from_config(cfg, oracle_period_ticks=50, **metrics_kw))
+                  metrics=MetricsSpec.from_config(cfg, oracle_period_ticks=50, **metrics_kw), **(plant_kw or {}))
     return cfg, spec, plant
 
 
@@ -198,6 +198,22 @@ def test_parity_fidelity_variants(ovr, metrics_kw):
     _compare(plant, ref, n)
     if metrics_kw.get("lock_reference") == "oracle":
         assert np.all(np.abs(plant.metrics()["lock_reference_pm"]) > 1.0)        # the operating point is off-line
+
+
+def test_parity_with_far_line_hold():
+    """The far-line hold of the self-heating optics (Plant(optics_far_hold=True), a bounded approximation;
+    docs/handoff/perf.md P5) lives in the shared optics adapter, so the kernel and the reference must still agree bit
+    for bit with it on (Python controller, latency 1)."""
+    n = 300
+    cfg, spec, plant = _setup(n_ticks=n, lat=1, plant_kw={"optics_far_hold": True})
+    ref = ReferenceEngine(plant)
+    c_ref = PyStair()
+    c_ref.reset(spec)
+    ref.run(n, c_ref)
+    c = PyStair()
+    c.reset(spec)
+    _run_python(plant, c, spec, n, None)
+    _compare(plant, ref, n)
 
 
 def test_parity_without_jit():
