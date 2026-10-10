@@ -58,8 +58,11 @@ Bias controllers need `controller_interface.bind.tx.bias: controller` (and no ab
   is then mistaken for a fall (the recapture ramps the wrong way and gives up: FAULT). A1/A2 rates are far slower;
   `test_ctrl_a_pi.py::test_fast_red_step_is_not_mistaken_for_a_fall` is a strict xfail recording it.
 - The slide-10 aggressor (A1) at its peak rate (2127 degC/s, 183 pm/ms at the victim) is held by the PI within
-  ~7-8 pm (type 2: 6.8 pm); the heater dither cannot follow it (~110 pm). Over the full A1 trajectory the aggressor
-  heats the monitor PD ~6x more than the ring in the interim layout; its dark current then moves the fraction-of-peak
-  lock point red until lock is lost near the cusp (handoff controllers_a, request 4).
+  ~2 pm (type 2: 2.7 pm) at the g26 default site, and within ~7-8 pm (type 2: 6.8 pm) at the stress site 5 um from
+  the monitor PD; the heater dither cannot follow it (~110 pm). In the stress scenario
+  `a1_slide10_aggressor_pd_adjacent` (the aggressor 5 um from ring 0's monitor PD; not a realistic layout, and not
+  the g26 default since 2026-10-10) the full A1 trajectory heats the monitor PD ~6x more than the ring; its dark
+  current then moves the fraction-of-peak lock point red until lock is lost near the cusp (handoff controllers_a,
+  request 4).
 - The inflection (2f) dither lock is nearly power independent (-9 pm for -1 dB, against -57 pm for the
   fraction-of-peak PI).

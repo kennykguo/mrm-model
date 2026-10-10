@@ -294,31 +294,33 @@ def calibrated(pp, sc):
 
 
 def a1_rate_scenario(cfg, pp, t_min_s: float, *, delta_t_k: float = 20.0, t_base_c: float = 25.0,
-                     victim_ring: int = 0, full: bool = False):
+                     victim_ring: int = 0, full: bool = False, site: str = "aggressor"):
     """Slide-10 aggressor (A1, rectified sine, resonance referencing) whose minimum falls at plant time ``t_min_s``.
     ``full=False``: the A1 peak rate (pi dT/P = 2127 degC/s, 183 pm/ms of resonance target) with a reduced swing
     ``delta_t_k`` (period pi dT / 2127 s) so the cusp arrives within ~15 ms; ``full=True``: the printed 88.5 K /
-    130.7 ms trajectory on the base ``t_base_c``."""
+    130.7 ms trajectory on the base ``t_base_c``. ``site``: the layout site of the aggressor (default the g26
+    default site; ``lib.AGGRESSOR_PD_ADJACENT_SITE`` is the stress site 5 um from ring 0's monitor PD)."""
     from mrm.scenarios import library as lib
     if full:
         period, dT = lib.A1_PERIOD_S, lib.A1_DELTA_T_K
     else:
         dT = float(delta_t_k)
         period = math.pi * dT / (math.pi * lib.A1_DELTA_T_K / lib.A1_PERIOD_S)
-    agg = lib.a1_slide10_aggressor(victim_ring=victim_ring, t_max_c=t_base_c + dT + 0.1, delta_t_k=dT,
+    agg = lib.a1_slide10_aggressor(site=site, victim_ring=victim_ring, t_max_c=t_base_c + dT + 0.1, delta_t_k=dT,
                                    period_s=period, t_base_c=t_base_c, phase_s=period / 2.0 - t_min_s)
     return calibrated(pp, stacked(cfg, agg, t_base_c=t_base_c)), period
 
 
 def a2_rate_scenario(cfg, pp, t_min_s: float, *, delta_t_k: float = 20.0, t_base_c: float = 25.0,
-                     victim_ring: int = 0, full: bool = False):
+                     victim_ring: int = 0, full: bool = False, site: str = "aggressor"):
     """The 808 degC/s run (A2, symmetric triangle reading: 1616 degC/s edges) with its minimum at ``t_min_s``.
-    ``full=False``: same edge rate, swing ``delta_t_k`` (period 2 dT / 1616 s); ``full=True``: 80.8 K / 100 ms."""
+    ``full=False``: same edge rate, swing ``delta_t_k`` (period 2 dT / 1616 s); ``full=True``: 80.8 K / 100 ms.
+    ``site``: as in :func:`a1_rate_scenario`."""
     from mrm.scenarios import library as lib
     rate = 2.0 * lib.A2_RATE_K_PER_S          # edge rate of the symmetric-triangle reading
     dT = lib.A2_RATE_K_PER_S * lib.A2_PERIOD_S if full else float(delta_t_k)
     period = 2.0 * dT / rate
-    agg = lib.a2_808_aggressor(victim_ring=victim_ring, reading="symmetric_triangle", t_low_c=t_base_c,
+    agg = lib.a2_808_aggressor(site=site, victim_ring=victim_ring, reading="symmetric_triangle", t_low_c=t_base_c,
                                t_high_c=t_base_c + dT, period_s=period, t_base_c=t_base_c)
     # the triangle starts at its minimum at t = 0; shift it so the minimum falls at t_min_s
     tgt = agg.aggressors[0].target

@@ -63,6 +63,10 @@ sf, obs, act)`, `dither_init`, `dither_step`, `bias_init`, `bias_step`, `bias_fa
    aggressor coupling is intended; a baseline/dark subtraction in the monitor (PAT-2 baseline subtraction,
    `ring.monitor.baseline_ua`) or a controller-side dark estimate would be the fix. A 0 degC base attempt did not
    lock in the harness (heater codes 50-65 k while placing; not diagnosed), so only the 25 degC full run is kept.
+   **Resolved 2026-10-10** (docs/handoff/integrator.md section 7): the coupling was not intended. The g26 default
+   site moved to (0, -30 um), 55 um from PD0 (every ring distance unchanged); the 5 um layout is now the stress
+   scenario `a1_slide10_aggressor_pd_adjacent`, and `test_a1_full_on_the_25c_base_monitor_dark_current` runs it
+   (`a1_rate_scenario(..., site=lib.AGGRESSOR_PD_ADJACENT_SITE)`). The a1_rate / a2_rate tests run the default site.
 5. **plant / content (bias physics, 07 P1-7).** In g26 at 1.05-1.8 V a 0.2 V bias step moves the resonance only
    0.1-0.5 pm (10 us after the step 0.3-0.5 pm, settling to 0.1-0.3 pm): the FCA absorption change heats/cools the
    ring by about as much as the electro-optic shift, opposite in sign. The loss change modulates the drop monitor
@@ -261,3 +265,30 @@ engine paths (identical), 0.005 simulated s per wall s on this machine with a wa
   g26_hot_selfheat). The monitor PGA has no gain below 1 (content request 6 stands).
 - Section 5 items still hold (laser power steps move the fraction-of-peak lock; peak locks fall off the fold;
   bias authority tiny in g26; heater dither cannot follow A1).
+
+## 8. Re-run after the aggressor-site change (2026-10-10, integrator; docs/handoff/integrator.md section 7)
+
+The g26 default aggressor site moved from (0, 30) to (0, -30) um: the same distance to every ring, 55 um instead of
+5 um from ring 0's monitor PD. The A1/A2-rate numbers of sections 4 and 7.3 were measured at the old site, where the
+PD observer (0.1 ms pole, 2051 K/W) added a fast dark-current transient to the monitor at every aggressor slope
+change; at the new site (3.4 ms pole, 186 K/W) it is small. `test_ctrl_a_scenarios.py` (17 passed) and
+`test_ctrl_a_corners.py` (14 passed) on the default site, victim ring 0, rms / max lock error (pm), old -> new:
+
+| controller, scenario | old site | new site |
+|---|---|---|
+| pi_lock, A1 rate ; A2 rate | 2.8 / 8.4 (1 excursion) ; 2.8 / 7.3 | 1.32 / 1.98 (0) ; 1.32 / 1.78 (0) |
+| pi_lock type 2 (and _c), A1 rate ; A2 rate | 2.0 / 6.8 (1) ; 2.2 / 6.1 | 0.33 / 2.74 (0) ; 0.29 / 2.23 (0) |
+| feedforward_pi (type 2), A1 ; A2 rate | 2.0 / 6.8 ; 2.2 / 6.1 | 0.32 / 2.66 ; 0.29 / 2.23 |
+| midranging, A1 rate | 4.2 / 9.7 | 3.23 / 4.44 |
+| bias_dither, A1 rate | 12.3 / 28.8 | 12.2 / 28.4 |
+| dither_lockin, A1 ; A2 rate | 52 / 113 ; 50 / 89 | 53 / 117 ; 51 / 97 |
+| es_sine, A1 ; A2 rate | 546 / 1030 ; 712 / 1124 | 544 / 1034 ; 716 / 1133 |
+| type-2 PI on the corners at the A1 rate (slow_thermal, hot_selfheat, heater_loss, latency x2) | 4.5-9.7 max, one excursion at the cusp | 2.0-2.9 max, no excursion; neighbours <= 0.47 |
+
+So the fraction-of-peak PI (and the feed-forward PI, which equals it here) now meets the 5 pm budget at the A1 and
+A2 peak rates on every corner tested; the old cusp error was mostly the PD's dark current. Checked with the current
+code at the stress site (`a1_rate_scenario(..., site=lib.AGGRESSOR_PD_ADJACENT_SITE)`, a scratch run): pi_lock 2.76 /
+8.30 (A1) and 2.82 / 7.21 (A2), type 2 2.01 / 6.76 and 2.20 / 6.04, one excursion each: the old column. The full printed A1 on the
+25 degC base (`test_a1_full_on_the_25c_base_monitor_dark_current`) now runs the stress scenario
+`a1_slide10_aggressor_pd_adjacent` (the old site): unchanged, error > 50 pm from 41.6 ms, 21 neighbour falls. Request
+4 is resolved (the coupling was not intended); the dark/baseline subtraction it suggested is still worth having.

@@ -161,7 +161,8 @@ wind-up. Noise and quantization inside the declared ranges do not matter: the g2
   runaway: ring 0's heater reached 65 535 at -10.7 ms, its next order (FSR 10.3 nm) swept across lines 3, 2, 1 and
   starved rings 3, 2, 1, which folded (-2.3 to -4.5 nm) and whose heaters went to 0. A bank-wide failure started by
   one ring's monitor. Plant question first (request 4); controller lesson: a set-point lock needs a dark/baseline
-  reference and a heater authority window.
+  reference and a heater authority window. Since 2026-10-10 this layout is the stress scenario
+  `a1_slide10_aggressor_pd_adjacent`, which the test runs (request 4).
 - **Model mismatch** (`test_model_mismatch_worlds_report`, 6 LHS worlds, seeds 11): only 2 of 6 worlds can hold
   their OMA points at all (worlds 0, 1: bank above the 200 mW supply power; worlds 3, 4: within the power but above
   the 150 mA supply current, so the supply droops every heater by 8-18 % and the warm start folds during the hold,
@@ -198,6 +199,10 @@ wind-up. Noise and quantization inside the declared ranges do not matter: the g2
    while the victim ring stays near 135 degC. The PD dark current then reaches 5 000-62 000 codes: 25-35 pm of
    set-point error in the windows and a runaway that takes down four rings near the cusp (3.1). Physical, or an
    artefact of the placeholder site path (plant_thermal handoff 6.8)? The FEM ROM should settle it.
+   **Resolved 2026-10-10** (docs/handoff/integrator.md section 7): it came from the layout (site 5 um from PD0), not
+   physics. The g26 default site is now (0, -30 um), 55 um from PD0 (ring distances unchanged), so the A1/A2 windows
+   of test_ctrl_c_kalman_lqg / mpc / oracle see little PD heating; the old layout is the stress scenario
+   `a1_slide10_aggressor_pd_adjacent` (`test_a1_toward_the_cusp_dark_current_runaway`).
 5. **WDM supervisor / acquisition owners**: in the g26 bank a cold heater ramp crosses three foreign lines, and a ring
    that falls off its fold (1.2 nm drop at +4 dBm) or runs hot (3.1, A1) brings its next order onto other lines
    (FSR 10.3 nm vs a 9.16 nm four-line span). These acquisitions are single-ring; no line arbitration, no heater
@@ -211,7 +216,9 @@ wind-up. Noise and quantization inside the declared ranges do not matter: the g2
 ## 5. Physics findings (please read before using the numbers)
 
 1. Dark current under the aggressor (4 above): the tracking error is scored against the monitor-consistent
-   reference; the total error against the oracle point (39 pm max under A2) is mostly this offset.
+   reference; the total error against the oracle point (39 pm max under A2) is mostly this offset. At the g26
+   default site since 2026-10-10 (55 um from the PD) the total error is 0.75 pm max under A2 and 0.45 pm under A1
+   (kalman_lqg windows; mpc A2 tracking 0.19 pm, oracle A2 0.47 pm).
 2. The OMA-optimal stable point in g26 nominal is the red (self-locked) side at +105 pm (+107 pm with the fallback
    coupling); the blue-side OMA peak is only 92-94 % of it and open-loop unstable (loop gain about +5).
 3. A monitor set-point lock moves with laser power (+0.5 dB -> +22 pm; -1.0 dB -> -70 pm; below -1.1 dB it folds)

@@ -29,10 +29,12 @@ Conditions (the same for every controller; they are written into the scorecard):
   each ring ends on (engine line_on, -1 = none) against the declared line.
 - A1: mrm.scenarios.library.a1_slide10_aggressor with phase_s = P/2, so t = 0 is the rounded minimum (aggressor
   near zero power, the warm start is honest) and the hot cusp is at t = 65.35 ms; duration one period (130.7 ms).
-  The aggressor power is calibrated by the engine (resonance referencing at ring 0). Two layouts: the g26 default
-  (ring 0's monitor PD 5 um from the aggressor site: the PD dark current is a known hazard, controllers_a/b/c
-  handoffs) and ``ring.thermal.pd_offset_um=[0,-25]`` (the PD on the far side, as tests/verification/
-  test_ctrl_b_ramp_aggressor.py).
+  The aggressor power is calibrated by the engine (resonance referencing at ring 0). Two runs: ``a1``, the g26
+  default site ``aggressor`` (0, -30) um, 55 um from ring 0's monitor PD; and ``a1_pd_adjacent``, the STRESS
+  scenario a1_slide10_aggressor_pd_adjacent at the site ``aggressor_pd_adjacent`` (0, 30) um, 5 um from that PD
+  (the former default: the PD dark current runs away, controllers_a/b/c handoffs; not a realistic layout). Both
+  sites are 30 um from ring 0 and the same distance from every ring, so the calibrated power and the rings' heat
+  are identical; only the monitor-PD paths differ (the die sensor sees both sites alike in the interim model).
 
 The asserts check that every controller ran closed loop on the engine (it moved the heater, the engine counted no
 pipeline overflow, the metrics are finite); lock quality is recorded, not asserted.
@@ -67,7 +69,6 @@ KNOWLEDGE = ("line_grid", "ring_to_line", "heater_nominal", "optics_nominal", "d
              "bias_efficiency", "model_nominal")
 BIAS = ("controller_interface.bind.tx.bias=controller", "scenario.bias_v=null")
 ASSIGN = ("controller_interface.bind.tx.assignment=controller",)
-PD_FAR = ("ring.thermal.pd_offset_um=[0.0,-25.0]",)
 LOCK_PM = 5.0
 HYST_PM = 1.0
 DEC = 10                                     # record decimation, ticks (= the g26 controller period)
@@ -244,10 +245,10 @@ def test_controller_runs_closed_loop_on_the_engine(name):
         lk = st["t_lock_s"][st["locked"]]
         t0 = (float(np.max(lk)) + 1e-3) if st["locked"].any() else 10e-3
         out["a1_t0_s"] = t0
-        a1 = lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2)
-        for key, extra in (("a1", ()), ("a1_pd_far", PD_FAR)):
+        for key, a1 in (("a1", lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2)),
+                        ("a1_pd_adjacent", lib.a1_slide10_aggressor_pd_adjacent(phase_s=lib.A1_PERIOD_S / 2))):
             t_w = time.perf_counter()
-            r1, _ = _run(name, a1, A1_S, extra)
+            r1, _ = _run(name, a1, A1_S)
             _closed_loop_checks(r1, name)
             out[key] = _score_a1(r1, st["ref_pm"], t0)
             out[key + "_wall_s"] = time.perf_counter() - t_w
@@ -288,8 +289,12 @@ def _write_scorecard(results: dict) -> str:
              "rms / max |e| / excursions over the last 10 ms; time to lock from t = 0 (includes the start-up).",
              f"- A1: slide-10 aggressor (rectified sine, 113.6 - 88.5 |sin| degC at ring 0, resonance referencing), "
              f"phase P/2 (t = 0 at the minimum, hot cusp at 65.35 ms), {A1_S * 1e3:.1f} ms. Lock error about the "
-             "steady d_ref, scored from the steady time to lock + 1 ms. `default` = g26 layout (ring 0's monitor PD "
-             "5 um from the aggressor site); `PD far` = `ring.thermal.pd_offset_um=[0,-25]`.",
+             "steady d_ref, scored from the steady time to lock + 1 ms. `a1` = the g26 default site `aggressor` "
+             "(0, -30) um, 55 um from ring 0's monitor PD; `a1_pd_adjacent` = the STRESS scenario "
+             "a1_slide10_aggressor_pd_adjacent at the site `aggressor_pd_adjacent` (0, 30) um, 5 um from that PD "
+             "(the default site until 2026-10-10; not a realistic layout). Both sites are 30 um from ring 0 and the "
+             "same distance from every ring: the calibrated power and the rings' heat are the same, only the "
+             "monitor-PD paths differ.",
              "- Excursions: exits beyond 5 pm with 1 pm hysteresis on the 10 us min/max envelope. OMA penalty: "
              "10 log10(mean oracle relOMA / mean relOMA) over the scored window (positive = OMA lost against the "
              "engine's oracle). Lines: rings whose final line (engine line_on) is not the declared line.",
@@ -313,7 +318,9 @@ def _write_scorecard(results: dict) -> str:
             f"{_fmt(np.max(s['max_pm']), '{:.1f}')} | {int(np.sum(s['exc']))} | "
             f"{_fmt(np.nanmean(s['penalty_db']), '{:.2f}')} | "
             f"{_fmt(np.min(s['ref_pm']), '{:.0f}')} to {_fmt(np.max(s['ref_pm']), '{:.0f}')} | {off} |")
-    for key, title in (("a1", "A1 aggressor, default layout"), ("a1_pd_far", "A1 aggressor, PD far from the site")):
+    for key, title in (("a1", "A1 aggressor, default layout (site 55 um from ring 0's monitor PD)"),
+                       ("a1_pd_adjacent", "A1 STRESS scenario a1_slide10_aggressor_pd_adjacent (site 5 um from ring "
+                                          "0's monitor PD; not a realistic layout)")):
         lines += ["", f"## {title}", "",
                   "| controller | max abs e ring 0 (pm) | max abs e rings 1-7 (pm) | rms e ring 0 (pm) | excursions "
                   "ring 0 / others | locked at the end | OMA penalty, mean (dB) | off declared line | PD0 max "
@@ -344,16 +351,25 @@ def _write_scorecard(results: dict) -> str:
               "- The lock error is about each ring's own steady operating point, so a side-of-fringe lock and an "
               "OMA-optimal lock score alike; the OMA penalty column shows what the operating point costs.",
               "- A1 is calibrated by resonance referencing (ring 0's resonance follows the printed 88.5 K swing at "
-              "85.86 pm/K). Near the hot cusp ring 0 then needs less than zero heater power: in the PD-far runs its "
-              "heater sits at code 0 for several ms (column 'at code 0'), and the error there is set by heater "
-              "authority, not by the controller (the replicas' CAL-9 finding, docs/handoff/replicas.md).",
-              "- In the default layout the monitor PD of ring 0 passes 600 degC near the cusp; its Arrhenius dark "
+              "85.86 pm/K). Near the hot cusp ring 0 then needs less than zero heater power: in the default-layout "
+              "runs its heater sits at code 0 for several ms (column 'at code 0'), and the error there is set by "
+              "heater authority, not by the controller (the replicas' CAL-9 finding, docs/handoff/replicas.md).",
+              "- In the stress scenario the monitor PD of ring 0 passes 600 degC near the cusp; its Arrhenius dark "
               "current reads as light on the monitor, so monitor-based locks are dragged red and then lost; a ring "
-              "at full-scale heater then disturbs its neighbours. The PD-far layout removes that path.",
+              "at full-scale heater then disturbs its neighbours. The default site (55 um from the PD) removes that "
+              "path. The die temperature sensor (feedforward_pi) sees the same aggressor in both runs: it sits "
+              "~1 mm away, where the interim site law is at its long-range floor (1.5 % of Z_heater->ring) for "
+              "both sites, so the aggressor alone moves its reading by ~20 K over A1 (open loop) in both.",
+              "- Until 2026-10-10 the g26 default site was (0, 30) um (the stress table, unchanged) and this file "
+              "ran an `a1_pd_far` case (`ring.thermal.pd_offset_um=[0,-25]`). `a1` now has the same PD-to-site "
+              "distances, but that override also put every PD 5 um from its own ring's driver site (driver_offset_um "
+              "(0, -30) um, ~4.5 mW of data heat), so the old PD-far PDs ran 8-10 K warmer. The controllers that "
+              "hold their lock agree with the old PD-far numbers within 0.09 pm; the ones that lose a ring diverge "
+              "after the loss. docs/handoff/integrator.md section 7 compares the two.",
               "", "## Per-controller notes", ""]
     for name, r in results.items():
         w = [f"steady {r.get('steady_wall_s', float('nan')):.0f} s"]
-        for key in ("a1", "a1_pd_far"):
+        for key in ("a1", "a1_pd_adjacent"):
             if key + "_wall_s" in r:
                 w.append(f"{key} {r[key + '_wall_s']:.0f} s")
         lines.append(f"- `{name}` ({r.get('start')}): {r.get('note')}. Wall time: {', '.join(w)}."

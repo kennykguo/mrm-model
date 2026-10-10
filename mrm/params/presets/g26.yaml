@@ -1016,11 +1016,16 @@ layout:
                   note: "unpublished; the G25 TX occupies 0.0028 mm^2 (~53 um square, printed) and the FEM ROM verifies at 50 um"}
   sites:
     value:
-      aggressor: {x_um: 0.0, y_um: 30.0, kind: aggressor}   # the default site name of mrm.scenarios.library (a1, a2)
+      # the default site name of mrm.scenarios.library (a1, a2): 30 um from ring 0, on the side away from its PD
+      aggressor: {x_um: 0.0, y_um: -30.0, kind: aggressor,
+                  note: "default A1/A2 site; moved from (0, 30) um so that it is 55 um, not 5 um, from ring 0's monitor PD"}
+      # STRESS site only (mrm.scenarios a1/a2 *_pd_adjacent): the former default, 5 um from ring 0's monitor PD
+      aggressor_pd_adjacent: {x_um: 0.0, y_um: 30.0, kind: aggressor,
+                              note: "stress test of monitor dark-current runaway, not a realistic layout"}
     provenance: assumed
     generation: G26
     source: LM26-P
-    note: "on-chip resistive aggressor heater 'adjacent to a MRM' (LM26-P section 3.2) beside ring 0; position unpublished"
+    note: "on-chip resistive aggressor heater 'adjacent to a MRM' (LM26-P section 3.2) beside ring 0; position unpublished. The default site 'aggressor' is at (0, -30) um: 30 um from ring 0, and every ring-to-site distance is the same as at the former (0, 30) um, so the A1/A2 calibrations in ring units do not change. It is 55 um from ring 0's monitor PD (ring.thermal.pd_offset_um (0, 25) um). It moved from (0, 30) um, 5 um from that PD, because there the calibrated A1 power heats the PD past ~600 degC, which is not physical for a real layout. The former position stays as the site 'aggressor_pd_adjacent' for the stress scenarios a1_slide10_aggressor_pd_adjacent and a2_808_aggressor_pd_adjacent only (monitor dark-current runaway); with no scenario power it adds no heat. The new site is at the same point as ring 0's driver site (ring.thermal.driver_offset_um (0, -30) um): both are heat sources, so the model adds them, but a real layout cannot put both there"
 
 array:
   n_rings: {value: 8, provenance: printed, generation: G26, source: LM26-P, note: "8 MRMs coupled to a single bus waveguide"}

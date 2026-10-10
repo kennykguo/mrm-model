@@ -122,7 +122,8 @@ literature, GF and patents). A file may declare extra keys in `meta.sources` (pr
 values (a designed stagger); a line-level leaf a scalar or a list of L values.
 
 **Tables.** A `table` key (`channel_plan.lines`, `layout.sites`, `temp_sensors`, `ring.geometry.jacobian`) holds
-records with bare numbers in their fields; provenance sits on the table leaf:
+records with bare numbers in their fields; provenance sits on the table leaf. A `layout.sites` record may carry a
+free-text `note` (why the site is there; the model does not read it):
 
 ```yaml
 temp_sensors:
@@ -936,7 +937,7 @@ is current.
 | `driver.level_convention` | enum |  |  | setting; per-world switch; enum: centered, one_sided; default centered | NRZ levels: centered (bias +- Vpp/2, 07 P1-7) or one_sided (bias - Vpp and bias) |
 | `temp_sensors` | table (list: name, site, attach, type, sample_rate_hz, latency_s, noise_rms_k, flicker_corner_hz, resolution_k, offset_sigma_k, gain_error_sigma_frac, self_heating_k, adc_bits, code_zero_c) | global |  |  | temperature sensors (07 P1-10) |
 | `layout.ring_pitch_um` | float | global | um |  | ring pitch of the default straight bank |
-| `layout.sites` | table (map: x_um, y_um, kind) | global |  |  | named sites {name: {x_um, y_um, kind}} (07 P1-2); rings default to ring<i> on a line at ring_pitch_um |
+| `layout.sites` | table (map: x_um, y_um, kind, note) | global |  |  | named sites {name: {x_um, y_um, kind}} (07 P1-2); rings default to ring<i> on a line at ring_pitch_um |
 | `array.n_rings` | int | global |  | required | rings per bank |
 | `array.bus_order` | list_int | global |  |  | order of the rings along the bus (default: identity) |
 | `array.heater_total_power_max_w` | float | die | w |  | die heater power limit (07 P1-12) |

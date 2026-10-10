@@ -409,7 +409,9 @@ more memory. Recorded in the sidecars as `mesh.memory_cap` (every artefact) and 
      artefact; Z_opt from the ROM, ratio 1.763), the layout puts the aggressor at (0, 30) um from ring 0, which is
      5 um from the ROM's default monitor-PD site (0, 25): that pair is clamped to the 20 um grid end (a warning). The
      FEM aggressor is a 10 um radius disk, so a PD 5 um from its centre is inside it; move the aggressor or set the PD
-     site explicitly.
+     site explicitly. **2026-10-10**: the default site moved to (0, -30) um, 55 um from that PD (inside the grid).
+     The old site stays in g26 as the stress site `aggressor_pd_adjacent`, so a ROM-mode g26 still warns about the
+     5 um pair (docs/handoff/integrator.md section 7).
 2. **params (schema, presets, realize)**
    - `ring.thermal.family` values: `inring_noundercut` (default), `silicide_undercut`, `metal_above`;
      `ring.thermal.rom_file`: `thermal_rom_<family>_<film>.npz`. g26 still runs `fidelity.thermal_model: interim`.

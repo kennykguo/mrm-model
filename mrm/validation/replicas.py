@@ -1347,14 +1347,27 @@ def _values_scalar(pp, key: str, b: int = 0, default: float = 1.0) -> float:
     return float(v[b if v.size > 1 else 0])
 
 
+def _aggressor_src(sysm) -> int | None:
+    """Source index of the replicas' aggressor: the layout site named mrm.scenarios.library.AGGRESSOR_SITE (the
+    default site of A1/A2) when the system has it, else the first aggressor site; None without one. g26 also has the
+    stress site aggressor_pd_adjacent, which the replicas never drive."""
+    if not sysm.aggressor_src.size:
+        return None
+    from mrm.scenarios.library import AGGRESSOR_SITE
+    for i in sysm.aggressor_src:
+        if str(sysm.src_names[int(i)]) == AGGRESSOR_SITE:
+            return int(i)
+    return int(sysm.aggressor_src[0])
+
+
 def _aggressor_ratio(pp, ring: StaticRing) -> float | None:
     """DC ratio (aggressor -> heater_resistor) / (aggressor -> ring_mode_weighted) for this ring (None without an
     aggressor source)."""
     sysm = pp.thermal.system
-    if not sysm.aggressor_src.size:
+    a = _aggressor_src(sysm)
+    if a is None:
         return None
     G = ring.cache["dc"][ring.b]
-    a = int(sysm.aggressor_src[0])
     gr = float(G[sysm.ring_obs[ring.n], a])
     gh = float(G[sysm.heater_obs[ring.n], a])
     return gh / gr if gr > 0 else None
@@ -1961,7 +1974,8 @@ def _dynamic_lock(cfg, pp, mode: str, *, bias: float, t_base: float, p_in: float
 # =====================================================================================================================
 def _aggressor_site(pp) -> str | None:
     sysm = pp.thermal.system
-    return str(sysm.src_names[int(sysm.aggressor_src[0])]) if sysm.aggressor_src.size else None
+    a = _aggressor_src(sysm)
+    return None if a is None else str(sysm.src_names[a])
 
 
 def _calibrated_aggressor(pp, *, which: str = "a1", victim_ring: int = 0, referencing: str = "resonance",
@@ -2002,7 +2016,7 @@ def _aggressor_rises(pp, cw, *, n_periods: int = 4, n_samples: int = 256) -> dic
     h = period / (2 * n_samples)
     t = np.arange(0, n_periods * 2 * n_samples + 1) * h
     u = np.zeros((t.size, pp.batch, sysm.n_src))
-    a = int(sysm.aggressor_src[0])
+    a = _aggressor_src(sysm)
     for b in range(pp.batch):
         u[:, b, a] = cw.power_at(t, b=b if cw.power_w.shape[0] > 1 else 0)
     obs = th.simulate(sysm, u, h, hold="foh", t_base_k=0.0)

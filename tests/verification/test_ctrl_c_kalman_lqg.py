@@ -9,10 +9,12 @@ steepest part; the aggressor lags are pre-settled exactly), a +0.5 dB laser powe
 from the uncertainty set, the controller using nominal), and the cold/probe acquisition.
 
 Findings reported by these tests (see docs/handoff/controllers_c.md):
-- The interim thermal site law heats ring 0's monitor PD to about 270 degC under the calibrated A1/A2 aggressor, so
-  the PD dark current (Arrhenius, 07 P1-9) rises to about 3 uA (about 5000 codes). A monitor set-point lock cannot
-  tell that from detuning: it moves the ring by about 25-35 pm. The tracking error is therefore scored against the
-  monitor-consistent reference (target + dark offset / slope, Truth) and the total offset is reported separately.
+- With the aggressor 5 um from ring 0's monitor PD (the g26 default until 2026-10-10, now the stress scenarios
+  *_pd_adjacent) the interim thermal site law heats the PD to about 270 degC in the A1/A2 windows, so the PD dark
+  current (Arrhenius, 07 P1-9) rises to about 3 uA (about 5000 codes). A monitor set-point lock cannot tell that from
+  detuning: it moved the ring by about 25-35 pm. The tracking error is therefore scored against the
+  monitor-consistent reference (target + dark offset / slope, Truth) and the total offset is reported separately. At
+  the default site (55 um from the PD) the offset is small: total error 0.75 pm max under A2, 0.45 pm under A1.
 - A laser power step moves a monitor set-point lock (the drop code scales with power): +0.5 dB moves the lock point
   by tens of pm; the test bounds the dynamics, not this static shift (no reference tap in g26). A drop of more than
   1.1 dB puts the set-point above the peak and every ring folds (slow, documented failure).
@@ -201,7 +203,9 @@ def test_laser_power_step(cfg):
 
 @pytest.mark.slow
 def test_a1_toward_the_cusp_dark_current_runaway(cfg):
-    """Documented failure (plant question, docs/handoff/controllers_c.md): toward the A1 hot cusp the calibrated
+    """Documented failure in the STRESS scenario a1_slide10_aggressor_pd_adjacent (the aggressor at the site
+    aggressor_pd_adjacent, 5 um from ring 0's monitor PD: the g26 default until 2026-10-10, not a realistic layout;
+    docs/handoff/controllers_c.md, integrator.md section 7). Toward the A1 hot cusp the calibrated
     aggressor heats ring 0's monitor PD through the interim site law to ~350-500 degC (the ring itself stays near
     135 degC). The PD dark current (Arrhenius, 07 P1-9) then grows toward and past the net set-point (~47 000 codes;
     26 700 codes at -17 ms, 50 000 at -11 ms), and a monitor set-point lock cannot hold its line: in this 7 ms window
@@ -212,7 +216,7 @@ def test_a1_toward_the_cusp_dark_current_runaway(cfg):
     line is declared locked."""
     from mrm.scenarios import registry as sreg2
     period = 130700
-    rig = build_rig(cfg, scenario=sreg2.create("a1"), k0=period - 17000, aggressor_presettle_ticks=6000)
+    rig = build_rig(cfg, scenario=sreg2.create("a1_pd_adjacent"), k0=period - 17000, aggressor_presettle_ticks=6000)
     hold(rig, 30)
     ctrl = K.KalmanLQG()
     dark = []
