@@ -640,6 +640,21 @@ class MetricsState:
         for b in range(self.af.shape[0]):
             metrics_reset_row(np.int64(k0), reg[b], self.af[b], self.ai[b], self.hist[b], self.runhist[b])
 
+    def restart(self, k0: int, reg) -> None:
+        """Restart the accumulators at tick k0 in the middle of a run (the scoring start, mrm.sim.runner
+        ``score_from_s``), keeping the two pieces of plant history that :meth:`reset` would lose: the current lock
+        reference of ``lock_reference: oracle`` (reset sets it to 0, the line, until the kernel's next oracle
+        evaluation, up to oracle_period_ticks later) and the previous controller latch (tick, register) of the
+        peak-slew accumulator (reset dates it at k0, so the first latch after it would divide its code step by a
+        shorter interval and overstate peak_slew_codes_per_s). ``reg`` (B, N): the latched heater registers at k0.
+        Moved here from the runner (experiments handoff request 10); same values."""
+        keep_ref = self.ref.copy() if self.ref is not None and self.spec.lock_reference_mode == 1 else None
+        keep_pop = self.ai[:, :, AI_PREV_POP_REG:AI_PREV_POP_TICK + 1].copy()
+        self.reset(k0, reg)
+        self.ai[:, :, AI_PREV_POP_REG:AI_PREV_POP_TICK + 1] = keep_pop
+        if keep_ref is not None:
+            self.ref[...] = keep_ref
+
 
 def _ratio(a, b):
     with np.errstate(divide="ignore", invalid="ignore"):

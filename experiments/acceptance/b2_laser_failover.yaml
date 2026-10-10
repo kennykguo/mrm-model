@@ -1,0 +1,20 @@
+# Acceptance B2 (textbook Ch17 group B, scenario b2): laser failover on line 0 at 10 ms: a spare laser swapped in,
+# +10 GHz and -1 dB (sizes assumed; YOLE / HOTI26 via the textbook). The ring of line 0 must re-lock on its line.
+# Criteria: every ring locked about its operating point at the end (5 pm), line, hop; BER over the run.
+extends: g26
+meta: {name: acc_b2_laser_failover, kind: experiment, description: "B2 laser failover on line 0, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: b2, params: {line: 0, t_fail_s: 0.01}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.05
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: B2-relock, metric: locked_final, reduce: all, op: "==", value: 1, source: "07 P1-12 (re-lock on the line)"}
+    - {id: B2-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: B2-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: B2-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}

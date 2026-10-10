@@ -7,11 +7,12 @@ name = "mrm"
 version = "0.1.0"
 description = "A calibrated, control-oriented plant model of Lightmatter-class silicon microring modulators"
 requires-python = ">=3.12"
-dependencies = ["numpy", "scipy", "matplotlib", "pyyaml", "numba"]
+dependencies = ["numpy", "scipy", "matplotlib", "pyyaml", "numba", "h5py"]   # h5py: run directories (07 P1-17)
 
 [project.optional-dependencies]
 extract = ["femwell", "scikit-fem", "gmsh", "meshio", "shapely", "pyamg", "devsim", "tidy3d"]
 rl = ["gymnasium"]
+hdl = ["cocotb"]                 # optional HDL co-simulation stretch (07 P1-21; tests/hdl runs Icarus only)
 dev = ["pytest"]
 
 [project.scripts]

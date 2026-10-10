@@ -1,0 +1,20 @@
+# Example (kind run): pi_lock_c under the slide-10 on-die aggressor A1 (LM26-S slide 10; 113.6 - 88.5 |sin| degC,
+# 2127 degC/s peak, power calibrated at ring 0, default site 55 um from PD0), one period from its cool minimum.
+# The lock error is judged about each ring's own steady operating point (self_reference), so a side-of-fringe lock
+# is not penalized for sitting 0.3-0.5 FWHM from its line. Expect ring 0 to leave its point by ~350 pm near the
+# hot cusp (its heater at code 0: heater authority, docs/handoff/controller_scorecard.md).
+extends: g26
+meta: {name: a1_pi_lock, kind: experiment, description: "pi_lock_c under A1, one period from the minimum"}
+controller: {name: pi_lock_c, params: {}}
+scenario: {name: a1, params: {phase_s: 0.06535}}      # P/2: t = 0 at the rounded minimum, hot cusp at 65.35 ms
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.1357          # 5 ms of start-up + one 130.7 ms period
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  record: ["detuning_m@10:mean", "detuning_m@10:envelope", "heater_code@10:last", "i_monitor_a@10:mean",
+           "t_pd_k@1000:max", "reloma@10:mean", "oracle_reloma@10:mean"]

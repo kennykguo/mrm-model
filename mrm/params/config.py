@@ -746,8 +746,22 @@ def parse_overrides(overrides: Mapping[str, Any] | Iterable[str] | None) -> dict
         if not isinstance(s, str) or "=" not in s:
             raise ConfigError(f"override {s!r} must be 'path=value'")
         k, v = s.split("=", 1)
-        out[k.strip()] = yaml_load(v)
+        out[k.strip()] = _enum_word(k.strip(), yaml_load(v))
     return out
+
+
+def _enum_word(path: str, v: Any) -> Any:
+    """YAML 1.1 reads off / on / no / yes as booleans. For an enum setting whose words do not include the boolean
+    but include exactly one word of that meaning, the word is meant: ``--set experiment.variation=off`` is 'off',
+    not False (experiments handoff request 8). Other values are returned unchanged."""
+    if not isinstance(v, bool):
+        return v
+    key = sch.lookup(path)
+    if key is None or key.type != "enum" or v in key.enum:
+        return v
+    words = [w for w in key.enum if isinstance(w, str) and w.lower() in (("on", "yes", "true") if v else
+                                                                         ("off", "no", "false"))]
+    return words[0] if len(words) == 1 else v
 
 
 def _parse_alts(alts: Mapping[str, str] | Iterable[str] | None) -> dict[str, str]:

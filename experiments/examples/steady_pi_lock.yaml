@@ -1,0 +1,18 @@
+# Example (kind run): the compiled drop-monitor PI lock (pi_lock_c, the most likely G26 scheme, 06 C1) holding all
+# eight g26 rings at 25 degC for 40 ms from a settled warm start. Records the standard traces into trace.h5.
+#   mrm run experiments/examples/steady_pi_lock.yaml            (add --dry-run for the cost estimate)
+extends: g26
+meta: {name: steady_pi_lock, kind: experiment, description: "pi_lock_c, static 25 degC, nominal world, 40 ms"}
+controller: {name: pi_lock_c, params: {}}
+scenario: {name: static}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.04
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm                 # quasi-static lock codes, settled thermal state
+  score_from_s: 0.005         # pi_lock maps its peak through the resonance in the first ~3 ms
+  self_reference: {duration_s: 0.02, window_s: 0.005}

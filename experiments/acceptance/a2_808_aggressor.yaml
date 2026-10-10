@@ -1,0 +1,23 @@
+# Acceptance A2 (textbook Ch17 group A, scenario a2): the paper's 808 degC/s on-chip aggressor (LM26-P section 3.2:
+# "ramped up and down between 25 and >105 degC with a period of 100 ms"; reading symmetric_triangle, 80.8 K,
+# 1616 degC/s edges, the scenarios default; the waveform is not published). Two periods from the minimum.
+# Criteria: as A1, with the monitor criterion of BND-3b (drop-monitor current within +-0.5 uA of its set-point:
+# "monitor photocurrent ... remained stable", LM26-P Fig. 3(b), read-off resolution).
+extends: g26
+meta: {name: acc_a2_808_aggressor, kind: experiment, description: "A2 808 degC/s aggressor, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: a2}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.205
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: A2-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: A2-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A2-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: A2-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER stable at 1e-11, < 1e-9)"}
+    - {id: A2-monitor, metric: monitor_dev_ua_max, op: "<=", value: 0.5, source: "BND-3b"}

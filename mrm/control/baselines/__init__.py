@@ -7,13 +7,19 @@ finds them without an explicit import (the registry imports this package once on
   ``bias_dither``, ``es_po``, ``es_sine``, ``feedforward_pi``, ``midranging`` (docs/handoff/controllers_a.md);
 - controllers B (acquisition, WDM, bit statistics): ``ramp_acquire``, ``acquire_then_lock``, ``bitstat_lock``,
   ``wdm_supervisor`` (docs/handoff/controllers_b.md);
-- controllers C (model based): ``kalman_lqg``, ``kalman_lqg_c``, ``mpc``, ``mpc_c`` (docs/handoff/controllers_c.md).
+- controllers C (model based): ``kalman_lqg``, ``kalman_lqg_c``, ``mpc``, ``mpc_c`` (docs/handoff/controllers_c.md);
+- ``fxp_pi``: mrm.control.fxp.FxpPi, the fixed-point reference PI of the golden vectors and the bridge
+  (docs/handoff/hardware.md; registered by its "module:Class" path, so mrm.control.fxp is imported on first use).
 
 The Truth-fed oracle (mrm.validation.oracle) is not a baseline and is never registered (07 P1-1).
 """
 from mrm.control.baselines import (bias_dither, bitstat_lock, dither_lockin, extremum_seeking,  # noqa: F401
                                    feedforward, kalman_lqg, midranging, mpc, pi_lock, ramp_acquire,
                                    wdm_supervisor)
+
+from mrm.control.registry import register as _register
+
+_register("fxp_pi", "mrm.control.fxp:FxpPi")
 
 __all__ = ["bias_dither", "bitstat_lock", "dither_lockin", "extremum_seeking", "feedforward", "kalman_lqg",
            "midranging", "mpc", "pi_lock", "ramp_acquire", "wdm_supervisor"]

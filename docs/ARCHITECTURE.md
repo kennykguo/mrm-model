@@ -59,7 +59,8 @@ mrm/
     timing.py              integer-tick clock, latency FIFOs, event order at a controller edge (07 P0-6)
     rng.py                 counter-based RNG (splitmix64/Philox) usable in numba, stream-id enum (07 P1-13)
   extraction/              offline solvers -> mrm/data/extracted/ (never imported by runtime code)
-    modes.py coupling.py thermal_fem.py junction.py fdtd_check.py (optional) run_all.py
+    modes.py coupling.py thermal_fem.py mor.py junction.py common.py (fdtd_check.py, optional, and run_all.py are
+                           not built)
   data/extracted/          committed artefacts + JSON sidecars (schema id, sha256, inputs, tool versions, errors)
   plant/
     optics.py              exact add-drop ring with CW/CCW backscatter + TCMT (complex sum over orders) (P2-2, P2-4)
@@ -74,37 +75,48 @@ mrm/
                            heater readback, faults (P1-9, P1-10, P1-13)
     datapath.py            ones count, bit-statistics sampler, error counter (P0-11)
     laser.py               line table, static error, drift (random walk + linear), RIN, power drift, line enable
-    plant.py               Plant: Python API over the kernel; Truth
-  scenarios/               parametric generators evaluable inside numba + named library + registry (P1-4, P0-10)
+    io.py                  channel maps, controller pipeline FIFO, observation packing, action clipping (kernel I/O)
+    plant.py               Plant: Python API over the kernel; Truth; settle (settled warm start)
+  scenarios/               parametric generators evaluable inside numba + named library + registry (P1-4, P0-10);
+                           calibrate.py (aggressor power from a stated victim trajectory); compression checks and
+                           the convergence certificate (P0-10)
   control/
     api.py                 ControllerSpec, Observation, Controller protocol, BaseController, PerRing/PerDie
                            adapters, telemetry, CompositeController (P1-1, P1-19, P1-20, P2-7)
     registry.py            name -> class
     models.py              linearize(nominal_cfg, op, Ts) -> (A,B,C,D,delay) for model-based controllers
     calibration.py         simulated factory calibration (warm/cold start)
-    fxp.py lfsr.py         fixed-point toolkit (P1-21)
+    fxp.py lfsr.py         fixed-point toolkit and the reference fixed-point PI FxpPi (P1-21)
+    fxp_mlp.py             fixed-point MLP inference helper (P1-22): quantize, packed int64 form, numba eval
+    cli.py                 `mrm golden | bridge | vectors`: golden traces (07 4.9), bridge and vector utilities
     baselines/             one file per controller family (section 6)
   sim/
     kernel.py              @njit run_block: plant substeps + sensor sampling + compiled controller + metric
                            accumulators (P0-8, P0-9); kernel_ref.py: the pure-NumPy reference (P1-18)
-    runner.py              run(cfg|experiment) -> RunResult; Python-controller slow path; record specs
+    runner.py              run(cfg, controller, scenario) -> RunResult; Python-controller slow path; quasi_static;
+                           warm_start_codes (settled warm start)
     metrics.py             streaming accumulators and summarize()
-    experiment.py          run | sweep | mc | compare | robust | acceptance | quasi_static (P0-10, P1-17)
-    manifest.py            runs/<UTC>_<hash8>/ resolved yaml, manifest.json, metrics.json, trace.h5
-    gym_env.py             vectorized gymnasium env (P1-22)
-    bridge.py              binary lockstep bridge for external controllers (P1-21)
-    vectors.py             golden vector export (.npz/.hex)
+    experiment.py          run | sweep | mc | compare | robust | acceptance | quasi_static (P0-10, P1-17, 4.8);
+                           mrm.run(); the compression gate and convergence experiment; --dry-run estimates
+    manifest.py            runs/<UTC>_<hash8>/: experiment.resolved.yaml, manifest.json, metrics.json, trace.h5,
+                           inputs/, report.txt (convergence.json); compare_runs for `mrm rerun`
+    cli.py                 `mrm run | sweep | mc | compare | robust | acceptance | rerun`
+    gym_env.py             vectorized gymnasium env (P1-22), registered as mrm/MRM-v0
+    bridge.py              binary lockstep bridge for external controllers (P1-21), C header and C reference PI
+    vectors.py             golden vectors (record, .npz/.hex/.layout.vh, replay through the protocol or the ABI)
   waveform/                short time-domain TCMT + driver + junction RC runs; normalized-coordinate LUT (P2-6)
   validation/
     targets/{calibration,validation,bounds,excluded}.yaml  (07 P0-5, section 4; frozen with a sha256)
-    replicas.py oracle.py report.py
-  calibration/             fits that may read ONLY targets/calibration.yaml
+    replicas.py oracle.py targets_io.py (report.py and `mrm report` not built yet)
+  calibration/             fits that may read ONLY targets/calibration.yaml (package only; no fit built yet)
   cli.py                   `mrm ...` entry point
 experiments/               experiment YAMLs (acceptance/, examples/)
-examples/                  controller templates + tutorial notebook
-tests/{verification,closure,calibration,validation,golden,perf}/
-docs/ ARCHITECTURE.md PARAMETERS.md (generated) VALIDATION.md (generated) EXPLAINED.md CHANGELOG.md research/
-tools/memguard.py          all solver runs go through it (16 GB machine)
+examples/                  controller templates (controllers/) + tutorial notebook (tutorial.ipynb)
+tests/{verification,closure,calibration,validation,golden,perf,hdl}/   (hdl: Icarus replay of the golden vectors)
+docs/ ARCHITECTURE.md ENGINE.md PARAMETERS.md (generated) PARAMETERS_FORMAT.md VALIDATION.md (generated)
+      CHANGELOG.md handoff/ research/   (EXPLAINED.md not written yet)
+tools/memguard.py          all solver runs go through it (16 GB machine); perf_*.py, clear_numba_cache.py,
+                           scorecard_compare.py (docs/handoff/perf.md section 1)
 ```
 
 ## 3. Time scales

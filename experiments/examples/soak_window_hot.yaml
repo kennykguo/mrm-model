@@ -1,0 +1,17 @@
+# Example (kind run): a dynamic soak window (07 P0-10: "dynamic soak windows (turnarounds, the fastest ramps)
+# start from quasi-static states"): 60 s of the soak at compression 1 from its hot turnaround (108 degC, the
+# triangle's maximum), from the quasi-static lock at that ambient (start warm). Uncompressed, so no convergence
+# certificate is needed. ~5 min wall at the auto policy (mrm run --dry-run).
+extends: g26
+meta: {name: soak_window_hot, kind: experiment}
+controller: {name: pi_lock_c}
+scenario: {name: soak, params: {start: high}}
+sim: {substep_policy: auto}
+experiment:
+  kind: run
+  duration_s: 60.0
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  record: ["detuning_m@auto:envelope", "heater_code@auto:last", "t_base_k@auto:mean", "reloma@auto:mean"]

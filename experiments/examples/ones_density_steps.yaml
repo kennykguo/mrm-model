@@ -1,0 +1,14 @@
+# Example (kind run): data-pattern heat (07 P0-11, Sun et al. VLSI 2015 Fig. 5): the ones density steps
+# 0 -> 0.5 -> 1 every 200 ms while pi_lock_c holds the bank (a monitor lock that does not know the ones count).
+extends: g26
+meta: {name: ones_density_steps, kind: experiment}
+controller: {name: pi_lock_c}
+scenario: {name: ones_density_steps}
+experiment:
+  kind: run
+  duration_s: 0.65
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

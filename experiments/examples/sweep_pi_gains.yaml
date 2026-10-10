@@ -1,0 +1,17 @@
+# Example (kind sweep): pi_lock_c crossover frequency x set-point fraction under A1, nominal world; one run per grid
+# point (9 runs). Grid keys are config paths (controller.params.* included), alt:<path>, corner or controller.
+extends: g26
+meta: {name: sweep_pi_gains, kind: experiment}
+controller: {name: pi_lock_c}
+scenario: {name: a1, params: {phase_s: 0.06535}}
+experiment:
+  kind: sweep
+  duration_s: 0.1357
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  grid:
+    controller.params.crossover_hz: [1000.0, 2500.0, 5000.0]
+    controller.params.fraction: [0.6, 0.7, 0.8]

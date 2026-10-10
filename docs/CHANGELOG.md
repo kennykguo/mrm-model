@@ -3,6 +3,83 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-10: experiments, hardware and RL stage integration
+
+Three tasks, built and reviewed separately, integrated here: experiments (07 P0-10, P1-17, P2-12, 4.8; details in
+docs/handoff/experiments.md), hardware (07 P1-21, 4.9; docs/handoff/hardware.md) and rl (07 P1-22, P1-19;
+docs/handoff/rl.md). Integrator record: docs/handoff/integrator.md section 8. No kernel or leaf njit code changed:
+every regression and adversarial scenario of tools/perf_scenarios*.py is bit-identical to runs/perf_r2/final3 and
+final3_adv (0 of 476 + 1132 signals differ), and so is the default warm start.
+
+New contracts:
+
+- **Experiments** (`mrm/sim/experiment.py`, `manifest.py`, `cli.py`): experiment files (`meta.kind: experiment`,
+  `extends:` a preset; `experiments/acceptance/*.yaml`, `experiments/examples/*.yaml`), the kinds run | sweep | mc |
+  compare | robust | acceptance | quasi_static, `mrm.run(config, ...)`, the CLI `mrm run | sweep | mc | compare |
+  robust | acceptance | rerun` with `--dry-run`, run directories `runs/<UTC>_<hash8>/` (manifest schema
+  `mrm.run/1`, `experiment.resolved.yaml`, `metrics.json`, `trace.h5`, `inputs/`, `report.txt`, `convergence.json`)
+  and the bit-for-bit `mrm rerun`. Time compression needs the 07 P0-10 convergence certificate (run first, or
+  `experiment.convergence_certificate`). h5py is now a core dependency (07 P1-17; pyproject.toml).
+- **Schema**: the experiment-layer keys are mrm.params keys: `experiment.{start, n_threads, score_from_s,
+  convergence_certificate, compression_factors, histogram, oracle, p_in_w, max_worlds_per_plant, rank_metrics}`
+  and the open subtrees `experiment.{record, corners, self_reference, acceptance}` (validated again by
+  mrm.sim.experiment). `mrm.params.load(experiment_file)` and `mrm.run(mrm.params.load(...))` now accept every
+  experiment file (before, mrm.sim.experiment stripped these keys). The experiment hash counts them once, as options
+  (`mrm.sim.experiment.config_hash_without_options`), so it did not change: recorded run directories keep their
+  hash8 and still rerun (checked: every acceptance file). A dotted override refines a map option
+  (`--set experiment.self_reference.window_s=...`). mrm.params `--set` maps a YAML 1.1 boolean to an enum word
+  (`--set experiment.variation=off` is 'off', not False). PARAMETERS_FORMAT.md key appendix regenerated.
+- **Runner**: `run(..., score_from_s=...)` (metrics restart at that time; `MetricsState.restart` keeps the oracle
+  lock reference and the previous controller latch); `manifest_inputs["warm_start"]` gains `no_code`,
+  `supply_limited`, `mode` and `order_hopped`; `warm_start_codes(..., return_no_code=True)` (the gym env no longer
+  imports the private form). Fix: after a scenario `fault.controller_reset` the Python path clips the new held
+  command of a CompiledController (it kept clipping the array the reset replaced, so a controller whose commands
+  left the range built on an unclipped value and diverged from the kernel path;
+  tests/verification/test_runner_fault_reset.py; found by the hardware review).
+- **quasi_static checks the array heater supply limit** (07 P1-12, `mrm.plant.electrical.supply_limit_row`): new
+  result fields `supply_scale` (A, V, B) and `supply_limited`; at a supply-limited point no ring counts as
+  reachable (code_ok False, codes kept), so `code_range_coverage` can drop; `warm_start_codes` warns about such
+  worlds. Reason: the experiments handoff's "quasi_static vs settle disagreement" in the g26 stacked_eic world (the
+  engine settled 800-1100 pm blue of the lines) is this limit: at 25 degC the stacked_eic lock currents (~155 mA
+  at the lock codes) exceed the assumed 150 mA supply (`array.heater_supply_current_max_a`, assumed), the plant
+  droops every heater by 3-5 % in voltage (6-9 % in power) and the rings fall to the cold self-heating branch.
+  The engine was right; quasi_static did not check the limit. The nominal g26 world never reaches the limit
+  (0-105 degC, 1-3.75 V), so A7 and every nominal result are unchanged. The limit binds in ~1/3 of the g26 LHS
+  worlds at 25 degC (content owner: the 0.2 W / 0.15 A limits are assumed; integrator.md section 8.3).
+- **Reachable warm-start order** (experiments request 10.4b): `quasi_static(..., order="reachable")` and
+  `run(..., heater_code="quasi_static_reachable")` lock a ring whose heater-up order needs a negative heater power
+  one order bluer instead of starting it at code_min (`runner.WARM_START_MODES`). The default `'quasi_static'` is
+  unchanged (bit for bit; worlds without such a ring are identical in both modes). **The experiments' `start: warm`
+  now uses the reachable mode**: identical in the nominal world (every acceptance file), different in sampled
+  worlds with such rings (g26 seeds 1000, B = 8: 10 -> 3 rings without a code); LHS results recorded before this
+  change do not rerun bit for bit.
+- **Hardware** (`mrm/sim/bridge.py`, `mrm/sim/vectors.py`, `mrm/control/cli.py`, additions to
+  `mrm/control/fxp.py`): binary lockstep bridge protocol 1 (frames generated from the ChannelSpecs, profiles
+  minimal / full, layout and ControllerSpec fingerprints in the handshake; C reference controller and header
+  generator), golden vectors format `mrm.vectors/1` (`.npz` + `$readmemh` `.hex` + `.layout.vh`), golden traces
+  format `mrm.golden/1` (`mrm golden [--update --reason]`), the fixed-point reference PI `FxpPi`
+  (`fx_pi_update`, `fxp_pi_init`, `fxp_pi_step`, `pi_float_bound_codes`; registry name `fxp_pi`).
+  `mrm.sim.record_vectors` is a lazy export of `mrm.sim.vectors.record_vectors`. **Deviation (07 P1-21)**: the
+  Verilator / cocotb closed-loop HDL co-simulation is not built (neither tool is installed); tests/hdl replays the
+  golden vectors through a synthesizable Verilog PI under Icarus and checks it with yosys. New optional extra `hdl`
+  (cocotb) in pyproject.toml.
+- **Golden traces** (07 4.9): static lock, the fast aggressor and the compressed soak. The compressed soak
+  (`g26__soak_compressed`, added by the integrator through the hardware task's hook) is the c = 100 case of the A4
+  convergence experiment (one soak cycle at compression 100, auto substeps, pi_lock_c only: no convergence
+  experiment covers another controller); its metrics equal the certified run's bit for bit (47 of 47 shared
+  arrays). `GoldenCase.scenario` may be `'config'` (the scenario section of the case's config, with its signal
+  defaults). Its test is marked slow (95 s idle, ~3.5 min under load).
+- golden: tests/golden/g26__static.npz updated (data sha256 bb95d4ab4626): first golden traces (static lock and the A1 fast aggressor on g26; hardware task, 07 4.9)
+- golden: tests/golden/g26__a1_slide10_aggressor.npz updated (data sha256 2b898a0568ce): first golden traces (static lock and the A1 fast aggressor on g26; hardware task, 07 4.9)
+- golden vectors: tests/golden/vectors/fxp_pi__g26__aggressor_square.npz added (sha256 da23b4c547c2): FxpPi on g26 nominal, direct square aggressor, 400 edges (hardware task, 07 P1-21)
+- golden: tests/golden/g26__soak_compressed.npz updated (data sha256 b278f2666f89): first compressed-soak golden: one soak cycle at compression 100, pi_lock_c, the c = 100 case of the A4 convergence experiment (integrator, 07 4.9, P0-10)
+- **RL** (`mrm/sim/gym_env.py`, `mrm/control/fxp_mlp.py`, `examples/tutorial.ipynb`): `MRMEnv` (a gymnasium
+  VectorEnv over the plant batch, registered as `mrm/MRM-v0`), `MRMSingleEnv`, `RewardSpec`; the fixed-point MLP
+  inference helper of 07 P1-22 (`quantize_mlp`, `FxpMlp`, `fxp_mlp_eval`, `error_bound`) and its deployment as a
+  compiled controller (`MRMEnv.compiled_policy`). **Not met**: 07 P1-22's >= 1e5 env steps/s at B = 256 (measured
+  2.5-2.6e4: the plant itself caps it at ~4e4, and the Python-path per-call setup costs ~35 %; rl.md section 4).
+  The env's ControllerSpec is `MRMEnv.ctrl_spec` (`spec` is gymnasium's EnvSpec).
+
 ## 2026-10-10: engine performance round 2
 
 Details, measurements and the change log R2-1 ... R2-16: docs/handoff/perf.md section 8 (owner: engine). Every

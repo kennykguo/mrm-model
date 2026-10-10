@@ -1,0 +1,42 @@
+# Acceptance A4 (textbook Ch17 group A, scenario a4): the 30.4 h TEC soak as ONE experiment (07 D12, P0-10): base
+# temperature 33 <-> 108 degC, 90 cycles of 20.3 min, 0.123 degC/s (LM26-S slide 10, read-off; LM26-P Fig. 3(a):
+# 8 lanes, BER < 1e-9 at 50 Gb/s over the whole soak). Run at time compression 100 (the 07 P0-10 rule allows <= 173:
+# compressed ramp <= 1 % of the 2127 K/s fast transient); the mandatory convergence experiment (one 20.3 min cycle
+# at compression 1, 10 and 100, same plant, controller, start and seeds) runs first unless
+# experiment.convergence_certificate names an earlier run. Substep policy auto (exact multi-tick thermal steps,
+# 07 P0-10) for every factor.
+# The base temperature is driven by the scenario, so the lock is judged by the oracle OMA penalty, the BER windows
+# and the actuator range instead of a self reference.
+# Criteria and sources:
+#   ber      no 2 s BER window above 1e-9 on any lane (LM26-P Fig. 3(a))
+#   line     no ring on a foreign line at the end, no wrong-line event (07 P1-12)
+#   hop      no FSR hop (BND-2): the detuning from the resonance order nearest the declared line stays below FSR/2
+#            (5094-5220 pm in g26: 1.8 THz at 1302-1319 nm; 5000 pm used) at every tick, so that order never
+#            changed. The engine's fsr_hop_events counter only counts RE-LOCKS on another order, and with the line
+#            reference at 5 pm a side-of-fringe lock never "locks" (pi_lock_c sits ~125 pm red of its line), so that
+#            counter is 0 by construction here and cannot judge a hop (it is still reported).
+#   rails    the heater never at code_min or code_max (BND-2 range; CAL-9 code range)
+#   oma      worst-lane OMA penalty against the oracle <= 1 dB (BND-4 / VAL-4: relOMA spread below 1 dB, 0-105 degC)
+extends: g26
+meta: {name: acc_a4_soak, kind: experiment, description: "A4 30.4 h soak, compression 100, pi_lock_c"}
+controller: {name: pi_lock_c}
+scenario: {name: soak, time_compression: 100.0}
+sim: {substep_policy: auto}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 1096.2           # 90 x 1218 s / 100
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  compression_factors: [1.0, 10.0, 100.0]
+  record: ["detuning_m@auto:envelope", "detuning_m@auto:mean", "heater_code@auto:last", "t_base_k@auto:mean",
+           "t_ring_k@auto:mean", "reloma@auto:mean", "oracle_reloma@auto:mean", "line_on@auto:last"]
+  acceptance:
+    - {id: A4-ber, metric: ber_windows_over_limit, reduce: sum, op: "==", value: 0, source: "LM26-P Fig. 3(a)"}
+    - {id: A4-line, metric: wrong_line_events, reduce: sum, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A4-hop, metric: max_abs_detuning_pm, op: "<", value: 5000.0,
+       source: "BND-2 (|d| < FSR/2 at every tick: no order change)"}
+    - {id: A4-rail-hi, metric: heater_sat_s, op: "==", value: 0.0, source: "BND-2, CAL-9"}
+    - {id: A4-rail-lo, metric: heater_low_rail_s, op: "==", value: 0.0, source: "BND-2, CAL-9"}
+    - {id: A4-oma, metric: oma_penalty_db, op: "<=", value: 1.0, source: "BND-4, VAL-4"}

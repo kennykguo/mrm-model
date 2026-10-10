@@ -89,10 +89,12 @@ TOP_SECTIONS = ("meta", "fidelity", "sim", "channel_plan", "laser", "optical_pat
                 "metrics", "experiment", "datapath")
 #: top-level keys that are not sections of the physical tree
 SPECIAL_TOP = ("extends", "alts", "relations")
-#: subtrees validated by their own registries (controller and scenario params, sweep grids); meta.inventory is
-#: validated by tests/closure/test_presets.py against docs/research/00_prior_notes_checklist.md
+#: subtrees validated by their own registries (controller and scenario params, sweep grids; the experiment
+#: records, corners, self reference and acceptance criteria by mrm.sim.experiment); meta.inventory is validated by
+#: tests/closure/test_presets.py against docs/research/00_prior_notes_checklist.md
 OPEN_PREFIXES = ("meta.sources", "meta.inventory", "controller.params", "scenario.params", "scenario.aggressor",
                  "scenario.target", "scenario.external_reflection", "experiment.grid", "experiment.controllers",
+                 "experiment.record", "experiment.corners", "experiment.self_reference", "experiment.acceptance",
                  "relations")
 #: keys deleted by 07; using them gives this message instead of a did-you-mean
 DELETED = {
@@ -576,6 +578,25 @@ _KEYS: list[Key] = [
     S("experiment.variation", "enum", "per-device variation on or off", enum=("off", "sample"), default="sample"),
     S("experiment.grid", "map", "sweep grid {path: [values]}"),
     S("experiment.controllers", "list_str", "controllers of a compare experiment"),
+    # experiment-layer keys of mrm.sim.experiment (docs/handoff/experiments.md section 3; integrator 2026-10-10).
+    # Defaults equal mrm.sim.experiment.EXTENSION_KEYS (the experiment hash uses the resolved options). The open
+    # subtrees experiment.record / corners / self_reference / acceptance (OPEN_PREFIXES) and every value below are
+    # validated again by mrm.sim.experiment.
+    S("experiment.start", "enum", "start state: cold (code_min, reset protocol, cold lags), cold_settled (code_min, "
+      "settled, branch_low), warm (quasi-static lock codes, settled, branch_high); default: the scenario's ResetSpec",
+      enum=("cold", "cold_settled", "warm")),
+    S("experiment.n_threads", "int", "kernel worker threads (default os.cpu_count())"),
+    S("experiment.score_from_s", "float", "the metrics accumulate from this time (runner score_from_s)"),
+    S("experiment.convergence_certificate", "str", "run directory whose 07 P0-10 convergence certificate covers "
+      "this compressed scenario and plant"),
+    S("experiment.compression_factors", "list_float", "time-compression factors of the 07 P0-10 convergence "
+      "experiment", default=(1.0, 10.0, 100.0)),
+    S("experiment.histogram", "bool", "detuning histogram accumulators (07 P0-8)", default=False),
+    S("experiment.oracle", "bool", "in-kernel oracle (OMA penalty, lock_reference oracle)", default=True),
+    S("experiment.p_in_w", "float", "quasi_static: power per line at the chip (default the plant's own)"),
+    S("experiment.max_worlds_per_plant", "int", "largest B in one Plant (Monte Carlo chunk)", default=512),
+    S("experiment.rank_metrics", "list_str", "compare: world metrics to rank by (lower is better; "
+      "mrm.sim.experiment.RANKABLE)"),
 
     # ---------------------------------------------------------------------------------------------- datapath
     P("datapath.bitrate_gbps", doc="line rate (G26: 50 Gb/s NRZ)", bounds=(0.0, 1000.0)),

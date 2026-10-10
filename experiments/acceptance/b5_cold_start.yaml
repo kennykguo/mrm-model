@@ -1,0 +1,26 @@
+# Acceptance B5 (textbook Ch17 group B, scenario b5): cold start in an unknown thermal environment: heaters at zero,
+# no stored calibration (07 P1-1), the ambient drawn uniformly over 0-105 degC per world (printed closed-loop range,
+# LM26-S slide 9), lasers on at power-up (sim.reset_protocol laser_ramp). Eight worlds of the nominal plant.
+# Controller: wdm_supervisor (map, assign, acquire, track; it owns tx.assignment, cyclic policy: a barrel-shifted
+# assignment is legal, PAT-1), with the nominal design tokens a firmware would carry.
+# A ring counts as locked on its line when it ends within 300 pm (~0.9 FWHM) of its declared line.
+# Criteria: every ring locked on its (declared) line at the end, no ring on a foreign line. The FSR-hop counter is
+# reported but not judged: an acquisition map sweeps each ring across several orders of its line, and every entry
+# into the 300 pm window on another order counts as a hop.
+extends: g26
+meta: {name: acc_b5_cold_start, kind: experiment, description: "B5 cold start 0-105 degC, wdm_supervisor"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
+  bind: {tx.assignment: controller}
+controller: {name: wdm_supervisor}
+scenario: {name: b5}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0, allowed_assignments: cyclic}
+experiment:
+  kind: acceptance
+  duration_s: 0.08
+  batch: 8
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: cold
+  acceptance:
+    - {id: B5-lock, metric: locked_final, reduce: all, op: "==", value: 1, source: "LM26-P (initialized automatically)"}
+    - {id: B5-line, metric: wrong_line_final, reduce: sum, op: "==", value: 0, source: "07 P1-12"}
