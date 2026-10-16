@@ -10,10 +10,13 @@ reject are kept and refitted (rule 3 of :mod:`mrm.calibration.pipeline`); nothin
 
 The G25 bench device for the replicas of the G25 targets is ``g25_test_vehicle`` with the device leaves of this
 preset applied (:func:`bench_overrides`): ``g25_test_vehicle`` extends ``g26`` and a preset cannot extend two
-chains that share a parent without the second one overwriting the first.
+chains that share a parent without the second one overwriting the first. The same bench is also written as a preset,
+``g25_test_vehicle_calibrated`` (:func:`write_bench_preset`, a child of ``g25_test_vehicle`` that restates the device
+leaves and uncertainty entries of this preset), for users and for the report.
 """
 from __future__ import annotations
 
+import copy
 import datetime as _dt
 import math
 from collections.abc import Mapping
@@ -26,7 +29,7 @@ from mrm.calibration import groups as G
 from mrm.calibration.core import calibration_targets, jsonable
 
 __all__ = ["PRESET_NAME", "PRESET_PATH", "write_preset", "preset_document", "bench_overrides", "bank_config",
-           "bench_config"]
+           "bench_config", "BENCH_PRESET_NAME", "BENCH_PRESET_PATH", "bench_preset_document", "write_bench_preset"]
 
 PRESET_NAME = "g26_calibrated"
 
@@ -37,6 +40,9 @@ def _preset_dir() -> Path:
 
 
 PRESET_PATH = _preset_dir() / f"{PRESET_NAME}.yaml"
+#: the calibrated G25 bench (the report's G25 companion of g26_calibrated)
+BENCH_PRESET_NAME = "g25_test_vehicle_calibrated"
+BENCH_PRESET_PATH = _preset_dir() / f"{BENCH_PRESET_NAME}.yaml"
 
 #: pseudo-paths of the pipeline that map onto variation entries
 _VARIATION_PSEUDO = {"variation.geometry.ring_sigma_scale", "variation.laser.line_offset_ghz.sigma_scale"}
@@ -123,6 +129,7 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
     }
     variation: dict = {}
     uncertainty: dict = {}
+    selections: dict = {}           # uncertainty entry -> choice -> {leaf path: alternative name}
     for gname, g in groups.items():
         for d in g["decisions"]:
             path = d["path"]
@@ -159,6 +166,12 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
                     if rec["provenance"] == "calibrated":
                         rec.update(generation=gen, source=src)
                     alts[an] = rec
+                    sel = a.get("select")
+                    if sel:
+                        # a world of an uncertainty entry selects this alternative (e.g. thermo_optic=H86 its own
+                        # heater leaves): restate the parent's entry with the selection added
+                        ent = selections.setdefault(sel["entry"], {})
+                        ent.setdefault(sel["choice"], {})[path] = an
                 leaf["alternatives"] = alts
             if path == G.P_DISP and "cal_dispersion" in (d.get("alternatives") or {}):
                 # the nominal world must be the config as written: the calibrated dispersion becomes the leaf value
@@ -174,8 +187,11 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
                     "generation": parent.get("generation"), "source": parent.get("source"),
                     "note": "the coupler artefact's dispersion (the g26 value), selected by the loss-mechanism "
                             "worlds of uncertainty.er_mechanism"}}
+                # a child's uncertainty entry replaces the parent's: restate its provenance, generation and source
+                pu = (raw.get("uncertainty") or {}).get("er_mechanism") or {}
                 uncertainty["er_mechanism"] = {"kind": "hypothesis", "nominal": "dispersion",
-                                               "choices": {"dispersion": {}}}
+                                               "choices": {"dispersion": {}},
+                                               **{k: pu[k] for k in ("provenance", "generation", "source") if k in pu}}
             _set(doc, path, leaf)
     if "er_mechanism" in uncertainty:
         coupling_alts = set((_get(doc, G.P_COUPLING) or {}).get("alternatives", {}))
@@ -192,6 +208,35 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
             "alpha_other (cal_<mechanism>_branch, Q_L at the nominal): the branch is tied to the mechanism and "
             "overrides uncertainty.coupling_regime in those worlds (entries apply in name order). Likelihood ratios: "
             "docs/handoff/calibration.md")
+    worlds = ((groups.get("coupling_er") or {}).get("extra") or {}).get("composed_worlds") or {}
+    over = worlds.get("coupling_regime=over")
+    if over and "er_mechanism" in uncertainty:
+        # restate coupling_regime with what the calibration found about its 'over' choice (review: the entry's g26
+        # note says both branches meet CAL-1/CAL-2, which holds here only in the loss-mechanism worlds)
+        cr = copy.deepcopy((raw.get("uncertainty") or {}).get("coupling_regime"))
+        if cr is not None:
+            ok = all(t.get("within_tolerance") for t in (over.get("targets") or {}).values())
+            cr["note"] = (str(cr.get("note", "")) + " [g26_calibrated: the branch names the cold 0 V state. 'over' "
+                          f"with the nominal er_mechanism (dispersion) gives chi2 {float(over['chi2']):.3g} against "
+                          f"{float(over['nominal_chi2']):.3g} for the nominal world and "
+                          + ("meets" if ok else "MISSES") + " the CAL-2 tolerance; the over-coupled worlds that fit "
+                          "CAL-2 are er_mechanism=ring_t_loss / heater_t_loss, which select their own alpha_other "
+                          "(entries apply in name order in realize). The nominal (dispersion) world crosses critical "
+                          "coupling during a heater sweep, so it is over-coupled at the operating line; the loss worlds "
+                          "are the mirror (docs/handoff/calibration.md 4.2)]")
+            uncertainty["coupling_regime"] = cr
+    for entry, choices in selections.items():
+        pu = copy.deepcopy(uncertainty.get(entry) or (raw.get("uncertainty") or {}).get(entry))
+        if pu is None:
+            raise ValueError(f"uncertainty.{entry} is not in g26: cannot select calibrated alternatives in it")
+        for choice, sel in choices.items():
+            if choice not in pu["choices"]:
+                raise ValueError(f"uncertainty.{entry} has no choice {choice!r}")
+            pu["choices"][choice] = {**(pu["choices"][choice] or {}), **sel}
+        pu["note"] = (str(pu.get("note", "")) + f" [g26_calibrated: the calibration adds its own leaves to "
+                      f"{', '.join(sorted(choices))} ({', '.join(sorted({p for v in choices.values() for p in v}))}), "
+                      f"refitted in that world]")
+        uncertainty[entry] = pu
     if uncertainty:
         doc["uncertainty"] = uncertainty
     if variation:
@@ -228,8 +273,10 @@ def _header(results: Mapping[str, Any]) -> list[str]:
         f"Run {results.get('created_utc')} at commit {results.get('git_commit')}; fit record "
         "mrm/calibration/latest_fit.json; method and findings docs/handoff/calibration.md.",
         "Rules: least squares + profile likelihood; a leaf is 'calibrated' only when the hull of its 95 % profile",
-        "intervals over the non-rejected hypotheses is at most half its prior range, closed and one interval;",
-        "otherwise it keeps its provenance and the narrowed interval is in its note. Not fitted: CAL-6 (the H86",
+        "intervals over the non-rejected hypotheses is at most half its declared prior range, closed and one",
+        "interval, and the fit meets every target's tolerance; otherwise it keeps its provenance and the narrowed",
+        "interval is in its note. Every calibrated value is conditional on the hypotheses named in its",
+        "identifiable.hypothesis and note (CAL-2: an instrument notch floor). Not fitted: CAL-6 (the H86",
         "hypothesis), CAL-11 / 12a / 12c / 12d / 13a / 13b (populations, scenario bounds and scenario calibrations,",
         "residuals reported), CAL-14 (not reached inside the swing prior, see the swing note) and CAL-9 (no",
         "hypothesis reaches it within tolerance, see the full-scale note): their leaves keep their values.",
@@ -243,6 +290,59 @@ def write_preset(results: Mapping[str, Any], path: str | Path = PRESET_PATH) -> 
     text = "\n".join("# " + h for h in header) + "\n" + yaml.safe_dump(doc, sort_keys=False, width=118,
                                                                      allow_unicode=False)
     path = Path(path)
+    path.write_text(text)
+    from mrm import params
+    params.load(str(path))
+    return path
+
+
+def bench_preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
+    """The calibrated G25 bench as a preset (integrator, calibration stage): ``g25_test_vehicle`` plus, restated
+    exactly as in g26_calibrated, every leaf of decision scope ``device`` and the uncertainty entries g26_calibrated
+    restates (their choices select device alternatives: the loss-mechanism worlds, the coupling branch, the heater
+    leaves of the H86 world). The system leaves (monitor gain, DAC, drive, laser population) are G26 leaves and are
+    not applied to the bench, as in :func:`bench_config`. Unlike the overrides of :func:`bench_config`, a preset keeps
+    the alternatives, so the named corners and the H86 world select the calibrated alternatives on the bench too."""
+    from mrm.params import config as C
+    doc, _ = preset_document(results)
+    bench_raw = C.yaml_load((_preset_dir() / f"{G.BENCH}.yaml").read_text())
+    device = [d["path"] for g in results["groups"].values() for d in g["decisions"] if d.get("scope") == "device"]
+    out: dict = {"extends": G.BENCH, "meta": {
+        "name": BENCH_PRESET_NAME, "kind": "preset",
+        "description": ("g25_test_vehicle with the device leaves of g26_calibrated (the calibrated G25 bench: the "
+                        "plant of the G25 calibration targets after the fit)"),
+        "generation_mix": str((bench_raw.get("meta") or {}).get("generation_mix", "")).strip() + (
+            " Calibrated device leaves (mrm.calibration, " + str(results.get("created_utc")) + "): Q_L, coupling "
+            "and extinction mechanism, heater P_FSR / R / droop, offset, junction efficiency, R_s, as in "
+            "g26_calibrated.")}}
+    for path in device:
+        leaf = _get(doc, path)
+        if leaf is None:
+            continue
+        if _raw_leaf(bench_raw, path) is not None:
+            raise ValueError(f"{G.BENCH} restates {path}: the calibrated bench cannot take g26_calibrated's leaf")
+        _set(out, path, copy.deepcopy(leaf))
+    unc = copy.deepcopy(doc.get("uncertainty") or {})
+    clash = sorted(set(unc) & set(bench_raw.get("uncertainty") or {}))
+    if clash:
+        raise ValueError(f"{G.BENCH} restates uncertainty entries {clash} that g26_calibrated restates too")
+    if unc:
+        out["uncertainty"] = unc
+    header = [
+        f"{BENCH_PRESET_NAME}: the G25 bench ({G.BENCH}) with the calibrated device leaves of {PRESET_NAME}.",
+        "GENERATED by mrm.calibration (mrm calibrate --write-preset-only); edit the code or rerun, not this file.",
+        f"Run {results.get('created_utc')} at commit {results.get('git_commit')}; fit record "
+        "mrm/calibration/latest_fit.json; leaves, notes and rules as in g26_calibrated.yaml.",
+    ]
+    return out, header
+
+
+def write_bench_preset(results: Mapping[str, Any], path: str | Path | None = None) -> Path:
+    """Write the calibrated G25 bench preset (:func:`bench_preset_document`) and check that it loads."""
+    doc, header = bench_preset_document(results)
+    text = "\n".join("# " + h for h in header) + "\n" + yaml.safe_dump(doc, sort_keys=False, width=118,
+                                                                     allow_unicode=False)
+    path = Path(path) if path is not None else BENCH_PRESET_PATH
     path.write_text(text)
     from mrm import params
     params.load(str(path))

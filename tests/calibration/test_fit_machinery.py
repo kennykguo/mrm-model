@@ -107,3 +107,33 @@ def test_restrict_holds_parameters():
     fr = core.fit(r)
     assert set(fr.theta) == {"x"}
     assert fr.theta["x"] == pytest.approx(3.05, abs=1e-5)
+
+
+def test_common_mode_covariance_whitening():
+    """CAL-4's shifts share one read-off error: the whitened residuals give the correlated chi2 d' C^-1 d, a common
+    offset of all points costs much less than the same offset on one point, and without it the residuals are the
+    independent ones."""
+    t4 = T["CAL-4"]
+    y = np.asarray(t4.value["y"])
+    s = np.asarray(t4.sigma)
+    c = 0.025
+    cov = np.full((y.size, y.size), c ** 2)
+    np.fill_diagonal(cov, s ** 2)
+    d = np.random.default_rng(1).normal(0.0, 0.05, y.size)
+    w = core.target_residuals(t4, (y + d).tolist(), common_sigma=c)
+    assert float(w @ w) == pytest.approx(float(d @ np.linalg.solve(cov, d)), rel=1e-10)
+    common = core.target_residuals(t4, (y + 0.04).tolist(), common_sigma=c)
+    one = core.target_residuals(t4, (y + np.eye(y.size)[5] * 0.04 * math.sqrt(y.size)).tolist(), common_sigma=c)
+    assert float(common @ common) < 0.5 * float(one @ one)
+    assert np.allclose(core.target_residuals(t4, (y + s).tolist()), 1.0)
+    p = core.Problem(group="t", hypothesis="h", params=[core.Param("a", None, -1.0, 1.0, 0.0)], targets=[t4],
+                     predict=lambda th: {"CAL-4": (y + th["a"]).tolist()}, common_sigma={"CAL-4": c})
+    assert core.restrict(p, {}).common_sigma == {"CAL-4": c}
+    assert p.chi2({"a": 0.04}) == pytest.approx(float(common @ common))
+
+
+def test_half_prior_uses_the_declared_width_when_the_prior_is_widened():
+    """A fit prior that widens a leaf's declared range never makes the half-prior rule easier to meet."""
+    par = core.Param("r", None, 35.0, 58.0, 45.0, declared_range=(42.0, 58.0))
+    assert core.half_prior(par, [39.0, 43.0]) == pytest.approx(4.0 / 16.0)
+    assert core.half_prior(core.Param("r", None, 35.0, 58.0, 45.0), [39.0, 43.0]) == pytest.approx(4.0 / 23.0)

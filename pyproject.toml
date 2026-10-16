@@ -28,4 +28,5 @@ mrm = ["params/presets/*.yaml", "params/*.yaml", "data/**/*", "validation/target
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["slow: long-running test (solver or long simulation)",
-           "perf: performance measurement against the 07 P0-9 budget (machine dependent)"]
+           "perf: performance measurement against the 07 P0-9 budget (machine dependent)",
+           "calibration: calibration fit residuals (07 4.1; reported, not CI-blocking; run pytest -m calibration)"]

@@ -20,12 +20,17 @@ from mrm.validation import targets_io as tio
 STAMP = {"date": "2026-01-01", "commit": "0000000", "dirty": False}
 
 
-def test_validation_md_is_current():
-    """docs/VALIDATION.md is generated: fail when it is stale (fast mode: no replica, engine or Sobol run)."""
-    text = rep.DOC_PATH.read_text()
+REPORT_FILES = [rep.DOC_PATH] + sorted(rep.DOC_PATH.parent.glob("VALIDATION_*.md"))
+
+
+@pytest.mark.parametrize("path", REPORT_FILES, ids=[p.name for p in REPORT_FILES])
+def test_validation_md_is_current(path):
+    """docs/VALIDATION.md (g26) and every other committed report docs/VALIDATION_<preset>.md are generated: fail
+    when one is stale (fast mode: no replica, engine or Sobol run)."""
+    text = path.read_text()
     if rep.read_stamp(text) is None:
-        pytest.fail("docs/VALIDATION.md was not generated: run python -m mrm.validation.report")
-    probs = rep.check()
+        pytest.fail(f"{path.name} was not generated: run python -m mrm.validation.report")
+    probs = rep.check(out=path)
     assert probs == [], "\n".join(probs)
 
 
@@ -114,6 +119,8 @@ def test_companion_preset():
     assert rep.companion_g25("g26") == "g25_test_vehicle"
     assert rep.companion_g25("g26_h86") == "g25_test_vehicle"            # no g25_test_vehicle_h86 preset
     assert rep.companion_g25("g26_calibrated", "mine") == "mine"
+    if (rep.PRESETS_DIR / "g25_test_vehicle_calibrated.yaml").exists():
+        assert rep.companion_g25("g26_calibrated") == "g25_test_vehicle_calibrated"
 
 
 def test_missing_preset_is_a_clean_error(capsys):
@@ -153,8 +160,19 @@ def test_calibrated_leaf_audit_flags_contamination(tmp_path):
         warnings.simplefilter("ignore")
         cfg = params.load(str(f))
     lines = rep._section_identifiability(cfg, {}, "g26_bad_cal", tmp_path, False)
+    # the section 3.2 audit row (section 3.1 can hold a fit record's row of the same leaf)
+    lines = lines[lines.index("### 3.2 Leaves tagged `calibrated` in this preset"):]
     row = next(ln for ln in lines if ln.startswith("| `ring.optics.q_loaded`"))
     assert "CONTAMINATION" in row and "VAL-1" in row
+
+
+def test_fit_record_appears_only_in_its_presets_reports():
+    """A fit record without a ``preset`` key belongs to g26 (the start) and g26_calibrated (the output) only."""
+    if not (rep.REPO / "mrm" / "calibration" / "latest_fit.json").exists():
+        pytest.skip("no fit record")
+    assert rep._calibration_outputs("g26") and rep._calibration_outputs("g26_calibrated")
+    assert not rep._calibration_outputs("g26_h86") and not rep._calibration_outputs("g26_bad_cal")
+    assert rep._calibrated("g26_calibrated") and not rep._calibrated("g26") and not rep._calibrated("g26_h86")
 
 
 def test_scales_fall_back_to_the_tolerance():

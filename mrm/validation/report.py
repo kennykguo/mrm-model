@@ -1048,9 +1048,16 @@ def _section_targets(data: Mapping, presets: Mapping[str, str], ddir: Path, char
     if unapplied:
         out += ["Corners that could not be applied (left out of the band and of the corner count): "
                 + "; ".join(f"{k} ({len(v)} targets)" for k, v in sorted(unapplied.items())) + ".", ""]
+    calibrated = _calibrated(presets["G26"])
     if presets["G26"] == "g26":
         out += ["The preset is uncalibrated: no parameter was fitted to any target, so the calibration rows are "
                 "prior-predictive residuals, not fit residuals.", ""]
+    elif calibrated:
+        out += [f"Preset `{presets['G26']}` (and its G25 bench `{presets['G25']}`) was fitted to the calibration "
+                "targets only (section 3.1): the calibration rows are fit residuals under the replicas' own "
+                "protocols, not predictions. The validation and bounds rows are held-out predictions: the "
+                "calibration never read them. Where the fit's protocol differs from the replica's, or the fit did "
+                "not reach a target, the row is flagged.", ""]
     # evaluation
     rows, zrows = {}, []
     counts: dict[str, dict[str, int]] = {}
@@ -1087,6 +1094,8 @@ def _section_targets(data: Mapping, presets: Mapping[str, str], ddir: Path, char
                     c["fail"] += 1
             band, cp = _band(t, r, corners)
             flags = [TARGET_FLAGS[t.id]] if t.id in TARGET_FLAGS else []
+            if calibrated and t.id in CALIBRATED_FLAGS:
+                flags.append(CALIBRATED_FLAGS[t.id])
             if r.get("predicted_nonfinite"):
                 flags.append("prediction not finite")
             if r.get("artefact_fallbacks"):
@@ -1227,15 +1236,39 @@ def _section_closure(cfg, d, data: Mapping) -> list[str]:
     out.append("")
     if missing:
         out += [f"{len(missing)} of {len(CLOSURE_ROWS)} rows have no xfail(strict=True) closure test yet "
-                "(requested in docs/handoff/report.md).", ""]
+                "(requested in docs/handoff/integrator.md section 9.4).", ""]
     return out
+
+
+#: presets whose report shows a fit record that names no ``preset`` (``mrm/calibration/latest_fit.json``): g26, the
+#: preset the fit starts from, and g26_calibrated, the preset it writes. Any other preset (a corner, a test preset)
+#: shows only records that name it.
+FIT_RECORD_PRESETS = ("g26", "g26_calibrated")
+
+#: flags of the calibration rows in the report of a calibrated preset (where the fit's protocol differs from the
+#: replica's primary, or the fit did not reach the target; docs/handoff/calibration.md sections 4 and 7)
+CALIBRATED_FLAGS: dict[str, str] = {
+    "CAL-2": "the fit adds an instrument notch-floor nuisance that the replica protocol does not model (calibration "
+             "handoff 4.2): fails here, passes with the fitted floor; the fitted nominal world passes critical "
+             "coupling during the heater sweep (over-coupled at the operating line)",
+    "CAL-4": "fitted on the swept device (its own P_FSR, calibration handoff 4.1); the replica runs the median device",
+    "CAL-9a": "not reached by any hypothesis; nothing written (calibration handoff 4.6)",
+    "CAL-9b": "not reached by any hypothesis; nothing written (calibration handoff 4.6)",
+    "CAL-9c": "not reached by any hypothesis; nothing written (calibration handoff 4.6)",
+    "CAL-14": "not reached inside the swing prior; nothing written (calibration handoff 4.5)",
+}
+
+
+def _calibrated(preset: str) -> bool:
+    """True for a preset written by the calibration (a fit record belongs to it and it is not the base g26)."""
+    return preset != "g26" and bool(_calibration_outputs(preset))
 
 
 def _calibration_outputs(preset: str) -> list[dict]:
     """Calibration-task results for ``preset``: JSON files under mrm/calibration/ (any depth) or
-    docs/calibration/ whose ``schema`` starts with ``mrm.calibration`` and whose ``preset`` is this preset or absent
-    (``mrm/calibration/latest_fit.json`` names no preset: it is the fit on the g26 / G25 bench presets that
-    g26_calibrated is written from, shown in the report of either)."""
+    docs/calibration/ whose ``schema`` starts with ``mrm.calibration`` and whose ``preset`` is this preset, or absent
+    for a preset of :data:`FIT_RECORD_PRESETS` (``mrm/calibration/latest_fit.json`` names no preset: it is the fit on
+    the g26 / G25 bench presets that g26_calibrated is written from, shown in the report of either)."""
     out = []
     for root in (REPO / "mrm" / "calibration", REPO / "docs" / "calibration"):
         if not root.is_dir():
@@ -1246,7 +1279,7 @@ def _calibration_outputs(preset: str) -> list[dict]:
             except (OSError, ValueError):
                 continue
             if isinstance(d, dict) and str(d.get("schema", "")).startswith("mrm.calibration") and \
-                    d.get("preset") in (preset, None):
+                    (d.get("preset") == preset or (d.get("preset") is None and preset in FIT_RECORD_PRESETS)):
                 d["_file"] = f.relative_to(REPO).as_posix()
                 out.append(d)
     return out
@@ -1313,9 +1346,10 @@ def _chart_profiles(profs: Mapping[str, Mapping], path: Path) -> None:
 def _section_calibration_fit(c: Mapping, ddir: Path, charts: bool) -> list[str]:
     """Section 3.1 from a ``mrm.calibration.fit/1`` result (mrm/calibration/latest_fit.json)."""
     groups = c.get("groups") or {}
+    sha, _, suffix = str(c.get("git_commit") or "").partition("-")          # "<sha>[-dirty]"
     out = [f"From `{c['_file']}` (schema `{c.get('schema')}`, created {c.get('created_utc')}, commit "
-           f"`{str(c.get('git_commit') or '')[:12]}`). Every target id the fit used (group targets, per-hypothesis "
-           "residual targets, leaf decisions) is checked against the frozen split.", ""]
+           f"`{sha[:12]}`{' with uncommitted changes' if suffix == 'dirty' else ''}). Every target id the fit used "
+           "(group targets, per-hypothesis residual targets, leaf decisions) is checked against the frozen split.", ""]
     for g, gr in groups.items():
         fits = gr.get("fits") or {}
         ids = set(map(str, gr.get("targets") or []))
@@ -1352,12 +1386,15 @@ def _section_calibration_fit(c: Mapping, ddir: Path, charts: bool) -> list[str]:
                            f"{_md(_fmt(idf.get('prior')))} | {_num(idf.get('width_frac'), 3)} | "
                            f"{_md(idf.get('rule'))} | {_md(_fmt(idf.get('unique')))} | {_md(_fmt(dcs.get('targets')))} |")
             out.append("")
-        profs = (gr.get("profiles") or {}).get(cmp_.get("best")) or {}
+        # the profiles of the written (nominal) hypothesis, whose leaves the decisions above describe; the best
+        # hypothesis when the nominal has none
+        hyp = gr.get("nominal") if (gr.get("profiles") or {}).get(gr.get("nominal")) else cmp_.get("best")
+        profs = (gr.get("profiles") or {}).get(hyp) or {}
         if profs:
             f = ddir / f"profiles_{re.sub(r'[^a-z0-9_]+', '_', str(g).lower())}.svg"
             if charts:
                 _chart_profiles(profs, f)
-            out += [f"![profile likelihoods, group {g}, hypothesis {cmp_.get('best')}]({_rel(f)})", ""]
+            out += [f"![profile likelihoods, group {g}, hypothesis {hyp}]({_rel(f)})", ""]
     if c.get("notes"):
         out += ["Calibration notes: " + _md("; ".join(map(str, c["notes"]))), ""]
     return out

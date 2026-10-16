@@ -103,7 +103,9 @@ class Param:
     ``nuisance`` (fitted alongside, never written). declared_prior: the range is a prior declared before the fit
     (the leaf's own ``range`` or an uncertainty interval of the preset); False when the calibration had to invent
     fit bounds for a leaf that declares none, in which case the half-prior rule cannot be applied (the width of an
-    invented range would decide the tag) and the leaf is never tagged ``calibrated``."""
+    invented range would decide the tag) and the leaf is never tagged ``calibrated``. declared_range: the leaf's own
+    declared range when the fit prior [lo, hi] widens it (the prior_source must say why); the half-prior rule then
+    uses the narrower of the two widths, so the widening can never make a tag easier to obtain."""
 
     name: str
     path: str | None
@@ -115,10 +117,13 @@ class Param:
     role: str = "leaf"
     prior_source: str = ""
     declared_prior: bool = True
+    declared_range: tuple[float, float] | None = None
 
     def __post_init__(self):
         if not self.hi > self.lo:
             raise ValueError(f"{self.name}: prior range must have hi > lo")
+        if self.declared_range is not None and not self.declared_range[1] > self.declared_range[0]:
+            raise ValueError(f"{self.name}: declared range must have hi > lo")
         if self.log and self.lo <= 0:
             raise ValueError(f"{self.name}: a log parameter needs a positive range")
         if self.role not in ("leaf", "nuisance"):
@@ -164,12 +169,26 @@ def n_data(targets: Sequence[Target]) -> int:
     return n
 
 
-def target_residuals(target: Target, prediction: Any, *, sigma_scale: float = 1.0) -> np.ndarray:
+def target_residuals(target: Target, prediction: Any, *, sigma_scale: float = 1.0,
+                     common_sigma: float | None = None) -> np.ndarray:
     """Standardized residuals (prediction - value) / sigma of one calibration target (module docstring).
 
     ``prediction`` is shaped as :func:`mrm.validation.targets_io.evaluate` expects (the replica's value). A
-    non-finite prediction gives a large finite residual (1e3 per point) so that the optimizer moves away from it."""
+    non-finite prediction gives a large finite residual (1e3 per point) so that the optimizer moves away from it.
+
+    ``common_sigma``: the points of a curve share one read-off error of this size (CAL-4: every shift is a
+    difference against the same 0 V read-off), so their covariance is diag(sigma^2) with common_sigma^2 off the
+    diagonal; the residuals are then whitened, w = L^-1 (prediction - value) with L L^T the covariance, so that
+    w.w is the correlated chi2 (review fix: the first version treated the shifts as independent)."""
     kind = target.kind
+    if common_sigma and kind == "curve":
+        y = _as_float_array(target.value["y"])
+        d = _as_float_array(prediction) - y
+        s = _as_float_array(target.sigma) * np.ones_like(y)
+        if np.all(np.isfinite(d)):
+            cov = np.full((y.size, y.size), float(common_sigma) ** 2)
+            np.fill_diagonal(cov, s ** 2)
+            return np.linalg.solve(np.linalg.cholesky(cov), d) / sigma_scale
     if kind == "curve":
         y = _as_float_array(target.value["y"])
         p = _as_float_array(prediction)
@@ -211,8 +230,9 @@ class Problem:
 
     params: the free parameters. targets: the targets in the likelihood. predict(theta) -> {target id: prediction}
     with theta = {param name: value}. fixed: description of everything held fixed (overrides, alternatives) for the
-    record. measurement: {target id: callable(prediction, theta) -> prediction} applied after predict (a measurement
-    model such as an instrument floor)."""
+    record. constraint(theta) -> extra residuals (a branch wall). derived(theta) -> quantities recorded with the
+    fit. A measurement model (an instrument floor) is part of ``predict``. common_sigma: {target id: sigma of a
+    read-off error shared by every point of that curve target} (:func:`target_residuals`)."""
 
     group: str
     hypothesis: str
@@ -223,6 +243,7 @@ class Problem:
     starts: list[dict[str, float]] = dataclasses.field(default_factory=list)
     constraint: Callable[[dict[str, float]], np.ndarray] | None = None
     derived: Callable[[dict[str, float]], dict[str, Any]] | None = None
+    common_sigma: dict[str, float] = dataclasses.field(default_factory=dict)
     n_evals: int = 0
     _cache: dict = dataclasses.field(default_factory=dict, repr=False)
 
@@ -252,7 +273,7 @@ class Problem:
 
     def residuals(self, theta: Mapping[str, float], *, with_constraint: bool = True) -> np.ndarray:
         pred = self.predictions(theta)
-        r = [target_residuals(t, pred[t.id]) for t in self.targets]
+        r = [target_residuals(t, pred[t.id], common_sigma=self.common_sigma.get(t.id)) for t in self.targets]
         if with_constraint and self.constraint is not None:
             r.append(np.atleast_1d(np.asarray(self.constraint(dict(theta)), dtype=float)))
         return np.concatenate(r)
@@ -334,9 +355,10 @@ def fit(prob: Problem, *, max_nfev: int = 200, extra_starts: int = 0, seed: int 
     dof = max(n_data(prob.targets) - n, 1)
     tsum = {}
     for t in prob.targets:
-        r = target_residuals(t, pred[t.id])
+        r = target_residuals(t, pred[t.id], common_sigma=prob.common_sigma.get(t.id))
+        z = target_residuals(t, pred[t.id])          # each point against its own sigma (the reported z)
         ev = evaluate(t, pred[t.id])
-        tsum[t.id] = {"prediction": jsonable(pred[t.id]), "chi2": float(r @ r), "z_max": float(np.max(np.abs(r))),
+        tsum[t.id] = {"prediction": jsonable(pred[t.id]), "chi2": float(r @ r), "z_max": float(np.max(np.abs(z))),
                       "max_abs_residual": ev.max_abs_residual, "tolerance_level": ev.level,
                       "within_tolerance": ev.passed}
     minima = [{"chi2": c, "theta": prob.theta(u)} for c, u in found]
@@ -454,11 +476,18 @@ def profile(prob: Problem, fr: FitResult, name: str, *, n_grid: int = 13, max_nf
 
 
 def half_prior(par: Param, interval: Sequence[float]) -> float:
-    """Width of ``interval`` as a fraction of the prior range of ``par`` (log coordinates for a log parameter)."""
+    """Width of ``interval`` as a fraction of the prior range of ``par`` (log coordinates for a log parameter).
+    When the fit prior widens the leaf's declared range (``par.declared_range``), the fraction of the narrower,
+    declared width is returned if it is larger (the widening never makes the rule easier to meet)."""
     lo, hi = float(interval[0]), float(interval[1])
-    if par.log:
-        return (math.log(max(hi, par.lo)) - math.log(max(lo, par.lo))) / (math.log(par.hi) - math.log(par.lo))
-    return (hi - lo) / (par.hi - par.lo)
+    ranges = [(par.lo, par.hi)] + ([tuple(par.declared_range)] if par.declared_range is not None else [])
+    fr = []
+    for a, b in ranges:
+        if par.log:
+            fr.append((math.log(max(hi, par.lo)) - math.log(max(lo, par.lo))) / (math.log(b) - math.log(a)))
+        else:
+            fr.append((hi - lo) / (b - a))
+    return max(fr)
 
 
 # =====================================================================================================================
@@ -503,4 +532,4 @@ def restrict(prob: Problem, fixed: Mapping[str, float], *, hypothesis: str | Non
     return Problem(group=prob.group, hypothesis=hypothesis or f"{prob.hypothesis} | held {sorted(fixed)}",
                    params=params, targets=prob.targets, predict=predict, fixed={**prob.fixed, **fixed},
                    starts=[{k: v for k, v in s.items() if k not in fixed} for s in prob.starts],
-                   constraint=cons, derived=der)
+                   constraint=cons, derived=der, common_sigma=dict(prob.common_sigma))

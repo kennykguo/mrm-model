@@ -6,19 +6,23 @@ result is written to ``mrm/calibration/latest_fit.json`` and the calibrated pres
 ``mrm/params/presets/g26_calibrated.yaml`` (:mod:`mrm.calibration.preset`).
 
 Order (each group sees the leaves fitted by the groups before it, :class:`mrm.calibration.groups.Context`):
-coupling_er -> heater -> offset -> junction -> eo -> monitor -> modulation_depth -> dac -> laser. The device groups
-(CAL-1..5, 7, 10 on the G25 bench) come first because the G26 groups (CAL-8, 9, 14) run on a plant that takes its
-device physics from them.
+heater -> coupling_er -> offset -> junction -> eo -> monitor -> modulation_depth -> dac -> laser. The heater comes
+first because CAL-2 reads the notch at heater VOLTAGES (V -> P -> T through the heater law) while the heater targets
+do not depend on the coupling leaves (review fix: coupling_er ran first, on the uncalibrated heater, and a second
+pass moved its fit). The device groups (CAL-1..5, 7, 10 on the G25 bench) come before the G26 groups (CAL-8, 9, 14),
+which run on a plant that takes its device physics from them.
 
 Decision rules (stated before the fits were run, see docs/handoff/calibration.md):
 
 1. Hypotheses of a group are compared by chi2 (likelihood ratio, Birge-scaled ratio, AIC). The preset keeps the
    g26 nominal hypothesis of each uncertainty entry unless the data reject it (Birge-scaled likelihood ratio below
    :data:`REJECT_LR` against the best hypothesis); measurement-model hypotheses (an instrument floor, the swept
-   device's droop transfer) take the best one. Rejected hypotheses are reported, never deleted from the preset.
+   device's droop transfer) take the best one, the first listed among ties (:data:`TIE_DCHI2`). Rejected
+   hypotheses are reported, never deleted from the preset.
 2. A leaf is tagged ``calibrated`` only when its 95 % profile interval, taken as the hull of the intervals of every
    non-rejected hypothesis in which the leaf is free, is at most half its prior range (log coordinates for a log
-   prior), is closed on both sides (not cut by the prior) and is one connected interval, the prior is a declared
+   prior; the declared width when the fit prior widens the leaf's range), is closed on both sides (not cut by the
+   prior) and is one connected interval, the prior is a declared
    one (the leaf's ``range`` or an uncertainty interval, not fit bounds invented for a leaf that declares none) and
    the fit reproduces every target of the group within its tolerance (a fit that misses it is a model-form
    failure, not a calibration). Otherwise the leaf keeps its provenance (assumed, inferred, ...) and its note
@@ -27,7 +31,11 @@ Decision rules (stated before the fits were run, see docs/handoff/calibration.md
 3. A leaf that only one hypothesis uses (an extinction-mechanism coefficient) is written on that hypothesis'
    alternative, from a conditional fit with every other leaf at the nominal fit (the world the preset composes).
    Its provenance follows rule 2 applied to the UNCONDITIONAL profiles (every other parameter re-minimized, Q_L
-   included); the narrower interval conditional on the held leaves is recorded in its note only.
+   included); the narrower interval conditional on the held leaves is recorded in its note only. Likewise a leaf
+   whose value depends on another uncertainty world (the heater leaves under uncertainty.thermo_optic H86) gets that
+   world's fit as an alternative, which the preset's restated uncertainty entry selects in that world; the leaf
+   value and its tag are the nominal world's (rule 2 over that world's hypotheses), the alternative's tag follows
+   rule 2 over its own world's hypotheses.
 """
 from __future__ import annotations
 
@@ -49,10 +57,13 @@ from mrm.calibration import groups as G
 from mrm.calibration.core import FitResult, Problem, Profile, jsonable
 
 __all__ = ["GROUP_ORDER", "REJECT_LR", "LeafDecision", "GroupResult", "CalibrationRun", "run", "RESULTS_PATH",
-           "run_group", "write_results", "load_results"]
+           "run_group", "write_results", "load_results", "coupling_context", "refresh_coupling_worlds",
+           "context_from_decisions"]
 
 RESULTS_PATH = Path(__file__).resolve().parent / "latest_fit.json"
-GROUP_ORDER = ("coupling_er", "heater", "offset", "junction", "eo", "monitor", "modulation_depth", "dac", "laser")
+#: heater before coupling_er (review fix): CAL-2 depends on the heater law (V -> P -> T), while the heater
+#: targets (resonance positions) do not depend on the coupling leaves, so this order needs no second pass
+GROUP_ORDER = ("heater", "coupling_er", "offset", "junction", "eo", "monitor", "modulation_depth", "dac", "laser")
 #: a hypothesis is rejected when its Birge-scaled likelihood ratio against the best hypothesis is below this
 REJECT_LR = 0.05
 
@@ -196,7 +207,10 @@ def _decision(cfg, par: core.Param, fr: FitResult, ident: dict, *, scope: str, h
     hull = ident.get("profile_95")
     note = (f"calibration ({', '.join(targets)}, hypothesis {hypothesis}): best fit {_fmt(value)}"
             + (f", 95 % profile {_fmt(hull[0])}-{_fmt(hull[1])} over the non-rejected hypotheses"
-               f" ({ident['width_frac']:.2f} of the prior {_fmt(par.lo)}-{_fmt(par.hi)}, {par.prior_source})"
+               f" ({ident['width_frac']:.2f} of the "
+               + (f"declared range {_fmt(par.declared_range[0])}-{_fmt(par.declared_range[1])}; fit prior "
+                  if getattr(par, "declared_range", None) else "prior ")
+               + f"{_fmt(par.lo)}-{_fmt(par.hi)}, {par.prior_source})"
                if hull else "")
             + f"; {ident.get('rule', '')}"
             + (f"; was {prev_v!r} ({prev_p})" if prev_v is not None else "")
@@ -266,10 +280,16 @@ def _group_coupling(ctx, T, *, n_grid, inner, quick, log):
     for h, p in byname.items():
         if h in rej:
             continue
-        # the nominal hypothesis at the full resolution, the others (they only widen the hull) coarser
-        full = h == nominal
-        profs[h] = _profile_leaves(p, fits[h], n_grid=n_grid if full else max(5, n_grid - 4),
-                                   max_nfev=inner if full else max(12, inner // 2), log=log)
+        # every leaf whose tag a hypothesis' profile can decide is profiled at the full resolution (review fix: the
+        # first version profiled every non-nominal hypothesis coarsely, although the mechanism coefficients and the
+        # branch alpha_other of the composed worlds are tagged from those profiles alone). Only Q_L of a non-nominal
+        # hypothesis stays coarse: it can only widen the Q_L hull, which the nominal's profile already opens at the
+        # CAL-1 edge (= the leaf range's top), so its tag cannot depend on it.
+        full_names = [q.name for q in p.params if q.role == "leaf" and (h == nominal or q.name != "q_loaded")]
+        profs[h] = _profile_leaves(p, fits[h], n_grid=n_grid, max_nfev=inner, log=log, names=full_names)
+        if h != nominal:
+            profs[h].update(_profile_leaves(p, fits[h], n_grid=max(5, n_grid - 4), max_nfev=max(12, inner // 2),
+                                            log=log, names=["q_loaded"]))
     fr = fits[nominal]
     # CAL-1 is a flat interval and Q_L trades against alpha_other along the CAL-2 valley, so the free best fit sits at
     # an arbitrary point of the valley: write the point at the centre of the CAL-1 interval when it fits as well
@@ -425,10 +445,22 @@ def _fit_from_dict(d: Mapping[str, Any]) -> FitResult:
     return FitResult(**{k: d[k] for k in keys if k in d})
 
 
+def coupling_context(res: Mapping[str, Any]) -> G.Context:
+    """The context the coupling_er problems of a fit record were built on: the record's leaves of every group
+    before coupling_er in :data:`GROUP_ORDER` (and the scratch ranges)."""
+    ctx = G.Context(ranges={k: list(v) for k, v in res.get("context", {}).get("ranges", {}).items()})
+    dev = res.get("context", {}).get("device", {})
+    for h in GROUP_ORDER[:GROUP_ORDER.index("coupling_er")]:
+        paths = {d.get("path") for d in res.get("groups", {}).get(h, {}).get("decisions", [])}
+        ctx.device.update({k: v for k, v in dev.items() if k in paths})
+    return ctx
+
+
 def refresh_coupling_worlds(path: str | Path = RESULTS_PATH, *, log=print) -> dict:
     """Recompute the leaf decisions and composed worlds of the coupling_er group of a fit record from its stored
     fits and profiles (the same code as a full run, without refitting the hypotheses or their profiles) and rewrite
-    the record. Coupling is the first group, so its problems need no earlier context."""
+    the record. The problems see the leaves of the groups before coupling_er in :data:`GROUP_ORDER` (the heater),
+    taken from the record."""
     res = load_results(path)
     g = res["groups"]["coupling_er"]
     nom = g["nominal"]
@@ -437,7 +469,7 @@ def refresh_coupling_worlds(path: str | Path = RESULTS_PATH, *, log=print) -> di
     profs = {h: {n: _profile_from_dict(p) for n, p in ps.items()} for h, ps in g["profiles"].items()}
     rej = {r["hypothesis"] for r in g["comparison"]["rows"] if r["likelihood_ratio_birge"] < REJECT_LR}
     T = core.calibration_targets()
-    ctx = G.Context()
+    ctx = coupling_context(res)
     byname = {p.hypothesis: p for p in G.coupling_er_problems(ctx, T)}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -457,14 +489,37 @@ def _coupling_note(fr: FitResult) -> str:
             f"{_fmt(th.get('notch_floor_db', float('nan')))} dB (measurement nuisance, not written)")
 
 
+#: two hypotheses whose chi2 differ by less than this are a tie (a reparametrization such as the droop transfer
+#: fits the data identically): the first listed one is taken, so the record does not depend on rounding noise
+TIE_DCHI2 = 0.01
+
+
+def _first_best(hyps: Sequence[str], fits: Mapping[str, FitResult]) -> str | None:
+    """The best of ``hyps`` by chi2, the first listed one among ties (:data:`TIE_DCHI2`)."""
+    if not hyps:
+        return None
+    c_min = min(fits[h].chi2 for h in hyps)
+    return next(h for h in hyps if fits[h].chi2 <= c_min + TIE_DCHI2)
+
+
+#: thermo-optic worlds of the heater group other than the nominal H_solver: (hypothesis prefix, uncertainty entry,
+#: choice, alternative name written on the heater leaves)
+HEATER_WORLDS = (("H86", "thermo_optic", "H86", "cal_h86"),)
+
+
 def _group_heater(ctx, T, *, n_grid, inner, quick, log):
     probs = G.heater_problems(ctx, T)
     byname = {p.hypothesis: p for p in probs}
     fits = _fit_all(probs, log=log)
     cmp = core.compare_hypotheses("heater", list(fits.values()),
-                                  note="droop transfer from the swept device to the median device (CAL-4 vs CAL-3)")
+                                  note="thermo-optic world x droop transfer from the swept device to the median "
+                                       "device (CAL-4 vs CAL-3)")
     rej = _rejected(cmp)
-    nominal = cmp.best
+    world_of = {h: next((w for w in HEATER_WORLDS if h.startswith(w[0] + "/")), None) for h in byname}
+    nominal_set = [h for h in byname if world_of[h] is None]
+    # the nominal world is H_solver (rule 1: the g26 nominal of uncertainty.thermo_optic unless rejected); within it
+    # the droop-transfer hypothesis (a measurement model) takes the best
+    nominal = _first_best([h for h in nominal_set if h not in rej], fits) or cmp.best
     profs = {h: _profile_leaves(p, fits[h], n_grid=n_grid, max_nfev=inner, log=log)
              for h, p in byname.items() if h not in rej}
     cfg = ctx.config(G.BENCH)
@@ -475,12 +530,15 @@ def _group_heater(ctx, T, *, n_grid, inner, quick, log):
     for par in byname[nominal].params:
         if par.role != "leaf":
             continue
-        ident = _identifiable(par, {h: pr[par.name] for h, pr in profs.items()}, fits, rej)
+        # the leaf value is the H_solver world's: its tag follows the profiles of that world's hypotheses; each
+        # other thermo-optic world gets its own alternative, tagged from its own profiles (rule 3)
+        ident = _identifiable(par, {h: pr[par.name] for h, pr in profs.items() if h in nominal_set}, fits, rej)
         extra, rng = "", None
         if par.path == G.P_R0:
             extra = (f"hot resistance at P_FSR {_fmt(der['r_hot_at_p_fsr_ohm'])} ohm (CAL-3b: 1.195^2/25.45 = 56.1); "
                      f"the prior was widened from the leaf range [42, 58] because that range was computed with the "
-                     f"earlier droop y = 0.00904 /mW (R0 = R_hot/(1 + y P_FSR))")
+                     f"earlier droop y = 0.00904 /mW (R0 = R_hot/(1 + y P_FSR), the leaf's own note); the "
+                     f"half-prior fraction is taken on the declared 16 ohm width")
             rng = [35.0, 58.0]
         if par.path == G.P_RATIO:
             extra = (f"y = TCR x R_th,H = {_fmt(der['y_per_mw'])} /mW at TCR {_fmt(der['tcr_per_k'])} /K "
@@ -491,9 +549,38 @@ def _group_heater(ctx, T, *, n_grid, inner, quick, log):
         if par.path == G.P_PFSR:
             extra = ("the R2 anchor with the FSR at the line, set so the bench protocol (FSR between the cold order "
                      "and the next red order) gives the printed 25.45 mW median")
-        dec.append(_decision(cfg, par, fr, ident, scope="device", hypothesis=nominal, targets=tg, extra_note=extra,
-                             range_=rng))
-    return GroupResult("heater", tg, nominal, fits, cmp, profs, dec, {"derived": der}, 0.0)
+        extra += (f". Conditional on: the thermo-optic world H_solver (dlambda/dT rising with T; the H86 world has "
+                  f"its own alternative 'cal_h86'), the droop transfer from the swept device (hull over "
+                  f"same_rth_heater and same_ratio), the swept device's own R0 (a nuisance with the variation "
+                  f"entry's log prior; fitted R0_dev {_fmt(der.get('r_cold_swept_device_ohm', float('nan')))} ohm), "
+                  f"and the CAL-3a/3b medians read as one device")
+        d = _decision(cfg, par, fr, ident, scope="device", hypothesis=nominal, targets=tg, extra_note=extra,
+                      range_=rng)
+        for prefix, entry, choice, alt in HEATER_WORLDS:
+            wset = [h for h in byname if world_of[h] and world_of[h][0] == prefix]
+            ok = [h for h in wset if h not in rej]
+            if not ok:
+                d.note += f". World {entry}={choice}: rejected (no alternative written)"
+                continue
+            wbest = _first_best(ok, fits)
+            wid = _gate(_identifiable(par, {h: profs[h][par.name] for h in ok}, fits, rej), fits[wbest])
+            row = next(r for r in cmp.rows if r["hypothesis"] == wbest)
+            hull = wid.get("profile_95")
+            d.alternatives[alt] = {
+                "value": float(fits[wbest].theta[par.name]),
+                "calibrated": bool(wid.get("calibrated")),
+                "provenance": "calibrated" if wid.get("calibrated") else d.previous_provenance,
+                "select": {"entry": entry, "choice": choice},
+                "identifiable": wid,
+                "note": (f"world uncertainty.{entry}={choice} ({wbest}): chi2 {fits[wbest].chi2:.3g} against "
+                         f"{fr.chi2:.3g} in the nominal world (LR {row['likelihood_ratio']:.2g}, Birge "
+                         f"{row['likelihood_ratio_birge']:.2g}); 95 % profile "
+                         + (f"{_fmt(hull[0])}-{_fmt(hull[1])} over {', '.join(ok)}" if hull else "none")
+                         + f"; {wid.get('rule', '')}; y {_fmt(fits[wbest].derived.get('y_per_mw', float('nan')))} /mW")}
+        dec.append(d)
+    return GroupResult("heater", tg, nominal, fits, cmp, profs, dec,
+                       {"derived": der, "worlds": {w[0]: {"entry": w[1], "choice": w[2], "alternative": w[3]}
+                                                   for w in HEATER_WORLDS}}, 0.0)
 
 
 def _group_offset(ctx, T, *, n_grid, inner, quick, log):
@@ -602,7 +689,10 @@ def _group_modulation_depth(ctx, T, *, n_grid, inner, quick, log):
     fits = _fit_all(probs, log=log)
     cmp = core.compare_hypotheses("modulation_depth", list(fits.values()), note="lock mode of the relOMA map")
     profs = {h: _profile_leaves(byname[h], fits[h], n_grid=n_grid, max_nfev=inner, log=log) for h in fits}
-    scan = G.modulation_depth_scan(ctx, T)
+    # the swing that closes CAL-14 also at the CAL-5 alternative efficiency (P_in -> 0; a refit, a few seconds)
+    jp = {p.hypothesis: p for p in G.junction_problems(ctx, T, lut_variant=False)}
+    eff_p0 = float(core.fit(jp["analytic/p_in_0"]).theta["eff_at_0v_pm_per_v"])
+    scan = G.modulation_depth_scan(ctx, T, alt_effs={"cal5_p_in_0": eff_p0})
     alt_read = _reloma_dbm_reading(ctx, T)
     nominal = "mode=oracle"
     fr = fits[nominal]
@@ -611,7 +701,8 @@ def _group_modulation_depth(ctx, T, *, n_grid, inner, quick, log):
     reached = abs(fr.targets["CAL-14"]["prediction"] - float(t14.value)) <= tol
     cfg = ctx.config(G.BANK)
     par = byname[nominal].params[0]
-    ident = _identifiable(par, {h: profs[h][par.name] for h in profs}, fits, set())
+    # the hull over the lock modes the data do not reject (review fix: the rejected setpoint_lock mode was included)
+    ident = _identifiable(par, {h: profs[h][par.name] for h in profs}, fits, _rejected(cmp))
     closing = _closing_rows(scan, float(t14.value))
     note = (f"CAL-14 (oracle, the replica's primary) cannot be reached inside the swing prior: best "
             f"{_fmt(fr.targets['CAL-14']['prediction'])} dB at {_fmt(fr.theta[par.name])} V (target -2.1 +- 0.3). "
@@ -628,11 +719,38 @@ def _group_modulation_depth(ctx, T, *, n_grid, inner, quick, log):
                        {"scan": scan, "closing": closing, "dbm_reading": alt_read}, 0.0)
 
 
+def _crossing(rows: list, key: str, target_db: float):
+    """Linear interpolation of ``key`` (and the depth) where the sorted rows' relOMA first reaches ``target_db``."""
+    rows = sorted(rows, key=lambda r: r[key])
+    x = np.array([r[key] for r in rows])
+    y = np.array([r["reloma_db"] for r in rows])
+    dpt = np.array([r["depth"] for r in rows])
+    k = np.flatnonzero((y[:-1] < target_db) & (y[1:] >= target_db))
+    if not k.size:
+        return None, None, (float(np.max(y)) if y.size else float("nan"))
+    i = int(k[0])
+    f = (target_db - y[i]) / (y[i + 1] - y[i])
+    return float(x[i] + f * (x[i + 1] - x[i])), float(dpt[i] + f * (dpt[i + 1] - dpt[i])), float(np.max(y))
+
+
 def _closing_rows(scan: dict, target_db: float) -> dict:
-    """Interpolated swing (at the preset efficiency) and efficiency scale (at 1.3 V) that reach ``target_db``."""
+    """Interpolated swing (at the preset efficiency) and efficiency scale (at 1.3 V) that reach ``target_db``, and
+    the centered swing at each alternative efficiency of the scan (``alt_effs``)."""
     out = {}
+    base = [r for r in scan["rows"] if r.get("eff_base", "context") == "context"]
+    for name in scan.get("alt_effs", {}):
+        sw, dp, mx = _crossing([r for r in scan["rows"] if r.get("eff_base") == name], "swing_pp_v", target_db)
+        out[f"centered_swing_v_at_{name}"] = sw
+        out[f"centered_depth_at_{name}"] = dp
+        out[f"centered_max_db_at_{name}"] = mx
+        sw24, _, _ = _crossing([r for r in scan["rows"] if r.get("eff_base") == name], "swing_pp_v",
+                               target_db - 0.3)
+        out[f"centered_swing_v_tolerance_edge_at_{name}"] = sw24
+    sw24, _, _ = _crossing([r for r in base if r["level_convention"] == "centered" and r["eff_scale"] == 1.0],
+                           "swing_pp_v", target_db - 0.3)
+    out["centered_swing_v_tolerance_edge"] = sw24
     for conv in ("centered", "one_sided"):
-        rows = [r for r in scan["rows"] if r["level_convention"] == conv and r["eff_scale"] == 1.0]
+        rows = [r for r in base if r["level_convention"] == conv and r["eff_scale"] == 1.0]
         rows.sort(key=lambda r: r["swing_pp_v"])
         x = np.array([r["swing_pp_v"] for r in rows])
         y = np.array([r["reloma_db"] for r in rows])
@@ -646,7 +764,7 @@ def _closing_rows(scan: dict, target_db: float) -> dict:
         else:
             out[f"{conv}_swing_v"] = None
             out[f"{conv}_max_db"] = float(np.max(y))
-        er = [r for r in scan["rows"] if r["level_convention"] == conv and r["swing_pp_v"] == 1.3]
+        er = [r for r in base if r["level_convention"] == conv and r["swing_pp_v"] == 1.3]
         er.sort(key=lambda r: r["eff_scale"])
         xs = np.array([r["eff_scale"] for r in er])
         ys = np.array([r["reloma_db"] for r in er])
@@ -657,15 +775,27 @@ def _closing_rows(scan: dict, target_db: float) -> dict:
             f = (target_db - ys[i]) / (ys[i + 1] - ys[i])
             out[f"{conv}_eff_scale_at_1p3v"] = float(xs[i] + f * (xs[i + 1] - xs[i]))
             out[f"{conv}_depth_eff"] = float(ds[i] + f * (ds[i + 1] - ds[i]))
-    depths = [v for k, v in out.items() if k.endswith("_depth") or k.endswith("_depth_eff")]
+    depths = [v for k, v in out.items() if (k.endswith("_depth") or k.endswith("_depth_eff")
+                                            or k.startswith("centered_depth_at_")) and v is not None]
     out["depth"] = float(np.median(depths)) if depths else float("nan")
     c = out.get("centered_swing_v")
     e = out.get("centered_eff_scale_at_1p3v")
-    out["text"] = (f"{'a ' + _fmt(c, 3) + ' Vpp centered swing (the levels clip at the -0.5 V forward edge of the '
-                               'junction grid)' if c else 'no centered swing up to 4.5 Vpp'}, or "
-                   f"{'x' + _fmt(e, 3) + ' the junction efficiency at 1.3 Vpp' if e else 'more than x3 efficiency'}"
-                   f"; the one-sided convention saturates at {_fmt(out.get('one_sided_max_db', float('nan')), 3)} dB"
-                   if out.get("one_sided_swing_v") is None else "")
+    smax = max(r["swing_pp_v"] for r in base) if base else float("nan")
+    parts = [(f"a {_fmt(c, 3)} Vpp centered swing (levels "
+              f"{_fmt(1.075 - c / 2, 3)} to {_fmt(1.075 + c / 2, 3)} V; the junction grid clips at -0.5 V forward)"
+              if c else f"no centered swing up to {_fmt(smax, 3)} Vpp"),
+             (f"x{_fmt(e, 3)} the junction efficiency at 1.3 Vpp" if e else "more than x3 efficiency")]
+    for name in scan.get("alt_effs", {}):
+        sa = out.get(f"centered_swing_v_at_{name}")
+        parts.append(f"at the {name} efficiency ({_fmt(scan['alt_effs'][name], 3)} pm/V) "
+                     + (f"a {_fmt(sa, 3)} Vpp centered swing" if sa else
+                        f"no centered swing up to {_fmt(smax, 3)} Vpp (best "
+                        f"{_fmt(out.get(f'centered_max_db_at_{name}', float('nan')), 3)} dB)"))
+    if out.get("one_sided_swing_v") is None:
+        parts.append(f"the one-sided convention saturates at {_fmt(out.get('one_sided_max_db', float('nan')), 3)} dB")
+    else:
+        parts.append(f"a {_fmt(out['one_sided_swing_v'], 3)} Vpp one-sided swing")
+    out["text"] = "; ".join(parts)
     return out
 
 
@@ -740,9 +870,18 @@ def _group_laser(ctx, T, *, n_grid, inner, quick, log):
 # Run
 # =====================================================================================================================
 def _git_commit() -> str | None:
+    """The short HEAD commit, with ``-dirty`` when the calibration code or its inputs (mrm/, tests/calibration/)
+    differ from it (review: a record made with uncommitted code named only the commit)."""
+    root = Path(__file__).resolve().parents[2]
     try:
-        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
-                              cwd=Path(__file__).resolve().parents[2], timeout=10).stdout.strip() or None
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                              cwd=root, timeout=10).stdout.strip() or None
+        if head is None:
+            return None
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", "mrm", "tests/calibration",
+                                ":!mrm/calibration/latest_fit.json", ":!mrm/params/presets/g26_calibrated.yaml"],
+                               capture_output=True, text=True, cwd=root, timeout=10).stdout.strip()
+        return head + ("-dirty" if dirty else "")
     except Exception:  # noqa: BLE001
         return None
 
@@ -765,20 +904,34 @@ def run(groups: Sequence[str] | None = None, *, quick: bool = False, out: str | 
     prev_ctx = {}
     if prev is not None:
         prev_ctx = prev["context"] if isinstance(prev, dict) else prev.context
-    if subset and names and names[0] != GROUP_ORDER[0] and prev is not None:
-        done = GROUP_ORDER[:GROUP_ORDER.index(names[0])]
-        # only the leaves of the groups BEFORE the first rerun group: a later group's leaf (e.g. the laser line
-        # offset) must not enter an earlier group's fit, as it could not in a full run
-        later: set[str] = set()
-        if isinstance(prev, dict):
-            for g, gv in prev.get("groups", {}).items():
-                if g not in done:
-                    later.update(d.get("path") for d in gv.get("decisions", []))
-        ctx.device.update({k: v for k, v in prev_ctx.get("device", {}).items() if k not in later})
-        ctx.system.update({k: v for k, v in prev_ctx.get("system", {}).items() if k not in later})
+    prev_groups: dict = {}
+    if prev is not None:
+        prev_groups = prev.get("groups", {}) if isinstance(prev, dict) else \
+            {g: {"decisions": [jsonable(d) for d in gr.decisions]} for g, gr in prev.groups.items()}
+    if subset and prev is not None:
         ctx.ranges.update({k: list(v) for k, v in prev_ctx.get("ranges", {}).items()})
-        log(f"context from the previous run (groups {', '.join(done)}): {len(ctx.device)} device, "
-            f"{len(ctx.system)} system leaves")
+        if not prev_groups:
+            # a bare context (no group records): every leaf of it is an earlier group's
+            ctx.device.update(prev_ctx.get("device", {}))
+            ctx.system.update(prev_ctx.get("system", {}))
+
+    def preceding_context(g: str) -> None:
+        """Before rerun group g: the previous record's leaves of every group that precedes g and is not rerun
+        (review fix: only the groups before the FIRST rerun group were loaded, so a non-contiguous subset such as
+        ``heater laser`` fitted laser without the coupling ... dac leaves). A later group's leaf never enters an
+        earlier group's fit, as in a full run."""
+        if not subset or prev is None:
+            return
+        for h in GROUP_ORDER[:GROUP_ORDER.index(g)]:
+            if h in names or h not in prev_groups:
+                continue
+            paths = {d.get("path") for d in prev_groups[h].get("decisions", [])}
+            n0 = len(ctx.device) + len(ctx.system)
+            ctx.device.update({k: v for k, v in prev_ctx.get("device", {}).items() if k in paths})
+            ctx.system.update({k: v for k, v in prev_ctx.get("system", {}).items() if k in paths})
+            if len(ctx.device) + len(ctx.system) > n0:
+                log(f"context from the previous run of group {h}: "
+                    f"{len(ctx.device) + len(ctx.system) - n0} leaves")
     res = CalibrationRun(created_utc=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                          git_commit=_git_commit(), groups={}, context={})
     if subset and isinstance(prev, dict):
@@ -797,6 +950,7 @@ def run(groups: Sequence[str] | None = None, *, quick: bool = False, out: str | 
         warnings.simplefilter("ignore")
         for g in names:
             log(f"group {g}")
+            preceding_context(g)
             res.groups[g] = run_group(g, ctx, T, quick=quick, log=log)
             res.context = merged_context()
             if out is not None:
@@ -827,3 +981,22 @@ def write_results(res: CalibrationRun, path: str | Path = RESULTS_PATH) -> Path:
 
 def load_results(path: str | Path = RESULTS_PATH) -> dict:
     return json.loads(Path(path).read_text())
+
+
+def context_from_decisions(record: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """The device and system leaves a full serial run leaves in its context, rebuilt from a record's leaf decisions
+    (``run_group`` writes every decision with ``write_value``; coupling_er also hands the fitted dispersion to the
+    later groups). A record's ``context`` must equal this: ``bench_config`` and every ``--groups`` rerun read it.
+    Integrator (calibration stage): the review's record merged two parallel runs and kept the pre-review context
+    values of the offset, junction and eo leaves, so the G25 bench of the before/after table ran with 93.86 instead
+    of the fitted 93.64 pm/V."""
+    out: dict[str, dict[str, Any]] = {"device": {}, "system": {}}
+    groups = record.get("groups") or {}
+    for g in GROUP_ORDER:
+        for d in (groups.get(g) or {}).get("decisions") or []:
+            p = d.get("path")
+            if d.get("write_value", True) and p and not str(p).startswith("variation.") and p != "uncertainty":
+                out["device" if d.get("scope") == "device" else "system"][p] = d["value"]
+            if g == "coupling_er" and p == G.P_DISP:
+                out["device"][p] = d["value"]
+    return out
