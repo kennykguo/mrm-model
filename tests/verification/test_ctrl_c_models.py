@@ -186,10 +186,12 @@ def test_delay_bookkeeping(cfg):
 def test_adc_mux_gives_each_ring_its_own_measurement_delay():
     """07 P0-7 adc_mux: with channels_per_adc = 4 (round_robin) the rings sharing a converter are sampled at phases
     0..3 ticks, so the age of the samples an edge consumes differs per ring. linearize uses the plant's own phase rule
-    (MonitorHw.phase) per ring, and the LQG design pads the delay lines to one state size."""
+    (MonitorHw.phase) per ring, and the LQG design pads the delay lines to one state size. Four rings take turns on
+    one integrating converter, so their windows must fit in the 4-tick ADC period: 1 us each (the g26 2 us window
+    would overlap them; physics_sensing review)."""
     from mrm.control.baselines.kalman_lqg import KalmanLQG
     from mrm.plant.sensing import MonitorHw
-    cfg4 = load_cfg(overrides=["ring.monitor.adc_mux.channels_per_adc=4"])
+    cfg4 = load_cfg(overrides=["ring.monitor.adc_mux.channels_per_adc=4", "ring.monitor.integration_window_s=1e-6"])
     pp = M.nominal_plant_params(cfg4)
     phase = MonitorHw.from_plant_params(pp).phase
     assert len(set(phase.tolist())) > 1

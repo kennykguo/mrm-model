@@ -28,11 +28,13 @@ Changed (owned):
 - `mrm/__init__.py`: `mrm.run(config, **kwargs)` (lazy import; `import mrm` stays light).
 - `mrm/sim/runner.py` (extended, every existing signature and result unchanged):
   - new option `run(..., score_from_s=...)`: the metric accumulators restart at that time (`MetricsState.reset`
-    at the split tick with the latched heater registers); plant, controller and records are untouched. On the
-    Python controller path a split that falls on a controller edge moves one tick later (the Python loop must not
-    stop on an edge between two segments). `manifest_inputs["score_from_tick" | "score_from_s"]`. Two pieces of
-    plant history survive the restart (review fixes): the lock reference of `lock_reference: oracle` (the reset
-    would set it to 0, the line, until the next oracle evaluation up to 1 ms later) and the previous controller
+    at the split tick with the latched heater registers); plant, controller and records are untouched (under the
+    fixed substep policy; under `auto` only for a split on a controller edge, docs/ENGINE.md section 2, correction
+    2026-10-16). On the Python controller path a split that falls on a controller edge moves one tick later (the
+    Python loop must not stop on an edge between two segments). `manifest_inputs["score_from_tick" |
+    "score_from_s"]`. Two pieces of plant history survive the restart (review fixes): the lock reference of
+    `lock_reference: oracle` (the reset would set it to 0, the line, until the next oracle evaluation up to 1 ms
+    later) and the previous controller
     latch (tick, register) of the peak-slew accumulator (the reset dated it at the split, overstating
     `peak_slew_codes_per_s` up to 10x depending on where the split fell in the controller period). Tested: the
     scored metrics equal the same metrics over the scored ticks of a per-tick record.
@@ -112,7 +114,7 @@ enum values raise `ExperimentError` with a did-you-mean over both key sets):
 |---|---|---|---|
 | `experiment.start` | cold \| cold_settled \| warm | ResetSpec of the scenario, else cold | cold = heaters at code_min, `sim.reset_protocol` (g26 laser_ramp), cold lags (power-up); cold_settled = code_min, thermal state settled, branch_low; warm = quasi-static oracle lock codes, settled, branch_high |
 | `experiment.record` | list | run: `default_records` (detuning mean + envelope, relOMA, oracle relOMA, heater and monitor codes, monitor current, ring T, line_on; <= 10 000 windows); others: none | `'field@dec:reducer'` (dec ticks or `auto`; reducer mean, min, max, last, envelope) or maps |
-| `experiment.corners` | list | compare/robust: the 12 `NAMED_CORNERS`; else none | corner preset names or `{name, alts}` |
+| `experiment.corners` | list | compare/robust: the `NAMED_CORNERS` (07 4.8's 12; g26_tec_package since 2026-10-16); else none | corner preset names or `{name, alts}` |
 | `experiment.n_threads` | int | os.cpu_count() | kernel threads |
 | `experiment.self_reference` | map | off | `{duration_s: 0.02, window_s: 0.005}` (positive, window_s <= duration_s): lock error about each ring's own steady operating point (section 5) |
 | `experiment.score_from_s` | float | 0 | metrics accumulate from this time (runner `score_from_s`) |
@@ -354,7 +356,8 @@ was needed; the runner change is plain Python).
    reference from a slightly different operating point. It overrides `metrics.lock_reference`. d_ref is the median
    of ~10 window means over the last `window_s` of the pre-run.
 4. **New runner option `score_from_s`** (runner.py is mine to extend): exact (records, plant, controller untouched;
-   tested bit for bit on the compiled and Python paths). first_lock_s / time_to_lock_s become relative to the
+   tested bit for bit on the compiled and Python paths at the fixed policy; under `auto` only a split on a controller
+   edge keeps the trajectory, ENGINE.md section 2, correction 2026-10-16). first_lock_s / time_to_lock_s become relative to the
    scoring start. On the Python path a split on a controller edge moves one tick.
 5. **Convergence (07 P0-10)**: implemented with mrm.scenarios' plan, metrics and tolerances (design choices of the
    scenarios owner: 0.2 pm or 5 % on max detuning, exact event counts, 16 codes or 1 % on heater range, 1 error or
@@ -561,7 +564,7 @@ flags. `mrm rerun` of the new A1, A7 and B5 directories: bit-for-bit identical.
 |---|---|---|
 | steady_pi_lock | worst-lane OMA penalty 0.117 dB, lock 0.062 pm, no excursion | 2.6 s |
 | a1_pi_lock | as A1: OMA penalty 0.316 dB, 4 excursions, ring 0 348.7 pm | 4.3 s |
-| mc_pi_lock (64 sampled worlds, static) | median OMA penalty 1.63 dB, p75 15.0, p95 31.9 dB; wrong-line rings p75 1, p95 5; warm start: 9 rings without a code in the 64 worlds (98 with the heater-up order: 89 moved one order bluer; per world median 1, max 6), 1 supply-limited world; 26 worlds have a ring > 5 pm from its own operating point, 10 of them without any warm-start flag (worlds 1, 3, 11, 13, 30, 32, 33, 39, 43, 48) | 20 s |
+| mc_pi_lock (64 sampled worlds, static) | median OMA penalty 1.63 dB, p75 15.0, p95 31.9 dB; wrong-line rings p75 1, p95 5; warm start: 9 rings without a code in the 64 worlds (98 with the heater-up order: 89 moved one order bluer; per world median 1, max 6), 1 supply-limited world; 26 worlds have a ring > 5 pm from its own operating point, 10 of them without any warm-start flag (worlds 1, 3, 11, 13, 30, 32, 33, 39, 43, 48). Rerun 2026-10-16 after the engine review fixes (iterated order hop, per-world settle stop; runs/engine_fix/exp): median 1.63 dB, p75 15.8, p95 31.0 dB; 1 ring without a code (world 21 ring 4), 101 hopped rings, 2 supply-limited worlds (36, 63); 27 worlds off by > 5 pm, the same 10 unflagged | 20 s |
 | sweep_pi_gains | fraction 0.6 / 0.7 / 0.8: OMA penalty 0.79 / 0.32 / 0.24 dB; crossover changes little; ring 0 326-371 pm at the cusp in every point (as before) | 32 s |
 | sweep_hypotheses | default: 0.316 dB; FSR window A: 2 wrong-line rings, 12.7 dB; H86: 2 wrong-line rings, 4.0 dB; H86 + window A: 5 wrong-line rings, 53.8 dB | 13 s |
 | quasi_static_g26 | coverage 1, no supply-limited point, BND-4 5.11e-9 dB; oracle relOMA -5.99 (1 V) to -9.23 dB (3.75 V) | 2.7 s |

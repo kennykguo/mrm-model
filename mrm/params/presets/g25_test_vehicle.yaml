@@ -39,6 +39,9 @@ laser:
     textbook: REF.inputPowerDbm
     disagrees: null
     note: "'about 4 dBm' input power at the ring (LM-P section 3.2); the reference plane is the ring, so chip_input_loss_db is 0"
+    alternatives:
+      # g26's Guide value is a laser-module output (100 mW per fibre over 16 lines), not a power at the G25 bench ring
+      guide_16_lines: null
   line_offset_ghz: {value: 0.0, provenance: assumed, generation: G25, source: MODEL, range: [-20.0, 20.0],
                     note: "a bench tunable laser: no grid error"}
 

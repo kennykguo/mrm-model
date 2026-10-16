@@ -187,11 +187,18 @@ wind-up. Noise and quantization inside the declared ranges do not matter: the g2
    `ring_to_line`) and then use `spec.nominal` as the nominal design. Please (a) add the token to the knowledge enum
    / documentation, (b) make sure `ControllerSpec.nominal` is the controller-knowledge view: `mrm/sim/runner.py`
    passes `nominal=cfg`, so a run that selects a corner (`alts=`) hands the corner to the model (the model would
-   know the corner).
+   know the corner). **Partly resolved 2026-10-16 (controllers review, controllers-2):** `ControllerSpec` now keeps
+   only `mrm.control.knowledge.NominalView` of that design: a key no granted token releases raises KnowledgeError,
+   the experiment section (seeds, world choices) is never released, and `model_nominal`'s `model_config()` is the
+   design without the experiment section and without the scenario beyond its operating point (ambient, bias). Still
+   open: the view is of the run's own config, so a corner selected with `alts=` still reaches `model_nominal` (no
+   separate `controller_knowledge` preset yet).
 3. **engine (mrm/sim/runner.py, plant.py)**: (a) the oracle needs the thermal lag states and per-world Conditions:
    `runner._run_python` calls `ctrl.step(obs, truth=plant.truth())` but `Truth` has neither `x` nor the Conditions
    (NRZ levels, ones and transition density, base temperature); please build a `mrm.validation.oracle.TruthState`
-   or add those to Truth; `Oracle(pp, cfg).reset(spec)` is supported. (b) A real warm start (thermal state at the
+   or add those to Truth; `Oracle(pp, cfg).reset(spec)` is supported. **Resolved** (noted 2026-10-16, controllers
+   review): `Plant.truth()` carries `x`, `heater_applied` and the per-world `conditions`;
+   `test_engine_physics.py::test_truth_fed_oracle_runs_on_the_engine` runs the oracle through `mrm.sim.runner`. (b) A real warm start (thermal state at the
    lock steady state, as `tests/verification/test_ctrl_c_harness.py::warm_start` does with `models.static_point`)
    would let the lock-only compiled controllers run on the engine; `heater_code` + laser ramp starts cold.
 4. **plant_thermal / extraction / scenarios**: the calibrated A1/A2 aggressor heats ring 0's monitor PD through the

@@ -15,8 +15,10 @@ of the TRUE world (``mrm.control.models.oma_curve``: the heater supplies whateve
 largest OMA = |P_out1 - P_out0| (its line at the bus output) among points where the self-heating loop is open-loop
 stable, Z_opt(0) dP_abs/dT_R < 1 (the heater held, the loop gain magnitude is largest at DC for a passive Foster
 network, so this DC test is sufficient); refined by golden-section search. The unrestricted optimum is reported next
-to it (07 P0-1 item 7). In g26 nominal the optimum is about +107 pm (resonance red of the laser, self-locked side,
-loop gain about -5) and the unrestricted optimum about -100 pm sits on the unstable side (loop gain about +5).
+to it (07 P0-1 item 7). In g26 nominal the optimum is +103 to +105 pm (rings 0-3 +104.6 to +104.9 pm, rings 4-7
++103.4 pm; resonance red of the laser, self-locked side, loop gain -4.7 to -5.4), and it is also the unrestricted
+optimum: the stability restriction costs no OMA there. The best point on the unstable (blue) side, about -100 pm
+with loop gain about +5, has 92-94 % of that OMA (tests/verification/test_ctrl_c_oracle.py).
 
 Holding (dynamic). The oracle knows the world exactly, so it needs no estimator. At reset it linearizes the TRUE
 world at its target (``models.linearize_bank(..., pp=truth, measurement="none")``: the actuation delay only, no
@@ -38,8 +40,9 @@ integer code; it is a benchmark, not a realizable controller.
 Interface for the engine (07 P1-1 "used by the replicas and the OMA-penalty metric"): ``Oracle(pp, cfg)`` then
 ``reset(spec)`` (or ``reset(spec, truth_pp, truth_state, cfg)``) and ``step(obs, truth) -> {"tx.heater": (B, N)
 int64}`` with ``truth`` a :class:`TruthState` filled by the plant at the edge (thermal lag states, ring temperatures,
-per-world conditions). ``mrm.sim.runner`` calls ``ctrl.step(obs, truth=plant.truth())``; its ``Truth`` does not carry
-the lag states or the Conditions yet (docs/handoff/controllers_c.md).
+per-world conditions). ``mrm.sim.runner`` calls ``ctrl.step(obs, truth=plant.truth())``: ``Plant.truth()`` carries
+the lag states ``x``, ``heater_applied`` and the per-world ``conditions`` the oracle reads
+(tests/verification/test_engine_physics.py::test_truth_fed_oracle_runs_on_the_engine runs it on the engine).
 """
 from __future__ import annotations
 

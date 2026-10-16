@@ -22,8 +22,18 @@ The peak is open-loop stable, but at g26 nominal (bistability ratio ~6) the fold
 probe or dither that reaches past it makes the ring fall onto the cold branch, the monitor collapses and the
 controller would chase the wrong side. Both controllers detect the fall (monitor drop by ``fall_frac`` of the recent
 DC to below ``fall_level``), ramp the heater up past a guard until the monitor peaked and fell back (as pi_lock), and
-resume: in g26 nominal they cycle between approach and fall (measured in tests/verification/test_ctrl_a_es.py; the
-peak is also the wrong point for a modulator, 04 C5). Without bistability (low laser power) they converge to the peak.
+resume. Measured at g26 nominal with the default parameters (controllers review 2026-10-16):
+
+- es_po: its +-delta probes reach past the fold. In the 8 ms harness run of tests/verification/test_ctrl_a_es.py it
+  falls 8 times; on the engine (settled warm start at the oracle lock codes, 0.4 s) it falls 2-4 times per ring in
+  its first ~60 ms and then parks at the drop peak (rings 0-3 and 7) or on the cold branch ~1 nm blue of the line
+  (rings 4-6); it does not keep cycling.
+- es_sine: its dither does not reach the fold and it never falls. It approaches the peak slowly, at 0.77-0.95
+  pm/ms from the warm start (+97 to +121 pm), and parks at the drop peak (-0.6 to -1.1 pm) after 100-160 ms, where
+  the OMA penalty is ~13 dB; a run shorter than that sees a transient (docs/handoff/controller_scorecard.md counts
+  its rings as drifting, not locked).
+
+The peak is the wrong point for a modulator (04 C5). Without bistability (low laser power) both converge to it.
 
 Hand-off contract as pi_lock (stable branch; heater code from ``init_codes`` or ``tx.heater.applied``).
 """

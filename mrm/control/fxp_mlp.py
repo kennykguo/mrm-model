@@ -71,7 +71,7 @@ from mrm.control.fxp import (MAX_BITS, Overflow, QFormat, Rounding, fx_add, fx_c
 
 __all__ = [
     "ACT_LINEAR", "ACT_RELU", "ACT_HARDTANH", "ACTIVATIONS", "FxpLayer", "FxpMlp", "MlpErrorBound",
-    "quantize_mlp", "mlp_forward_float", "error_bound", "fxp_mlp_eval", "fxp_mlp_forward_batch",
+    "quantize_mlp", "acc_bits_needed", "mlp_forward_float", "error_bound", "fxp_mlp_eval", "fxp_mlp_forward_batch",
     "fxp_mlp_check", "packed_n_in", "packed_n_out", "packed_max_width", "packed_out_frac", "packed_in_frac",
     "H_SIZE", "L_SIZE", "MAGIC", "VERSION", "memh_lines",
 ]
@@ -184,9 +184,11 @@ def fxp_mlp_check(p, base):
     3 size, 4 layer count, 5 layer widths, 6 data offsets, 7 accumulator or output width, 8 output width of the
     network, 9 rounding or overflow mode, 10 activation, 11 fraction bits (every shift of :func:`fxp_mlp_eval` in
     0..62 and the output fraction bits <= the accumulator's), 12 input format, 13 a weight times the largest raw
-    input of its layer reaches 2^62 (fx_mul's limit). A network that passes evaluates without an exception in the
-    WRAP and SATURATE modes (the compiled MLP policy checks it at init, so no exception can leave the engine's tick
-    loop); every network of :func:`quantize_mlp` passes."""
+    input of its layer reaches 2^62 (fx_mul's limit), 14 the ``proven`` flag is set but a layer's accumulator is
+    narrower than its worst case over every raw input (the int64 fast path would not emulate its overflow; the
+    worst case as :func:`acc_bits_needed`, from the packed weights and biases). A network that passes evaluates
+    without an exception in the WRAP and SATURATE modes (the compiled MLP policy checks it at init, so no exception
+    can leave the engine's tick loop), and its proof flag holds; every network of :func:`quantize_mlp` passes."""
     if p.shape[0] - base < H_SIZE:
         return 1
     if p[base + H_MAGIC] != MAGIC or p[base + H_VER] != VERSION:
@@ -226,6 +228,28 @@ def fxp_mlp_check(p, base):
         for j in range(p[r + L_N_OUT] * p[r + L_N_IN]):
             if abs(p[w0 + j]) > w_lim:
                 return 13
+        if p[base + H_PROVEN] != 0:
+            # the proof of the int64 fast path: every partial sum fits the accumulator for every raw input
+            lim = np.int64(1) << MAX_BITS
+            b0 = base + p[r + L_B_OFF]
+            sh = f_acc - p[r + L_B_FRAC]
+            n_in = p[r + L_N_IN]
+            for o in range(p[r + L_N_OUT]):
+                bb = abs(p[b0 + o])
+                if sh >= 0:
+                    sm = lim if (sh >= MAX_BITS or bb > (lim >> sh)) else bb << sh
+                else:
+                    sm = (bb >> (-sh)) + 1
+                for i in range(n_in):
+                    t = abs(p[w0 + o * n_in + i]) * x_max         # < 2^62 (code 13)
+                    sm = lim if sm >= lim - t else sm + t
+                need = 1                                          # bit_length(sm) + 1 (signed)
+                v = sm
+                while v > 0:
+                    need += 1
+                    v >>= 1
+                if need > p[r + L_ACC_BITS]:
+                    return 14
         width = p[r + L_N_OUT]
         x_frac = p[r + L_OUT_FRAC]
         x_bits = p[r + L_OUT_BITS]
@@ -353,16 +377,60 @@ class FxpLayer:
         return self.b_raw.astype(np.float64) * 2.0 ** -self.b_frac
 
 
+def _layer_acc_bits_needed(w_raw, b_raw, b_frac: int, f_acc: int, x_raw_max: int) -> int:
+    """Exact worst case of every partial sum of one layer over every raw input (Python integers): the signed
+    accumulator width that can never overflow, bit_length(max_o sum_i |W_oi| max|x_raw| + |b_o| at f_acc) + 1 (a
+    bias with more fraction bits than the accumulator rounds: one LSB more)."""
+    sh = int(f_acc) - int(b_frac)
+    worst = 0
+    for o in range(w_raw.shape[0]):
+        bb = abs(int(b_raw[o]))
+        bias = bb << sh if sh >= 0 else (bb >> -sh) + 1
+        worst = max(worst, sum(abs(int(v)) for v in w_raw[o]) * int(x_raw_max) + bias)
+    return worst.bit_length() + 1
+
+
+def acc_bits_needed(in_fmt: QFormat, layers: Sequence) -> list[int]:
+    """Per layer, the accumulator width that proves no overflow for any raw input of ``in_fmt`` (each layer's input
+    range from the previous layer's output format; the rule of :func:`quantize_mlp`)."""
+    out = []
+    x_frac, x_raw_max = in_fmt.frac_bits, 1 << (in_fmt.bits - 1)
+    for l in layers:
+        out.append(_layer_acc_bits_needed(l.w_raw, l.b_raw, l.b_frac, l.w_fmt.frac_bits + x_frac, x_raw_max))
+        x_frac, x_raw_max = l.out_fmt.frac_bits, 1 << (l.out_fmt.bits - 1)
+    return out
+
+
 @dataclass(frozen=True)
 class FxpMlp:
     """A quantized MLP (module docstring). Build with :func:`quantize_mlp`; evaluate with :meth:`forward` (raw) or
-    :meth:`forward_real` (real in, real out); :meth:`pack` gives the int64 vector of :func:`fxp_mlp_eval`."""
+    :meth:`forward_real` (real in, real out); :meth:`pack` gives the int64 vector of :func:`fxp_mlp_eval`.
+
+    ``proven`` (the int64 fast path: no accumulator can overflow for any raw input) is derived from the layers
+    (:func:`acc_bits_needed`, recomputed from the weights, whatever ``FxpLayer.acc_bits_needed`` says): None (the
+    default) takes the derived value; True is refused (ValueError) when a layer's accumulator is narrower than its
+    worst case, since the fast path would hide the overflow the declared width has; False forces the per-addition
+    path, which emulates every accumulator width exactly."""
     in_fmt: QFormat
     layers: tuple
     rounding: int = int(Rounding.HALF_EVEN)
     overflow: int = int(Overflow.SATURATE)
-    proven: bool = True
+    proven: bool | None = None
     _packed: np.ndarray | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self):
+        need = acc_bits_needed(self.in_fmt, self.layers)
+        short = [(i, l.acc_bits, n) for i, (l, n) in enumerate(zip(self.layers, need)) if l.acc_bits < n]
+        if self.proven is None:
+            proven = not short
+        elif self.proven and short:
+            i, a, n = short[0]
+            raise ValueError(f"FxpMlp(proven=True): layer {i}'s {a}-bit accumulator is narrower than its worst case "
+                             f"({n} bits over every raw input), so the no-overflow proof does not hold; pass "
+                             f"proven=None to derive it (the declared accumulator is then emulated)")
+        else:
+            proven = bool(self.proven)
+        object.__setattr__(self, "proven", proven)
 
     @property
     def n_in(self) -> int:
@@ -560,11 +628,7 @@ def quantize_mlp(weights: Sequence[np.ndarray], biases: Sequence[np.ndarray], ac
         b_frac = f_acc                                  # the bias enters the accumulator without rounding
         b_raw = np.asarray(quantize(b, QFormat(61 - f_acc, f_acc), rounding, "checked"), np.int64).reshape(b.shape)
         # exact worst case of every partial sum over every raw input of the format (Python integers)
-        worst = 0
-        for o in range(w_raw.shape[0]):
-            s = sum(abs(int(v)) for v in w_raw[o]) * x_raw_max + abs(int(b_raw[o]))
-            worst = max(worst, s)
-        need = worst.bit_length() + 1
+        need = _layer_acc_bits_needed(w_raw, b_raw, b_frac, f_acc, x_raw_max)
         if need > MAX_BITS:
             raise ValueError(f"layer {i}: the worst-case accumulator needs {need} bits (> {MAX_BITS}); use narrower "
                              "formats")

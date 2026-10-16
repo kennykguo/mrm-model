@@ -10,7 +10,14 @@ kernel has something to be compared with (tests/verification/test_kernel_parity.
 
 Scope: the fixed substep policy, Python or compiled controllers (the latter through their Python protocol), no
 fast_kernel (that path is tested against a 1 MHz Python step, 07 P0-7). Build it from a :class:`mrm.plant.plant.Plant`
-so both see identical parameters, seeds and channel maps.
+so both see identical parameters, seeds and channel maps. Every scenario signal the kernel reads is applied here too,
+including the scenario fault ``fault.controller_reset`` (07 P1-10): its rising edge is latched in the interval and
+the controller is reset at the next edge, before it steps (the kernel restores a compiled controller's post-init
+state and syncs its held command from the latched registers; ``CompiledController.reset`` does the same through the
+protocol). A reset latched in any world resets the controller of every world, as on the runner's Python path; the
+kernel restarts per world, which is the same for a die-common pulse or B = 1. The kernel's other scenario paths
+(aggressor FOH, laser events, data events, sensor and actuator faults) are checked in
+tests/verification/test_kernel_parity.py with a scenario that drives them all.
 """
 from __future__ import annotations
 
@@ -18,7 +25,7 @@ import math
 
 import numpy as np
 
-from mrm.control.api import Observation
+from mrm.control.api import Observation, merge_round_robin
 from mrm.core import rng as _rng
 from mrm.plant import electrical as el
 from mrm.plant import optics as op
@@ -133,8 +140,13 @@ class ReferenceEngine:
         self.oracle = np.zeros((B, N))
         self.oracle_unr = np.zeros((B, N))
         self.oracle_next = self.tick
-        self.last = {"rho": np.zeros((B, N)), "out_r": np.zeros((B, op.N_R, N)), "p_bg": np.zeros((B, N)),
-                     "t_pd": np.repeat(t_amb[:, None], N, axis=1)}
+        # the state the first edge releases (before any interval): the scenario's ones density at the start tick
+        # (the bit-statistics window takes the scenario density, not a tick's realized n1/nb) and the ADC reference
+        # at the reset temperature (both ring.monitor.adc_ref_site choices)
+        dens0 = self.arr.evaluate(self.tick, self.arr.new_cache())["data.ones_density"]
+        self.last = {"rho": np.zeros((B, N)), "dens": np.array(dens0, float), "out_r": np.zeros((B, op.N_R, N)),
+                     "p_bg": np.zeros((B, N)), "t_pd": np.repeat(t_amb[:, None], N, axis=1),
+                     "t_adc": np.repeat(t_amb[:, None], N, axis=1)}
         self.trace: list[dict] = []
         self.obs_log: dict[int, np.ndarray] = {}
         self.assign = self.act.assign
@@ -142,6 +154,8 @@ class ReferenceEngine:
         self.lock_ref_oracle = plant.metrics_spec.lock_reference == "oracle"
         self.lock_ref = plant.metrics_spec.reference_m(B, N)
         self.shift = np.zeros((B, N, 2))
+        # scenario fault.controller_reset (07 P1-10): rising edge latched in the interval, served at the next edge
+        self._ctrl_reset = np.zeros(B, bool)
         self._ctrl_reset_prev = np.zeros(B, bool)
 
     # -------------------------------------------------------------------------------------------- helpers
@@ -163,8 +177,8 @@ class ReferenceEngine:
 
         def bitstat():
             self.dp.bitstat_from_monitor(k, self.mon, last["out_r"][:, op.R_DROP_SUM1],
-                                         last["out_r"][:, op.R_DROP_SUM0], self.act.bs_thr, density=last["rho"],
-                                         p_bg_w=last["p_bg"], t_pd_k=last["t_pd"], t_adc_k=last["t_pd"],
+                                         last["out_r"][:, op.R_DROP_SUM0], self.act.bs_thr, density=last["dens"],
+                                         p_bg_w=last["p_bg"], t_pd_k=last["t_pd"], t_adc_k=last["t_adc"],
                                          pga_select=self.act.pga,
                                          rin_per_hz=np.asarray(self.pp.laser.rin_per_hz).reshape(-1))
         sensors, new = self.sensors.release(k, heater_applied=self.heater.applied_codes.astype(np.uint16),
@@ -175,13 +189,28 @@ class ReferenceEngine:
 
     def _controller_step(self, k, controller):
         sensors, new = self._release(k)
-        obs = self.spec.layout.pack_obs(k, sensors, new)
+        # round robin (07 P2-7): edge j updates ring j % N only (the kernel's _active_ring of its edge index)
+        active_ring = self.edge_j % self.N if self.spec.schedule == "round_robin" else -1
+        obs = self.spec.layout.pack_obs(k, sensors, new, active_ring)
         self.obs_log[k] = obs
         if controller is None:
             return
-        actions = controller.step(Observation(k, self.dt, sensors, new))
-        val = self.plant.validator.validate(actions)
         cur = self.act.act[:, :self.maps.act_size]
+        held = cur.copy()                          # the held command of the edge (before a reset or the step)
+        if np.any(self._ctrl_reset):
+            # a scenario controller reset latched since the last edge: the controller restarts before it steps (the
+            # kernel's MODE_COMPILED edge and the runner's Python path)
+            controller.reset(self.spec)
+            self._ctrl_reset[:] = False
+        active = None
+        if active_ring >= 0:
+            active = np.zeros(self.N, dtype=bool)
+            active[active_ring] = True
+        actions = controller.step(Observation(k, self.dt, sensors, new, active))
+        # round robin: only the active ring's element of every per-ring (B, N) channel is applied (the others keep
+        # the held command of the edge), then validated, clipped and counted as in the kernel
+        actions = merge_round_robin(self.spec, actions, held, active_ring)
+        val = self.plant.validator.validate(actions)
         self.spec.layout.pack_act(val, cur)
         if getattr(controller, "act", None) is not None and controller.act.shape == cur.shape:
             controller.act[...] = cur              # the held command is the clipped one, as in the kernel
@@ -198,6 +227,10 @@ class ReferenceEngine:
         popped_r = hv.copy()
         ev0 = self.arr.evaluate(k, self.cache)
         ev1 = self.arr.evaluate(k + 1, self.cache)
+        # controller reset fault: a rising edge of the scenario flag at k is latched until the next controller edge
+        cr = np.asarray(ev0["fault.controller_reset"]).reshape(B, -1)[:, 0] >= 0.5
+        self._ctrl_reset |= cr & ~self._ctrl_reset_prev
+        self._ctrl_reset_prev = cr
         # laser lines, laser_ramp factor (07 P0-1 item 6), chip input
         ef = np.clip(ev0["laser.line_enable"], 0.0, 1.0)
         f_hz, p_w = self.laser.tick(k, enable=ef, f_offset_hz=ev0["laser.dfreq_hz"],
@@ -338,8 +371,10 @@ class ReferenceEngine:
         p_bus = out_rl[:, op.RL_PIN].sum(axis=2)
         pdo = np.asarray(P.th_pd_obs)
         t_pd = np.where(pdo[None, :] >= 0, self.t_obs[:, np.maximum(pdo, 0)], self.t_ring)
-        self.mon.tick(k, p_pd_w=out_r[:, op.R_DROP_SUM], p_bg_w=p_bus, t_pd_k=t_pd, pga_select=self.act.pga,
-                      fault=fault)
+        # the ADC reference temperature (ring.monitor.adc_ref_site): the PD observer, or the package base at k + 1
+        t_adc = self.mon.hw.adc_temperature(t_pd, t_base_end)
+        self.mon.tick(k, p_pd_w=out_r[:, op.R_DROP_SUM], p_bg_w=p_bus, t_pd_k=t_pd, t_adc_k=t_adc,
+                      pga_select=self.act.pga, fault=fault)
         decl = self._declared()
         bidx = np.arange(B)[:, None]
         nidx = np.arange(N)[None, :]
@@ -361,7 +396,8 @@ class ReferenceEngine:
         tr["bits"] = self.dp.nb.astype(float).copy()
         tr["reg"] = self.heater.applied_codes.copy()
         self.trace.append(tr)
-        self.last = {"rho": rho.copy(), "out_r": out_r, "p_bg": p_bus, "t_pd": t_pd}
+        self.last = {"rho": rho.copy(), "dens": np.asarray(ev0["data.ones_density"], float).copy(), "out_r": out_r,
+                     "p_bg": p_bus, "t_pd": t_pd, "t_adc": t_adc}
         self.tick = k + 1
         return tr
 

@@ -31,7 +31,7 @@ meta:
     # excluded: deliberately not modelled, with the reason; unknown: no public number, with what stands in for it.
     A:
       "ring radius / round-trip length": {status: key, keys: [ring.geometry.radius_um, ring.optics.fsr_thz], reason: "R3 derives the radius from the FSR hypothesis and n_g; L = 2 pi R"}
-      "bus-ring gap": {status: key, keys: [ring.optics.kappa_d_over_kappa, ring.optics.q_through, variation.ring.optics.kappa_d_over_kappa, variation.ring.optics.q_loaded], reason: "gaps live in coupling_<xsec>.json; at runtime the couplers are Q_t (derived from Q_L) and kappa_d/kappa; the drop-gap spread is rel_sigma 0.1 on kappa_d/kappa and the through-gap spread rel_sigma 0.015 on Q_L (Q_t moves, Q_i stays)"}
+      "bus-ring gap": {status: key, keys: [ring.optics.kappa_d_over_kappa, ring.optics.q_through, ring.geometry.jacobian_coupling, variation.geometry], reason: "gaps live in coupling_<xsec>.json; at runtime the couplers are Q_t (derived from Q_L) and kappa_d/kappa of the nominal-geometry device; each device's gap errors (variation.geometry gap_through / gap_drop, one local sigma, and the width error that closes both) move its per-pass couplings through ring.geometry.jacobian_coupling, and its Q_L follows (07 P1-16)"}
       "coupling length and coupler geometry": {status: key, keys: [ring.optics.dln_kappa2_through_dlambda_per_nm, ring.optics.dln_kappa2_drop_dlambda_per_nm], reason: "curved-gap coupler solved in coupling_<xsec>.json (07 P1-5); its K^2 at the gap enters through Q_t/kappa_d, its dispersion through these keys"}
       "waveguide width, height, cross-section type (rib/strip/slab)": {status: key, keys: [ring.geometry.width_nm, ring.geometry.film_nm, ring.geometry.slab_nm, ring.geometry.xsec, uncertainty.film_thickness]}
       "bend geometry": {status: key, keys: [ring.geometry.radius_um, ring.optics.n_eff, ring.optics.loss_budget.alpha_bend_radiation_db_per_cm], reason: "bent-mode solve at r_ref (07 P1-6)"}
@@ -234,7 +234,10 @@ fidelity:
   self_heating: "on"                 # 07 P0-1 item 1: on in every preset except teaching_*
   thermo_optic_order: 2              # 07 P0-3: s(T) = s0 (1 + beta (T - T0))
   thermal_model: interim             # ARCHITECTURE 5.3 / 07 P1-2: interim until the FEM ROM passes the calibration split
-  junction_model: analytic           # the junction LUT artefact is not extracted yet (ARCHITECTURE 5.4)
+  junction_model: analytic           # the rib160 LUT exists (mrm/data/extracted/junction_rib160.json, devsim); analytic
+                                     # is kept: no rib200 or lateral LUT exists while uncertainty.film_thickness is
+                                     # sampled (lut_file names one file), and the switch waits for the integrator's
+                                     # CAL-5 / CAL-10 decision (docs/handoff/extract_junction.md, calibration.md 4.3)
   optics_model: exact
   backscatter: "off"                 # schema default; turn on for BiDi and reflection studies (cost, plant_optics 2)
   shot_noise: "on"
@@ -319,9 +322,9 @@ optical_path:
     provenance: inferred
     generation: G25
     source: LM-P
-    range: [2.0, 10.0]
+    range: [1.0, 10.0]
     textbook: REF.inputPowerDbm
-    note: "chosen so that the G26 10 dBm per line gives the G25 '~4 dBm' input at the ring (LM-P section 3.2); the uncertainty spans 0 to +8 dBm at the ring (07 4.8)"
+    note: "chosen so that the G26 10 dBm per line gives the G25 '~4 dBm' input at the ring (LM-P section 3.2); the uncertainty spans 0 to +8 dBm at the ring (07 4.8). The range also holds the corner ocp_ring_plus9dbm (1 dB: OCP's +9 dBm planning midpoint at the ring, 07 P0-1 item 4)"
   bus_loss_db_per_mm:
     value: 0.073
     provenance: printed
@@ -338,10 +341,11 @@ ring:
       value: null
       provenance: derived
       textbook: REF.radiusUm
-      note: "R3: r_ref = c/(2 pi n_g FSR), about 6.6 um for window B at n_g 4.0; the printed '~15 um diameter' (LM26-S, HC) fits 1.8 THz only if it is an outer dimension (01 section 4.4)"
+      note: "R3: r_ref = c/(2 pi n_g FSR), 6.727 um at 1.8 THz with the modes_rib160 n_g 3.9405; the printed '~15 um diameter' (LM26-S, HC) fits 1.8 THz only if it is an outer dimension (01 section 4.4). With sampled geometry it is solved once per world from the nominal n_g and held for every device (a mask dimension), so each device's FSR follows its own n_g (07 P1-16)"
     width_nm: {value: 400.0, provenance: assumed, generation: none, source: SMTAI, range: [360.0, 450.0],
                note: "rib width at mid-height: the SMTAI render (400) and the BU 45CLO rib (410); informational (sets the artefact)",
-               alternatives: {strip400x200: {value: 400.0, provenance: printed, source: SMTAI}}}
+               alternatives: {strip400x200: {value: 400.0, provenance: printed, source: SMTAI},
+                              rib200: {value: 400.0, provenance: printed, source: SMTAI}}}
     film_nm:
       value: 160.0
       provenance: printed
@@ -352,6 +356,7 @@ ring:
       disagrees: "the textbook uses the 400 x 200 nm SMTAI render; GF 45SPCLO prints a 160 nm photonics film and G25 is printed as 45SPCLO (01 D1, 07 D21); 200 nm stays a hypothesis"
       alternatives:
         strip400x200: {value: 200.0, provenance: printed, generation: none, source: SMTAI}
+        rib200: {value: 200.0, provenance: printed, generation: none, source: SMTAI, note: "the SMTAI render's film thickness as a rib (mrm.extraction.common XSECS rib200)"}
     slab_nm:
       value: 60.0
       provenance: assumed
@@ -361,6 +366,7 @@ ring:
       note: "partial-etch depth is not public; 60 nm on 160 nm (slab/film 0.375, typical foundry ribs; mrm.extraction.common XSECS rib160)"
       alternatives:
         strip400x200: {value: 0.0, provenance: printed, generation: none, source: SMTAI}
+        rib200: {value: 80.0, provenance: assumed, generation: none, source: MODEL, note: "80 nm slab on the 200 nm film (slab/film 0.4; mrm.extraction.common XSECS rib200, the junction artefact's cross-section)"}
     xsec: rib160
     jacobian:
       value: {from: "extracted/modes_rib160.json:jacobian"}
@@ -380,8 +386,34 @@ ring:
           provenance: inferred
           generation: none
           source: X-MODES
-          note: "the 400 x 200 nm strip Jacobian (modes_strip400x200.json) applied to the 160 nm rib until modes_rib160 exists"
+          note: "the 400 x 200 nm strip Jacobian (modes_strip400x200.json), used only if modes_rib160.json is missing (the loader's artefact fallback)"
         strip400x200: {from: "extracted/modes_strip400x200.json:jacobian", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        rib200: {from: "extracted/modes_rib200.json:jacobian", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+    jacobian_coupling:
+      value: {from: "extracted/coupling_rib160.json:jacobian"}
+      provenance: solver(assumed-geometry)
+      generation: none
+      source: X-COUPLING
+      note: >-
+        d ln K^2 of the through and drop couplers per nm of width, film, slab and their own edge-to-edge gaps, at
+        1310 nm and fixed gaps and r_ref (07 P1-16; method A CMT, 2-D full-wave checked for rib160). Partial
+        derivatives at fixed edge-to-edge gaps: variation.geometry.width_closes_gaps makes a width error close both
+        gaps by the same amount (the artefact's note: total = d/dw - d/dgap; through -0.0145 + 0.0135 = -0.0010 /nm,
+        drop -0.0189 + 0.0141 = -0.0048 /nm). realize moves the per-pass couplings of the nominal-geometry device
+        (the R4 anchors) by it and by the coupler dispersion times the resonance move (mrm.params.relations R4_q). The
+        200 nm film world keeps these 160 nm couplers (as it keeps their dispersion): the rib200 couplers have no 2-D
+        full-wave check
+      alternatives:
+        fallback:
+          value:
+            d: [gap_through_nm, gap_drop_nm]
+            of:
+              ln_kappa2_through_per_nm: [-0.02, 0.0]
+              ln_kappa2_drop_per_nm: [0.0, -0.02]
+          provenance: inferred
+          generation: none
+          source: R05
+          note: "femwell coupled strips: d ln K^2/d gap ~ -2 %/nm (05 t02, 07 P1-9); used only if coupling_rib160.json is missing"
   optics:
     resonance_offset_nm:
       value: 7.6
@@ -406,6 +438,7 @@ ring:
       alternatives:
         fallback: {value: 2.40, provenance: inferred, generation: none, source: R01, note: "400 x 160 nm strip FD 2.36 (01 section 2.2) plus a slab"}
         strip400x200: {from: "extracted/modes_strip400x200.json:n_eff", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        rib200: {from: "extracted/modes_rib200.json:n_eff", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
     n_g:
       value: {from: "extracted/modes_rib160.json:n_g"}
       provenance: solver(assumed-geometry)
@@ -418,6 +451,7 @@ ring:
       alternatives:
         fallback: {value: 4.0, provenance: inferred, generation: none, source: BU-45CLO, note: "between the BU 45CLO rib ring (3.91-3.98, inferred from its FSR) and the 400 x 160 nm strip FD (4.07, 01)"}
         strip400x200: {from: "extracted/modes_strip400x200.json:n_g", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        rib200: {from: "extracted/modes_rib200.json:n_g", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
     dn_g_dlambda_per_nm:
       value: {from: "extracted/modes_rib160.json:dn_g_dlambda_per_nm"}
       provenance: solver(assumed-geometry)
@@ -427,6 +461,7 @@ ring:
       alternatives:
         fallback: {value: 1.4e-4, provenance: inferred, generation: none, source: X-MODES, note: "value of the 400 x 200 nm strip artefact"}
         strip400x200: {from: "extracted/modes_strip400x200.json:dn_g_dlambda_per_nm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        rib200: {from: "extracted/modes_rib200.json:dn_g_dlambda_per_nm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
     fsr_thz:
       value: 1.8
       provenance: printed
@@ -553,7 +588,7 @@ ring:
         provenance: solver(assumed-geometry)
         generation: none
         source: X-MODES
-        note: "bend and slab radiation at r_ref (07 P0-2). If the rib solve gives more than ~5 dB/cm, rebalance alpha_scatter so alpha_i stays ~112 dB/cm (Q_i fixed by Q_L and the notch)"
+        note: "bend and slab radiation at r_ref (07 P0-2): 0.119 dB/cm for rib160, 0.1 % of alpha_i 110.08 dB/cm. Q_i is fixed by Q_L and the notch (07 D1), so when n_g or this term changes alpha_other_abs is re-solved to keep Q_i, not alpha_i. Exponential in the geometry: realize applies the Jacobian's secant as d ln alpha_rad/dp from the artefact's stored evaluations (-0.0485, -0.1785, +0.4104 per nm of width, film, slab), so a sampled device never gets a negative radiation loss"
         alternatives:
           fallback: {value: 1.0, provenance: assumed, generation: none, source: X-MODES, note: "strip bends radiate ~1e-13 dB/cm at r_ref (modes_strip400x200) and 2e-4 dB/cm at 7.5 um (05 t01); the 60 nm slab may leak more"}
           strip400x200: {from: "extracted/modes_strip400x200.json:alpha_rad_db_per_cm", provenance: solver(assumed-geometry), generation: none, source: X-MODES}
@@ -569,11 +604,26 @@ ring:
               the strip radiation plus the non-heating loss that keeps Q_i (11.54 dB/cm for under, 10.64 for over with the modes_rib160 n_g 3.9405; 11.09
               splits the difference: notch 27.9 +- 0.7 dB in both regimes). Which component carries it is unknown; a
               non-heating term lowers eta by 0.92x in the 200 nm worlds. Recompute when n_g of modes_rib160 or
-              modes_rib200 changes: alpha_i,160 (n_g,200/n_g,160 - 1) + alpha_rad,160 for each regime, then the mean
+              modes_rib200 changes: alpha_i,160 (n_g,200/n_g,160 - 1) + alpha_rad,160 for each regime, then the mean.
+              Not selected since 2026-10-16: the '200' choice uses the rib200 artefact (rib200_q_anchor)
+          rib200_q_anchor:
+            value: 2.03
+            provenance: inferred
+            generation: G25
+            source: LM-T
+            note: >-
+              selected by uncertainty.film_thickness '200' (the 400 x 200 nm rib, modes_rib200). The measured G25 Q_L
+              and 0 V notch (CAL-1, CAL-2) pin Q_i = 2 pi n_g/(lambda alpha_i), so with the rib200 n_g 4.0116 the
+              budget must total alpha_i,160 x 4.0116/3.9405 to keep Q_i: this term is alpha_i,160 (n_g,200/n_g,160 - 1)
+              + alpha_rad,160 = 2.107 dB/cm for under (alpha_i,160 110.08) and 1.951 for over (101.44); 2.03 splits
+              the difference. The rib200's own bend radiation is 1.03 dB/cm, so ~1.0 dB/cm is non-heating loss of
+              unknown origin carried here (a non-heating term composes with the eta and regime hypotheses; eta x0.98 in
+              the 200 nm worlds). The geometry draw scales the whole term with the rib200 radiation law (as if it were
+              radiation). Recompute when n_g of modes_rib160 or modes_rib200 changes
     heat_fraction: {value: null, provenance: derived, note: "eta = (fca + other)/alpha_i = 0.848 nominal (07 D1: ~0.85; range 0.5-0.95 by uncertainty.self_heating.eta)"}
     q_intrinsic: {value: null, provenance: derived, note: "R4_loss_budget: Q_i = 2 pi n_g/(lambda alpha_i) ~ 7500 at the G25 line (near-critical, 07 D1)"}
-    q_through: {value: null, provenance: derived, note: "R4_q: 1/Q_t = 1/Q_L - 1/Q_i - 1/Q_d; the through-gap Jacobian cannot move it (anchor choice, params_machinery handoff 3)"}
-    q_drop: {value: null, provenance: derived, note: "R4_q: Q_d = Q_L / kappa_d_over_kappa"}
+    q_through: {value: null, provenance: derived, note: "R4_q: 1/Q_t = 1/Q_L - 1/Q_i - 1/Q_d for the nominal-geometry device; a sampled device's coupler is that coupler moved by its geometry (ring.geometry.jacobian_coupling), and its Q_L and drop share follow (R4_q geometry branch, 07 P1-16)"}
+    q_drop: {value: null, provenance: derived, note: "R4_q: Q_d = Q_L / kappa_d_over_kappa (nominal-geometry device; see q_through)"}
     index_weight_oxide:
       value: 0.25
       provenance: inferred
@@ -609,6 +659,7 @@ ring:
       alternatives:
         fallback: {value: 66.0, provenance: inferred, generation: none, source: R06, note: "400 x 160 nm strip ~64 pm/K thermo-optic at 1.94e-4 /K (01 verification 1) + ~2 pm/K expansion; 06 FEM 66-69 pm/K for 200-220 nm strips and ribs"}
         strip400x200: {from: "extracted/modes_strip400x200.json:dlambda_dt_pm_per_k", at: {t_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        rib200: {from: "extracted/modes_rib200.json:dlambda_dt_pm_per_k", at: {t_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES}
         H86: {value: 86.0, provenance: printed, generation: G26, source: LM26-P, note: "~15 GHz/degC, introduction aside; a constant at the ring (07 D2)"}
         bench: {value: 62.5, provenance: inferred, generation: G26, source: SIB, note: "50 nm/s / 800 degC/s (Lightmatter bench equivalence)"}
         imec: {value: 62.54, provenance: literature, generation: none, source: CO24-JOM, note: "printed for imec O-band rings, method not stated (04 V9)"}
@@ -617,20 +668,32 @@ ring:
     dlambda_dt_ref_ring_temp_c: {value: 25.0, provenance: inferred, generation: none, source: X-MODES,
                                  note: "T0 of s0: the at: of dlambda_dt_pm_per_k (the modes artefact t_ref)"}
     dlambda_dt_beta_per_k:
-      value: {from: "extracted/modes_rib160.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}}
+      value: 1.2377e-3
       provenance: solver(assumed-geometry)
       generation: none
       source: X-MODES
       range: [0.0, 0.002]
       textbook: REF.dnSi_dT
       disagrees: "the textbook holds dn_Si/dT at the C-band 300 K value 1.86e-4 /K; at 1310 nm it is 1.94e-4 /K at 300 K and rises ~14 % per 100 K (06 T6, 02 headline 1)"
-      note: "beta of s(T) = s0 (1 + beta (T - T0)), quadratic fit of the solver table"
+      note: >-
+        beta of s(T) = s0 (1 + beta (T - T0)) over the operating range: the secant of the solver curve (modes_rib160
+        dlambda_dt_pm_per_k 0-125 degC, its quadratic fit, residual 0.003 pm/K) from T0 = 25 degC (s0, the table value)
+        to the nominal lock temperature 133.98 degC (where the integral of the solver s from 25 degC equals the 7.6 nm
+        offset): beta = (s(T_lock)/s0 - 1)/(T_lock - T0) = (73.853/65.075 - 1)/108.98. The solver curve is concave,
+        so its tangent at 25 degC (alternative tangent_25, the artefact's dlambda_dt_beta_per_k, 1.472e-3) lies above
+        it everywhere: +2.25 % at the lock, T_lock 0.80 K low, Z 1.2 % low (extract_modes handoff). The secant is
+        exact at 25 degC and at the lock, within -0.5 % between them (the concave curve lies above its secant), +0.75 %
+        at 0 degC and +0.96 % at 170 degC (the end of the P_FSR sweep; the quadratic extrapolates the table there, the
+        cubic agrees to 0.05 %); T_lock is then 0.41 K high and Z 0.16 % high. tests/closure/test_params_notes.py
+        recomputes it from the artefact
       alternatives:
         fallback: {value: 1.4e-3, provenance: inferred, generation: none, source: R06, note: "Si dn/dT +14 %/100 K (Souza 2018 via 06 section 2.6), 07 P0-3"}
-        strip400x200: {from: "extracted/modes_strip400x200.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES}
+        tangent_25: {from: "extracted/modes_rib160.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES, note: "the solver curve's tangent at 25 degC (the value before 2026-10-16)"}
+        strip400x200: {from: "extracted/modes_strip400x200.json:dlambda_dt_beta_per_k", at: {t0_c: 25.0}, provenance: solver(assumed-geometry), generation: none, source: X-MODES, note: "tangent at 25 degC"}
+        rib200: {value: 1.2308e-3, provenance: solver(assumed-geometry), generation: none, source: X-MODES, note: "the same secant on modes_rib200 (s0 66.910 pm/K; lock at 131.21 degC for the 7.6 nm offset, s 75.657 pm/K there); the artefact's tangent at 25 degC is 1.462e-3"}
         const: {value: 0.0, provenance: printed, generation: G26, source: LM26-P, note: "H86 is a constant at the ring"}
     z_heater_ring_k_per_mw: {value: null, provenance: derived, textbook: REF.RthKPerMw,
-                             note: "R2 fsr_integral: dT_FSR/P_FSR with the integral of s(T) over the sweep from p_fsr_ref_temp_c equal to one FSR (5.58 K/mW at the G25 line; lock_slope gives 5.33); the textbook's 4.7 K/mW = 0.405 nm/mW / 86 pm/K"}
+                             note: "R2 fsr_integral: dT_FSR/P_FSR with the integral of s(T) over the sweep from p_fsr_ref_temp_c equal to one FSR at ring.heater.p_fsr_ref_wavelength_nm (5.704 K/mW, the same on every line; lock_slope gives 5.475); the textbook's 4.7 K/mW = 0.405 nm/mW / 86 pm/K"}
     z_ratio_opt_heater:
       value: 1.76
       provenance: solver(assumed-geometry)
@@ -707,29 +770,29 @@ ring:
       generation: none
       source: DEC19
       range: [5.0e-8, 1.0e-6]
-      note: "waveguide-core self-heating pole (07 P0-1 item 3): de Cea 2019 0.42-0.5 us; the in-ring FEM ROM puts 65 % of Z_opt below 1 us (t63 1.7 us). Share = (z - 1)/z (plant_thermal 6.5)"
+      note: "waveguide-core self-heating pole (07 P0-1 item 3): de Cea 2019 0.42-0.5 us. The in-ring FEM ROM's absorption -> ring step reaches 27 % of Z_opt at 100 ns, 54 % at 1 us and 63 % at 1.76 us (thermal_rom_inring_noundercut_160; step fractions, because pole-by-pole DC shares are not unique between fits: 38.5 % of the DC sits in poles below 1 us); the interim path reaches 48 % at 1 us at the g26 nominal (z 1.76). Share = (z - 1)/z (plant_thermal 6.5)"
     heater_self_ratio:
-      value: 1.158
+      value: 1.132
       provenance: inferred
       generation: G25
       source: textbook-REF
       range: [1.0, 4.0]
       textbook: REF.heaterSelfHeatPerMw
-      note: "R_th,H/Z_heater->ring chosen so y = TCR R_th,H stays at the G25 droop fit 0.00904 /mW (textbook heaterSelfHeatPerMw, CAL-4) for TCR 1.4e-3 and the nominal Z = 5.576 K/mW (R2 fsr_integral at the G25 line; 1.21 under lock_slope, Z 5.33); the FEM in-ring ROM gives 2.65 (with that TCR it would double the droop). LIMITATION: the interim model takes a RATIO, so y follows Z across worlds although the measured droop does not: y = 0.0075 /mW under fsr window_a (Z 4.63), 0.0076 under H86 (Z 4.70), 0.0078 under g25_cluster (Z 4.80); an absolute R_th,H key would hold it (handoff)"
+      note: "R_th,H/Z_heater->ring chosen so y = TCR R_th,H stays at the G25 droop fit 0.00904 /mW (textbook heaterSelfHeatPerMw, CAL-4) for TCR 1.4e-3 and the nominal Z = 5.704 K/mW (R2 fsr_integral at p_fsr_ref_wavelength_nm with the secant beta, the same on every line; 1.179 under lock_slope, Z 5.475); the FEM in-ring ROM gives 2.65 (with that TCR it would double the droop). LIMITATION: the interim model takes a RATIO, so y follows Z across worlds although the measured droop does not: y = 0.0075 /mW under fsr window_a (Z 4.725), 0.0075 under H86 (Z 4.704), 0.0078 under g25_cluster (Z 4.905); an absolute R_th,H key would hold it (handoff). tests/closure/test_params_notes.py recomputes these numbers"
       alternatives:
-        tin: {value: 3.243, provenance: inferred, source: textbook-REF, note: "same y with a TiN heater (TCR 0.5e-3)"}
-        silicide: {value: 1.0, provenance: inferred, source: textbook-REF, note: "lower bound: R_th,H >= Z; with TCR 2e-3 y is 0.0112 /mW, 23 % above the droop fit (a silicide heater is in tension with the G25 droop, 06 E1)"}
-        textbook: {value: 1.621, provenance: inferred, source: textbook-REF, note: "same y with the textbook's TCR 1e-3"}
+        tin: {value: 3.170, provenance: inferred, source: textbook-REF, note: "same y with a TiN heater (TCR 0.5e-3)"}
+        silicide: {value: 1.0, provenance: inferred, source: textbook-REF, note: "lower bound: R_th,H >= Z; with TCR 2e-3 y is 0.0114 /mW, 26 % above the droop fit (a silicide heater is in tension with the G25 droop, 06 E1)"}
+        textbook: {value: 1.585, provenance: inferred, source: textbook-REF, note: "same y with the textbook's TCR 1e-3"}
     heater_node_tau_s:
       value: 1.5e-6
-      provenance: solver(assumed-geometry)
+      provenance: assumed
       generation: none
       source: X-THERMAL
       range: [5.0e-7, 2.0e-5]
-      note: "heater-resistor observer pole: t63 of heater->heater_resistor in the in-ring FEM ROM (1.47 us)"
+      note: "pole of the excess term only: Z_HH = Z0 [S_H + (h - 1)/(1 + s tau)] (mrm.plant.thermal.InterimRom), so it carries (h - 1)/h = 11.7 % of Z_HH at h = 1.132. Assumed between the in-ring FEM ROM's excess response (Z_HH - Z_RH, t63 0.38 us) and its whole heater -> heater_resistor response (t63 1.48 us), a different quantity. The interim Z_HH has t63 6.93 us at the g26 nominal (FEM 1.48 us): set by h and the imec S_H poles, almost independent of this pole (6.90 us at 0 or 0.4 us, 6.93 us at 1.5 us)"
       alternatives:
-        metal: {value: 5.0e-6, provenance: literature, source: CO22-JLT, note: "imec W heater node, measured"}
-        undercut: {value: 1.81e-5, provenance: literature, source: CO22-JLT, note: "imec heater node with full undercut (simulated)"}
+        metal: {value: 5.0e-6, provenance: literature, source: CO22-JLT, note: "imec W heater node, measured: the time constant of the whole node, used here as the excess pole"}
+        undercut: {value: 1.81e-5, provenance: literature, source: CO22-JLT, note: "imec heater node with full undercut (simulated): the whole node's time constant, used here as the excess pole"}
     xt_nearest_frac:
       value: 0.03
       provenance: literature
@@ -738,10 +801,11 @@ ring:
       range: [0.01, 0.1]
       textbook: REF.crosstalkNearest
       disagrees: "the textbook assumes 10 % to the nearest and 3 % to the next ring with the self-path dynamics; imec measures 1.3-2.6 % out to 300 um arriving with 4-9 ms poles (07 D22, 04 X1-X2); 10 % stays as the pessimistic corner"
-      note: "fraction of the self DC (07 P1-2); 1.0 % at 50 um in the in-ring FEM ROM"
+      note: "fraction of the self DC (07 P1-2); 1.0 % at 50 um in the in-ring FEM ROM (its TEC-held package: alternative tec_held)"
       alternatives:
         stacked_eic: {value: 0.0432, provenance: literature, source: CO24-JOM, note: "+44 % with an EIC stacked on the PIC (simulated, 04 V8)"}
         textbook: {value: 0.1, provenance: assumed, source: textbook-REF}
+        tec_held: {value: 0.0102, provenance: solver(assumed-geometry), source: X-THERMAL, note: "in-ring FEM ROM (160 nm) heater -> ring at the 50 um pitch, TEC-held package (R_pkg 2 K/W): 1.02 % (metal above 0.96 %, silicide undercut 0.69 %)"}
     xt_next_frac:
       value: 0.015
       provenance: literature
@@ -753,24 +817,27 @@ ring:
       alternatives:
         stacked_eic: {value: 0.0216, provenance: literature, source: CO24-JOM}
         textbook: {value: 0.03, provenance: assumed, source: textbook-REF}
+        tec_held: {value: 0.0051, provenance: solver(assumed-geometry), source: X-THERMAL, note: "in-ring FEM ROM at 100 um: 0.51 %"}
     xt_floor_frac:
       value: 0.015
       provenance: literature
       generation: none
       source: CO24-JOM
       range: [0.0, 0.026]
-      note: "every other ring: imec 1.3-2.6 % at 100-300 um with an EIC, quasi-constant beyond 200 um (04 X1)"
+      note: "every other ring: imec 1.3-2.6 % at 100-300 um with an EIC and natural convection, quasi-constant beyond 200 um (04 X1). The in-ring FEM ROM (TEC-held package, R_pkg 2 K/W) gives 0.34 / 0.26 / 0.22 / 0.19 / 0.17 % at 150-350 um (alternative tec_held). The site law's long-range floor is site_floor_frac"
       alternatives:
         stacked_eic: {value: 0.0216, provenance: literature, source: CO24-JOM}
         textbook: {value: 0.0, provenance: assumed, source: textbook-REF, note: "the textbook couples only the nearest two"}
+        tec_held: {value: 0.0026, provenance: solver(assumed-geometry), source: X-THERMAL, note: "in-ring FEM ROM: the mean over the 30 floor pairs of the 8-ring bank at 50 um (150-350 um)"}
     xt_tau_ref_s:
       value: 4.1e-3
       provenance: literature
       generation: none
       source: CO22-TCPMT
       range: [1.0e-5, 1.0e-2]
-      note: "tau_xt = max(min, ref (d/dist_ref)^2), capped by the printed X2 table beyond (07 P1-2, plant_thermal 6.1)"
+      note: "tau_xt = max(min, ref (d/dist_ref)^2), capped by the printed X2 table beyond (07 P1-2, plant_thermal 6.1); d is the heat-source-to-victim distance of imec's anchor (60 um at their 100 um pitch, 04 section 2.5): the centre distance less both ring radii (r_ref), 36.5 um at the g26 pitch, so the nearest neighbour gets 1.52 ms. GAP (physics_thermal review 2026-10-16): the in-ring FEM ROM (TEC-held package) reaches 63 % of its 1.0 % crosstalk at the pitch in 0.12 ms (0.36 ms at 100 um; the response is not first order: 90 % at 2.7 ms), about 13x faster than this law, and time_scale_slow (0.5-2) reaches 0.76 ms at most. The imec numbers are for natural convection with an EIC on top (a large R_pkg); the G26 package is unknown: uncertainty.thermal.stack side_by_side_tec_held, corner g26_tec_package (VALIDATION.md closure-crosstalk-dynamics)"
       alternatives:
+        tec_held: {value: 3.45e-4, provenance: solver(assumed-geometry), source: X-THERMAL, note: "the d^2 law through the in-ring FEM ROM's t63 at the 50 um pitch (117 us at 35 um from the heat source, R 7.5 um); it follows the FEM t63 within x2 out to 350 um (with the capped X2 table)"}
         textbook: {value: 2.5e-5, provenance: assumed, source: textbook-REF, note: "stands in for the textbook's 'same dynamics as the self path' (10 us 75 % + 300 us 25 %) with one 25 us pole: the minimax single pole (within 0.16 of the DC at every time), and it keeps the 07 P0-1 lag bound at dt = 1 us with margin (max 0.044 over 5 x 512 sampled worlds; a 20 us pole reached 0.050 and failed realize, a 10 us pole 0.08; crosstalk_dynamics self is a global setting a corner cannot select, see handoff)"}
     xt_dist_ref_um:
       value: 60.0
@@ -788,8 +855,20 @@ ring:
       note: "0.1-0.3 ms at 15 um from the d^2 law (04 section 2.4)"
       alternatives:
         textbook: {value: 2.5e-5, provenance: assumed, source: textbook-REF, note: "see xt_tau_ref_s textbook"}
+        tec_held: {value: 2.0e-5, provenance: solver(assumed-geometry), source: X-THERMAL, note: "below the FEM's fastest site path in the g26 layout (aggressor -> ring at 30 um: t63 42 us), so the tec_held d^2 law is not clipped"}
     site_ref_um: {value: 60.0, provenance: assumed, generation: none, source: R04,
-                  note: "interim site coupling equals xt_nearest_frac at 60 um (plant_thermal default); placeholders until the FEM site residues are used"}
+                  note: "interim site coupling equals xt_nearest_frac at a 60 um centre distance (plant_thermal default); placeholders until the FEM site residues are used"}
+    site_floor_frac:
+      value: 0.015
+      provenance: literature
+      generation: none
+      source: CO24-JOM
+      range: [0.0, 0.026]
+      note: "long-range floor of the interim site law (fraction of Z_heater->ring per heater): what a die temperature sensor, far monitor PDs and far sites see. Equal to xt_floor_frac in every hypothesis except side_by_side_tec_held. A package term (imec: 'quasi-constant beyond ~200 um', measured to 300 um with natural convection), so it applies at any distance on the die: the g26 die sensor die0 (1 mm from the bank) sees each heater with 1.5 % of Z0 (85 K/W, one 9 ms pole; 0.085 K per mW of bank heater power). The in-ring FEM ROM's TEC-held package gives 0.09 % at 1 mm (2.6 K/W, alternative tec_held)"
+      alternatives:
+        stacked_eic: {value: 0.0216, provenance: literature, source: CO24-JOM}
+        textbook: {value: 0.0, provenance: assumed, source: textbook-REF, note: "the textbook couples only the nearest two"}
+        tec_held: {value: 0.0009, provenance: solver(assumed-geometry), source: X-THERMAL, note: "in-ring FEM ROM heater -> temperature sensor at 1000 um: 2.62 K/W, 0.092 % of Z (P x R_pkg with R_pkg 2 K/W; metal above 0.073 %, silicide undercut 0.032 %)"}
     pd_offset_um: {value: [0.0, 25.0], provenance: assumed, generation: none, source: MODEL,
                    note: "monitor PD 25 um from the ring centre (FEM ROM site offset); unpublished"}
     temp_sensor_offset_um: {value: [40.0, 0.0], provenance: assumed, generation: none, source: MODEL}
@@ -808,14 +887,25 @@ ring:
         stacked_eic: {value: 36.9, provenance: inferred, generation: M1000, source: CO24-JOM, note: "25.45/(1 - 0.31): imec measured 20.6-42.4 % efficiency loss with an EIC on top (04 V8)"}
     p_fsr_ref_temp_c: {value: 25.0, provenance: printed, generation: G25, source: LM-T,
                        note: "used only by fidelity.heater_anchor fsr_integral"}
+    p_fsr_ref_wavelength_nm:
+      value: 1309.5
+      provenance: inferred
+      generation: G25
+      source: LM-T
+      range: [1300.0, 1320.0]
+      note: >-
+        the line of the G25 P_FSR wafer maps: the 1309.5 nm G25 operating line (CAL-7). R2 takes FSR_lambda there
+        (10.30 nm at 1.8 THz), so the efficiency (0.405 nm/mW) and Z_heater->ring, a property of the heater and the
+        stack, are the same on every line of the bank; at each ring's own line Z followed lambda_line^2 (2.3 % across
+        1302.6-1318.6 nm, s0 being one value for every line)
     r_cold_ohm:
       value: 45.41
       provenance: inferred
       generation: G25
       source: textbook-REF
-      range: [42.0, 58.0]
+      range: [37.0, 58.0]
       textbook: REF.heaterOhm
-      note: "cold resistance at 25 degC: the hot 55.9 ohm at 1.195 V (21.4 mA, wafer maps) divided by 1 + y P with y = 0.00904 /mW (textbook HEATER_OHM_COLD); 60-die hot range 52.8-70.5 ohm"
+      note: "cold resistance at 25 degC: the hot 55.9 ohm at 1.195 V (21.4 mA, wafer maps) divided by 1 + y P with y = 0.00904 /mW (textbook HEATER_OHM_COLD); 60-die hot range 52.8-70.5 ohm. The range is that hot range over 1 + y P_FSR for every droop the thermo-optic worlds need: 42.9-57.3 at y 0.00904 (this preset), 38.8-51.8 at 0.0141 and 37.4-50.0 at 0.0161 (the order-2 CAL-4 refits of g26_calibrated; its R0 is 41.29)"
     r_ref_temp_c: {value: 25.0, provenance: printed, generation: G25, source: LM-T}
     tcr_per_k:
       value: 1.4e-3
@@ -897,7 +987,7 @@ ring:
       note: "ring-level dlambda/dV at 0 V of the charge-control fit A = 137.6 pm/V^0.5 (V_bi 0.9 V, rms 4.1 pm) to the G25 bias ladder 56.4/66.8/84.4 pm at 0.8/1.2/1.6 V (read-off, at measurement power)"
     v_bi_v: {value: 0.9, provenance: inferred, generation: none, source: R03, range: [0.8, 1.0],
              note: "fixed in the 03 fit; mrm.materials gives 0.95-0.99 V for 1-2e18 cm^-3 at 298 K"}
-    depletion_exponent: {value: 0.5, provenance: inferred, generation: none, source: R03, range: [0.33, 0.67],
+    depletion_exponent: {value: 0.5, provenance: inferred, generation: none, source: R03, range: [0.334, 0.666],
                          note: "abrupt junction: dlambda ~ removed charge ~ (V + Vbi)^(1/2) (03 section 5.3)"}
     loss_ratio_q:
       value: 0.06
@@ -925,8 +1015,8 @@ ring:
     dark_t0_c: {value: 25.0, provenance: printed, generation: GF, source: GF-BIAN}
     dark_activation_ev: {value: 0.37, provenance: literature, generation: none, source: COL08, range: [0.35, 0.5],
                          note: "x1.6 per 10 degC near room temperature (mrm.materials.ge_pd_dark_ea_ev); 0.5 eV stress"}
-    background_fraction: {value: 0.0, provenance: assumed, generation: none, source: D07, range: [0.0, 0.01],
-                          note: "stray or substrate light at the PD (07 P1-9)"}
+    background_fraction: {value: 0.0, provenance: assumed, generation: none, source: D07, range: [0.0, 3.0e-4],
+                          note: "stray or substrate light at the PD (07 P1-9), a fraction of the TOTAL bus power at the ring (all 8 lines: 3.1-8.0 x the declared line's power at the g26 nominal lock). 1e-4 adds 0.68-1.9 uA to the 26.6 uA lock current; the top 3e-4 keeps every nominal drop peak (31.8-32.2 uA) plus the background ~2 uA below the 40 uA full scale (bound 4.1e-4 with the whole chip input at every ring); 0.01 put 69-191 uA on the rings"}
     afe_type: integrate_dump           # 07 P0-7 default (PAT-2 dual-slope integrating ADC)
     integration_window_s: {value: 2.0e-6, provenance: inferred, generation: PAT, source: PAT-2, range: [1.0e-6, 1.0e-5],
                            note: "T_int 1-10 us, example 2 us = 400 x 5 ns"}
@@ -966,7 +1056,10 @@ ring:
       textbook: REF.afeNoisePaRtHz
       disagrees: "the textbook applies the data-path AFE's 6.4 pA/rtHz (16 GHz RX TIA) to the monitor; a ~100 kOhm monitor TIA has ~0.4 pA/rtHz (06 S3)"
     flicker_corner_hz: {value: 1000.0, provenance: assumed, generation: none, source: MODEL}
-    adc_ref_tempco_ppm_per_k: {value: 20.0, provenance: assumed, generation: none, source: MODEL}
+    adc_ref_tempco_ppm_per_k: {value: 20.0, provenance: assumed, generation: none, source: MODEL,
+                               note: "the reference's drift about its 25 degC trim, at the temperature of adc_ref_site (sign and size assumed)"}
+    adc_ref_site: package_base         # assumed: the converter sits on the electronic die beside the PIC (07 P1-3
+                                       # side_by_side), at the package base temperature; monitor_pd = at each ring's PD
     pga_gains: {value: [1.0, 2.0, 4.0, 8.0], provenance: assumed, generation: none, source: D07,
                 note: "07 P1-10 PGA steps (for connector re-mates and laser power steps)"}
     adc_mux:
@@ -1096,16 +1189,16 @@ uncertainty:
     choices:
       "160": {}
       "200":
-        ring.geometry.film_nm: strip400x200
-        ring.geometry.slab_nm: strip400x200
-        ring.geometry.width_nm: strip400x200
-        ring.optics.n_eff: strip400x200
-        ring.optics.n_g: strip400x200
-        ring.optics.dn_g_dlambda_per_nm: strip400x200
-        ring.thermal.dlambda_dt_pm_per_k: strip400x200
-        ring.thermal.dlambda_dt_beta_per_k: strip400x200
-        ring.optics.loss_budget.alpha_bend_radiation_db_per_cm: strip400x200_q_anchor
-        ring.geometry.jacobian: strip400x200
+        ring.geometry.film_nm: rib200
+        ring.geometry.slab_nm: rib200
+        ring.geometry.width_nm: rib200
+        ring.optics.n_eff: rib200
+        ring.optics.n_g: rib200
+        ring.optics.dn_g_dlambda_per_nm: rib200
+        ring.thermal.dlambda_dt_pm_per_k: rib200
+        ring.thermal.dlambda_dt_beta_per_k: rib200
+        ring.optics.loss_budget.alpha_bend_radiation_db_per_cm: rib200_q_anchor
+        ring.geometry.jacobian: rib200
     nominal: "160"
     weights: {"160": 3, "200": 1}
     provenance: assumed
@@ -1113,10 +1206,13 @@ uncertainty:
     source: D07
     note: >-
       07 D21 waveguide_thickness_nm (renamed so it applies before thermo_optic): 160 nm GF 45SPCLO (printed, single
-      source) or the 400 x 200 nm SMTAI render, represented by the strip400x200 artefact until modes_rib200 exists.
-      The 200 nm world keeps the measured G25 Q_i (so the CAL-2 notch and the coupling regime) through the
-      strip400x200_q_anchor loss term: with the budget fixed in dB/cm, the strip's n_g 4.349 would raise Q_i 8.7 % and
-      make both regime choices over-coupled (27.5 and 18.6 dB). Couplers and the thermal ROM keep the 160 nm values
+      source) or the 400 x 200 nm SMTAI render as a rib (modes_rib200: 80 nm slab, n_g 4.0116, s0 66.91 pm/K, bend
+      radiation 1.03 dB/cm; a depletion modulator needs the slab to contact its junction, so the strip artefact
+      strip400x200, the stand-in until 2026-10-16, stays a plain alternative only). The 200 nm world keeps the
+      measured G25 Q_i (so the CAL-2 notch and the coupling regime) through the rib200_q_anchor loss term: with the
+      budget fixed in dB/cm, the rib's n_g would raise Q_i 1.8 %. Its geometry Jacobian (0.368, 0.913, 0.787 nm/nm)
+      with the same fabrication sigmas gives a 4.2 nm die resonance spread (6.2 nm on rib160): the sigmas are
+      fabrication errors, and the thicker film is less sensitive. Couplers and the thermal ROM keep the 160 nm values
   thermal:
     family:
       kind: hypothesis
@@ -1144,6 +1240,7 @@ uncertainty:
           ring.thermal.xt_nearest_frac: textbook
           ring.thermal.xt_next_frac: textbook
           ring.thermal.xt_floor_frac: textbook
+          ring.thermal.site_floor_frac: textbook
           ring.thermal.xt_tau_ref_s: textbook
           ring.thermal.xt_dist_ref_um: textbook
           ring.thermal.xt_tau_min_s: textbook
@@ -1165,12 +1262,32 @@ uncertainty:
           ring.thermal.xt_nearest_frac: stacked_eic
           ring.thermal.xt_next_frac: stacked_eic
           ring.thermal.xt_floor_frac: stacked_eic
+          ring.thermal.site_floor_frac: stacked_eic
+        side_by_side_tec_held:
+          ring.thermal.stack: side_by_side
+          ring.thermal.xt_nearest_frac: tec_held
+          ring.thermal.xt_next_frac: tec_held
+          ring.thermal.xt_floor_frac: tec_held
+          ring.thermal.site_floor_frac: tec_held
+          ring.thermal.xt_tau_ref_s: tec_held
+          ring.thermal.xt_tau_min_s: tec_held
       nominal: side_by_side
-      weights: {side_by_side: 3, stacked_eic: 1}
+      weights: {side_by_side: 3, stacked_eic: 1, side_by_side_tec_held: 0}
       provenance: assumed
       generation: none
       source: D07
-      note: "07 P1-3: G26 has the SerDes beside the PIC; an EIC stacked on the PIC (M1000-like) costs 20-42 % heater efficiency (measured) and +44 % crosstalk (simulated) (CO24-JOM, 04 V8)"
+      note: >-
+        07 P1-3: G26 has the SerDes beside the PIC; an EIC stacked on the PIC (M1000-like) costs 20-42 % heater
+        efficiency (measured) and +44 % crosstalk (simulated) (CO24-JOM, 04 V8). The stack's package also sets the
+        ring-to-ring and long-range crosstalk (physics_thermal review 2026-10-16): side_by_side and stacked_eic use
+        the imec numbers (04 X1, X2), measured with natural convection and an EIC on top (a large R_pkg): 3 % nearest,
+        1.5 % to every other ring and every far site, first-order 1.5-9 ms poles (the d^2 law, then the X2 table).
+        side_by_side_tec_held is the in-ring FEM ROM's case: side by side in a TEC-held package (R_pkg 2 K/W): 1.0 %
+        nearest with a 0.12-0.13 ms pole at the pitch, 0.51 % next, 0.26 % floor, 0.09 % at 1 mm (die sensor), 13x
+        faster at the pitch. The G26 package is not published. Weight 0 (a named corner, g26_tec_package, in the
+        robustness set; appended last, so no sampled or Latin-hypercube draw changes): sampled worlds keep the imec
+        numbers, so a controller claim over sampled worlds does not cover a TEC-held package; weighting it is the
+        content owner's decision (VALIDATION.md closure-crosstalk-dynamics)
     scaling:
       kind: hypothesis
       choices:
@@ -1216,7 +1333,7 @@ uncertainty:
         tied draw, see handoff). The weights are the masses of a triangular density on [0.5, 0.95] with its mode at the
         nominal, binned at the midpoints between the points (1 : 6 : 9 : 10 : 2). stress_0p3 (weight 0) is the 07 D1
         stress corner. Values are for the under-coupled 160 nm world; the over-coupled choice lowers alpha_other, so
-        each point sits ~0.01-0.04 lower there, and the 200 nm world scales them by 0.92 (strip400x200_q_anchor)
+        each point sits ~0.01-0.04 lower there, and the 200 nm world scales them by 0.98 (rib200_q_anchor)
     z_ratio: {kind: interval, target: ring.thermal.z_ratio_opt_heater, low: 1.0, high: 2.0, provenance: assumed,
               generation: none, source: D07, note: "07 4.8 [PHY], 06 H2"}
   chip_input_loss:
@@ -1255,7 +1372,7 @@ uncertainty:
     provenance: assumed
     generation: none
     source: D07
-    note: "07 P1-5 under | over coupled at the same 27.9 dB G25 notch (exact ring, 1301.9 nm, Q_L 3850; the 200 nm world within 0.7 dB); the fit of CAL-1/CAL-2 returns both branches. The label holds only for Q_L near its nominal (see uncertainty.q_loaded)"
+    note: "07 P1-5 under | over coupled at the same 27.9 dB G25 notch (exact ring, 1301.9 nm, Q_L 3850; the 200 nm world within 0.2 dB); the fit of CAL-1/CAL-2 returns both branches. The label holds only for Q_L near its nominal (see uncertainty.q_loaded)"
   er_mechanism:
     kind: hypothesis
     choices:
@@ -1332,23 +1449,32 @@ variation:
   geometry:
     width: {die_sigma_nm: 5.0, ring_sigma_nm: 2.0}
     thickness: {die_sigma_nm: 4.2, ring_sigma_nm: 1.3}
-    jacobians: [ring.geometry.jacobian]
+    gap_through: {ring_sigma_nm: 1.5}
+    gap_drop: {ring_sigma_nm: 1.5}
+    width_closes_gaps: true
+    jacobians: [ring.geometry.jacobian, ring.geometry.jacobian_coupling]
     provenance: assumed
     generation: none
     source: BER-FAB
-    note: "split between width and film chosen so the strip Jacobian (0.65 and 1.19 nm/nm) reproduces the Berkeley 6 nm die and 2 nm local resonance spreads (textbook fabOffset*); CAL-9 (G26 lane offsets 7.5-9.5 k codes) calibrates it later"
+    note: >-
+      Width and film: split chosen (with the strip Jacobian 0.65 / 1.19 nm/nm) to reproduce the Berkeley 6 nm die
+      and 2 nm local resonance spreads (textbook fabOffset*); through the loaded rib160 Jacobian (0.402 / 1.390 nm/nm)
+      they give 6.17 nm and 1.98 nm (independent draws add in quadrature); CAL-9 (G26 lane offsets 7.5-9.5 k codes)
+      calibrates them later. Gaps: one local sigma for both couplers, 1.5 nm (assumed: the edges' own placement
+      error; a width error also closes both gaps, width_closes_gaps, so the die-level gap bias is the width's). With
+      coupling_rib160 (d ln K^2/d gap -1.35 / -1.41 %/nm) the gaps alone spread K_t^2 and K_d^2 by 2.0 % and 2.1 %
+      per ring; with the width and film terms the per-pass couplings move 3.5 % (through) and 5.3 % (drop) within a
+      die and 9.3 % and 16 % from die to die (correlated with the resonance offset, 07 P1-16). 07 P1-9's '+-5 nm of
+      gap is +-10 % of gain' used femwell's strip slope (-2 %/nm); +-5 nm is 3.3 sigma here. These replace the
+      former stand-in draws of q_loaded (rel 0.015, 1.5 nm) and kappa_d_over_kappa (rel 0.1, 5 nm)
   ring.heater.p_fsr_mw: {level: ring, dist: lognormal, die_sigma: 0.05, ring_sigma: 0.02, truncate: false,
                          provenance: inferred, generation: G25, source: LM-T,
                          note: "G25 60-die maps: median 25.45, range 24.9-34.1 mW, strongly right-skewed (-2 % / +34 % of the median). The machinery has only symmetric (log-)normal and uniform draws, so this is a compromise: a 60-die sample of it spans ~22.7-28.9 mW, i.e. ~1/3 of the rings fall below the observed minimum and the +34 % tail is missing (the stacked_eic alternative 36.9 mW is the high-P_FSR corner). Not truncated (clipping at 24.9 would pile 1/3 of the rings on it). Ring-to-ring within a die assumed"}
-  ring.optics.q_loaded: {level: ring, rel_sigma: 0.015, truncate: false, provenance: assumed, generation: none, source: R05,
-                         note: "stands in for the through-gap spread of 07 P1-16 (gap_through cannot move Q_t when Q_L is the R4 anchor, PARAMETERS_FORMAT 7.1): d ln K^2/d gap ~ -2 %/nm (05 t02, 07 P1-9) x ~1.5 nm local gap sigma (assumed) gives K_t^2 +-3 %, Q_L +-1.5 % at a fixed Q_i, so the per-ring notch varies around 27.9 dB as it does near critical coupling. Not truncated: the leaf range is the world-level plausible range"}
   ring.heater.r_cold_ohm: {level: ring, dist: lognormal, die_sigma: 0.06, ring_sigma: 0.01, truncate: false,
                            provenance: inferred, generation: G25, source: LM-T,
                            note: "G25 60-die hot resistance 52.8-70.5 ohm around 55.9 (-6 % / +26 %, right-skewed like P_FSR); the symmetric lognormal is a compromise (its lower tail goes below the observed minimum, the upper tail is short). Not truncated"}
   ring.monitor.responsivity_a_per_w: {level: ring, rel_sigma: 0.03, provenance: printed, generation: G25, source: LM-T,
                                       note: "0.88-1.04 A/W over 500 parts (CAL-11), truncated to that range"}
-  ring.optics.kappa_d_over_kappa: {level: ring, rel_sigma: 0.1, provenance: inferred, generation: none, source: R05,
-                                   note: "drop-gap spread: d ln K^2/d gap ~ -2 %/nm, +-5 nm gives +-10 % (07 P1-9)"}
   laser.line_offset_ghz: {level: line, die_sigma: 4.0, line_sigma: 6.0, provenance: inferred, generation: Guide,
                           source: YOLE, note: "+-15 GHz demonstrated (~2 sigma of the total) with a common-mode part per laser module (04 section 3.2); clipped to the +-20 GHz requirement"}
   ring.monitor.adc_offset_codes: {level: ring, ring_sigma: 5.0, provenance: assumed, generation: none, source: MODEL}

@@ -29,8 +29,9 @@ because the brute-force LFSR widths depend on the mode).
    DAC and ADC widths up to 32 bits, and a fixed uint16 would not hold them.
 6. **`samples_per_tick` (07 P1-1)** is `ControllerSpec.samples_per_step`, M = ceil(controller period / ADC period).
    An alias property keeps the 07 name.
-7. **`ring.monitor.adc_rate_hz` means the rate PER RING.** With `adc_mux.channels_per_adc > 1`, the mux only sets
-   the sample phases.
+7. **`ring.monitor.adc_rate_hz` means the rate PER RING.** With `adc_mux.channels_per_adc > 1`, the mux sets the
+   sample phases (and, since the 2026-10-16 physics_sensing review, the rings of one converter share its DNL and INL,
+   and round_robin needs C x integration window <= the ADC period).
 8. **CompositeController (07 P2-7).**
    - Its `latency_ticks` is the largest child latency. A shorter child pipeline is therefore modelled
      conservatively.
@@ -68,9 +69,12 @@ because the brute-force LFSR widths depend on the mode).
   - `laser.tune.present`, `laser.tune.bits` and `laser.tune.lsb_hz` (my proposal; if you rename them, change
     `HARDWARE_KEYS` or tell me);
   - the fields `temp_sensors[].adc_bits` and `temp_sensors[].code_offset_c`;
-  - optionally `controller_interface.expose`, a list_str of the sensors the controller may read.
+  - optionally `controller_interface.expose`, a list_str of the sensors the controller may read. (Added to the
+    schema; `from_config` reads it since 2026-10-16, controllers review: before, nothing read it.)
 - `nominal`: pass an object with `fingerprint()` or `to_dict()`. `ControllerSpec.fingerprint()` hashes it, which is
-  what 07 P1-1 `test_spec_independent_of_seed_and_uncertainty` compares.
+  what 07 P1-1 `test_spec_independent_of_seed_and_uncertainty` compares. Since 2026-10-16 (controllers review)
+  the spec wraps whatever it is given in `mrm.control.knowledge.NominalView` (07 D13): only the keys the granted
+  tokens release are readable and fingerprinted, never the experiment section.
 - `timing.check_tick_table(entries, dt)` raises one error that names every bad key. You can reuse it at load time.
 - realize calls `rng.fill_uniform(..., tick=_entry_id(name), ...)`. The tick must be >= 0, because a negative int64
   has no uint64 value under `NUMBA_DISABLE_JIT=1`.

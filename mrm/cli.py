@@ -35,9 +35,9 @@ COMMANDS: dict[str, Command] = {}
 #: ``module:function`` providers, imported lazily; missing modules are skipped (they belong to later agents)
 PROVIDERS: list[str] = [
     "mrm.params.table:register_cli",       # mrm params show | table | explain | diff | validate
-    "mrm.sim.cli:register_cli",            # mrm run | sweep | mc | compare | robust | acceptance | rerun (planned)
-    "mrm.validation.cli:register_cli",     # mrm report (planned)
-    "mrm.control.cli:register_cli",        # controller utilities (planned)
+    "mrm.sim.cli:register_cli",            # mrm run | sweep | mc | compare | robust | acceptance | rerun
+    "mrm.validation.cli:register_cli",     # mrm report (the generated docs/VALIDATION.md)
+    "mrm.control.cli:register_cli",        # mrm golden | bridge | vectors
     "mrm.calibration.cli:register_cli",    # mrm calibrate
 ]
 _LOADED = False

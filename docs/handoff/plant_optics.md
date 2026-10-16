@@ -62,6 +62,14 @@ Inputs the plant must prepare each substep (07 P1-5, P1-6, P1-7, P0-2):
   `2 pi [n_eff(lambda_l, T_ring) L(T) + fill L dn_eff(V)] / lambda_l`, without the coupler phase. The per-order
   backscatter uses the absolute order `floor(phi/2 pi)`; a phase re-anchored by a multiple of 2 pi that is not a
   multiple of 2 pi M_b gives the orders other beta values (07 P2-9 re-anchoring must respect this).
+  Note (2026-10-16, physics_optics review): mrm.plant.phase prepares phi by translating the cold phase curve
+  rigidly by the resonance shift (equation 2 there), not with n_eff(lambda, T); every order then moves by the same
+  shift. The error against the modes artefact's n_eff(lambda, T) table is 0.43 % of the shift per FSR at the other
+  orders (+-33 pm at the adjacent orders at the 7.6 nm g26 lock); the locked order is exact. Bound and consequences:
+  the mrm.plant.phase docstring.
+- `bus_t2` (N,): power transmission of the bus segment before each ring; the plant passes
+  `mrm.plant.phase.bus_t2_from_plant_params(pp)` (1 for the first ring in bus order, exp(-bus_loss x spacing)
+  after it; g26 0.99916 per segment). Until 2026-10-16 the plant passed none (every segment at 1).
 - `psi`: the coupler ring-side phase (sum of both couplers). Extraction should define `coupler_phase_rad` as the
   ring-side self-coupling phase relative to the uncoupled bent guide of the same length, so it adds to phi.
 - `k2_th/k2_dr`: per-pass power coupling at each LINE wavelength (never at the resonance, never per heater code).

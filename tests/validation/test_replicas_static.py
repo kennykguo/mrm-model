@@ -718,7 +718,10 @@ def test_other_lines_match_the_control_models_static_point(pps):
     controllers' bank optics with every line, written separately) gives the same line power at each ring and the
     same absorbed power at the same ring temperatures as bus_line_powers + StaticRing(lines='all'), and about the
     same oracle heater codes as the bank solve; the own-line-only heat misses ~9 % of it in g26 (the other order
-    2.6 FWHM from line n+4, BND-1). Residual < 1 %: how the NRZ levels are averaged along the bus."""
+    2.6 FWHM from line n+4, BND-1). Line and absorbed powers agree to rounding (measured <= 1.3e-14): both walk the
+    bus NRZ-averaged with the bus segment loss. Until the physics_optics fix static_point left the segment loss out,
+    and the residual of up to 0.6 % (ring 7: 0.99916^7) was that loss, hidden by a 1 % tolerance. The codes compare
+    two operating points (the bank's oracle lock against 107 pm on every ring), hence the looser bound."""
     M = pytest.importorskip("mrm.control.models")
     pp = pps["g26"]
     if not all(hasattr(M, f) for f in ("conditions_from_config", "static_point")):
@@ -733,11 +736,11 @@ def test_other_lines_match_the_control_models_static_point(pps):
         v_lo, v_hi = float(cond.v_lo[n]), float(cond.v_hi[n])
         t = np.array([float(sp.t_ring_k[n])])
         p_own = float(pl[n, r.line])
-        assert p_own == pytest.approx(float(sp.p_in_w[n]), rel=0.01)
+        assert p_own == pytest.approx(float(sp.p_in_w[n]), rel=1e-9)
         own = r.state_grid(r.lam_line, t, t_base=cond.t_base_k, p_in_w=p_own, v_lo=v_lo, v_hi=v_hi)
         allx = r.state_grid(r.lam_line, t, t_base=cond.t_base_k, p_in_w=p_own, v_lo=v_lo, v_hi=v_hi,
                             lines="all", p_lines_w=pl[n])
-        assert float(allx["p_abs"][0, 0]) == pytest.approx(float(sp.p_abs_w[n]), rel=0.01)
+        assert float(allx["p_abs"][0, 0]) == pytest.approx(float(sp.p_abs_w[n]), rel=1e-9)
         gain[n] = float(allx["p_abs"][0, 0]) / float(own["p_abs"][0, 0])
         assert float(allx["drop_other_w"][0]) > 0.0
     # integrator (2026-10-09): measured 1.092 1.091 1.088 1.069 1.033 1.038 1.036 1.029 for rings 0-7 with the landed

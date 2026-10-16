@@ -304,7 +304,8 @@ differences 2.8e-6 pm detuning (fold_up), 3.6e-5 mK ring temperature, 1.3e-5 uW 
 current, 8e-6 dB er_db (1.3e-7 relative); every monitor code, heater code, bias, line_on and discrete metric is
 identical; the backscatter and TCMT cases are bit-identical; the final Truth (every field, also er_db / il_db, which
 the engine now writes only at a block end) agrees to < 3e-10 relative. Chunking (chunk_ticks 1e5 / 777 / 1) and the
-thread count (1 vs 8 at B = 8) change nothing, bit for bit, in both trees. The counter RNG streams are unchanged
+thread count (1 vs 8 at B = 8) change nothing, bit for bit, in both trees (for chunking: not under the auto policy
+with a compiled controller, see the correction in section 9). The counter RNG streams are unchanged
 (mrm/core untouched; every noisy ADC code identical). Controller scorecard rerun on the final tree
 (`runs/review_r1/scorecard/`): 19 passed, identical number for number to the optimizer's run, so the comparison with
 8646691 of section 5.3 stands (largest: a1_pd_far max_pm 2.6e-6 pm; no discrete metric changed). Fast suite: 1475
@@ -576,7 +577,12 @@ under the auto policy with lines moving and aggressor edges, `optics_far_hold=Tr
 moving and aggressor edges, traffic on/off and a bias step with a Python controller, and a sampled B = 2 open loop
 run in irregular blocks (1 to 1000 ticks) with `Plant.truth()` out_rl / out_r / out_l saved after every block.
 Chunking (chunk_ticks 1e5 / 777 / 13 / 1, also under the auto policy) and the thread count (B = 8: 1, 3 and 8
-threads) change nothing, bit for bit. The counter RNG streams are unchanged (every monitor code, error count and obs
+threads) change nothing, bit for bit. **Correction (2026-10-16, engine review engine-4):** the chunking half is
+false for a compiled controller under the auto policy: a block end caps the substep in flight and the growth limit
+restarts from it (chunk_ticks 13 against 1e5: 11426 against 10582 substeps, monitor codes up to 9 apart over 20 ms);
+the open-loop and Python paths, which this check probably ran, ignore chunk_ticks. Since then the runner ends every
+block on a controller edge (no substep crosses one) when the run has no tick jitter, and chunk_ticks changes no
+result there (tests/verification/test_engine_blocks.py; docs/ENGINE.md section 4). The counter RNG streams are unchanged (every monitor code, error count and obs
 vector identical). Controller scorecard rerun (`runs/review_r2/scorecard`): 19 passed, every one of 4338 numbers
 identical to the committed scorecard of 6b598f7; against 8646691 the differences of 8.4 (steady, a1_pd_adjacent at
 rounding level; `a1` is the layout change).

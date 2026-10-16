@@ -136,7 +136,7 @@ class CtrlBPlant(ReferencePlant):
         last = self.last
         if last:                     # no window before the first plant interval
             self.dp.bitstat_from_monitor(k, self.mon, last["out_r"][:, op.R_DROP_SUM1],
-                                         last["out_r"][:, op.R_DROP_SUM0], self.thr, density=last["rho"],
+                                         last["out_r"][:, op.R_DROP_SUM0], self.thr, density=last["dens"],
                                          rin_per_hz=np.asarray(self.pp.laser.rin_per_hz).reshape(-1))
         s3, n3 = self.dp.release(k)
         sensors.update(s3)

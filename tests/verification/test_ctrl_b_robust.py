@@ -88,14 +88,14 @@ def _nearest_line(res, ring):
     return np.argmin(np.abs(d), axis=1)
 
 
-def _exact(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None, ring=0):
+def _exact(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None, ring=0, seeds=7):
     """(controller of the second run, result, line (B,), detuning to that line (B,) pm, p-p of lam_res over the last
     quarter (B,) pm)."""
-    _, res1 = _run(make_ctrl, preset, duration_s, batch, sampled, scenario)
+    _, res1 = _run(make_ctrl, preset, duration_s, batch, sampled, scenario, seeds=seeds)
     line = _nearest_line(res1, ring)
     asg = np.repeat(np.arange(8)[None, :], batch, axis=0)
     asg[:, ring] = line
-    ctrl, res = _run(make_ctrl, preset, duration_s, batch, sampled, scenario, assignment=asg)
+    ctrl, res = _run(make_ctrl, preset, duration_s, batch, sampled, scenario, seeds=seeds, assignment=asg)
     det = res.truth_final.fields["detuning_m"][:, ring] * 1e12
     mx = [v for k, v in res.trace.items() if k.startswith("lam_res_m") and k.endswith("max")][0]["value"][:, :, ring]
     mn = [v for k, v in res.trace.items() if k.startswith("lam_res_m") and k.endswith("min")][0]["value"][:, :, ring]
@@ -155,18 +155,28 @@ def test_bitstat_ratio_lock_under_a_swing_loss():
     """A 20 % loss of the data swing at 3.5 ms (data.swing_scale 1 -> 0.8; a driver or bias change). The eye ratio
     R = 2 x dx / (1 + x^2) scales with the swing, and R_ref cannot be reached any more (the maximum of R/dx at x = 1
     is 1/0.866 of its value at alpha 3/4): the ratio loop lowers alpha to its floor 0.55 (the R maximum is at
-    alpha 1/2; below it the law would run away). The inner lock holds; the lock point moves red (reported)."""
+    alpha 1/2; below it the law would run away). The inner lock holds; the lock point moves red (reported).
+
+    The p-p of the last quarter (2.25 ms after the step) measures the wander of the ratio loop: alpha is still
+    falling and the eye statistic is noisy, so one noise seed draws one sample of a wide distribution. It is judged as
+    the median over eight noise seeds (bound 4 pm, as before), every seed in LOCK on the red side. Measured
+    (physics_optics review, 2026-10-16), seeds 1-8: 3.03 0.88 2.77 3.75 2.99 6.52 5.76 3.22 pm (median 3.1); on the
+    engine before the bus segment loss was applied: 2.92 3.10 2.36 6.21 2.80 3.14 2.98 1.92 pm (median 2.95). The
+    former single-seed check (seed 7: 1.97 pm with the pre-modes_rib160 loss budget, 2.98 pm after the g26 budget was
+    re-solved, 5.76 pm with the bus loss, a 0.6 % change of the bus-output power) sat inside that tail, which reaches
+    6.2-6.5 pm on either engine."""
     sc = g.Scenario(name="swing", components=(g.step("data.swing_scale", 3.5e-3, -0.2),))
-    ctrl, res, line, det, pp_pm = _exact(lambda: BitStatLock(rings=[0]), "g26", 9e-3, scenario=sc)
-    mx = [v for k, v in res.trace.items() if k.startswith("lam_res_m") and k.endswith("max")][0]
-    t = mx["t_s"]
-    lam = mx["value"][:, 0, 0]
-    before = float(np.mean(lam[(t > 2.5e-3) & (t < 3.5e-3)]))
-    print(f"\nswing -20 %: alpha {ctrl.alpha_eye[0, 0]:.3f} (floor {ctrl.alpha_floor}), final detuning {det[0]:.1f} pm"
-          f" (moved {(lam[-1] - before) * 1e12:+.1f} pm), p-p {pp_pm[0]:.2f} pm")
-    assert ctrl.fsm.state[0, 0] == ST_LOCK
-    assert ctrl.alpha_eye[0, 0] >= ctrl.alpha_floor - 1e-12
-    # p-p of the last quarter (2.25 ms after the step): the ratio loop is still lowering alpha, so the lock point
-    # still creeps. Measured 1.97 pm with the pre-modes_rib160 loss budget (eta 0.8546) and 2.98 pm after the g26
-    # budget was re-solved for the landed artefact (eta 0.848; 2.79 pm at 12 ms): bound 4 pm (integrator, 2026-10-09)
-    assert 0.0 < det[0] < 300.0 and pp_pm[0] < 4.0
+    pps = []
+    for seed in range(1, 9):
+        ctrl, res, line, det, pp_pm = _exact(lambda: BitStatLock(rings=[0]), "g26", 9e-3, scenario=sc, seeds=seed)
+        mx = [v for k, v in res.trace.items() if k.startswith("lam_res_m") and k.endswith("max")][0]
+        t = mx["t_s"]
+        lam = mx["value"][:, 0, 0]
+        before = float(np.mean(lam[(t > 2.5e-3) & (t < 3.5e-3)]))
+        print(f"\nseed {seed}, swing -20 %: alpha {ctrl.alpha_eye[0, 0]:.3f} (floor {ctrl.alpha_floor}), final "
+              f"detuning {det[0]:.1f} pm (moved {(lam[-1] - before) * 1e12:+.1f} pm), p-p {pp_pm[0]:.2f} pm", end="")
+        assert ctrl.fsm.state[0, 0] == ST_LOCK, seed
+        assert ctrl.alpha_eye[0, 0] >= ctrl.alpha_floor - 1e-12, seed
+        assert 0.0 < det[0] < 300.0, (seed, det[0])
+        pps.append(float(pp_pm[0]))
+    assert float(np.median(pps)) < 4.0, pps

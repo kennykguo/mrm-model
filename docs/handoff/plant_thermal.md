@@ -173,6 +173,16 @@ run looks the same, the fit is ill-conditioned there. Fewer poles would also cut
   default offset when the caller lists "driver" in `sources` (G26 drives from a separate EIC, 07 P1-3).
 - Poles: at least one below 1 us (07 P0-1) and one above 1 ms (07 P1-2), else a warning. Lags with tau < 300 us are
   the fast layer (`time_scale_fast`), the rest slow; `ThermalScales.tau_split_s` changes the split.
+  **Correction (2026-10-16, physics_thermal review):** that per-pole rule holds only for a pair whose residues have
+  one sign (the driving-point pairs, and every interim lag). A non-collocated FEM pair (heater -> ring mode, every
+  cross pair) has mixed-sign residues several times its DC on both sides of 300 us; with unequal factors they no
+  longer cancel, and the step response overshot and dipped (metal_above_160 heater -> ring at x2 / x0.5: peak
+  1.21 x DC, drop 0.22 x DC, |H| 1.27 x DC near 600 Hz; silicide_undercut_200 1.08 x DC). Such a pair (mixed signs,
+  poles in both layers) is now time-scaled as a whole by `s_fast^w s_slow^(1 - w)`, w its step-response fraction
+  at `tau_split_s` (`thermal._whole_pair_time_scales`; `ThermalSystem.meta['time_scale_whole_pairs']` counts the
+  pairs), so its shape is the fit's. Equal factors give the former result bit for bit; the interim model is
+  unchanged. `lag_layer` still labels each pole by its tau. Test:
+  `test_thermal.py::test_rom_layer_time_scales_keep_every_pair_monotone` (six artefacts, three factor pairs).
 - If you store k(T) scaling ratios (P2-5), tell me the key; `k_temp_residue_scale` currently uses assumed weights.
 
 ## 5. Cost (B = 1, Apple M2, one 1 us substep, 8 Lorentzian rings, n_outer = 1)
@@ -211,6 +221,12 @@ residue matrix times z (about S x K states and M multiply-adds of r_m z, with z 
    100 um, above every printed far value (4.1-9.0 ms, X2). Default law `capped`: tau = min(d^2 law, far(d)), floored at
    0.1 ms, with far(d) the printed X2 table (or `xt_tau_far_s`); equal to the d^2 law below about 60 um. The literal
    07 law is available as `xt_tau_law="literal"`. The X2 distances 160..660 um are inferred (100 um pitch continued).
+   **Correction (2026-10-16, physics_thermal review):** the table and the 60 um anchor are imec's heat-source-to-
+   victim distances (04 2.5: 60 um for the first neighbour at a 100 um pitch), but the assembly passed centre
+   distances (imec's own geometry then gave 4.75 ms instead of the printed 4.14 ms). `_interim_lags` now passes
+   d_cc - r_src - r_obs (`InterimRom.ring_radius_um`, default 7.5 um, the FEM ROM's ring; realize passes each ring's
+   r_ref), with r = 0 for point sites; `site_fraction` keeps the centre distance (an assumed law). g26 nominal:
+   nearest neighbour 2.85 -> 1.52 ms, own PD 0.71 -> 0.38 ms, aggressor -> ring 0 1.03 -> 0.62 ms.
 2. **'capacitance' and 'independent' coincide numerically.** A DC scale can only come from a resistance change; under
    'resistance' each tau follows its residue factor (07 as written), under the other two the residue and tau scale
    independently. The label is kept for reports; the params owner may want to drop one or define it differently.
@@ -236,7 +252,11 @@ residue matrix times z (about S x K states and M multiply-adds of r_m z, with z 
 8. **Site paths in the interim model are assumed.** 07 gives only ring-to-ring crosstalk by neighbour rank. PDs,
    drivers, temperature sensors and aggressors use c(d) = clip(0.03 x 60 um/d, 0.015, 1) of Z0 with tau_xt(d). The
    aggressor's DC is calibrated against its target anyway (07 P1-4); the sensor and PD values are placeholders until
-   the FEM ROM exists.
+   the FEM ROM exists. **Since 2026-10-16** the floor of that law is its own field, `site_floor_frac` (default:
+   xt_floor_frac, so nothing changed by default): imec's 1.5 % floor is a package term measured to 300 um with
+   natural convection and applies at any distance on the die (a die sensor 1 mm away sees 1.5 % of Z0 per heater,
+   33x the FEM ROM's TEC-held package, 0.09 %). The g26 choice `uncertainty.thermal.stack: side_by_side_tec_held` sets it,
+   the crosstalk fractions and xt_tau_ref_s to the FEM values (physics_thermal review).
 9. **Interim crosstalk with per-ring Z0 variation.** To keep reciprocity exact, heater_j -> ring_i uses Z0_j,
    waveguide_i -> heater_resistor_j uses Z0_j, and like-like pairs use sqrt(Z0_i Z0_j).
 10. **The lagged cross-ring optical coupling (07 P0-1) is only valid for short steps.** Its per-step gain grows with

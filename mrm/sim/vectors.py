@@ -509,12 +509,17 @@ def layout_vh(vec: VectorStream) -> str:
 
 # ---------------------------------------------------------------------------------------------------- replay
 def observation_from_flat(spec: ControllerSpec, obs_i64: np.ndarray, tick: int | None = None) -> Observation:
-    """An Observation (B worlds) from flat obs_i64 rows (B, obs_size) in ``spec.layout`` (channel dtypes)."""
+    """An Observation (B worlds) from flat obs_i64 rows (B, obs_size) in ``spec.layout`` (channel dtypes), with the
+    round-robin active ring of the header (07 P2-7) as ``active``."""
     o = np.asarray(obs_i64, dtype=np.int64)
     if o.ndim == 1:
         o = o[None, :]
-    t, _active, sensors, new = spec.layout.unpack_obs(o)
-    return Observation(int(t if tick is None else tick), spec.tick_s, sensors, new)
+    t, active_ring, sensors, new = spec.layout.unpack_obs(o)
+    active = None
+    if active_ring >= 0:
+        active = np.zeros(spec.n_rings, dtype=bool)
+        active[active_ring] = True
+    return Observation(int(t if tick is None else tick), spec.tick_s, sensors, new, active)
 
 
 @dataclass

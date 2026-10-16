@@ -876,7 +876,9 @@ def serve(controller: Any, spec: ControllerSpec, transport: Transport, *, max_st
                 raise BridgeError(f"unexpected {_KIND_NAME[kind]} frame" + ("" if lay else " before HELLO"))
             tick, sensors, new = lay.decode_obs(p)
             t0 = time.perf_counter()
-            acts = validator.validate(controller.step(Observation(tick, cspec.tick_s, sensors, new)))
+            # the frame carries the tick; the round-robin ring of the edge follows from it (07 P2-7)
+            acts = validator.validate(controller.step(Observation(tick, cspec.tick_s, sensors, new,
+                                                                  cspec.active_mask(tick))))
             if compiled:
                 clip_held_command(controller, cspec)
             stats["step_s"] += time.perf_counter() - t0

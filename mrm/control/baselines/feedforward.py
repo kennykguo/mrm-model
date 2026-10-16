@@ -19,9 +19,17 @@ quadratic heater law at the current code and scaled by ``ff_scale``. Without eit
 controller is then the PI) and telemetry ``ff_active`` says so.
 
 Honest about the sensor (07 P1-10, 04 C11 failure modes): g26's die sensor converts at 1 kHz with 1 ms latency and
-0.0625 K LSB (assumed preset values), sits at the die site, not at the ring, and sees neither a local aggressor
-(it heats the victim ring, not the die sensor), nor laser drift, nor self-heating. The prediction over the latency
-amplifies quantization noise (slope from 0.0625 K steps). The self-heating relief divides the base disturbance and
+0.0625 K LSB (assumed preset values) and sits at the die site, ~1 mm from the bank, not at the ring. It sees neither
+laser drift nor self-heating, but the die sensor sees a local aggressor: through the long-range floor of the
+interim thermal site law (1.5 % of Z_heater->ring, ~84 K/W from the aggressor site) the calibrated A1 aggressor
+(~0.26 W at its peak) moves its reading by ~+20 K (open loop, heaters held: +22.9 K 2 ms after the hot cusp,
++19.6 K peak when A1 starts at its minimum), about a quarter of the victim ring's own rise. The feed-forward reads
+that as ambient and shifts every ring's heater; under A1 this controller loses every ring
+(docs/handoff/controller_scorecard.md): with the quadratic law K_ff is evaluated at the applied code u + ff, so a
+large negative feed-forward raises its own gain (~1/code) and runs away until the heater sits at code 0, and the
+feed-forward is held while a ring is not locked (measured on g26 nominal: ring 0 at code 0 from ~60 ms on, ring 7
+from ~85 ms; controllers review 2026-10-16). The prediction over the latency amplifies quantization noise (slope
+from 0.0625 K steps). The self-heating relief divides the base disturbance and
 the heater correction alike, so K_ff = s/kappa needs no relief model; but the nominal dlambda/dT is quoted at 25 degC
 while the locked ring runs ~100 K hotter (s grows with beta, ~15 % in g26) and the heater law is the cold one, so
 K_ff is a few to ~15 % low (``ff_scale`` trims it); the PI removes the residual. The die sensor also

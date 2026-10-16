@@ -8,7 +8,8 @@ docs/handoff/experiments.md section 10.4, ENGINE.md section 3).
    the engine was right, quasi_static did not check the limit.
 2. ``order='reachable'`` / ``heater_code='quasi_static_reachable'``: a ring whose heater-up order needs a negative
    heater power locks one order bluer instead of starting at code_min; worlds without such a ring are unchanged bit
-   for bit, and the default mode is unchanged.
+   for bit, and the default mode is unchanged. Since the engine review of 2026-10-16 the hop is repeated: a ring that
+   the hopped rings' extra heater power pushes below zero hops too (tests/verification/test_engine_start_review.py).
 ~10 s with a warm numba cache.
 """
 from __future__ import annotations
@@ -71,9 +72,14 @@ def test_reachable_order_moves_only_the_rings_that_need_negative_power():
     re = runner.quasi_static(cfg, order="reachable", **kw)
     assert up.order_hopped is not None and not up.order_hopped.any()
     hop = re.order_hopped
-    assert hop.any() and np.array_equal(hop, up.fsr_hop_risk)     # exactly the negative-power rings move
+    neg = up.fsr_hop_risk                                           # the heater-up order's negative-power rings
+    assert hop.any() and np.all(hop[neg])                          # every one of them moves ...
+    extra = hop & ~neg                                              # ... and the rings their heat pushes below zero
+    assert np.all(extra.any(axis=3) <= neg.any(axis=3))             # (only in worlds with a first hop)
+    assert np.isfinite(up.heater_code[extra]).all() and np.all(up.p_heater_w[extra] >= 0.0)
     assert np.array_equal(re.fsr_hop_risk, up.fsr_hop_risk)       # still reported for the heater-up order
-    assert np.isnan(up.heater_code[hop]).all()
+    assert np.isnan(up.heater_code[neg]).all()
+    assert not np.any(re.p_heater_w < 0.0)                         # no ring left needing a negative power
     assert np.isfinite(re.heater_code[hop]).mean() > 0.6           # most of them get a code one order bluer
     assert np.all(re.p_heater_w[hop] > 0.0)
     moved = hop.any(axis=3)                                         # (A, V, B) worlds with a hopped ring
@@ -100,7 +106,8 @@ def test_runner_warm_start_reachable_mode():
     na, nb = np.asarray(wa["no_code"]), np.asarray(wb["no_code"])
     hop = np.asarray(wb["order_hopped"])
     assert nb.sum() < na.sum() and not np.asarray(wa["order_hopped"]).any()
-    assert np.array_equal(hop & ~nb, na & ~nb)                     # a hopped ring with a code had none before
+    assert np.all(hop[na & ~nb])                                   # a ring that gained a code hopped
+    assert not np.any(hop & ~na & nb)                              # a secondary hop (it had a code) keeps one
     ca, cb = np.asarray(wa["heater_code"]), np.asarray(wb["heater_code"])
     rows = ~hop.any(axis=1)
     assert np.array_equal(ca[rows], cb[rows])

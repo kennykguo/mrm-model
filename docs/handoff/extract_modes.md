@@ -282,7 +282,7 @@ an explicit limit overrides the default).
 | first-design meshes (production h_core 10 nm, convergence down to 7.07 nm), cut under the former 3 GB cap | 15 nm production, 30 / 20 / 15 / 10 nm series; bias of the reported values in `validation.production_mesh_bias` (see "Memory cap") | `MG .venv/bin/python -m mrm.extraction.modes --study no --xsec rib160 --mesh-scale 1.0 --conv-scales 2.0 1.4142 1.0 0.7071 --out <tmp>` (one process per cross-section; estimated peak 3.1 GB rib160, 3.8 GB rib200), then the couplers with `--mesh-scale 1.0`. Replacing the committed modes files changes their sha256, which `junction_rib160.json` and the coupling sidecars record: re-extract those too | committed 15 nm values (lambda_res bias 0.025 nm, n_g bias 3.6e-5 on rib160) |
 | Tidy3D cross-check of TM0 / TE1 and of the de Cea geometry | FEM only (`mode_families`; `modes_decea2019.json` crosscheck is null) | needs a family selector in `tidy3d_block` (not written) | TM0 / TE1 are not used at runtime (07 P2-3 optional); VAL-7 uses the FEM |
 | sidewall-angle sensitivity | nominal 90 deg; `XSec.sidewall_deg` works in the FEM, not in the Tidy3D wrapper | add `sidewall_deg` to `jac_steps_nm` and re-extract (no CLI flag) | none; `realize` has no sidewall dimension |
-| n_eff(lambda, T) cross term (dlambda/dT per line) | n_eff(lambda) at 25 C and dn_eff/dT(T) at 1310 nm | not written | s(T) at 1310 nm for every line |
+| n_eff(lambda, T) cross term (dlambda/dT per line) | n_eff(lambda) at 25 C and dn_eff/dT(T) at 1310 nm | not written | s(T) at 1310 nm for every line (the rigid comb of mrm.plant.phase; its error against the `n_eff_table` of this artefact, measured 2026-10-16: 0.43 % of the shift per FSR at the other orders, see the mrm.plant.phase docstring) |
 | coupler K^2 versus temperature | K^2 at 25 C | not written | K^2 at 25 C (07 P1-5 excludes a ring-bus mismatch, < 1 %) |
 | VAL-7 replication of de Cea 2019 at the printed thickness | done, but it fails (see VAL-7) | - | `replicas.py` reads `modes_decea2019.json` |
 | the full extraction at R = 7.5 um (TE0 over 1260-1360 nm and 0-125 C, Jacobians, PML spread, Tidy3D) | `alt_radius`: single values at 1310 nm and 25 C (n_eff, n_g, dn_eff/dT, dlambda/dT, FSR, alpha_rad) | not written: `extract_xsec` has no radius override (r_ref is always the 1.8 THz radius); a `--radius-um` flag that skips `find_r_ref` would produce it | R3 derives the radius from the FSR and n_g; at the `pdk_size` FSR (R ~ 7.5 um) the runtime keeps the r_ref values: n_g differs by +1.0e-3 (rib160), dlambda/dT by +0.02 pm/K, alpha_rad 0.022 vs 0.119 dB/cm (negligible against the ~110 dB/cm budget) |
@@ -387,13 +387,17 @@ convergence scales before any solve (previously it failed in `production_mesh_bi
   `ring.geometry.jacobian` = `jacobian`; `ring.geometry.jacobian_coupling` = coupling `jacobian`.
 - **loss budget (07 P0-2):** `alpha_bend_radiation_db_per_cm` = `alpha_rad_db_per_cm` (0.12 dB/cm rib160, 1.0 rib200).
   For slab excursions use `slab_sweep` (log-interpolate), not the linear Jacobian (a secant, see the Jacobian note).
-- **realize (07 P1-16):** `alpha_rad_db_per_cm_per_nm` is applied as a linear offset, which can make the bend
-  radiation negative (rib160: -0.085 dB/cm at a +8.4 nm film draw). Either clamp `alpha_bend_radiation_db_per_cm` at
+- **realize (07 P1-16):** [resolved 2026-10-16, params review: realize applies this secant as d ln alpha_rad/dp from
+  the stored `jacobian.evaluations`, the log-scale law below; docs/CHANGELOG.md] `alpha_rad_db_per_cm_per_nm` is
+  applied as a linear offset, which can make the bend radiation negative (rib160: -0.085 dB/cm at a +8.4 nm film draw). Either clamp `alpha_bend_radiation_db_per_cm` at
   0 after the Jacobian, or add a log-scale target (e.g. `ln_alpha_rad_per_nm`, "lnscale", +1) and use the
   d ln alpha_rad/dp values of the Jacobian note (rib160: -0.0485, -0.1785, +0.4104 per nm of width, film, slab). I did
   not add them to the artefacts: an unknown `of` name would make `realize` raise, and rewriting `modes_rib160.json`
   would break the modes sha256 that `junction_rib160.json` and the coupling sidecars record.
-- **params_content (presets):** `modes_rib200.json` and `coupling_rib200.json` exist. The `uncertainty.film_thickness`
+- **params_content (presets):** [resolved 2026-10-16, params review: the "200" choice takes modes_rib200 with a
+  2.03 dB/cm rib200_q_anchor, `ring.geometry.jacobian_coupling` is wired to coupling_rib160 with the gap dimensions
+  and the litho correction below, the jacobian fallback note is fixed; the loss budget was rebalanced on 2026-10-09]
+  `modes_rib200.json` and `coupling_rib200.json` exist. The `uncertainty.film_thickness`
   "200" choice still uses the strip400x200 artefacts as a stand-in "until modes_rib200 exists", and the note of
   `strip400x200_q_anchor` asks for a recompute when the rib n_g lands (rib160 n_g 3.9405, rib200 4.0116). The
   `ring.geometry.jacobian` fallback note ("until modes_rib160 exists") is stale. `ring.geometry.jacobian_coupling` is
@@ -409,16 +413,21 @@ convergence scales before any solve (previously it failed in `production_mesh_bi
   extrapolates the same rib160 straight guide to 2.43706 against the FEM 2.43690 (delta 1.6e-4). Fitting the order
   (as `mrm.extraction.common.richardson` does) or aligning the grid with the interfaces would remove the failure.
 - **coupling (07 P1-5, P1-9):** `dln_kappa2_through_dlambda_per_nm` = 0.0077 /nm (rib160), drop 0.0123 /nm;
-  `dln_kappa2_dgap` -0.0135 /nm (so +-5 nm of drop gap is +-7 % of monitor gain, not +-10 %).
+  `dln_kappa2_dgap` -0.0135 /nm (so +-5 nm of drop gap is +-7 % of monitor gain, not +-10 %). [resolved 2026-10-16:
+  the g26 gap spreads now come from this slope and one local gap sigma through the coupling Jacobian]
 - **plant_optics:** `coupler_phase_rad` follows your psi convention (delay, adds to phi).
 - **realize:** the coupling Jacobian is partial at fixed gap; a correlated width bias needs d/dw - d/dgap. When
   `ln_kappa2_*_per_nm` is wired to Q_t/Q_d with `lnscale, -1`, note that d ln Q_e / d ln K^2 = -K^2 / ((1 - K^2)
   (-ln(1 - K^2))) = -1.057 at the through K^2 0.1045 (-1.003 for the drop), so the -1 mapping understates the
-  through coupler's geometry sensitivity of Q_t by 5.7 %.
+  through coupler's geometry sensitivity of Q_t by 5.7 %. [resolved 2026-10-16: `variation.geometry.width_closes_gaps`
+  applies d/dw - d/dgap, and the outputs move the per-pass K^2 itself (exact, no lnscale on Q), PARAMETERS_FORMAT 7.1]
 - **plant_optics / params (phase.py):** the runtime s(T) = s0 (1 + beta (T - T0)) with beta at 25 C overestimates
   the solver table by 0.5 / 1.25 / 1.9 % at 75 / 105 / 125 C (the integrated shift from 25 C by 0.18 / 0.44 /
   0.68 %), because s(T) is concave (beta 1.47e-3 at 25 C, 1.02e-3 at 105 C). This is below the Si dn/dT sigma
-  (3.2 pm/K at 105 C); a quadratic term or the `dlambda_dt_pm_per_k` table would remove it.
+  (3.2 pm/K at 105 C); a quadratic term or the `dlambda_dt_pm_per_k` table would remove it. [resolved 2026-10-16 in
+  the linear form: g26's beta is the secant of the solver curve from 25 degC to the nominal lock, 1.2377e-3 (exact at
+  both, within -0.5 % between, +0.96 % at 170 degC); extending the table above 125 degC (the P_FSR sweep reaches
+  170 degC) is still open]
 - **integrator (ARCHITECTURE 5.1):** `index_weights` holds `si`, `box`, `clad` (not `sio2`); amend the example or
   note it in docs/CHANGELOG.md (convention 4 above).
 - **validation (VAL-7):** use the table above; VAL-7 as frozen (n_g 2.73 +-3 %, Gamma 0.65 +-0.05) fails at 100 nm.

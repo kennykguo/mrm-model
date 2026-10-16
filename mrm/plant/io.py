@@ -71,9 +71,10 @@ class ChannelMaps:
     """Kernel tables of one ControllerSpec layout.
 
     obs_map (F, 6) int64: [source SRC_*, value offset, value size, new-flag offset, new-flag size, aux] for every
-    sensor channel the controller may read (``spec.layout.obs``); act_map (A, 5) int64: [destination DST_*, offset,
-    size, min, max] for every actuator bound to the controller; obs_size, act_size; act_init (act_size,) the channel
-    init values.
+    sensor channel the controller may read (``spec.layout.obs``); act_map (A, 6) int64: [destination DST_*, offset,
+    size, min, max, per_ring] for every actuator bound to the controller (per_ring 1 for a (B, N) channel: under
+    ``controller_interface.schedule: round_robin`` only the active ring's element is applied, 07 P2-7); obs_size,
+    act_size; act_init (act_size,) the channel init values.
     """
     obs_map: np.ndarray
     act_map: np.ndarray
@@ -103,9 +104,10 @@ class ChannelMaps:
             ch = spec.channels[f.name]
             if f.name not in DST_NAMES:
                 raise ValueError(f"actuator channel {f.name!r} has no plant destination in mrm.plant.io")
-            arows.append((DST_NAMES[f.name], f.offset, f.size, int(ch.min), int(ch.max)))
+            arows.append((DST_NAMES[f.name], f.offset, f.size, int(ch.min), int(ch.max),
+                          int(tuple(ch.shape[:2]) == ("B", "N") and len(ch.shape) == 2)))
             init[f.offset:f.offset + f.size] = int(ch.init)
-        return cls(obs_map=np.array(rows, np.int64).reshape(-1, 6), act_map=np.array(arows, np.int64).reshape(-1, 5),
+        return cls(obs_map=np.array(rows, np.int64).reshape(-1, 6), act_map=np.array(arows, np.int64).reshape(-1, 6),
                    obs_size=int(lay.obs_size), act_size=int(lay.act_size), act_init=init,
                    m=int(spec.samples_per_step))
 

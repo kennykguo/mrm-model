@@ -185,8 +185,8 @@ _KEYS: list[Key] = [
       default="off"),
     S("fidelity.heater_anchor", "enum", "R2 form: fsr_integral (default, integrator decision: Z = dT_FSR/P_FSR with "
       "the integral of s(T) over the P_FSR sweep equal to one FSR, the exact inversion of the anchor measurement, "
-      "07 D16) or lock_slope (07 P0-3 as written: Z = efficiency/s(T_lock); 4-5 % low with beta = 1.4e-3 /K and it "
-      "makes Z depend on each ring's sampled offset; docs/handoff/integrator.md)",
+      "07 D16) or lock_slope (07 P0-3 as written: Z = efficiency/s(T_lock); 4 % low at the g26 nominal, and it makes "
+      "Z depend on each ring's sampled offset; docs/handoff/integrator.md)",
       enum=("lock_slope", "fsr_integral"), default="fsr_integral"),
     S("fidelity.heater_pwm_ripple", "enum", "dac_pwm ripple term (07 P1-11)", enum=("off", "on"), default="off"),
     S("fidelity.plasma_dispersion", "enum", "free-carrier model (07 P1-7)",
@@ -349,6 +349,9 @@ _KEYS: list[Key] = [
     P("ring.thermal.site_ref_um", doc="interim site coupling: equals xt_nearest_frac at this distance",
       forbidden_if=_THERMAL_ROM, bounds=(1.0, 1e4)),
     P("ring.thermal.site_max_frac", doc="interim site coupling cap", forbidden_if=_THERMAL_ROM, bounds=(0.0, 1.0)),
+    P("ring.thermal.site_floor_frac", doc="interim site coupling floor at long range (die sensors, far sites), "
+      "fraction of the self DC: the package term; absent: xt_floor_frac", forbidden_if=_THERMAL_ROM,
+      bounds=(0.0, 0.5)),
     P("ring.thermal.pd_offset_um", "list_float", "monitor PD offset from the ring centre (x, y)", level="global",
       forbidden_if=_THERMAL_ROM),
     P("ring.thermal.temp_sensor_offset_um", "list_float", "ring-attached sensor offset (x, y)", level="global",
@@ -365,9 +368,11 @@ _KEYS: list[Key] = [
       required_if=_THERMAL_INTERIM, forbidden_if=_THERMAL_ROM, bounds=(0.0, 0.5)),
     P("ring.thermal.xt_floor_frac", doc="interim crosstalk floor to every other ring", required_if=_THERMAL_INTERIM,
       forbidden_if=_THERMAL_ROM, bounds=(0.0, 0.5)),
-    P("ring.thermal.xt_tau_ref_s", doc="tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2) (07 P1-2)",
+    P("ring.thermal.xt_tau_ref_s", doc="tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2) (07 P1-2), d the "
+      "heat-source-to-victim distance (centre distance less the ring radii)",
       required_if=_THERMAL_INTERIM, forbidden_if=_THERMAL_ROM, bounds=(1e-6, 1.0)),
-    P("ring.thermal.xt_dist_ref_um", doc="reference distance of xt_tau_ref_s", required_if=_THERMAL_INTERIM,
+    P("ring.thermal.xt_dist_ref_um", doc="reference heat-source-to-victim distance of xt_tau_ref_s (imec: 60 um at "
+      "a 100 um pitch)", required_if=_THERMAL_INTERIM,
       forbidden_if=_THERMAL_ROM, bounds=(1.0, 1e4)),
     P("ring.thermal.xt_tau_min_s", doc="floor of the crosstalk time constant", required_if=_THERMAL_INTERIM,
       forbidden_if=_THERMAL_ROM, bounds=(1e-7, 1.0)),
@@ -382,6 +387,9 @@ _KEYS: list[Key] = [
       required=True, relation=("R2_heater_efficiency",), bounds=(1.0, 200.0)),
     P("ring.heater.p_fsr_ref_temp_c", doc="stage temperature of the P_FSR measurement (fsr_integral form)",
       bounds=(-50.0, 150.0), required_if=when("fidelity.heater_anchor", "fsr_integral")),
+    P("ring.heater.p_fsr_ref_wavelength_nm", doc="wavelength of the line the P_FSR measurement was made on: R2 takes "
+      "FSR_lambda there, so the efficiency and Z_heater->ring are the same on every line (absent: each ring's line)",
+      relation=("R2_heater_efficiency", "R2_heater_z"), bounds=(500.0, 3000.0)),
     P("ring.heater.efficiency_nm_per_mw", doc="FSR/P_FSR (R2; derived)", level="ring", derived_only=True,
       relation=("R2_heater_efficiency", "R2_heater_z")),
     P("ring.heater.r_cold_ohm", doc="heater resistance at r_ref_temp_c", level="ring", required=True,
@@ -431,7 +439,8 @@ _KEYS: list[Key] = [
     P("ring.junction.v_bi_v", doc="built-in voltage", required_if=_ANALYTIC, bounds=(0.0, 2.0)),
     P("ring.junction.depletion_exponent", doc="m of dlambda = A*((V+Vbi)^m - Vbi^m): 1/2 (abrupt) to 2/3 (linearly "
       "graded) by charge control, dlambda ~ removed charge (03 section 5.3, plant_electrical note 1); 07 P1-7 wrote "
-      "1/3..1/2 (the depletion-width exponents)", required_if=_ANALYTIC, bounds=(0.2, 0.7)),
+      "1/3..1/2 (the depletion-width exponents); bounds [1/3, 2/3], the span mrm.plant.electrical.analytic_junction_table "
+      "accepts", required_if=_ANALYTIC, bounds=(1.0 / 3.0, 2.0 / 3.0)),
     P("ring.junction.dqi_dv_frac_per_v", doc="relative Q_i change per volt (derived in LUT mode)", level="ring",
       forbidden_if=_LUT, bounds=(-1.0, 1.0)),
     P("ring.junction.loss_ratio_q", doc="q = lambda*d_alpha/(4 pi d_n) of the plasma effect (03 section 5.4)",
@@ -446,8 +455,8 @@ _KEYS: list[Key] = [
     P("ring.monitor.dark_i0_na", doc="dark current at dark_t0_c (07 D20)", bounds=(0.0, 1e4)),
     P("ring.monitor.dark_t0_c", doc="reference temperature of dark_i0_na", bounds=(-50.0, 150.0)),
     P("ring.monitor.dark_activation_ev", doc="Arrhenius activation energy (07 P1-9)", bounds=(0.0, 2.0)),
-    P("ring.monitor.background_fraction", doc="stray light at the PD, fraction of the line power", level="ring",
-      bounds=(0.0, 1.0)),
+    P("ring.monitor.background_fraction", doc="stray light at the PD, as a fraction of the total bus power at the "
+      "ring (all lines, not one line; i += gain_scale R f P_bus, 07 P1-9)", level="ring", bounds=(0.0, 1.0)),
     S("ring.monitor.afe_type", "enum", "07 P0-7", enum=("rc", "integrate_dump"), default="integrate_dump"),
     P("ring.monitor.integration_window_s", doc="integrate-and-dump boxcar (07 P0-7)", tick="period",
       required_if=when("ring.monitor.afe_type", "integrate_dump"), bounds=(0.0, 1.0)),
@@ -464,9 +473,15 @@ _KEYS: list[Key] = [
     P("ring.monitor.adc_dnl_lsb", doc="ADC DNL", bounds=(0.0, 1e4)),
     P("ring.monitor.input_noise_pa_per_rt_hz", doc="input-referred current noise density", bounds=(0.0, 1e6)),
     P("ring.monitor.flicker_corner_hz", doc="1/f corner", bounds=(0.0, 1e9)),
-    P("ring.monitor.adc_ref_tempco_ppm_per_k", doc="reference tempco", bounds=(-1e4, 1e4)),
+    P("ring.monitor.adc_ref_tempco_ppm_per_k", doc="tempco of the ADC reference about 25 degC, at the temperature "
+      "of ring.monitor.adc_ref_site", bounds=(-1e4, 1e4)),
+    S("ring.monitor.adc_ref_site", "enum", "where the monitor ADC reference sits, i.e. the temperature its tempco "
+      "sees: package_base = thermal.t_base_k + thermal.xpu_rise_k (a converter on its own die beside the PIC, 07 "
+      "P1-3; its own dissipation not modelled); monitor_pd = each ring's PD observer (one converter per ring, next "
+      "to its PD)", enum=("package_base", "monitor_pd"), default="package_base"),
     P("ring.monitor.pga_gains", "list_float", "PGA gain steps (07 P1-10)", level="global"),
-    P("ring.monitor.adc_mux.channels_per_adc", "int", "rings per converter (07 P0-7)", bounds=(1, 64)),
+    P("ring.monitor.adc_mux.channels_per_adc", "int", "rings per converter (07 P0-7): ring n on converter n // C; "
+      "they share its DNL and INL; round_robin needs C x integration window <= the ADC period", bounds=(1, 64)),
     S("ring.monitor.adc_mux.order", "enum", "mux order", enum=("round_robin", "bank"), default="round_robin"),
     # integrator additions requested by plant_sensing (docs/handoff/plant_sensing.md section 4)
     P("ring.monitor.baseline_ua", doc="analog baseline current subtracted before the PGA and ADC (PAT-2 i_os,det, "
@@ -475,7 +490,8 @@ _KEYS: list[Key] = [
       default=True),
     S("ring.monitor.flicker_band_min_hz", "float", "lowest pole of the 1/f noise synthesis (mrm.plant.sensing)",
       default=1e-3),
-    S("ring.monitor.reference_tap.present", "bool", "reference-tap PD on the bus before the bank (07 P1-9, 06 S8)",
+    S("ring.monitor.reference_tap.present", "bool", "reference-tap PD on the bus before the bank (07 P1-9, 06 S8); "
+      "not built in the engine yet: true is refused when the plant is built (docs/ENGINE.md section 10)",
       default=False),
     P("ring.monitor.reference_tap.coupling_frac", doc="bus power fraction tapped to the reference PD",
       required_if=when("ring.monitor.reference_tap.present", True), bounds=(0.0, 1.0)),

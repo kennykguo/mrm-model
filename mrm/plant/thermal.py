@@ -120,7 +120,10 @@ ROM_TAU_SLOW_MIN_S = 1.0e-3      # P1-2: the shared tau set must include the mil
 
 # Crosstalk time constants of neighbours 1..7 at 100 um pitch, the first neighbour 60 um from the heat source
 # (simulated, printed: [CO22-TCPMT] Table II via docs/research/04 section 2.4 X2, UCUT; no-UCUT within 1.3 %).
-# The distances 160..660 um assume the 100 um pitch continues (inferred).
+# The distances are heat-source-to-victim distances, the convention of the paper and of 04 section 2.5 (60 um at a
+# 100 um pitch: imec's rings have R ~ 20 um, inferred), not centre distances; crosstalk_tau_s takes them in that
+# convention and the interim assembly converts its centre distances (_interim_lags). The distances 160..660 um assume
+# the 100 um pitch continues (inferred).
 XT_TABLE_D_UM = np.array([60.0, 160.0, 260.0, 360.0, 460.0, 560.0, 660.0])
 XT_TABLE_TAU_S = np.array([4.14, 5.67, 6.57, 7.21, 7.82, 8.48, 8.99]) * 1e-3
 
@@ -696,7 +699,11 @@ class ThermalScales:
     dc_scale: a global factor, or a mapping {"*": f, "<source>-><observer>": f, "<source>->*": f, "*-><observer>": f}
         (kind names); the factors that match a lag multiply. rom_dc_scale = efficiency/(Z_FEM * dlambda/dT) goes here.
     time_scale_fast, time_scale_slow: tau multipliers of the fast (tau < tau_split_s, or the interim self poles) and
-        slow (die, package, crosstalk) layers, one draw per world (D15).
+        slow (die, package, crosstalk) layers, one draw per world (D15). A pair whose residues change sign and whose
+        poles lie on both sides of tau_split_s (the non-collocated pairs of a FEM ROM fit) is scaled as a whole by
+        s_fast^w s_slow^(1 - w), w its step-response fraction at tau_split_s: per-pole factors would separate its
+        cancelling poles and make its step response overshoot (see _whole_pair_time_scales). The interim model's
+        residues are all positive, so its poles keep their layer factors.
     scaling_hypothesis: 'resistance' (tau_k scales with its residue, tau = RC, 07 P1-2), 'capacitance' or
         'independent' (residue and tau scale independently); a string, a (B,) sequence of strings, or int codes in
         SCALING_HYPOTHESES order. Lag m: r' = sigma_m x_m r, tau' = s_layer tau * (sigma_m if resistance else 1), with
@@ -743,7 +750,11 @@ class InterimRom:
     the mode region). Ring-to-ring crosstalk C = dlambda_victim/dlambda_heated: xt_nearest_frac to the nearest
     neighbour(s), xt_next_frac (optional) to the second rank, xt_floor_frac to all others, each a single pole
     tau_xt(d) (crosstalk_tau_s) or, with crosstalk_dynamics='self', the self shape S_H (the textbook corner). Sites
-    (monitor PD, driver, temperature sensor, aggressor) use site_fraction(d) with the same tau_xt(d).
+    (monitor PD, driver, temperature sensor, aggressor) use site_fraction(d) with the same tau_xt(d), and
+    site_floor_frac as the long-range floor of site_fraction. Distances: tau_xt takes the heat-source-to-victim
+    distance of its imec anchor (crosstalk_tau_s), d_cc - r_src - r_obs with r = ring_radius_um for the ring
+    elements (heater, waveguide and junction sources; ring and heater-resistor observers) and 0 for point sites;
+    site_fraction takes the centre (site) distance d_cc.
 
     Defaults and provenance:
       z_heater_ring_k_per_w 6.1e3 K/W: derived, R_th under H_solver (07 4.6); realize() passes efficiency/(dlambda/dT).
@@ -756,7 +767,13 @@ class InterimRom:
       xt_nearest_frac 0.03, xt_floor_frac 0.015: inferred (07 P1-2; 04 section 2.5 from X1-X5).
       xt_tau_ref_s 4.1e-3 at xt_dist_ref_um 60, xt_tau_min_s 1e-4: 07 P1-2 (04 section 2.4, [CO22-TCPMT] Eq. 4, X2).
       xt_tau_far_s None: use the printed X2 table beyond the near field; xt_far_um 100 (07 P1-2).
-      site_ref_um 60: site_fraction = xt_nearest at the [CO22-TCPMT] first-neighbour distance (assumed law).
+      site_ref_um 60: site_fraction = xt_nearest at a 60 um centre distance (assumed law; 60 um is the [CO22-TCPMT]
+        first-neighbour distance).
+      site_floor_frac None: the site-law floor equals xt_floor_frac (imec's 1.3-2.6 % at 100-300 um, quasi-constant
+        beyond 200 um: a die / package term). A package with a small R_pkg (the TEC-held package of the FEM ROM)
+        sets it lower: the FEM gives 0.09 % of Z0 at 1 mm.
+      ring_radius_um 7.5: printed '~15 um diameter' (HC, LM26-S) and the FEM ROM's ring (thermal_fem.ThermalConfig);
+        scalar, (B,) or (B, N). mrm.params.realize passes each ring's r_ref (R3).
       pd_offset_um (0, 25), temp_sensor_offset_um (40, 0): assumed, the same site offsets as the FEM ROM
         (mrm/extraction/thermal_fem.ThermalConfig), so both thermal models place the sites alike.
       driver_offset_um None: no driver heat source unless the layout gives driver sites (G26 drives from a separate
@@ -785,6 +802,8 @@ class InterimRom:
     crosstalk_dynamics: str = "imec"
     site_ref_um: float = 60.0
     site_max_frac: float = 1.0
+    site_floor_frac: Any = None
+    ring_radius_um: Any = 7.5
     pd_offset_um: tuple = (0.0, 25.0)
     temp_sensor_offset_um: tuple = (40.0, 0.0)
     driver_offset_um: tuple | None = None
@@ -803,8 +822,14 @@ class InterimRom:
 
 def crosstalk_tau_s(d_um, tau_ref_s=4.1e-3, dist_ref_um=60.0, tau_min_s=1.0e-4, tau_far_s=None, far_um=100.0,
                     law: str = "capped"):
-    """First-order crosstalk time constant at centre-to-centre distance d (um) (07 P1-2; 04 section 2.4).
+    """First-order crosstalk time constant at heat-source-to-victim distance d (um) (07 P1-2; 04 sections 2.4-2.5).
 
+    d is the distance from the heat source to the victim as [CO22-TCPMT] defines it (04 section 2.5: 60 um for the
+    first neighbour at their 100 um pitch), the convention of dist_ref_um, tau_ref_s and the X2 table
+    (XT_TABLE_D_UM), not the centre-to-centre distance: the interim assembly passes d_cc - r_src - r_obs
+    (InterimRom.ring_radius_um; at imec's geometry, R ~ 20 um at a 100 um pitch, it reproduces Table II). Until
+    2026-10-16 the assembly passed centre distances (4.75 ms instead of the printed 4.14 ms at imec's own geometry;
+    2.85 ms instead of 1.52 ms for the g26 nearest neighbour; physics_thermal review).
     Near field (derived d^2 diffusion law, [CO22-TCPMT] Eq. 4): tau_near = max(tau_min, tau_ref (d/d_ref)^2).
     law='literal' (07 P1-2 as written): tau_near for d <= far_um, tau_far beyond (tau_far: a number, or None = the
         printed X2 table interpolated in d). Note: at d = 100 um the d^2 law gives 11.4 ms, above every X2 value
@@ -828,8 +853,10 @@ def crosstalk_tau_s(d_um, tau_ref_s=4.1e-3, dist_ref_um=60.0, tau_min_s=1.0e-4, 
 
 def site_fraction(d_um, nearest_frac=0.03, floor_frac=0.015, ref_um=60.0, max_frac=1.0):
     """Interim static coupling of a site path, as a fraction of Z_heater->ring(0) (assumed law, 04 X1-X5 shape):
-    c(d) = clip(nearest_frac * ref_um / d, floor_frac, max_frac). At ref_um (the [CO22-TCPMT] first-neighbour
-    distance) it equals the nearest-neighbour crosstalk; it never falls below the measured long-range floor."""
+    c(d) = clip(nearest_frac * ref_um / d, floor_frac, max_frac), d the centre (site) distance in um. At ref_um it
+    equals the nearest-neighbour crosstalk; it never falls below floor_frac, the long-range floor (InterimRom
+    site_floor_frac, default xt_floor_frac: a package term, so it holds at any distance on the die; imec measured it
+    to 300 um with natural convection, the FEM's TEC-held package gives 0.09 % at 1 mm)."""
     d = np.maximum(np.asarray(d_um, dtype=np.float64), 1e-6)
     c = np.asarray(nearest_frac, float) * float(ref_um) / d
     return np.clip(c, np.asarray(floor_frac, float), float(max_frac))
@@ -1102,15 +1129,19 @@ def _interim_lags(spec: InterimRom, el: _Elements, layout: LayoutSites, n: int, 
     tau_f, tau_s, tau_t = p["tau_fast"], p["tau_slow"], p["tail_tau"]
     f_sh = p["f_sh"]
     hr = p["heater_self_ratio"]
+    rr = p["ring_radius"]                         # (B, N) um
     rank, dring = _ranks(layout.ring_xy_um)
 
-    def xt_tau(d):
+    def xt_tau(d_cc, r_src, r_obs):
+        # the law's distance is heat source to victim (its imec anchor, crosstalk_tau_s): the centre distance less
+        # the radius of each ring element (0 for a point site)
+        d = np.maximum(d_cc - r_src - r_obs, 0.0)
         return crosstalk_tau_s(d, p["xt_tau_ref"][:, 0], spec.xt_dist_ref_um, p["xt_tau_min"][:, 0],
                                None if spec.xt_tau_far_s is None else p["xt_tau_far"][:, 0], spec.xt_far_um,
                                spec.xt_tau_law)
 
     def site_c(d):
-        return site_fraction(d, p["xt_nearest"][:, 0], p["xt_floor"][:, 0], spec.site_ref_um, spec.site_max_frac)
+        return site_fraction(d, p["xt_nearest"][:, 0], p["site_floor"][:, 0], spec.site_ref_um, spec.site_max_frac)
 
     def add_shape(o, s, scale, i, pair, with_tail=True):
         """Z = scale * S_H(s) for ring i's self-path shape."""
@@ -1159,7 +1190,7 @@ def _interim_lags(spec: InterimRom, el: _Elements, layout: LayoutSites, n: int, 
                 if spec.crosstalk_dynamics == "self":
                     add_shape(o, s, c * zf, j, pair)
                 else:
-                    lg.add(o, s, xt_tau(dring[i, j]), c * zf, LAYER_SLOW, pair)
+                    lg.add(o, s, xt_tau(dring[i, j], rr[:, j], rr[:, i]), c * zf, LAYER_SLOW, pair)
                 continue
             # site law: monitor PDs, drivers, temperature sensors, aggressors
             d = float(np.linalg.norm(sxy - oxy))
@@ -1169,7 +1200,9 @@ def _interim_lags(spec: InterimRom, el: _Elements, layout: LayoutSites, n: int, 
                 zf = z0[:, orr]
             else:
                 zf = z0_mean
-            lg.add(o, s, xt_tau(d), site_c(d) * zf, LAYER_SLOW, pair)
+            r_s = rr[:, sr] if (sr >= 0 and local_src) else 0.0      # ring heat sources sit on the ring
+            r_o = rr[:, orr] if (orr >= 0 and local_obs) else 0.0    # ring and heater observers too
+            lg.add(o, s, xt_tau(d, r_s, r_o), site_c(d) * zf, LAYER_SLOW, pair)
 
 
 def _rom_lags(rom: ThermalRom, el: _Elements, layout: LayoutSites, B: int, tau_split: float, lg: _Lags, meta: dict,
@@ -1294,6 +1327,58 @@ def _dc_factor(dc_scale, sk_name, ok_name, B):
     return np.broadcast_to(f, (B,))
 
 
+def _whole_pair_time_scales(tau, res, obs, src, layer, fixed, s_fast, s_slow, tau_split):
+    """Pairs that the die-level time scales (07 D15) must scale as a whole, and their factor.
+
+    A lag takes the factor of its layer (time_scale_fast below tau_split, time_scale_slow above). That is exact for a
+    pair whose residues all have one sign: any layer factors then keep its impulse response one-signed, so its step
+    response stays monotone and |H(jw)| <= |H(0)|. A Foster fit of a non-collocated FEM pair (heater -> ring mode,
+    cross pairs) has mixed-sign residues several times its DC in poles on both sides of the split; they cancel only
+    when they are scaled together. Independent layer factors pull them apart, and the step response overshoots and
+    dips (up to 0.22 x DC for metal_above_160 at x2 / x0.5), which no heat-diffusion response does. Such a pair (mixed
+    signs in some world, poles in both layers) gets one factor per world, k = s_fast^w s_slow^(1 - w), with w the
+    fraction of its step response reached at tau_split (clipped to [0, 1]): the pair is time-scaled, y'(t) = y(t/k),
+    so its shape (monotone or not) is that of the fit, and k is the layer factor for a pair that lies in one layer.
+    Equal layer factors give exactly the old result (k = s_fast). Fixed-tau lags (a package tail from ThermalScales)
+    are not scaled and take no part. tau, res (B, M) before scaling; obs, src, layer (M,) int; fixed (M,) bool;
+    s_fast, s_slow (B,). Returns (whole (M,) bool, s_pair (B, M) or None when no pair needs it)."""
+    M = obs.shape[0]
+    whole = np.zeros(M, bool)
+    free = ~fixed
+    if M == 0 or not free.any():
+        return whole, None
+    key = obs.astype(np.int64) * (int(src.max()) + 1) + src.astype(np.int64)
+    _, g = np.unique(key, return_inverse=True)
+    g = g.reshape(-1)
+    G = int(g.max()) + 1
+    gf = g[free]
+    has_fast = np.zeros(G, bool)
+    has_slow = np.zeros(G, bool)
+    has_fast[gf[layer[free] == LAYER_FAST]] = True
+    has_slow[gf[layer[free] != LAYER_FAST]] = True
+    B = res.shape[0]
+    mn = np.full((G, B), np.inf)
+    mx = np.full((G, B), -np.inf)
+    np.minimum.at(mn, gf, res[:, free].T)
+    np.maximum.at(mx, gf, res[:, free].T)
+    mixed = np.any((mn < 0.0) & (mx > 0.0), axis=1)
+    bad = has_fast & has_slow & mixed
+    whole = free & bad[g]
+    if not whole.any():
+        return whole, None
+    gw = g[whole]
+    dc = np.zeros((G, B))
+    ys = np.zeros((G, B))
+    np.add.at(dc, gw, res[:, whole].T)
+    np.add.at(ys, gw, (res[:, whole] * -np.expm1(-float(tau_split) / tau[:, whole])).T)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        w = np.clip(np.where(dc != 0.0, ys / dc, 0.0), 0.0, 1.0)        # (G, B)
+        sf = np.asarray(s_fast, float)[None, :]
+        ss = np.asarray(s_slow, float)[None, :]
+        k = np.where(sf == ss, sf, np.exp(w * np.log(sf) + (1.0 - w) * np.log(ss)))
+    return whole, np.ascontiguousarray(k[g].T)
+
+
 def assemble(rom, layout, n_rings: int, scales=None, *, sources: Sequence[str] | None = None,
              observers: Sequence[str] | None = None, temp_sensors: Sequence[Mapping] | None = None,
              ring_pitch_um: float | None = None, prune_abs_k_per_w: float = 0.0) -> ThermalSystem:
@@ -1312,7 +1397,8 @@ def assemble(rom, layout, n_rings: int, scales=None, *, sources: Sequence[str] |
 
     Superposition: every source of every ring couples to every observer; same-ring pairs use the self table (d = 0),
     ring-to-ring pairs the cross residues at the centre distance, free sites the distance law. Scaling (per world):
-    dc_scale per (source, observer) group, crosstalk_scale on ring-to-ring residues, time_scale_fast/slow per layer,
+    dc_scale per (source, observer) group, crosstalk_scale on ring-to-ring residues, time_scale_fast/slow per layer
+    (one blended factor for a mixed-sign pair that straddles the layers; meta['time_scale_whole_pairs'] counts them),
     tau also times the dc_scale factor under 'resistance' (never the crosstalk scale), and a package tail from
     ThermalScales (DC preserving, absolute tau). B is the common length of every (B,) input, including a
     per-world scaling_hypothesis list. Returns a ThermalSystem with taus_s and res_k_per_w of shape (B, M).
@@ -1423,8 +1509,16 @@ def assemble(rom, layout, n_rings: int, scales=None, *, sources: Sequence[str] |
         sigma[:, m] = _dc_factor(scales.dc_scale, SOURCE_KINDS[src_kind[src[m]]], OBSERVER_KINDS[obs_kind[obs[m]]], B)
     xt = np.ones((B, M))
     xt[:, pair == PAIR_CROSS] = np.broadcast_to(sc["crosstalk_scale"], (B,))[:, None]
-    s_t = np.where(layer[None, :] == LAYER_FAST, np.broadcast_to(sc["time_scale_fast"], (B,))[:, None],
-                   np.broadcast_to(sc["time_scale_slow"], (B,))[:, None])
+    s_fast = np.broadcast_to(sc["time_scale_fast"], (B,))
+    s_slow = np.broadcast_to(sc["time_scale_slow"], (B,))
+    s_t = np.where(layer[None, :] == LAYER_FAST, s_fast[:, None], s_slow[:, None])
+    # a pair whose residues change sign and whose poles straddle tau_split is scaled as a whole (one factor per
+    # pair and world): independent layer factors would pull its cancelling neighbour poles apart
+    whole, s_whole = _whole_pair_time_scales(tau, res, obs, src, layer, fixed, s_fast, s_slow,
+                                             float(scales.tau_split_s))
+    if s_whole is not None:
+        s_t = np.where(whole[None, :], s_whole, s_t)
+    meta["time_scale_whole_pairs"] = int(np.unique(obs[whole] * len(el.src_kind) + src[whole]).size)
     resistance = (hyp == SCALING_HYPOTHESES.index("resistance"))[:, None]
     # tau follows the conductance factor sigma under 'resistance' (tau = RC); crosstalk_scale is a magnitude
     # uncertainty and never moves tau; a package tail given in ThermalScales keeps its absolute tau
@@ -1488,7 +1582,10 @@ def _interim_params(spec: InterimRom, n: int) -> dict:
          "xt_nearest": bn(spec.xt_nearest_frac, "xt_nearest_frac"), "xt_floor": bn(spec.xt_floor_frac, "xt_floor_frac"),
          "xt_next": bn(0.0 if spec.xt_next_frac is None else spec.xt_next_frac, "xt_next_frac"),
          "xt_tau_ref": bn(spec.xt_tau_ref_s, "xt_tau_ref_s"), "xt_tau_min": bn(spec.xt_tau_min_s, "xt_tau_min_s"),
-         "xt_tau_far": bn(0.0 if spec.xt_tau_far_s is None else spec.xt_tau_far_s, "xt_tau_far_s")}
+         "xt_tau_far": bn(0.0 if spec.xt_tau_far_s is None else spec.xt_tau_far_s, "xt_tau_far_s"),
+         "ring_radius": bn(spec.ring_radius_um, "ring_radius_um")}
+    p["site_floor"] = (p["xt_floor"] if spec.site_floor_frac is None
+                       else bn(spec.site_floor_frac, "site_floor_frac"))
     z = p["z_ratio"]
     p["f_sh"] = (bn(spec.selfheat_share_frac, "selfheat_share_frac") if spec.selfheat_share_frac is not None
                  else (z - 1.0) / z)
@@ -1500,6 +1597,10 @@ def _interim_params(spec: InterimRom, n: int) -> dict:
         raise ValueError("heater_self_ratio must be >= 1 (R_th,H >= Z_heater->ring, 06 E1)")
     if np.any((p["f_sh"] < 0) | (p["f_sh"] > 1)):
         raise ValueError("selfheat_share_frac must be in [0, 1]")
+    if np.any(p["ring_radius"] < 0):
+        raise ValueError("ring_radius_um must be >= 0")
+    if np.any(p["site_floor"] < 0):
+        raise ValueError("site_floor_frac must be >= 0")
     if np.any(p["share_fast"] < 0) or np.any(p["tail_share"] < 0) or np.any(p["share_fast"] + p["tail_share"] > 1):
         raise ValueError("share_fast_frac and tail_share_frac must be >= 0 with a sum <= 1")
     for k in ("tau_fast", "tau_slow", "tail_tau", "selfheat_tau", "heater_node_tau", "xt_tau_ref", "xt_tau_min"):

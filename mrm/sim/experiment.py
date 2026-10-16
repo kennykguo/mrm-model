@@ -114,10 +114,12 @@ Q1_CAVEAT = ("Performance is conditional on the assumed thermal dynamics (heater
 KINDS = ("run", "sweep", "mc", "compare", "robust", "acceptance", "quasi_static")
 #: start states (see EXTENSION_KEYS['start'])
 STARTS = ("cold", "cold_settled", "warm")
-#: the corner presets 07 section 4.8 names (thin extends: files of mrm/params/presets that select alternatives)
+#: the corner presets 07 section 4.8 names (thin extends: files of mrm/params/presets that select alternatives), and
+#: g26_tec_package (uncertainty.thermal.stack = side_by_side_tec_held: the FEM ROM's TEC-held package; physics_thermal
+#: review 2026-10-16, docs/CHANGELOG.md)
 NAMED_CORNERS = ("g26_slow_thermal", "g26_fast_thermal", "g26_undercut", "g26_h86", "g26_h86_sensor",
                  "g26_overcoupled", "g26_heater_loss", "g26_hot_selfheat", "g26_low_eta", "g26_fsr_window_a",
-                 "g26_fsr_edge", "g26_textbook_thermal")
+                 "g26_fsr_edge", "g26_textbook_thermal", "g26_tec_package")
 #: world-level metrics a compare ranks the controllers by (lower is better); 07 4.8 primary metrics
 RANK_METRICS = ("oma_penalty_db_worst", "excursion_count", "excursion_max_s", "wrong_line_rings", "time_to_lock_s")
 #: world_summary metrics a ranking may use (lower is better; relOMA, where higher is better, is reported only)

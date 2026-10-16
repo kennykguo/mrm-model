@@ -4,9 +4,11 @@ and the compiled-controller ABI (07 P1-1, P1-19, P1-20, P2-7, P0-7, P0-9).
 What a controller sees
 ----------------------
 - ``reset(spec)`` once, with a :class:`ControllerSpec`: typed facts about the hardware interface (tick, controller
-  period, ADC, heater DAC, bias DAC, temperature sensors, channel specs, bus order) and ``nominal``, a config view
-  filtered by ``controller_interface.knowledge``. The spec is built from the UNSAMPLED design, so it is identical
-  across seeds and uncertainty worlds (07 D13, ``ControllerSpec.fingerprint``). There is no ``extras`` field.
+  period, ADC, heater DAC, bias DAC, temperature sensors, channel specs, bus order) and ``nominal``, the view of the
+  UNSAMPLED design filtered by ``controller_interface.knowledge`` (:class:`mrm.control.knowledge.NominalView`: a key
+  no granted token releases raises KnowledgeError; the experiment section is never released). The spec is
+  therefore identical across seeds and uncertainty worlds (07 D13, ``ControllerSpec.fingerprint``). There is no
+  ``extras`` field.
 - ``step(obs)`` at every controller edge, with an :class:`Observation`: ``tick`` (int64), ``t_s`` (derived),
   ``sensors`` (channel -> (B, ...) array, read-only) and ``new`` (channel -> new-sample flags). Access to an
   undeclared channel raises :class:`UndeclaredChannelError` (07 P1-1 ``test_no_truth_leak``).
@@ -50,9 +52,10 @@ import numba as nb
 import numpy as np
 from numba.core.dispatcher import Dispatcher
 
+from mrm.control.knowledge import knowledge_view
 from mrm.core.channels import (
-    INT64_MAX, AbiLayout, BindingError, ChannelError, ChannelHardware, ChannelSpec, assign_channel_ids,
-    build_v1_channels, make_abi_layout, resolve_bindings, samples_per_step,
+    INT64_MAX, V1_CHANNEL_TABLE, AbiLayout, BindingError, ChannelError, ChannelHardware, ChannelSpec,
+    assign_channel_ids, build_v1_channels, make_abi_layout, resolve_bindings, samples_per_step,
 )
 from mrm.core.timing import TimingError, check_tick_table, is_edge, edge_index, rate_to_period_ticks
 
@@ -63,11 +66,13 @@ __all__ = [
     "TELEMETRY_KEYS", "controller_telemetry", "controller_fast_kernel", "CompositeController", "CompiledController",
     "spec_arrays", "obs_offset", "new_offset", "act_offset", "user_i64", "user_f64", "call_step_batch",
     "fast_obs_size", "fast_act_size", "fo_new", "fo_code", "fo_sample_tick", "fa_heater", "fa_bias",
-    "SCHEDULES", "ON_OUT_OF_RANGE", "nominal_line_grid_hz",
+    "SCHEDULES", "ON_OUT_OF_RANGE", "nominal_line_grid_hz", "merge_round_robin",
 ]
 
 SCHEDULES = ("simultaneous", "round_robin")
 ON_OUT_OF_RANGE = ("clip", "error")
+#: the sensor channels whose ChannelSpec scale converts monitor ADC codes to amperes (monitor_nominal knowledge)
+_ADC_SCALED_CHANNELS = frozenset(r["name"] for r in V1_CHANNEL_TABLE if r.get("scale") == "adc")
 
 
 class UndeclaredChannelError(KeyError):
@@ -146,8 +151,10 @@ class ControllerSpec:
     sensors + actuators bound to the controller), bindings (owner of every actuator), layout (flat ABI),
     bus_order (ring index at each bus position along the light path, N; array.bus_order, as in realize),
     line_grid_hz (nominal grid in Hz, L, or None if not in knowledge), ring_to_line (nominal assignment, N, or
-    None), knowledge (controller_interface.knowledge), nominal (Config view filtered by knowledge; provided by
-    mrm.params), schedule (simultaneous | round_robin), on_out_of_range (clip | error), heater_readback (tuple of
+    None), knowledge (controller_interface.knowledge), nominal (the unsampled design filtered by knowledge: any
+    design given here is wrapped in a :class:`mrm.control.knowledge.NominalView`, 07 D13; None = no design),
+    schedule (simultaneous | round_robin: the engine updates ring j % N only at controller edge j, 07 P2-7),
+    on_out_of_range (clip | error, on both engine paths), heater_readback (tuple of
     (name, value) readback facts, or None), error_count_period_ticks, tick_jitter_ticks
     (largest delay of a controller edge, 07 P2-7; the runner draws each edge's delay with
     ``mrm.core.timing.edge_jitter``; 0 = no jitter).
@@ -176,6 +183,11 @@ class ControllerSpec:
     heater_readback: tuple | None = None
     error_count_period_ticks: int | None = None
     tick_jitter_ticks: int = 0
+
+    def __post_init__(self):
+        # 07 D13: a controller reads the design only through the knowledge filter (also after dataclasses.replace)
+        object.__setattr__(self, "knowledge", tuple(self.knowledge or ()))
+        object.__setattr__(self, "nominal", knowledge_view(self.nominal, self.knowledge))
 
     # -- derived --
     @property
@@ -219,6 +231,23 @@ class ControllerSpec:
                                          f"(declared: {sorted(self.channels)})")
         return self.channels[channel].resolve_shape(self.dims)
 
+    def active_ring(self, tick: int) -> int:
+        """The ring that the controller edge at ``tick`` updates under ``schedule = round_robin`` (07 P2-7): j % N
+        with j = (tick - phase_ticks) // period_ticks the edge index (a jittered edge keeps its index, as in the
+        kernel); -1 (every ring) when simultaneous."""
+        if self.schedule != "round_robin":
+            return -1
+        return int((int(tick) - self.phase_ticks) // self.period_ticks) % self.n_rings
+
+    def active_mask(self, tick: int) -> np.ndarray | None:
+        """:meth:`active_ring` as the (N,) bool mask of ``Observation.active`` (None when simultaneous)."""
+        r = self.active_ring(tick)
+        if r < 0:
+            return None
+        m = np.zeros(self.n_rings, dtype=bool)
+        m[r] = True
+        return m
+
     @property
     def actuators(self) -> dict[str, ChannelSpec]:
         """Actuator channels bound to the controller."""
@@ -245,7 +274,11 @@ class ControllerSpec:
         sensor channels the controller may read (default: all; exposing a sample block also exposes its count
         channel). Channel ids in the ABI come from the full channel set, so ``expose`` never renumbers a channel.
         ``line_grid_hz`` / ``ring_to_line`` are kept only if ``line_grid`` / ``ring_to_line`` are in ``knowledge``
-        (07 P1-1, P1-12). ``tick_jitter_s`` (07 P2-7) must be whole ticks and below the controller period.
+        (07 P1-1, P1-12); so is the monitor ADC's code-to-ampere scale of the ``tx.monitor.samples`` /
+        ``tx.monitor.latest`` channel specs (``ring.monitor.adc_full_scale_ua``) for ``monitor_nominal`` or
+        ``model_nominal`` (without them those specs carry no scale: codes only, the full scale in codes is in
+        ``adc``). ``nominal`` (the unsampled design) is kept as its knowledge-filtered view (07 D13).
+        ``tick_jitter_s`` (07 P2-7) must be whole ticks and below the controller period.
         """
         hw = ChannelHardware() if hw is None else hw
         if schedule not in SCHEDULES:
@@ -288,6 +321,13 @@ class ControllerSpec:
         # with jitter J, two actual edges can be up to period + J ticks apart (07 P2-7)
         m = samples_per_step(period + jitter, t["ring.monitor.adc_rate_hz"])
         all_ch = dict(build_v1_channels(hw, n_lines=n_lines) if channels is None else channels)
+        know = tuple(knowledge)
+        if not ({"monitor_nominal", "model_nominal"} & set(know)):
+            # the monitor full scale (A per code) is monitor_nominal knowledge (mrm.control.calibration), not an
+            # interface fact: without the token the ADC channels carry codes only
+            for n in _ADC_SCALED_CHANNELS & set(all_ch):
+                if all_ch[n].scale is not None:
+                    all_ch[n] = dataclasses.replace(all_ch[n], scale=None, offset=None, phys_unit=None)
         bindings = resolve_bindings(all_ch, bind, scenario_drives=scenario_drives, scenario_offsets=scenario_offsets)
         expose_set = None if expose is None else set(expose)
         if expose_set is not None:
@@ -327,7 +367,6 @@ class ControllerSpec:
         bus = tuple(range(int(n_rings))) if bus_order is None else tuple(int(x) for x in bus_order)
         if sorted(bus) != list(range(int(n_rings))):
             raise ValueError(f"bus_order {bus} must be a permutation of 0..{int(n_rings) - 1}")
-        know = tuple(knowledge)
         grid = tuple(float(x) for x in line_grid_hz) if (line_grid_hz is not None and "line_grid" in know) else None
         if grid is not None and len(grid) != int(n_lines):
             raise ValueError(f"line_grid_hz has {len(grid)} entries for L = {n_lines}")
@@ -346,12 +385,15 @@ class ControllerSpec:
                     scenario_offsets: Iterable[str] = (), expose: Iterable[str] | None = None,
                     line_grid_hz: Sequence[float] | None = None) -> "ControllerSpec":
         """Build from an ``mrm.params.Config`` (duck-typed: ``get``, ``si``). Reads sim.dt_plant_s, array.n_rings,
-        the line count, controller_interface.{update_rate_hz, tick_jitter_s, bind.<channel>, knowledge, schedule,
-        on_out_of_range}, array.bus_order, channel_plan.ring_to_line (default: identity, as in realize), the nominal
-        grid (:func:`nominal_line_grid_hz`, unless ``line_grid_hz`` is given) and the hardware keys of
+        the line count, controller_interface.{update_rate_hz, tick_jitter_s, bind.<channel>, expose, knowledge,
+        schedule, on_out_of_range}, array.bus_order, channel_plan.ring_to_line (default: identity, as in realize),
+        the nominal grid (:func:`nominal_line_grid_hz`, unless ``line_grid_hz`` is given) and the hardware keys of
         :meth:`ChannelHardware.from_config`. The grid and the assignment reach the spec only if ``line_grid`` /
-        ``ring_to_line`` are in ``controller_interface.knowledge``. ``nominal`` is the knowledge-filtered view built
-        by mrm.params; ``scenario_drives`` / ``scenario_offsets`` come from the scenario (07 P0-7).
+        ``ring_to_line`` are in ``controller_interface.knowledge``. ``expose`` (default: the config's
+        ``controller_interface.expose``; None there = every sensor channel) limits the sensor channels, as in
+        :meth:`build`. ``nominal`` is the unsampled design (the Config); the spec keeps only its knowledge-filtered
+        view (:class:`mrm.control.knowledge.NominalView`, 07 D13). ``scenario_drives`` / ``scenario_offsets`` come
+        from the scenario (07 P0-7).
         """
         def val(key, default=None):
             v = cfg.get(key, None)
@@ -382,6 +424,11 @@ class ControllerSpec:
         # channel_plan.ring_to_line defaults to the identity, as in mrm.params.realize (schema: "default: identity")
         r2l = val("channel_plan.ring_to_line")
         r2l = list(range(n_rings)) if r2l is None else r2l
+        if expose is None:
+            # controller_interface.expose (07 P0-7): None = every sensor channel; build() refuses unknown names
+            expose = val("controller_interface.expose")
+            if isinstance(expose, str):
+                expose = [expose]
         return cls.build(n_batch=n_batch, n_rings=n_rings, n_lines=int(n_lines), tick_s=float(dt),
                          update_rate_hz=float(rate), hw=hw, bind=bind, scenario_drives=scenario_drives,
                          scenario_offsets=scenario_offsets, expose=expose, bus_order=val("array.bus_order"),
@@ -940,6 +987,33 @@ class ActionValidator:
         return out
 
 
+def merge_round_robin(spec: ControllerSpec, actions: Mapping[str, Any], held: np.ndarray,
+                      active_ring: int) -> Mapping[str, Any]:
+    """What the engine applies of a step's actions under ``schedule = round_robin`` (07 P2-7): every per-ring
+    (B, N) actuator channel keeps only the ``active_ring`` element; the other rings take the held command of the edge
+    (``held``: the (B, act_size) int64 act vector before the step). Other channels pass unchanged, and so does a
+    channel the validator will refuse (unknown, a sensor, wrong shape or dtype). ``active_ring`` < 0: ``actions``
+    unchanged. The kernel applies the same rule (mrm.sim.kernel._rr_apply_a); the Python path merges before
+    :class:`ActionValidator`, so only applied commands are range-checked and counted, as in the kernel."""
+    if active_ring < 0 or not isinstance(actions, Mapping):
+        return actions
+    out = dict(actions)
+    others = np.ones(spec.n_rings, dtype=bool)
+    others[int(active_ring)] = False
+    for name, v in actions.items():
+        ch = spec.channels.get(name)
+        if ch is None or ch.kind != "actuator" or tuple(ch.shape) != ("B", "N"):
+            continue
+        a = np.asarray(v)
+        if a.shape != spec.shape_of(name) or a.dtype.kind not in "biu":
+            continue
+        a = a.astype(np.int64) if a.dtype != np.uint64 else np.minimum(a, np.uint64(INT64_MAX)).astype(np.int64)
+        f = spec.layout.act_field(name)
+        a[:, others] = np.asarray(held)[:, f.offset:f.offset + f.size][:, others]
+        out[name] = a
+    return out
+
+
 TELEMETRY_KEYS: dict[str, str] = {
     "state": "int: state-machine state (controller-defined enumeration)",
     "locked": "bool: the controller declares lock (scored against Truth: missed loss of lock, false alarms)",
@@ -1056,9 +1130,11 @@ class CompositeController(_HoldMixin):
 
     ``schedule = round_robin`` time-multiplexes one datapath across the rings: at its j-th edge a child gets
     ``obs.active`` with only ring ``j % N`` set, and only that ring's (B, N) commands are applied; (B, L) channels
-    are applied whole. ``latency_ticks`` is the largest child latency (equal pipelines are the common case; a
-    shorter child pipeline is modelled conservatively). Compiled composition is not provided: a composite runs on the
-    Python path.
+    are applied whole. A child's spec carries the composite's ``schedule``. The composite itself needs the interface
+    schedule ``simultaneous`` (``controller_interface.schedule: round_robin`` would multiplex its output a second
+    time: :meth:`reset` refuses it; use this ``schedule`` instead). ``latency_ticks`` is the largest child latency
+    (equal pipelines are the common case; a shorter child pipeline is modelled conservatively). Compiled composition
+    is not provided: a composite runs on the Python path.
     """
 
     def __init__(self, children: Sequence[tuple], schedule: str = "simultaneous", name: str = "composite"):
@@ -1113,6 +1189,11 @@ class CompositeController(_HoldMixin):
         return g
 
     def reset(self, spec: ControllerSpec) -> None:
+        if spec.schedule != "simultaneous":
+            raise ValueError(f"CompositeController: controller_interface.schedule = {spec.schedule!r}; the engine "
+                             f"would multiplex the composite's output over the rings on top of its own schedule "
+                             f"({self.schedule!r}). Set the interface schedule to simultaneous and the composite's "
+                             f"schedule (controller.params.schedule) to round_robin")
         self.spec = spec
         self._hold_init()
         periods = self.child_periods(spec.tick_s)
@@ -1124,7 +1205,8 @@ class CompositeController(_HoldMixin):
                             f"1 / ({self.base_period_ticks(spec.tick_s)} * dt))")
         if errs:
             raise TimingError("; ".join(errs))
-        self._child_specs = [spec.with_period(p, ph) for p, (_, _, ph) in zip(periods, self.children)]
+        self._child_specs = [dataclasses.replace(spec.with_period(p, ph), schedule=self.schedule)
+                             for p, (_, _, ph) in zip(periods, self.children)]
         self._acc = [_Accumulator(cs) for cs in self._child_specs]
         for (ctrl, _, _), cs in zip(self.children, self._child_specs):
             ctrl.reset(cs)

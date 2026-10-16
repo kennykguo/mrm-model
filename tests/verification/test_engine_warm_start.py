@@ -16,6 +16,7 @@ import pytest
 from mrm import params
 from mrm.control import registry
 from mrm.control.api import ControllerSpec
+from mrm.plant.plant import DEFAULT_SH_DT_MAX_K as K_DT_MAX
 from mrm.plant.plant import Plant
 from mrm.sim import kernel as K
 from mrm.sim import runner
@@ -141,3 +142,55 @@ def test_quasi_static_codes_fall_back_to_code_min_in_sampled_worlds(cfg):
     assert ws["settle"]["converged"], ws["settle"]
     codes = np.asarray(ws["heater_code"])
     assert codes.shape == (8, 8) and np.any(codes == 0) and np.any(codes > 20000)
+
+
+def test_settle_reports_its_largest_step_against_the_selfheat_bound(cfg):
+    """physics_thermal review (2026-10-16): the self-heating bounds cover |T - T_ref| <= KParams.dt_max_k = 50 K for
+    every step (the comment that an auto substep scales it was wrong: nothing does). Plant.settle's first DC
+    iterations move further (~100 K from branch_low, ~240 K from branch_high at the g26 nominal), so settle() now
+    reports its largest step and the bound. Those solves are not certified by the bound alone; the settled states of
+    g26 equal those of a plant whose bound covers every step (dt_max_k 400 K), so no root was skipped."""
+    pl = _plant(cfg)
+    assert float(pl.P.dt_max_k) == K_DT_MAX
+    c = runner.load_inputs(cfg, uncertainty="nominal", variation="off")[0]
+    out = {}
+    for protocol in ("branch_low", "branch_high"):
+        for dt_max in (None, 400.0):
+            pl = _plant(cfg)
+            if dt_max is not None:
+                pl.P = pl.P._replace(dt_max_k=float(dt_max))
+            pl.reset(protocol=protocol)
+            codes = runner.warm_start_codes(pl, c)
+            pl.reset(protocol=protocol, heater_code=codes, settle=True)
+            info = pl.settle_info
+            assert info["converged"] and info["sh_dt_max_k"] == (dt_max or K_DT_MAX), info
+            out[protocol, dt_max] = (pl.S.rf[:, K.RF_T_RING, :].copy(), info["max_step_k"])
+        t50, step50 = out[protocol, None]
+        t400, step400 = out[protocol, 400.0]
+        assert step50 > K_DT_MAX and step400 < 400.0, (protocol, step50, step400)
+        np.testing.assert_allclose(t50, t400, atol=2e-3)       # the settle tolerance: the same root
+    assert out["branch_high", None][1] > out["branch_low", None][1]
+
+
+def test_selfheat_bound_is_one_value_for_both_substep_policies(cfg):
+    """KParams.dt_max_k is DEFAULT_SH_DT_MAX_K under the fixed and the auto policy alike (the auto rules cap a
+    substep's resonance move at sim.max_detuning_step_pm, so no scaling is needed), and a full-scale heater step from
+    a settled cold start moves a ring by less than the bound in one tick."""
+    c, pp, _ = runner.load_inputs(cfg, uncertainty="nominal", variation="off")
+    sc = runner._make_scenario(None, c)
+    spec = ControllerSpec.from_config(c, n_batch=1, nominal=c, scenario_drives=sc.drives, scenario_offsets=sc.offsets)
+    for policy in ("fixed", "auto"):
+        pl = Plant(pp, sc, spec, substep_policy=policy)
+        assert float(pl.P.dt_max_k) == K_DT_MAX, policy
+    pl = _plant(cfg)
+    pl.reset(protocol="branch_low", heater_code=np.zeros((1, pp.n_rings), np.int64), settle=True)
+    t_prev = pl.S.rf[:, K.RF_T_RING, :].copy()
+    full = int(np.asarray(pp.heater.code_max).max())
+    pl.reset(protocol="branch_low", heater_code=np.full((1, pp.n_rings), full, np.int64))
+    step = 0.0
+    for _ in range(200):
+        pl.run(1, mode=K.MODE_OPEN)
+        t_now = pl.S.rf[:, K.RF_T_RING, :]
+        step = max(step, float(np.max(np.abs(t_now - t_prev))))
+        t_prev = t_now.copy()
+    assert 1.0 < step < K_DT_MAX, step

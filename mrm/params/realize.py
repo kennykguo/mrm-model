@@ -58,18 +58,29 @@ _LORENTZ_MAX_SLOPE = 3.0 * math.sqrt(3.0) / 8.0
 WORLD_VARIABLES = {
     "timing.latency_scale": "multiplies every I/O latency before quantization (07 4.8 'loop latency')",
 }
-#: Jacobian output name -> (config path, how it applies, sign). 'offset' adds sign*sum(J*dg) in the leaf's units;
-#: 'lnscale' multiplies the leaf by exp(sign*sum(J*dg)) (Q_c ~ 1/K^2 to first order in K^2).
+#: Jacobian output name -> (target, how it applies, sign). 'offset' adds sign*sum(J*dg) in the leaf's units;
+#: 'lnscale' multiplies the leaf by exp(sign*sum(J*dg)); 'exp' takes the coefficients as the secant of a quantity that
+#: is exponential in the geometry (the bend radiation, extract_modes handoff): the leaf is multiplied by
+#: exp(sum(d_k*dg_k)) with d_k = d ln(value)/dp_k from the table's stored evaluations (J_k/leaf without them), so it
+#: stays positive; 'kappa2' accumulates d ln K^2 at a fixed wavelength for the R4_q geometry branch (07 P1-16: the
+#: anchors describe the nominal-geometry device, mrm.params.relations).
 JACOBIAN_TARGETS = {
     "lambda_res_nm_per_nm": (rel.P_OFFSET, "offset", -1.0),       # offset = line - resonance
     "resonance_offset_nm_per_nm": (rel.P_OFFSET, "offset", 1.0),
     "n_eff_per_nm": (rel.P_NEFF, "offset", 1.0),
     "n_g_per_nm": (rel.P_NG, "offset", 1.0),
     "dlambda_dt_pm_per_k_per_nm": (rel.P_S0, "offset", 1.0),
-    "ln_kappa2_through_per_nm": (rel.P_QT, "lnscale", -1.0),
-    "ln_kappa2_drop_per_nm": (rel.P_QD, "lnscale", -1.0),
-    "alpha_rad_db_per_cm_per_nm": (rel.P_A_RAD, "offset", 1.0),
+    "ln_kappa2_through_per_nm": ("derived.geometry.dln_kappa2_through", "kappa2", 1.0),
+    "ln_kappa2_drop_per_nm": ("derived.geometry.dln_kappa2_drop", "kappa2", 1.0),
+    "alpha_rad_db_per_cm_per_nm": (rel.P_A_RAD, "exp", 1.0),
+    "ln_alpha_rad_per_nm": (rel.P_A_RAD, "lnscale", 1.0),
 }
+#: the stored evaluation (jacobian.evaluations.<input>.plus/minus) of an 'exp' output
+_JAC_EVAL_NAME = {"alpha_rad_db_per_cm_per_nm": "alpha_rad"}
+#: coupler dispersion of each 'kappa2' output: the device's cold resonance moves by the lambda_res Jacobian, and the
+#: anchors hold at the cold resonance, so K^2 there also moves by d ln K^2/d lambda x d lambda_res
+_KAPPA2_DISPERSION = {"derived.geometry.dln_kappa2_through": "ring.optics.dln_kappa2_through_dlambda_per_nm",
+                      "derived.geometry.dln_kappa2_drop": "ring.optics.dln_kappa2_drop_dlambda_per_nm"}
 #: Jacobian input names -> variation.geometry dimension
 _JAC_DIMS = {"width_nm": "width", "film_nm": "thickness", "thickness_nm": "thickness", "slab_nm": "slab",
              "gap_through_nm": "gap_through", "gap_drop_nm": "gap_drop"}
@@ -291,6 +302,7 @@ class MonitorParams(_Frozen):
     ref_tap_coupling_frac: np.ndarray | None = None  # (B,1) bus power fraction to the tap (nan when absent)
     ref_tap_responsivity_a_per_w: np.ndarray | None = None  # (B,1) nan = the drop PD's
     ref_tap_dark_i0_a: np.ndarray | None = None  # (B,1) nan = the drop PD's
+    adc_ref_site: str = "package_base"  # ring.monitor.adc_ref_site: package_base | monitor_pd
 
 
 @dataclass(frozen=True)
@@ -446,7 +458,7 @@ class PlantParams:
         Every batched array is cut, including those inside nested dataclasses: ``thermal.system`` (the
         ThermalSystem's (B, M) residues and poles), ``thermal.inputs`` / ``thermal_inputs`` (their (B, N) gains,
         (B, 1) interim values, (B,) scales and the B scaling-hypothesis names), ``world``, ``seeds``, ``values`` and
-        the per-element diagnostics ``rom_dc_scale`` and ``geometry_draws_nm``.
+        the per-element diagnostics ``rom_dc_scale``, ``geometry_draws_nm`` and ``geometry_dlambda_res_nm``.
         """
         import dataclasses
         B = self.batch
@@ -498,6 +510,8 @@ class PlantParams:
                     d["rom_dc_scale"] = cut(np.asarray(d["rom_dc_scale"]), 1)
                 if "geometry_draws_nm" in d:
                     d["geometry_draws_nm"] = {k: cut(x) for k, x in d["geometry_draws_nm"].items()}
+                if "geometry_dlambda_res_nm" in d:
+                    d["geometry_dlambda_res_nm"] = cut(np.asarray(d["geometry_dlambda_res_nm"]))
                 kw[f.name] = d
             else:
                 kw[f.name] = v
@@ -842,37 +856,58 @@ def realize(cfg: "Config", batch: int = 1, seeds: int | np.ndarray | dict = 0, g
         prov[p] = "override"
 
     # ---- 4. variation (devices)
+    arr_nom = None
+    geo_kappa: dict[str, np.ndarray] = {}
     if var_mode == "sample":
-        _apply_geometry(cfg, arr, tables, sd["device"], layout, B, N, diag)
+        if cfg.geometry:
+            # the nominal-geometry device of every world (after the uncertainty and the grid, before any device
+            # draw): its relation solve gives the mask radius, the order and the per-pass couplings the anchors mean
+            arr_nom = {p: a.copy() for p, a in arr.items()}
+        geo_kappa = _apply_geometry(cfg, arr, tables, sd["device"], layout, B, N, diag)
         _apply_variation(cfg, arr, sd["device"], layout, B, N, L, diag)
 
     # ---- 5. SI
-    vals: dict[str, Any] = {}
-    for p, a in arr.items():
-        vals[p] = to_si(p, a)
-    for path, leaf in cfg.leaves.items():
-        if path in vals or leaf.is_free:
-            continue
-        key = sch.lookup(path)
-        if key is not None and key.type in ("float", "int") and key.level == "global" and not isinstance(
-                leaf.value, list):
-            vals[path] = to_si(path, leaf.value)
     f_grid, directions = line_frequencies_hz(cfg)
     lam_grid = C0 / f_grid
     lam_line = np.tile(lam_grid[layout.ring_to_line][None, :], (B, 1))
-    vals["derived.optics.lambda_line_m"] = lam_line
-    vals["derived.optics.lambda_res_cold_m"] = lam_line - vals[rel.P_OFFSET]
-    given = {p for p in vals if p in cfg.leaves and not cfg.leaves[p].is_free}
-    given |= {"derived.optics.lambda_line_m", "derived.optics.lambda_res_cold_m"}
+    vals, given = _si_values(cfg, arr, lam_line)
 
     # ---- 6. relations
     lat_scale = world.get("timing.latency_scale")
     lat_scale = np.ones((B, 1)) if lat_scale is None else np.asarray(lat_scale, float).reshape(B, 1)
-    ctx = rel.RelationContext(
-        vals=vals, given=given, prov=prov, order2=int(cfg.get("fidelity.thermo_optic_order")) == 2,
-        heater_anchor=str(cfg.get("fidelity.heater_anchor")),
-        tolerance={r: float(d["tolerance_rel"]) for r, d in cfg.relations_cfg.items() if "tolerance_rel" in d},
-        dt=float(cfg.si("sim.dt_plant_s")), latency_scale=lat_scale)
+    rel_kw = dict(order2=int(cfg.get("fidelity.thermo_optic_order")) == 2,
+                  heater_anchor=str(cfg.get("fidelity.heater_anchor")),
+                  tolerance={r: float(d["tolerance_rel"]) for r, d in cfg.relations_cfg.items() if "tolerance_rel" in d},
+                  dt=float(cfg.si("sim.dt_plant_s")), latency_scale=lat_scale)
+    ctx = rel.RelationContext(vals=vals, given=given, prov=prov, **rel_kw)
+    if arr_nom is not None:
+        # the device's own R4 anchor members (after a path-keyed device draw of q_loaded, say) with the nominal
+        # geometry: a coupler spread drawn on an anchor stays a coupler spread
+        for p in (rel.P_QL, rel.P_QT, rel.P_QD, rel.P_XD):
+            if p in arr:
+                arr_nom[p] = arr[p]
+        vals_n, given_n = _si_values(cfg, arr_nom, lam_line)
+        ctx_n = rel.solve(rel.RelationContext(vals=vals_n, given=given_n, prov=dict(prov), **rel_kw))
+        vn = ctx_n.vals
+        ctx.radius_hold = np.broadcast_to(np.asarray(vn[rel.P_RADIUS], float), (B, N)).copy()
+        ctx.order_hold = np.broadcast_to(np.asarray(vn[rel.P_ORDER]), (B, N)).copy()
+        ctx.coupling_anchor = {
+            "kappa2_through": np.broadcast_to(vn["derived.optics.kappa2_through"], (B, N)).copy(),
+            "kappa2_drop": np.broadcast_to(vn["derived.optics.kappa2_drop"], (B, N)).copy(),
+            "alpha_i_per_m": np.broadcast_to(vn["derived.optics.alpha_i_per_m"], (B, N)).copy(),
+            "dln_kappa2_through": geo_kappa["derived.geometry.dln_kappa2_through"],
+            "dln_kappa2_drop": geo_kappa["derived.geometry.dln_kappa2_drop"]}
+        for t, a in geo_kappa.items():
+            vals[t] = a
+            ctx.derivations[t] = rel.Derivation(
+                t, "variation.geometry", ("ring.geometry.jacobian", "ring.geometry.jacobian_coupling",
+                                          "ring.optics.dln_kappa2_through_dlambda_per_nm"
+                                          if t.endswith("through") else "ring.optics.dln_kappa2_drop_dlambda_per_nm"),
+                "sum_k J_k dg_k + D d lambda_res: d ln K^2 of the device's coupler at its cold resonance (07 P1-16)")
+        for p in ("derived.optics.kappa2_through", "derived.optics.kappa2_drop"):
+            vals[p.replace("derived.optics.", "derived.geometry.nominal_")] = ctx.coupling_anchor[
+                p.rsplit(".", 1)[1]]
+    _line_derivations(cfg, ctx)
     rel.solve(ctx)
     vals = ctx.vals
     resid = rel.residuals(vals)
@@ -1101,6 +1136,45 @@ def _assert_finite(optics: OpticsParams, thermal: ThermalParams, heater: HeaterP
                            f"quantities (an uncertainty draw, a hypothesis choice or a missing key)")
 
 
+def _si_values(cfg: "Config", arr: dict, lam_line: np.ndarray) -> tuple[dict, set]:
+    """SI values of every realizable leaf (the arrays of ``arr`` and the global numbers) and the line and cold
+    resonance wavelengths, with the set of given members for the relation solvers (step 5 of realize)."""
+    vals: dict[str, Any] = {}
+    for p, a in arr.items():
+        vals[p] = to_si(p, a)
+    for path, leaf in cfg.leaves.items():
+        if path in vals or leaf.is_free:
+            continue
+        key = sch.lookup(path)
+        if key is not None and key.type in ("float", "int") and key.level == "global" and not isinstance(
+                leaf.value, list):
+            vals[path] = to_si(path, leaf.value)
+    vals["derived.optics.lambda_line_m"] = lam_line
+    vals["derived.optics.lambda_res_cold_m"] = lam_line - vals[rel.P_OFFSET]
+    given = {p for p in vals if p in cfg.leaves and not cfg.leaves[p].is_free}
+    given |= {"derived.optics.lambda_line_m", "derived.optics.lambda_res_cold_m"}
+    return vals, given
+
+
+#: the channel-plan leaves the line wavelengths come from (07 P1-14: a derived value carries its inputs'
+#: provenance). channel_plan.ring_to_line is left out on purpose: it is the design convention every per-ring value is
+#: stated against (each ring is designed relative to its own line, ring.optics.resonance_offset_nm), and it only
+#: permutes the plan's wavelengths over the rings
+LINE_PLAN_INPUTS = ("channel_plan.lines", "channel_plan.center_thz", "channel_plan.spacing_ghz", "channel_plan.n_lines")
+
+
+def _line_derivations(cfg: "Config", ctx: rel.RelationContext) -> None:
+    """Record how the line and cold-resonance wavelengths are made (``mrm params explain``, provenance)."""
+    ins = ("channel_plan.lines",) if cfg.get("channel_plan.lines") else LINE_PLAN_INPUTS[1:]
+    ctx.derivations["derived.optics.lambda_line_m"] = rel.Derivation(
+        "derived.optics.lambda_line_m", "channel_plan", ins,
+        "lambda_line = c/f of the ring's line (channel_plan.ring_to_line); f = center + (k - (L - 1)/2) spacing, or "
+        "the channel_plan.lines table")
+    ctx.derivations["derived.optics.lambda_res_cold_m"] = rel.Derivation(
+        "derived.optics.lambda_res_cold_m", "channel_plan", ("derived.optics.lambda_line_m", rel.P_OFFSET),
+        "lambda_res = lambda_line - resonance_offset (the cold resonance, 07 P1-6)")
+
+
 # ------------------------------------------------------------------------------------------------ variation
 
 def _corr_chol(layout: LayoutParams, corr_um) -> np.ndarray | None:
@@ -1111,10 +1185,41 @@ def _corr_chol(layout: LayoutParams, corr_um) -> np.ndarray | None:
     return np.linalg.cholesky(c + 1e-12 * np.eye(c.shape[0]))
 
 
-def _apply_geometry(cfg, arr, tables, seeds, layout, B, N, diag) -> None:
+def _jac_log_derivative(jac: dict, out: str, coeffs, dims_in, leaf: np.ndarray) -> np.ndarray:
+    """d ln(value)/dp per input of an 'exp' Jacobian output, shape (n_inputs, ...) broadcastable to the leaf.
+
+    From the table's stored central-difference evaluations (``evaluations.<input>.plus/minus.<name>``, both > 0):
+    (ln v+ - ln v-)/(2 step), the exact log-slope of an exponential (extract_modes handoff: the bend radiation's
+    secant overstates the slab slope 4.8x). An input without positive evaluations uses J/leaf (the same first-order
+    slope at the leaf's value); a zero coefficient stays zero."""
+    ev = jac.get("evaluations") if isinstance(jac.get("evaluations"), dict) else {}
+    name = _JAC_EVAL_NAME.get(out)
+    leaf = np.asarray(leaf, float)
+    rows = []
+    for c, dn in zip(coeffs, dims_in):
+        c = float(c)
+        e = ev.get(dn) if name else None
+        vp = vm = None
+        if isinstance(e, dict) and isinstance(e.get("plus"), dict) and isinstance(e.get("minus"), dict):
+            vp, vm, st = e["plus"].get(name), e["minus"].get(name), e.get("step_nm")
+        if c == 0.0:
+            rows.append(np.zeros_like(leaf))
+        elif vp is not None and vm is not None and st and float(vp) > 0.0 and float(vm) > 0.0:
+            rows.append(np.full_like(leaf, (math.log(float(vp)) - math.log(float(vm))) / (2.0 * float(st))))
+        else:
+            if np.any(leaf <= 0.0):
+                raise RealizeError(f"Jacobian output {out}: the leaf must be > 0 for the exponential law")
+            rows.append(c / leaf)
+    return np.stack(rows)
+
+
+def _apply_geometry(cfg, arr, tables, seeds, layout, B, N, diag) -> dict:
+    """Draw the correlated geometry and map it through the Jacobians (07 P1-16). Moves the given leaves in ``arr``
+    and returns the per-device coupling moves {'derived.geometry.dln_kappa2_<through|drop>': (B, N) d ln K^2 at the
+    device's cold resonance} for the R4_q geometry branch ({} without a geometry)."""
     g = cfg.geometry
     if not g:
-        return
+        return {}
     dg: dict[str, np.ndarray] = {}
     for dim in _GEOM_SLOT:
         spec = g.get(dim)
@@ -1128,6 +1233,14 @@ def _apply_geometry(cfg, arr, tables, seeds, layout, B, N, diag) -> None:
             zr = zr @ ch.T
         dg[dim] = float(spec.get("die_sigma_nm", 0.0)) * zd + float(spec.get("ring_sigma_nm", 0.0)) * zr
     diag["geometry_draws_nm"] = {k: v.copy() for k, v in dg.items()}
+    if g.get("width_closes_gaps") and "width" in dg:
+        # the coupler Jacobians are partial derivatives at fixed edge-to-edge gaps: a lithographic width error of
+        # every waveguide moves both edges of each gap, so it closes the gaps by the same amount (coupling artefact
+        # note: total = d/dw - d/dgap); the gap draws are then the gaps' own error on top of it
+        for gd in ("gap_through", "gap_drop"):
+            dg[gd] = dg.get(gd, 0.0) - dg["width"]
+    kap = {t: np.zeros((B, N)) for t in _KAPPA2_DISPERSION}
+    dlam_res = np.zeros((B, N))                       # geometry move of the cold resonance (nm)
     jac_paths = g.get("jacobians", ["ring.geometry.jacobian"])
     if isinstance(jac_paths, str):
         jac_paths = [jac_paths]
@@ -1157,9 +1270,14 @@ def _apply_geometry(cfg, arr, tables, seeds, layout, B, N, diag) -> None:
                 delta = np.zeros((len(bs), N))
                 for c, dim in zip(coeffs, dims):
                     if dim in dg and c:
-                        delta += float(c) * dg[dim][bsel]
+                        delta += float(c) * np.broadcast_to(dg[dim], (B, N))[bsel]
                 if not np.any(delta):
                     continue
+                if how == "kappa2":
+                    kap[tgt][bsel] += sign * delta
+                    continue
+                if out in ("lambda_res_nm_per_nm", "resonance_offset_nm_per_nm"):
+                    dlam_res[bsel] -= sign * delta    # offset = line - resonance
                 if tgt not in arr:
                     raise RealizeError(f"{jp}.of.{out}: target {tgt} is not a given input of this config (it is "
                                        f"free or absent); the geometry cannot move it (07 P1-16)")
@@ -1167,8 +1285,24 @@ def _apply_geometry(cfg, arr, tables, seeds, layout, B, N, diag) -> None:
                     arr[tgt] = np.broadcast_to(arr[tgt], (B, N)).copy()
                 if how == "offset":
                     arr[tgt][bsel] += sign * delta
-                else:
+                elif how == "lnscale":
                     arr[tgt][bsel] *= np.exp(sign * delta)
+                else:                                 # 'exp': the secant as a log-derivative (positive values)
+                    d = _jac_log_derivative(jac, out, coeffs, jac["d"], arr[tgt][bsel])
+                    ln = np.zeros((len(bs), N))
+                    for k, dim in enumerate(dims):
+                        if dim in dg:
+                            ln += d[k] * np.broadcast_to(dg[dim], (B, N))[bsel]
+                    arr[tgt][bsel] *= np.exp(sign * ln)
+    out_k = {}
+    for t, disp in _KAPPA2_DISPERSION.items():
+        # the anchors hold at each device's own cold resonance, which the geometry moved by dlam_res: the coupler's
+        # K^2 there differs from the nominal device's by its dispersion as well (no double count at the line:
+        # mrm.plant.phase evaluates K^2(lambda_line) = K^2(lambda_res) exp(D (lambda_line - lambda_res)))
+        dd = np.broadcast_to(np.asarray(arr.get(disp, 0.0), float), (B, N))
+        out_k[t] = kap[t] + dd * dlam_res
+    diag["geometry_dlambda_res_nm"] = dlam_res.copy()
+    return out_k
 
 
 def _apply_variation(cfg, arr, seeds, layout, B, N, L, diag) -> None:
@@ -1374,7 +1508,8 @@ def _monitor(cfg, vals, timing, g, bn, b1, BN, B1) -> MonitorParams:
         ref_tap_coupling_frac=b1(g("ring.monitor.reference_tap.coupling_frac", B1, np.nan, "nan (no reference tap)")),
         ref_tap_responsivity_a_per_w=b1(g("ring.monitor.reference_tap.responsivity_a_per_w", B1, np.nan,
                                           "nan (the drop PD's)")),
-        ref_tap_dark_i0_a=b1(g("ring.monitor.reference_tap.dark_i0_na", B1, np.nan, "nan (the drop PD's)")))
+        ref_tap_dark_i0_a=b1(g("ring.monitor.reference_tap.dark_i0_na", B1, np.nan, "nan (the drop PD's)")),
+        adc_ref_site=str(cfg.get("ring.monitor.adc_ref_site") or "package_base"))
 
 
 def _need_absent(vals, given: str, missing: str, shape) -> np.ndarray:
@@ -1398,6 +1533,15 @@ def _timing(cfg, vals, lat_scale, diag) -> TimingParams:
             errs.append("ring.monitor.integration_window_s must be at least one tick")
         if win > adc:
             errs.append(f"ring.monitor.integration_window_s ({win} ticks) must fit in one ADC period ({adc} ticks)")
+        cpa = int(cfg.get("ring.monitor.adc_mux.channels_per_adc") or 1)
+        if (str(cfg.get("ring.monitor.adc_mux.order") or "round_robin") == "round_robin" and cpa > 1
+                and cpa * win > adc >= 1):
+            errs.append(f"ring.monitor.adc_mux: {cpa} rings take turns on one integrating converter, so their "
+                        f"{win}-tick windows need {cpa * win} ticks per ADC period ({adc} ticks; 07 P0-7)")
+    if (str(cfg.get("ring.monitor.adc_ref_site") or "package_base") == "monitor_pd"
+            and int(cfg.get("ring.monitor.adc_mux.channels_per_adc") or 1) > 1):
+        errs.append("ring.monitor.adc_ref_site monitor_pd puts each ring's converter at its PD, which needs "
+                    "ring.monitor.adc_mux.channels_per_adc = 1")
     mu = cfg.get("ring.heater.dac_max_update_hz")
     if ctrl and mu:
         min_period = 1.0 / float(to_si("dac_max_update_hz", mu))
@@ -1478,7 +1622,7 @@ def _temp_sensors(cfg, layout: LayoutParams, seeds, lat_scale, B: int, dt: float
 _INTERIM_FIELDS_SI = ("tau_fast_s", "share_fast_frac", "tau_slow_s", "tail_tau_s", "tail_share_frac",
                       "selfheat_tau_s", "selfheat_share_frac", "heater_self_ratio", "heater_node_tau_s",
                       "xt_nearest_frac", "xt_floor_frac", "xt_next_frac", "xt_tau_ref_s", "xt_tau_min_s",
-                      "xt_tau_far_s")
+                      "xt_tau_far_s", "site_floor_frac")
 _INTERIM_FIELDS_UM = ("xt_dist_ref_um", "xt_far_um", "site_ref_um")
 
 
@@ -1523,6 +1667,9 @@ def _assemble_thermal(tmod, cfg, tin: ThermalInputs, vals: dict, N: int, diag: d
                 kw[f] = tuple(float(x) for x in v)
         kw["xt_tau_law"] = str(cfg.get("ring.thermal.xt_tau_law"))
         kw["crosstalk_dynamics"] = str(cfg.get("ring.thermal.crosstalk_dynamics"))
+        # each ring's r_ref (R3, (B, N) in um): the crosstalk tau law takes heat-source-to-victim distances, the
+        # centre distance less the ring radii (mrm.plant.thermal.crosstalk_tau_s)
+        kw["ring_radius_um"] = np.broadcast_to(np.asarray(vals[rel.P_RADIUS], float), (B, N)) / 1e-6
         rom = tmod.InterimRom(**kw)
     else:
         rom = tmod.load_rom(tin.rom_path)
@@ -1589,7 +1736,10 @@ def _selfheat_lag_gain(cfg, optics: OpticsParams, thermal: ThermalParams, laser:
     frac = np.where(near[None], iv("xt_nearest_frac"), np.where(second[None], iv("xt_next_frac", floor), floor))
     # crosstalk pole: the plant's own law when importable (07 P1-2, 04 section 2.4: capped d^2 law, printed X2 table
     # when xt_tau_far_s is absent), else the d^2 near-field law with the given far value
-    d_um = d * 1e6                                                  # m -> um for the plant's law (um API)
+    # m -> um for the plant's law (um API); the law takes heat-source-to-victim distances: the centre distance less
+    # both ring radii (mrm.plant.thermal.crosstalk_tau_s)
+    r_um = np.asarray(optics.radius_m, float) * 1e6                 # (B,N)
+    d_um = np.maximum(d[None] * 1e6 - r_um[:, :, None] - r_um[:, None, :], 0.0)
     far_m = iv("xt_far_m")
     law = str(cfg.get("ring.thermal.xt_tau_law"))
     try:
@@ -1598,13 +1748,13 @@ def _selfheat_lag_gain(cfg, optics: OpticsParams, thermal: ThermalParams, laser:
         crosstalk_tau_s = None
     if crosstalk_tau_s is not None:
         far_s = iv("xt_tau_far_s")
-        tau = crosstalk_tau_s(d_um[None], iv("xt_tau_ref_s"), float(np.asarray(t["xt_dist_ref_m"]).ravel()[0]) * 1e6,
+        tau = crosstalk_tau_s(d_um, iv("xt_tau_ref_s"), float(np.asarray(t["xt_dist_ref_m"]).ravel()[0]) * 1e6,
                               iv("xt_tau_min_s"), far_s, float(far_m.ravel()[0]) * 1e6 if far_m is not None
                               else 100.0, law)                      # 100 um: InterimRom.xt_far_um default (07 P1-2)
     else:  # pragma: no cover
-        tau = np.maximum(iv("xt_tau_min_s"), iv("xt_tau_ref_s") * (d[None] / iv("xt_dist_ref_m")) ** 2)
+        tau = np.maximum(iv("xt_tau_min_s"), iv("xt_tau_ref_s") * (d_um * 1e-6 / iv("xt_dist_ref_m")) ** 2)
         if far_m is not None and "xt_tau_far_s" in t:
-            tau = np.where(d[None] > far_m, iv("xt_tau_far_s"), tau)
+            tau = np.where(d_um * 1e-6 > far_m, iv("xt_tau_far_s"), tau)
     scale = thermal.inputs.scales.get("time_scale_slow")
     if scale is not None:
         tau = tau * np.asarray(scale, float).reshape(-1, 1, 1)

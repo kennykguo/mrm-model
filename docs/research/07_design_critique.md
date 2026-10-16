@@ -622,6 +622,10 @@ Sources: [PHY], [ARCH], [VAL], [CTRL], [R04] §2, [R06] N5 and E1. Conflicts D15
   - self path: 3.2 µs (43 %) + 13.0 µs (57 %), plus a die and package tail of 1 to 10 ms carrying 2 to 10 %;
   - crosstalk: 3 % to the nearest neighbour (sweep 1 to 10 %) and a 1.5 % floor to every other ring (0.5 to 2.6 %),
     with first-order dynamics τ_xt = max(0.1 ms, 4.1 ms·(d/60 µm)²) up to 100 µm and 4 to 9 ms beyond;
+    [2026-10-16, physics_thermal review: d is the heat-source-to-victim distance of [R04] §2.5 (60 µm for imec's
+    first neighbour at a 100 µm pitch), i.e. the centre distance less both ring radii; the runtime passed centre
+    distances until then. The crosstalk numbers are imec's natural-convection package; the FEM ROM's TEC-held package
+    is the choice `uncertainty.thermal.stack: side_by_side_tec_held` (docs/CHANGELOG.md)]
   - the textbook's 10/300 µs and 0.1/0.03 crosstalk with the self-path dynamics become a pessimistic corner.
 - A derived diagnostic, `rom_dc_scale = efficiency_measured/(Z_FEM·dλ/dT)`, per dλ/dT hypothesis. It is printed in
   VALIDATION.md, with a warning outside [0.5, 2].
@@ -822,6 +826,8 @@ Sources: [PHY], [VAL], [R02] §10, [R06] S4, S6 and S8. Conflicts D7, D20.
   shot noise. Rename `dark_doubling_k` to `dark_activation_ev`.
 - Add `ring.monitor.background_fraction` (stray or substrate light; assumed; default 0, with a range) and an optional
   `ring.monitor.reference_tap` sensor channel with its own responsivity, coupling and dark current [R06 S8].
+  [2026-10-16, physics_sensing review: the fraction is of the total bus power at the ring, all lines; the reference
+  tap is not built in the engine yet and a config that enables it is refused (docs/CHANGELOG.md)]
 - The drop current sums every line and every resonance order, so neighbour leakage (about 0.7 % per neighbour at
   400 GHz [R06 S6]) appears on its own.
 
@@ -846,6 +852,9 @@ Sources: [CTRL] (twice), [R01] PAT-2, [R04] C11. Conflict D14.
 - ADC: `adc_inl_lsb`, `adc_dnl_lsb`, `pga_gains` with the `monitor.pga_select` actuator, `adc_ref_tempco_ppm_per_k`,
   `flicker_corner_hz`, and the baseline subtraction of the patent's integrating ADC. Heater: `dac_inl_lsb`,
   `dac_dnl_lsb`, `dac_max_update_hz`, `driver_compliance_v` (current-drive headroom as R rises through the TCR).
+  [2026-10-16, physics_sensing review: the tempco acts at `ring.monitor.adc_ref_site`, default the package base
+  temperature (the converter beside the PIC), not at each PD; rings that share a converter (adc_mux) share its DNL
+  and INL (docs/CHANGELOG.md)]
 - Faults, as scenario-bound channel masks: `adc_drop_mask`, `adc_stuck`, `adc_saturate`, `dac_glitch`,
   `controller_reset_at`. Observation flags: `monitor_valid`, `adc_overrange`.
 

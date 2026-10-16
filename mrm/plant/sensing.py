@@ -20,7 +20,13 @@ Signal chain of one monitor channel (ring n)::
       -> baseline subtraction (the patent's analog baseline subtraction, PAT-2)
       -> PGA gain (monitor.pga_select)                                                           (07 P1-10)
       -> ADC: code = x g / LSB (1 + gain_err) / (1 + tc (T_adc - T_ref)) + offset + INL bow, then quantized with
-              per-code threshold errors (DNL); clipped to 0 .. 2^bits - 1 with the overrange flag
+              per-code threshold errors (DNL); clipped to 0 .. 2^bits - 1 with the overrange flag. T_adc is the
+              temperature of the converter's voltage reference, set by ring.monitor.adc_ref_site: package_base
+              (default) = the package base temperature thermal.t_base_k + thermal.xpu_rise_k (a converter on a
+              separate electronic die beside the PIC, 07 P1-3 side_by_side; its own dissipation is not modelled),
+              monitor_pd = the ring's own PD observer (a converter next to the PD). gain_err and offset are per ring
+              (front end and converter); the DNL thresholds and the INL bow belong to the quantizer, so the C rings
+              that share one converter (adc_mux, ring n on converter n // C) share them
       -> faults: adc_saturate, adc_stuck, adc_drop                                               (07 P1-10)
       -> latency FIFO (ring.monitor.adc_latency_s), released at controller edges as a sample block (07 P0-7)
 
@@ -51,7 +57,8 @@ Randomness (07 P1-13): counter RNG of mrm/core/rng.py, keyed by (seed_b, stream,
 - shot noise: ``Stream.SHOT_NOISE``, noise seed (a separate stream, so toggling fidelity.shot_noise leaves the ADC
   noise draws unchanged);
 - DNL thresholds and the INL bow: streams ``adc_monitor_dnl`` / ``adc_monitor_inl``, DEVICE seed (a device property;
-  Plant.reset(noise_seed) never resamples it);
+  Plant.reset(noise_seed) never resamples it), keyed by the converter index n // channels_per_adc (= n without a
+  mux), not by the ring;
 - temperature sensors ``adc_temp`` (ring index = sensor index), heater readback ``adc_readback``.
 A second monitor bank (the reference tap) uses its own stream names and a slot offset (``slot_base``).
 
@@ -79,9 +86,10 @@ __all__ = [
     # enums, flags, constants
     "AFE_RC", "AFE_INTEGRATE_DUMP", "AFE_TYPES", "FAULT_ADC_DROP", "FAULT_ADC_STUCK", "FAULT_ADC_SATURATE",
     "FAULT_DAC_GLITCH", "SAMPLE_OVERRANGE", "SAMPLE_INVALID", "SAMPLE_DROPPED", "TEMP_SENSOR_TYPES",
-    "PR_RESP", "PR_BG", "PR_IBASE", "PR_GAIN_ERR", "PR_OFFSET", "PR_INL_BOW", "NPR",
+    "PR_RESP", "PR_BG", "PR_IBASE", "PR_GAIN_ERR", "PR_OFFSET", "PR_INL_BOW", "PR_ADC_UNIT", "NPR",
     "PW_GAIN_SCALE", "PW_DARK_I0", "PW_DARK_T0", "PW_DARK_EA", "PW_S_TIA", "PW_LSB", "PW_TEMPCO", "PW_T_REF",
     "PW_DNL", "PW_A_TICK", "PW_MU", "PW_DT", "NPW",
+    "ADC_REF_SITES", "ADC_REF_PACKAGE_BASE", "ADC_REF_MONITOR_PD",
     "REF_TAP_SLOT_BASE", "PAT2_T_INT_S", "PAT2_C_INT_F", "PAT2_V_REF_V", "ADC_REF_T_K_DEFAULT",
     # numba kernels
     "dark_current_a", "adc_quantize", "flicker_step", "monitor_tick_row", "monitor_tick", "monitor_tick_par",
@@ -117,14 +125,21 @@ _CODE_MASK = (1 << 40) - 1
 
 TEMP_SENSOR_TYPES = {"diode": 0, "rtd": 1, "thermistor": 2}
 
+# where the monitor ADC's voltage reference sits (ring.monitor.adc_ref_site): the temperature its tempco sees
+ADC_REF_PACKAGE_BASE = 0   # thermal.t_base_k + thermal.xpu_rise_k (converter on its own die beside the PIC)
+ADC_REF_MONITOR_PD = 1     # the ring's monitor_pd observer (converter next to the PD; one converter per ring)
+ADC_REF_SITES = {"package_base": ADC_REF_PACKAGE_BASE, "monitor_pd": ADC_REF_MONITOR_PD}
+
 # packed per-ring float parameters of a monitor bank, pr (B, N, NPR)
 PR_RESP = 0       # responsivity, A/W
 PR_BG = 1         # background (stray light) fraction of the bus power, 1
 PR_IBASE = 2      # analog baseline current subtracted before the PGA, A
 PR_GAIN_ERR = 3   # ADC gain error, fraction
 PR_OFFSET = 4     # ADC offset, codes
-PR_INL_BOW = 5    # INL bow amplitude, LSB (per device)
-NPR = 6
+PR_INL_BOW = 5    # INL bow amplitude, LSB (per device; equal for the rings of one converter)
+PR_ADC_UNIT = 6   # index of the converter that serves the ring (adc_mux: n // channels_per_adc), an exact small
+#                   integer stored as a float; it keys the DNL thresholds
+NPR = 7
 # packed per-world float parameters, pw (B, NPW)
 PW_GAIN_SCALE = 0  # lumped monitor-gain nuisance factor (07 P1-9), 1
 PW_DARK_I0 = 1     # dark current at T0, A
@@ -285,12 +300,14 @@ def monitor_tick_row(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault,
 
     Inputs (N,): p_pd_w optical power at the PD (W; the drop port sums every line and order, 07 P1-9), p_bg_w the
     bus power that the background fraction applies to (W), t_pd_k PD temperature (K, ROM observer monitor_pd),
-    t_adc_k ADC reference temperature (K), pga_sel PGA index (int64, clipped), fault mask (int8, FAULT_*).
+    t_adc_k temperature of the ADC reference (K; MonitorHw.adc_temperature: the package base or the PD observer,
+    ring.monitor.adc_ref_site), pga_sel PGA index (int64, clipped), fault mask (int8, FAULT_*).
     Parameters: pr (N, NPR), pw (NPW,), lat (ADC latency, ticks), phase (N,) sample phases (ticks, adc_mux),
     pga_gains (G,) (empty = gain 1), fl_coef (J, 10) flicker coefficients (J = 0: no flicker).
     Switches: afe_type (AFE_*), window_ticks W, period_ticks P (W <= P), code_max = 2^bits - 1, shot_on, stuck_flagged
     (a stuck converter marks its samples invalid), slot_base (counter-RNG slot offset of this bank).
-    Keys (uint64): key_adc (TIA + flicker, noise seed), key_shot (shot noise, noise seed), key_dnl (DNL, device seed).
+    Keys (uint64): key_adc (TIA + flicker, noise seed), key_shot (shot noise, noise seed), key_dnl (DNL, device seed;
+    the thresholds are keyed by the ring's converter pr[n, PR_ADC_UNIT], so rings that share a converter share them).
     State: sf (N, NSF), si (N, NSI), fx/fc (N, J), FIFO fv/fr/fm (N, C) (mrm.core.timing).
     out_sampled (N,) int8: 0 no sample, 1 sample queued, 2 sample lost because the FIFO was full.
     """
@@ -380,7 +397,8 @@ def monitor_tick_row(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_sel, fault,
             g = pga_gains[sel]
         ref = 1.0 + pw[PW_TEMPCO] * (t_adc_k[n] - pw[PW_T_REF])
         v = x * g / pw[PW_LSB] * (1.0 + pr[n, PR_GAIN_ERR]) / ref + pr[n, PR_OFFSET]
-        code, over = adc_quantize(v, pr[n, PR_INL_BOW], pw[PW_DNL], code_max, key_dnl, n, slot_base)
+        code, over = adc_quantize(v, pr[n, PR_INL_BOW], pw[PW_DNL], code_max, key_dnl, np.int64(pr[n, PR_ADC_UNIT]),
+                                  slot_base)
         flags = SAMPLE_OVERRANGE if over else 0
         f = fault[n]
         if f & FAULT_ADC_SATURATE:
@@ -948,19 +966,25 @@ def integrator_full_scale_a(t_int_s: float = PAT2_T_INT_S, c_int_f: float = PAT2
     return c_int_f * v_swing_v / t_int_s
 
 
-def draw_inl_bow_lsb(device_seeds, N: int, inl_lsb, stream_name: str = "adc_monitor_inl") -> np.ndarray:
+def draw_inl_bow_lsb(device_seeds, N: int, inl_lsb, stream_name: str = "adc_monitor_inl",
+                     channels_per_adc: int = 1) -> np.ndarray:
     """Per-device INL bow amplitudes (B, N) uniform in [-inl, +inl] LSB from the DEVICE seed (07 P1-10, P1-13).
 
-    The bow peaks at mid-scale with |INL| = |bow| (adc_quantize). inl_lsb: scalar or (B,) spec value.
+    The bow peaks at mid-scale with |INL| = |bow| (adc_quantize). inl_lsb: scalar or (B,) spec value. The bow is a
+    property of the quantizer: it is drawn per converter (key n // channels_per_adc), so the rings that share one
+    converter (adc_mux) get the same bow; channels_per_adc = 1 gives one draw per ring (key n).
     """
     seeds = np.atleast_1d(np.asarray(device_seeds, dtype=np.int64))
     B = seeds.size
     inl = _arr_b(inl_lsb, B, "inl_lsb")
     keys = _keys(seeds, B, stream_name)
+    cpa = int(channels_per_adc)
+    if cpa < 1:
+        raise ValueError("channels_per_adc must be >= 1")
     out = np.zeros((B, N))
     for b in range(B):
         for n in range(N):
-            out[b, n] = inl[b] * (2.0 * _rng.uniform(keys[b], n, 0, _SLOT_INL) - 1.0)
+            out[b, n] = inl[b] * (2.0 * _rng.uniform(keys[b], n // cpa, 0, _SLOT_INL) - 1.0)
     return out
 
 
@@ -990,11 +1014,30 @@ class MonitorHw:
     stream: str = "adc_monitor"  # noise stream of the TIA/flicker draws; DNL/INL use stream + '_dnl' / '_inl'
     afe_tau_s: float = 0.0
     device_seeds: np.ndarray | None = None  # (B,) int64 device seeds (DNL thresholds); set by from_plant_params
+    adc_ref_site: int = ADC_REF_PACKAGE_BASE  # ADC_REF_*: where the ADC reference sits (ring.monitor.adc_ref_site)
+    channels_per_adc: int = 1    # adc_mux: rings per converter (ring n on converter n // C)
 
     @property
     def lsb_a(self) -> np.ndarray:
         """ADC LSB at PGA gain 1, A per code, (B,)."""
         return self.pw[:, PW_LSB].copy()
+
+    def adc_temperature(self, t_pd_k=None, t_base_k=None) -> np.ndarray:
+        """Temperature of the ADC reference (B, N), K, by ``adc_ref_site``: monitor_pd -> t_pd_k (default: the dark
+        current reference temperature); package_base -> t_base_k, the package base temperature thermal.t_base_k +
+        thermal.xpu_rise_k (scalar, (B,) or (B, N); default: the trim temperature T_ref, i.e. no tempco error).
+        The engine computes the same value per tick (mrm.sim.kernel row RF_T_ADC)."""
+        B, N = self.B, self.N
+        if self.adc_ref_site == ADC_REF_MONITOR_PD:
+            if t_pd_k is None:
+                return np.ascontiguousarray(np.broadcast_to(self.pw[:, PW_DARK_T0][:, None], (B, N))).copy()
+            return _arr_bn(t_pd_k, B, N, "t_pd_k")
+        if t_base_k is None:
+            return np.ascontiguousarray(np.broadcast_to(self.pw[:, PW_T_REF][:, None], (B, N))).copy()
+        t = np.asarray(t_base_k, dtype=np.float64)
+        if t.ndim == 1:                                  # a 1-D base temperature is per world, never per ring
+            t = t.reshape(-1, 1)
+        return _arr_bn(t, B, N, "t_base_k")
 
     @classmethod
     def build(cls, B: int, N: int, dt_s: float, *, responsivity_a_per_w, adc_full_scale_a, gain_scale=1.0,
@@ -1007,9 +1050,10 @@ class MonitorHw:
               flicker_f_max_hz: float | None = None, flicker_per_decade: int = _FLICKER_PER_DECADE,
               adc_ref_tempco_per_k=0.0, adc_ref_t_k=ADC_REF_T_K_DEFAULT, pga_gains=(), channels_per_adc: int = 1,
               mux_order: str = "round_robin", shot_noise: bool = True, stuck_flagged: bool = True,
-              slot_base: int = 0, stream: str = "adc_monitor") -> "MonitorHw":
+              slot_base: int = 0, stream: str = "adc_monitor", adc_ref_site="package_base") -> "MonitorHw":
         """Build from SI values. Arrays broadcast: per ring (B, N) for responsivity, background_fraction, baseline_a,
-        adc_offset_codes, adc_gain_error_frac, adc_inl_bow_lsb; per world (B,) for the rest.
+        adc_offset_codes, adc_gain_error_frac, adc_inl_bow_lsb; per world (B,) for the rest. A 1-D array of length N
+        is per ring (pass a per-world array as (B, 1)).
 
         Defaults are fallbacks for tests; presets own the real values. Their provenance: integration window 2 us
         (printed example, PAT-2), adc_rate_hz 250 kHz (inferred: a dual-slope conversion is the 2 us integration plus
@@ -1020,9 +1064,18 @@ class MonitorHw:
 
         afe_type: 'integrate_dump' (default, 07 P0-7; window integration_window_s, whole ticks, <= the ADC period) or
         'rc' (afe_tau_s). adc_rate_hz is the rate PER RING (docs/handoff/core_control_api.md item 7); the ADC period
-        must be whole ticks. adc_mux (07 P0-7): with channels_per_adc = C, 'round_robin' staggers ring n by
-        floor((n mod C) P / C) ticks (one converter serves C rings in turn); 'bank' samples every ring at phase 0
-        (simultaneous sample-and-hold; assumed meaning). adc_full_scale_a: input current at code 2^bits - 1 (PGA 1).
+        must be whole ticks. adc_mux (07 P0-7): with channels_per_adc = C, ring n is served by converter n // C.
+        'round_robin' staggers ring n by floor((n mod C) P / C) ticks: one integrating converter (07 P0-7: the PAT-2
+        dual-slope ADC, whose integrator is the converter) serves its C rings in turn, so their integrate-and-dump
+        windows must not overlap, C W <= P (checked). The conversion (de-integration) time is not modelled: it is
+        carried by adc_latency_s, and a shared dual-slope converter also needs C (W + T_deint) <= P, which the
+        preset's adc_rate_hz must respect. 'bank' samples every ring at phase 0 (simultaneous sample-and-hold: a
+        front end per ring ahead of the shared quantizer; assumed meaning). Under both orders the C rings share
+        the quantizer's DNL thresholds and INL bow (adc_inl_bow_lsb must be equal for them; checked); the per-ring
+        adc_offset_codes and adc_gain_error_frac belong to the front end and stay per ring.
+        adc_ref_site ('package_base' default, or 'monitor_pd'; ADC_REF_SITES): where the reference whose tempco
+        adc_ref_tempco_per_k acts sits (:meth:`adc_temperature`); monitor_pd needs channels_per_adc = 1 (one
+        converter per ring, at its PD). adc_full_scale_a: input current at code 2^bits - 1 (PGA 1).
         dark_activation_ev: E_a in eV (07 D20: 0.35-0.38). adc_dnl_lsb: peak |DNL| (clipped to 1).
         input_noise_a_per_rt_hz: one-sided input-referred white current noise density; flicker_corner_hz its 1/f
         corner. shot_noise = fidelity.shot_noise. stuck_flagged: a stuck converter marks its samples invalid
@@ -1070,10 +1123,23 @@ class MonitorHw:
             raise ValueError("channels_per_adc must be >= 1")
         if mux_order == "round_robin":
             phase = np.array([((n % cpa) * period) // cpa for n in range(N)], dtype=np.int64)
+            if afe == AFE_INTEGRATE_DUMP and cpa > 1 and cpa * window > period:
+                raise ValueError(
+                    f"adc_mux round_robin: {cpa} rings share one integrating converter, so their {window}-tick "
+                    f"integration windows need {cpa} x {window} = {cpa * window} ticks per ADC period, which is only "
+                    f"{period} ticks (overlapping windows of one integrator; shorten "
+                    "ring.monitor.integration_window_s, lower ring.monitor.adc_rate_hz or use adc_mux.order bank)")
         elif mux_order == "bank":
             phase = np.zeros(N, dtype=np.int64)
         else:
             raise ValueError("mux_order must be 'round_robin' or 'bank'")
+        site = ADC_REF_SITES.get(adc_ref_site, -1) if isinstance(adc_ref_site, str) else int(adc_ref_site)
+        if site not in ADC_REF_SITES.values():
+            raise ValueError(f"adc_ref_site must be one of {tuple(ADC_REF_SITES)}")
+        if site == ADC_REF_MONITOR_PD and cpa > 1:
+            raise ValueError("adc_ref_site monitor_pd puts each ring's converter at its own PD, but "
+                             f"channels_per_adc = {cpa} rings share one converter")
+        unit = np.arange(N) // cpa
         pr = np.zeros((B, N, NPR))
         pr[:, :, PR_RESP] = _arr_bn(responsivity_a_per_w, B, N, "responsivity_a_per_w")
         pr[:, :, PR_BG] = _arr_bn(background_fraction, B, N, "background_fraction")
@@ -1081,6 +1147,12 @@ class MonitorHw:
         pr[:, :, PR_GAIN_ERR] = _arr_bn(adc_gain_error_frac, B, N, "adc_gain_error_frac")
         pr[:, :, PR_OFFSET] = _arr_bn(adc_offset_codes, B, N, "adc_offset_codes")
         pr[:, :, PR_INL_BOW] = _arr_bn(adc_inl_bow_lsb, B, N, "adc_inl_bow_lsb")
+        pr[:, :, PR_ADC_UNIT] = unit[None, :]
+        if cpa > 1:
+            bow = pr[:, :, PR_INL_BOW]
+            if np.any(bow != bow[:, (unit * cpa)]):
+                raise ValueError("adc_inl_bow_lsb: the rings that share one converter (adc_mux, ring n on converter "
+                                 "n // channels_per_adc) share its INL bow (draw_inl_bow_lsb(..., channels_per_adc))")
         noise = _arr_b(input_noise_a_per_rt_hz, B, "input_noise_a_per_rt_hz")
         pw = np.zeros((B, NPW))
         pw[:, PW_GAIN_SCALE] = _arr_b(gain_scale, B, "gain_scale")
@@ -1107,7 +1179,7 @@ class MonitorHw:
                    adc_bits=bits, code_max=code_max, shot_on=int(bool(shot_noise)),
                    stuck_flagged=int(bool(stuck_flagged)), phase=phase, latency_ticks=lat_ticks, pga_gains=gains,
                    pr=pr, pw=pw, fl_coef=_stack_coefs(coefs), slot_base=int(slot_base), stream=str(stream),
-                   afe_tau_s=tau)
+                   afe_tau_s=tau, adc_ref_site=int(site), channels_per_adc=cpa)
 
     @classmethod
     def from_plant_params(cls, pp, *, baseline_a=None, mux_order: str | None = None, stuck_flagged: bool | None = None,
@@ -1121,14 +1193,27 @@ class MonitorHw:
         hw.device_seeds). An absent ring.monitor.dark_activation_ev takes 0.37 eV (inferred, 02 section 10; realize
         now defaults it the same way). baseline_a, mux_order, stuck_flagged and flicker_f_min_hz default to the
         MonitorParams fields (ring.monitor.baseline_ua, adc_mux.order, stuck_flagged, flicker_band_min_hz; integrator
-        additions); a keyword argument overrides them.
+        additions); a keyword argument overrides them. The ADC reference site is ring.monitor.adc_ref_site
+        (MonitorParams.adc_ref_site).
+
+        Raises NotImplementedError for ring.monitor.reference_tap.present: the reference tap (07 P1-9) is not built
+        from PlantParams (no tx.monitor_ref.* channels exist, and the optics do not take the tap's coupling_frac
+        share of the bus power), so a config with the tap is refused instead of being run without it. The Python
+        building blocks (:meth:`reference_tap`, SensingBank(ref_tap=...)) remain for hand-built studies.
         """
         m, t = pp.monitor, pp.timing
+        if bool(getattr(m, "ref_tap_present", False)):
+            raise NotImplementedError(
+                "ring.monitor.reference_tap.present is true, but the reference tap is not built from PlantParams: the "
+                "engine has no tx.monitor_ref.* channels and the optics do not take its coupling_frac share of the "
+                "bus power (docs/ENGINE.md section 10). Remove the key; for a hand-built study use "
+                "MonitorHw.build(...).reference_tap() with SensingBank(ref_tap=...)")
         B, N = int(pp.batch), int(pp.n_rings)
         dt = float(t.dt_s)
         if baseline_a is None:
             bl = getattr(m, "baseline_a", None)
-            baseline_a = 0.0 if bl is None else np.asarray(bl, dtype=float).reshape(-1)
+            # (B, 1): one baseline per world. A flat (B,) array would read as per ring when B == N (build's 1-D rule)
+            baseline_a = 0.0 if bl is None else np.asarray(bl, dtype=float).reshape(-1, 1)
         if mux_order is None:
             mux_order = str(getattr(m, "mux_order", "round_robin"))
         if stuck_flagged is None:
@@ -1136,7 +1221,8 @@ class MonitorHw:
         if flicker_f_min_hz is None:
             flicker_f_min_hz = float(getattr(m, "flicker_band_min_hz", _FLICKER_F_MIN_HZ))
         inl = np.asarray(m.adc_inl_lsb, dtype=float).reshape(-1)
-        bow = draw_inl_bow_lsb(pp.seeds["device"], N, inl) if np.any(inl > 0) else 0.0
+        cpa = int(m.channels_per_adc)
+        bow = draw_inl_bow_lsb(pp.seeds["device"], N, inl, channels_per_adc=cpa) if np.any(inl > 0) else 0.0
         afe = int(m.afe_type)
         ea_ev = m.dark_activation_j.reshape(-1) / Q_E
         if "ring.monitor.dark_activation_ev" not in (getattr(pp, "values", None) or {}):
@@ -1157,8 +1243,9 @@ class MonitorHw:
             flicker_corner_hz=m.flicker_corner_hz.reshape(-1), flicker_f_min_hz=flicker_f_min_hz,
             flicker_f_max_hz=flicker_f_max_hz, flicker_per_decade=flicker_per_decade,
             adc_ref_tempco_per_k=m.adc_ref_tempco_per_k.reshape(-1), adc_ref_t_k=adc_ref_t_k,
-            pga_gains=m.pga_gains, channels_per_adc=m.channels_per_adc, mux_order=mux_order,
-            shot_noise=bool(pp.flags.shot_noise), stuck_flagged=stuck_flagged)
+            pga_gains=m.pga_gains, channels_per_adc=cpa, mux_order=mux_order,
+            shot_noise=bool(pp.flags.shot_noise), stuck_flagged=stuck_flagged,
+            adc_ref_site=str(getattr(m, "adc_ref_site", "package_base")))
         hw.device_seeds = _arr_b(pp.seeds["device"], B, "pp.seeds['device']", np.int64)
         return hw
 
@@ -1184,11 +1271,13 @@ class MonitorHw:
                          latency_ticks=self.latency_ticks.copy(), pga_gains=self.pga_gains.copy(), pr=pr, pw=pw,
                          fl_coef=self.fl_coef.copy(), slot_base=self.slot_base + REF_TAP_SLOT_BASE, stream=stream,
                          afe_tau_s=self.afe_tau_s,
-                         device_seeds=None if self.device_seeds is None else self.device_seeds.copy())
+                         device_seeds=None if self.device_seeds is None else self.device_seeds.copy(),
+                         adc_ref_site=self.adc_ref_site, channels_per_adc=self.channels_per_adc)
 
     def ideal_code(self, i_a, pga_select=0, t_adc_k=None) -> np.ndarray:
         """Ideal (unquantized, noiseless) ADC code of a PD current i_a (A, broadcast to (B, N)): the transfer used by
-        the kernel without INL, DNL or clipping. For calibration replicas and tests."""
+        the kernel without INL, DNL or clipping. For calibration replicas and tests. t_adc_k: temperature of the ADC
+        reference (default T_ref; :meth:`adc_temperature` gives the plant's value for this hardware's site)."""
         i = _arr_bn(i_a, self.B, self.N, "i_a")
         g = 1.0
         if self.pga_gains.size:
@@ -1317,17 +1406,20 @@ class MonitorBank:
         self.fifo_lost = 0
 
     def tick(self, k: int, p_pd_w, p_bg_w=0.0, t_pd_k=None, t_adc_k=None, pga_select=None, fault=None,
-             parallel: bool = False) -> np.ndarray:
+             parallel: bool = False, t_base_k=None) -> np.ndarray:
         """Integrate interval [k, k+1). p_pd_w, p_bg_w in W; t_pd_k (default: the dark-current reference
-        temperature), t_adc_k (default: t_pd_k) in K; pga_select int; fault int8 FAULT_* masks. All broadcast to
-        (B, N). Returns out_sampled (B, N) int8 (a view)."""
+        temperature) in K; t_adc_k, the temperature of the ADC reference (K; default
+        ``hw.adc_temperature(t_pd_k, t_base_k)``: the PD temperature for adc_ref_site monitor_pd, the package base
+        temperature t_base_k (thermal.t_base_k + thermal.xpu_rise_k at k + 1; default T_ref) for package_base);
+        pga_select int; fault int8 FAULT_* masks. All broadcast to (B, N). Returns out_sampled (B, N) int8 (a
+        view)."""
         hw = self.hw
         B, N = hw.B, hw.N
         p = _arr_bn(p_pd_w, B, N, "p_pd_w")
         pb = _arr_bn(p_bg_w, B, N, "p_bg_w")
         t_pd = (np.ascontiguousarray(np.broadcast_to(hw.pw[:, PW_DARK_T0][:, None], (B, N))) if t_pd_k is None
                 else _arr_bn(t_pd_k, B, N, "t_pd_k"))
-        t_adc = t_pd if t_adc_k is None else _arr_bn(t_adc_k, B, N, "t_adc_k")
+        t_adc = hw.adc_temperature(t_pd, t_base_k) if t_adc_k is None else _arr_bn(t_adc_k, B, N, "t_adc_k")
         sel = self._zeros_i64 if pga_select is None else _arr_bn(pga_select, B, N, "pga_select", np.int64)
         flt = self._zeros_i8 if fault is None else _arr_bn(fault, B, N, "fault", np.int8)
         fn = monitor_tick_par if parallel else monitor_tick
@@ -1359,11 +1451,11 @@ class MonitorBank:
         return sensors, new
 
     def level_codes(self, p1_w, p0_w, p_bg_w=0.0, t_pd_k=None, t_adc_k=None, pga_select=None, tau_s: float = 0.0,
-                    noise_a_per_rt_hz: float | None = None, rin_per_hz=0.0):
+                    noise_a_per_rt_hz: float | None = None, rin_per_hz=0.0, t_base_k=None):
         """(mu1, mu0, sig1, sig0) (B, N) codes of the two NRZ levels for the bit-statistics sampler
         (:func:`monitor_level_codes_row`). noise_a_per_rt_hz: input noise density of the bit-rate sampler front end
         (one-sided, A/sqrt(Hz)); None uses the monitor's own input_noise_a_per_rt_hz. rin_per_hz: laser RIN (1/Hz,
-        scalar or (B,)) seen at the sampler bandwidth."""
+        scalar or (B,)) seen at the sampler bandwidth. t_adc_k / t_base_k as in :meth:`tick`."""
         hw = self.hw
         B, N = hw.B, hw.N
         p1 = _arr_bn(p1_w, B, N, "p1_w")
@@ -1371,7 +1463,7 @@ class MonitorBank:
         pb = _arr_bn(p_bg_w, B, N, "p_bg_w")
         t_pd = (np.ascontiguousarray(np.broadcast_to(hw.pw[:, PW_DARK_T0][:, None], (B, N))) if t_pd_k is None
                 else _arr_bn(t_pd_k, B, N, "t_pd_k"))
-        t_adc = t_pd if t_adc_k is None else _arr_bn(t_adc_k, B, N, "t_adc_k")
+        t_adc = hw.adc_temperature(t_pd, t_base_k) if t_adc_k is None else _arr_bn(t_adc_k, B, N, "t_adc_k")
         sel = self._zeros_i64 if pga_select is None else _arr_bn(pga_select, B, N, "pga_select", np.int64)
         s_tia = -1.0 if noise_a_per_rt_hz is None else float(noise_a_per_rt_hz) ** 2
         rin = _arr_b(rin_per_hz, B, "rin_per_hz")
@@ -1678,10 +1770,13 @@ class SensingBank:
                 bank.reset(noise_seeds)
 
     def tick(self, k: int, *, p_pd_w, p_bg_w=0.0, t_pd_k=None, t_adc_k=None, pga_select=None, fault=None,
-             t_site_k=None, heater_v=None, heater_i=None, p_ref_w=None) -> None:
-        self.monitor.tick(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_select, fault)
+             t_site_k=None, heater_v=None, heater_i=None, p_ref_w=None, t_base_k=None) -> None:
+        """One plant interval [k, k+1) of every bank (arguments as in :meth:`MonitorBank.tick`; t_base_k is the
+        package base temperature the ADC reference sees under adc_ref_site package_base)."""
+        self.monitor.tick(k, p_pd_w, p_bg_w, t_pd_k, t_adc_k, pga_select, fault, t_base_k=t_base_k)
         if self.ref_tap is not None:
-            self.ref_tap.tick(k, 0.0 if p_ref_w is None else p_ref_w, 0.0, t_pd_k, t_adc_k, pga_select, None)
+            self.ref_tap.tick(k, 0.0 if p_ref_w is None else p_ref_w, 0.0, t_pd_k, t_adc_k, pga_select, None,
+                              t_base_k=t_base_k)
         if self.temps is not None and self.temps.hw.S > 0:
             if t_site_k is None:
                 raise ValueError("temperature sensors need t_site_k (B, S)")

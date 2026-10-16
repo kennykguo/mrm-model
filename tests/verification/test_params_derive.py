@@ -84,8 +84,51 @@ def test_index_weight_below_ceiling_under_h_solver(d):
 
 
 def test_next_order_distance(d):
-    # 4 lines at -600, -200, 200, 600 GHz around the centre; FSR 1.8 THz
-    np.testing.assert_allclose(d.diagnostics["next_order_distance_ghz"], [600, 1000, 1000, 600], atol=1e-6)
+    """BND-1 diagnostic from the plant's phase model (07 P1-6): every other order of a ring locked on its own line sits
+    where the cold phase curve, translated by the lock shift, puts it. Checked against the kernel's independent order
+    solve (mrm.sim.kernel.cold_coordinate, exact derivative). Before the physics_optics review the diagnostic used
+    the ideal comb f_line + k FSR (here [600, 1000, 1000, 600] GHz: 4 lines at -600, -200, 200, 600 GHz, FSR
+    1.8 THz), which leaves out the lock shift's squeeze of the comb and the dispersion."""
+    from mrm.plant import phase as ph
+    from mrm.sim import kernel as K
+    p = d.params
+    phs = ph.PhaseParams.from_plant_params(p)
+    f = np.asarray(p.laser.line_freq_hz)[0]
+    want = []
+    for n in range(p.n_rings):
+        rp = phs.ring[0, n]
+        a = int(p.layout.ring_to_line[n])
+        lam_res = rp[ph.RP_LAM_RES]
+        m = round(rp[ph.RP_N_EFF] * rp[ph.RP_LEN] / lam_res)
+        shift = C0 / f[a] - lam_res
+        fsr_m = lam_res ** 2 * p.optics.fsr_hz[0, n] / C0
+        best = math.inf
+        for k in (-2, -1, 1, 2):                         # span 1.2 THz < FSR: orders +-1, +-2
+            x = K.cold_coordinate(rp, lam_res - k * fsr_m, float(m + k))
+            best = min(best, float(np.min(np.abs(C0 / (x + shift) - np.delete(f, a)))))
+        want.append(best / 1e9)
+    np.testing.assert_allclose(d.diagnostics["next_order_distance_ghz"], want, rtol=1e-9)
+    assert np.max(np.abs(d.diagnostics["next_order_distance_ghz"] - [600, 1000, 1000, 600])) > 1.0
+
+
+@pytest.mark.parametrize("preset", ["g26", "g26_fsr_edge", "g26_fsr_window_a"])
+def test_next_order_distance_is_the_bnd1_replica(preset):
+    """derive's next_order_distance_fwhm is the BND-1 replica's distance (mrm.validation.replicas.
+    adjacent_order_penalty: the plant's comb, each order's FWHM) for the nominal world, per ring and as the bank
+    minimum, and its warning follows the 2 FWHM threshold. Before the physics_optics review derive published 3.37
+    FWHM for g26 (replica 2.79), 1.17 for g26_fsr_edge (1.33) and 2.16-2.19 for g26_fsr_window_a (1.68, a soft fail
+    for which derive gave no warning)."""
+    R = pytest.importorskip("mrm.validation.replicas")
+    dd = derive(load(preset))
+    got = dd.diagnostics["next_order_distance_fwhm"]
+    rep = R.adjacent_order_penalty(preset, batch=1)
+    assert float(got.min()) == pytest.approx(rep.value, rel=1e-8)
+    per_ring = {}
+    for row in rep.detail["rows"]:                     # the 16 closest (ring, order) pairs
+        per_ring[row["ring"]] = min(per_ring.get(row["ring"], math.inf), row["distance_fwhm"])
+    for ring, v in per_ring.items():
+        assert float(got[ring]) == pytest.approx(v, rel=1e-8), ring
+    assert any("BND-1" in w for w in dd.warnings) == (rep.value < 2.0)
 
 
 def test_identifiable_block(d):
@@ -101,11 +144,18 @@ def test_identifiable_block(d):
 
 
 def test_provenance_propagates_weakest(d):
-    # efficiency = FSR/P_FSR: the FSR is the given fsr_thz (printed; R was solved from it and n_g), P_FSR printed
-    # -> printed (07 D16: the efficiency inherits the FSR hypothesis). The radius depends on n_g (inferred).
+    # efficiency = FSR_lambda/P_FSR: the FSR is the given fsr_thz (printed; R was solved from it and n_g), P_FSR
+    # printed (07 D16: the efficiency inherits the FSR hypothesis); without ring.heater.p_fsr_ref_wavelength_nm the
+    # FSR_lambda is at the ring's line, which comes from the channel plan (07 P1-14): mini's n_lines is assumed.
+    # The radius depends on n_g (inferred).
     from mrm.params.derive import effective_provenance
     cfg = load(MINI)
-    assert effective_provenance("ring.heater.efficiency_nm_per_mw", cfg, d.params.derivations) == "printed"
+    assert effective_provenance("derived.optics.fsr_hz", cfg, d.params.derivations) == "printed"
+    assert effective_provenance("derived.optics.lambda_line_m", cfg, d.params.derivations) == "assumed"
+    assert effective_provenance("ring.heater.efficiency_nm_per_mw", cfg, d.params.derivations) == "assumed"
+    ref = load(MINI, overrides={"ring.heater.p_fsr_ref_wavelength_nm": 1309.5})   # override: tagged 'override'
+    dr = derive(ref)
+    assert effective_provenance("ring.heater.efficiency_nm_per_mw", ref, dr.params.derivations) == "override"
     assert effective_provenance("ring.geometry.radius_um", cfg, d.params.derivations) == "inferred"
     assert effective_provenance("ring.optics.q_intrinsic", cfg, d.params.derivations) == "assumed"
     assert d.provenance["bistability_ratio"] == "assumed"
@@ -119,7 +169,8 @@ def test_provenance_propagates_weakest(d):
     cfg2 = load(m)
     der = derive(cfg2, thermal_hook=None).params.derivations
     assert effective_provenance("derived.optics.fsr_hz", cfg2, der) == "inferred"
-    assert effective_provenance("ring.heater.efficiency_nm_per_mw", cfg2, der) == "inferred"
+    # the efficiency (FSR_lambda at the line) also carries mini's line plan (n_lines assumed)
+    assert effective_provenance("ring.heater.efficiency_nm_per_mw", cfg2, der) == "assumed"
 
 
 def test_explain_chain(cfg):

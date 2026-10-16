@@ -72,7 +72,7 @@ def test_bare_number_in_experiment_is_override(tmp_path):
     # like an overrides= value it holds in every world: the q_loaded interval is pinned (it was drawn before)
     from mrm.params.realize import realize
     assert cfg.uncertainty["q_loaded"].pinned == "override"
-    assert np.all(realize(cfg, 8, 0, thermal_hook=None).optics.q_loaded == 4000)
+    assert np.all(realize(cfg, 8, 0, variation="off", thermal_hook=None).optics.q_loaded == 4000)
 
 
 def test_leaf_needs_provenance_generation_source():
@@ -230,9 +230,11 @@ def test_overrides_dict_and_strings():
     lf = cfg.leaf("ring.optics.q_loaded")
     assert lf.value == 4100 and lf.provenance == "override" and lf.base_provenance == "read-off"
     assert cfg.uncertainty["q_loaded"].pinned == "override"
-    cfg = load(MINI, overrides=["ring.optics.q_loaded=4100", "uncertainty.q_loaded.high=4500",
+    cfg = load(MINI, overrides=["ring.optics.q_loaded=4100", "uncertainty.q_loaded.high=4150",
                                 "variation.ring.heater.r_cold_ohm.ring_sigma=1.0", "controller.params.kp=0.3"])
-    assert cfg.uncertainty["q_loaded"].fields["high"] == 4500
+    assert cfg.uncertainty["q_loaded"].fields["high"] == 4150
+    with pytest.raises(ConfigError, match="outside the range"):     # a world's value must lie in the leaf's range
+        load(MINI, overrides=["uncertainty.q_loaded.high=4500"])
     assert cfg.variation["ring.heater.r_cold_ohm"].fields["ring_sigma"] == 1.0
     assert cfg.get("controller.params.kp") == 0.3
     with pytest.raises(ConfigError, match="must be 'path=value'"):

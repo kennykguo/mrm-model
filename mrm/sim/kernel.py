@@ -59,10 +59,10 @@ from mrm.plant.datapath import (bitstat_window_row, ber_from_oma, errors_release
                                 pattern_tick_row)
 from mrm.plant.io import (apply_act_row, clip_act_row, pack_obs_row, pipe_pop_row, pipe_push_row)
 from mrm.plant.laser import laser_tick_row
-from mrm.plant.sensing import (FAULT_DAC_GLITCH, SAMPLE_DROPPED, _CODE_MASK, _FLAG_SHIFT, PR_BG, PR_RESP,
-                               PW_DARK_EA, PW_DARK_I0, PW_DARK_T0, PW_GAIN_SCALE, dark_current_a, fault_mask_row,
-                               monitor_level_codes_row, monitor_release_row, monitor_tick_row, readback_release_row,
-                               readback_tick_row, temp_release_row, temp_tick_row)
+from mrm.plant.sensing import (ADC_REF_MONITOR_PD, FAULT_DAC_GLITCH, SAMPLE_DROPPED, _CODE_MASK, _FLAG_SHIFT,
+                               PR_BG, PR_RESP, PW_DARK_EA, PW_DARK_I0, PW_DARK_T0, PW_GAIN_SCALE, dark_current_a,
+                               fault_mask_row, monitor_level_codes_row, monitor_release_row, monitor_tick_row,
+                               readback_release_row, readback_tick_row, temp_release_row, temp_tick_row)
 from mrm.scenarios import generators as _sg
 from mrm.sim.metrics import (AI_WIN_TICKS, MPI_BER_WIN, TR, N_TR, metrics_tick_row, record_tick_row)
 from mrm.units import C0
@@ -91,7 +91,8 @@ _RF_NAMES = ("bi_ys", "bi_yo", "bi_hold", "bi_vt", "bi_vavg", "bi_vend",
              "rho", "dens", "td", "swing", "en", "boff", "bias_v", "glitch",
              "p_pd", "p_bg", "t_pd", "oma", "dp_lam", "mu1", "mu0", "sig1", "sig0",
              "oracle", "oracle_unr", "det", "ber", "bits", "p_abs", "swing_v",
-             "ppd_prev", "tpd_prev", "lamres_prev", "pabs_prev", "t_sens_prev", "pbg_prev", "bi_vt0", "i_dark")
+             "ppd_prev", "tpd_prev", "lamres_prev", "pabs_prev", "t_sens_prev", "pbg_prev", "bi_vt0", "i_dark",
+             "t_adc")
 RF = {n: i for i, n in enumerate(_RF_NAMES)}
 NRF = len(_RF_NAMES)
 # per-ring int64 block S.ri (B, NRI, N)
@@ -114,7 +115,8 @@ NRB = len(_RB_NAMES)
 # per-world int64 S.wi (B, NWI)
 _WI_NAMES = ("edge_next", "edge_idx", "k_reset", "n_fail", "pipe_over", "mon_lost", "mon_fifo_lost", "bs_new",
              "oracle_next", "pending_edge", "ctrl_reset", "ctrl_reset_prev", "n_substeps", "n_ticks", "sat_total",
-             "temp_lost", "rb_lost", "err_lost", "sub_h_max", "fast_calls", "sh_iter", "last_h")
+             "temp_lost", "rb_lost", "err_lost", "sub_h_max", "fast_calls", "sh_iter", "last_h", "sat_first_tick",
+             "sat_first_elem", "sat_first_val")
 WI = {n: i for i, n in enumerate(_WI_NAMES)}
 NWI = len(_WI_NAMES)
 # per-world float S.wf (B, NWF)
@@ -133,7 +135,7 @@ NLF = len(_LF_NAMES)
  RF_P_NEW, RF_T_NEW, RF_PMAX, RF_D2P, RF_DPDT, RF_V_LO, RF_V_HI, RF_CJ, RF_RS, RF_PJ, RF_PD, RF_RHO, RF_DENS, RF_TD,
  RF_SWING, RF_EN, RF_BOFF, RF_BIAS_V, RF_GLITCH, RF_P_PD, RF_P_BG, RF_T_PD, RF_OMA, RF_DP_LAM, RF_MU1, RF_MU0,
  RF_SIG1, RF_SIG0, RF_ORACLE, RF_ORACLE_UNR, RF_DET, RF_BER, RF_BITS, RF_P_ABS, RF_SWING_V, RF_PPD_PREV,
- RF_TPD_PREV, RF_LAMRES_PREV, RF_PABS_PREV, RF_T_SENS_PREV, RF_PBG_PREV, RF_BI_VT0, RF_I_DARK) = range(NRF)
+ RF_TPD_PREV, RF_LAMRES_PREV, RF_PABS_PREV, RF_T_SENS_PREV, RF_PBG_PREV, RF_BI_VT0, RF_I_DARK, RF_T_ADC) = range(NRF)
 (RI_BI_REG, RI_BI_PEND, RI_BI_LAST, RI_BI_CODE, RI_BI_CMD, RI_BI_EFF, RI_HE_REG, RI_HE_PEND, RI_HE_LAST, RI_HE_CODE,
  RI_HE_CMD, RI_HE_ADD, RI_HE_EFF, RI_N_ITER, RI_DP_BITPOS, RI_DP_ONES, RI_DP_BITS, RI_DP_N1, RI_DP_NB, RI_DP_ERR,
  RI_BS_ABOVE, RI_BS_N1, RI_BS_A1, RI_BS_A0, RI_MO_COUNT, RI_MO_LATEST, RI_RB_V, RI_RB_I, RI_ASSIGN, RI_BS_THR,
@@ -144,7 +146,8 @@ NLF = len(_LF_NAMES)
  RB_ERR_NEW) = range(NRB)
 (WI_EDGE_NEXT, WI_EDGE_IDX, WI_K_RESET, WI_N_FAIL, WI_PIPE_OVER, WI_MON_LOST, WI_MON_FIFO_LOST, WI_BS_NEW,
  WI_ORACLE_NEXT, WI_PENDING_EDGE, WI_CTRL_RESET, WI_CTRL_RESET_PREV, WI_N_SUBSTEPS, WI_N_TICKS, WI_SAT_TOTAL,
- WI_TEMP_LOST, WI_RB_LOST, WI_ERR_LOST, WI_SUB_H_MAX, WI_FAST_CALLS, WI_SH_ITER, WI_LAST_H) = range(NWI)
+ WI_TEMP_LOST, WI_RB_LOST, WI_ERR_LOST, WI_SUB_H_MAX, WI_FAST_CALLS, WI_SH_ITER, WI_LAST_H, WI_SAT_FIRST_TICK,
+ WI_SAT_FIRST_ELEM, WI_SAT_FIRST_VAL) = range(NWI)
 (WF_T_BASE0, WF_T_BASE1, WF_HE_SCALE, WF_RATE, WF_BI_SCALE, WF_RAMP, WF_LOSS_KEY, WF_LOSS_VAL) = range(NWF)
 (LF_F, LF_P, LF_PCHIP, LF_LAM, LF_EN, LF_DF, LF_PS, LF_TUNE_HZ, LF_EN_B, LF_PDB_KEY, LF_PDB_POW) = range(NLF)
 
@@ -198,7 +201,7 @@ _SI_NC = _sg.SI_NC
 KParams = namedtuple("KParams", [
     # sizes, switches, timing
     "n_rings", "n_lines", "dt", "self_heating", "use_tcmt", "m_orders", "period", "phase", "jitter", "key_sched",
-    "ctrl_latency", "reset_protocol", "ramp_ticks", "bias_ctrl", "policy", "fast_on",
+    "ctrl_latency", "reset_protocol", "ramp_ticks", "bias_ctrl", "policy", "fast_on", "schedule",
     # optics / phase
     "ph_ring", "jt_grid", "jt_dn", "jt_al", "jt_c", "jt_rs", "jt_cum", "sh_args_i", "bus_order", "ring_to_line", "fwhm_hz",
     "z_opt_self", "dt_max_k", "sh_max_iter", "sh_tol", "sh_n_outer",
@@ -223,7 +226,7 @@ KParams = namedtuple("KParams", [
     "th_agg_src", "th_pd_obs", "th_temp_obs", "th_src_scale",
     # monitor
     "mo_pr", "mo_pw", "mo_lat", "mo_phase", "mo_pga", "mo_fl", "mo_afe", "mo_win", "mo_period", "mo_cmax",
-    "mo_shot", "mo_stuck", "mo_slot", "mo_key_adc", "mo_key_shot", "mo_key_dnl",
+    "mo_shot", "mo_stuck", "mo_slot", "mo_key_adc", "mo_key_shot", "mo_key_dnl", "mo_adc_site",
     # temperature sensors
     "ts_tp", "ts_period", "ts_lat", "ts_cmax", "ts_fl", "ts_key",
     # heater readback
@@ -1036,21 +1039,23 @@ def _implicit_step_eng(x, coef, uu, ms_exo, ms_cross, idx_ax, opt_tab, lag_obs, 
 def release_row(P, S, b, k):
     """Event-order step 2 at controller edge k for world b: release the monitor, temperature, readback and
     error-counter FIFOs, run the bit-statistics window, and pack obs_i64 (07 P0-6, P0-7, P0-11). :func:`_release_a`
-    on world b's arrays."""
+    on world b's arrays; the observation's active ring is :func:`_active_ring` of the edge (07 P2-7)."""
     _release_a(k, P.n_rings, _row(P.mo_lat, b), S.mo_fv[b], S.mo_fr[b], S.mo_fm[b], S.mo_samples[b], S.mo_ticks[b],
                S.rf[b], S.ri[b], S.rb[b], S.wi[b], S.ts_fv[b], S.ts_fr[b], S.ts_fm[b], S.ts_latest[b], S.ts_new[b],
                P.rb_on, S.rb_fv[b], S.rb_fr[b], S.rb_fm[b], S.dp_fv[b], S.dp_fr[b], S.dp_fm[b], S.sh_args_f[b],
                P.sh_args_i[b], P.mo_pr[b], P.mo_pw[b], P.mo_pga, P.mo_shot, P.dp_bs_tau, P.dp_bs_stia, P.dp_rin[b],
-               P.dp_win_bits, P.dp_mode, P.dp_words, P.dp_pre, P.dp_period, P.dp_key_dp[b], S.obs[b], P.obs_map)
+               P.dp_win_bits, P.dp_mode, P.dp_words, P.dp_pre, P.dp_period, P.dp_key_dp[b], S.obs[b], P.obs_map,
+               _active_ring(S.wi[b], P.schedule, P.n_rings))
 
 
 @njit(cache=True, _nrt=False)
 def _release_a(k, n_r, mo_lat, mo_fv, mo_fr, mo_fm, mo_samples, mo_ticks, rf, ri, rbb, wi, ts_fv, ts_fr, ts_fm,
                ts_latest, ts_new, rb_on, rb_fv, rb_fr, rb_fm, dp_fv, dp_fr, dp_fm, args_f, args_i, mo_pr, mo_pw, mo_pga,
                mo_shot, dp_bs_tau, dp_bs_stia, dp_rin, dp_win_bits, dp_mode, dp_words, dp_pre, dp_period, dp_key,
-               obs, obs_map):
+               obs, obs_map, active):
     """:func:`release_row` on one world's arrays (a call that takes the KParams/KState tuples copies all ~270 array
-    structs, ~0.4 us; docs/handoff/perf.md R2-8). The same calls in the same order."""
+    structs, ~0.4 us; docs/handoff/perf.md R2-8). The same calls in the same order. ``active``: the ring this edge
+    updates under round_robin, -1 for every ring (packed into the observation header, OBS_ACTIVE_RING)."""
     lost = monitor_release_row(k, mo_lat, mo_fv, mo_fr, mo_fm, mo_samples, mo_ticks, ri[RI_MO_COUNT],
                                ri[RI_MO_LATEST], rbb[RB_MO_VALID], rbb[RB_MO_OVER], rbb[RB_MO_NEW])
     wi[WI_MON_LOST] += lost
@@ -1059,17 +1064,19 @@ def _release_a(k, n_r, mo_lat, mo_fv, mo_fr, mo_fm, mo_samples, mo_ticks, rf, ri
     if rb_on != 0:
         readback_release_row(k, rb_fv, rb_fr, rb_fm, ri[RI_RB_V], ri[RI_RB_I], rbb[RB_RB_NEW])
     errors_release_row(k, dp_fv, dp_fr, dp_fm, ri[RI_DP_ERR], rbb[RB_ERR_VALID])
-    # bit statistics (07 P0-11): level codes of the last interval through the sampler bandwidth, then the window
+    # bit statistics (07 P0-11): level codes of the last interval through the sampler bandwidth, then the window of
+    # the last bits at the scenario's ones density (RF_DENS; the realized n1/nb of a tick, RF_RHO, is never exactly
+    # 0.5 under a PRBS and would miss the exact PRBS window)
     o = args_i[_op.SH_O_OR]
     n_sh = args_i[_op.SH_N]
     monitor_level_codes_row(args_f[o + _op.R_DROP_SUM1 * n_sh:o + (_op.R_DROP_SUM1 + 1) * n_sh],
                             args_f[o + _op.R_DROP_SUM0 * n_sh:o + (_op.R_DROP_SUM0 + 1) * n_sh], rf[RF_P_BG],
-                            rf[RF_T_PD], rf[RF_T_PD], ri[RI_PGA], mo_pr, mo_pw, mo_pga, mo_shot, dp_bs_tau, rf[RF_MU1],
+                            rf[RF_T_PD], rf[RF_T_ADC], ri[RI_PGA], mo_pr, mo_pw, mo_pga, mo_shot, dp_bs_tau, rf[RF_MU1],
                             rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0], dp_bs_stia, dp_rin)
-    bitstat_window_row(k, dp_win_bits, dp_mode, rf[RF_RHO], rf[RF_MU1], rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0],
+    bitstat_window_row(k, dp_win_bits, dp_mode, rf[RF_DENS], rf[RF_MU1], rf[RF_MU0], rf[RF_SIG1], rf[RF_SIG0],
                        ri[RI_BS_THR], dp_words, dp_pre, dp_period, ri[RI_DP_BITPOS], dp_key,
                        ri[RI_BS_ABOVE], ri[RI_BS_N1], ri[RI_BS_A1], ri[RI_BS_A0])
-    pack_obs_row(obs, obs_map, k, -1, mo_samples, mo_ticks, ri[RI_MO_COUNT], ri[RI_MO_LATEST],
+    pack_obs_row(obs, obs_map, k, active, mo_samples, mo_ticks, ri[RI_MO_COUNT], ri[RI_MO_LATEST],
                  rbb[RB_MO_VALID], rbb[RB_MO_OVER], rbb[RB_MO_NEW], ts_latest, ts_new, ri[RI_RB_V], ri[RI_RB_I],
                  rbb[RB_RB_NEW], ri[RI_DP_ONES], ri[RI_DP_BITS], ri[RI_BS_ABOVE], True, ri[RI_DP_ERR],
                  rbb[RB_ERR_VALID], ri[RI_HE_REG], ri[RI_BI_REG])
@@ -1145,13 +1152,63 @@ def _sync_act_a(act, act_map, he_reg, bi_reg):
 
 
 @njit(cache=True, _nrt=False)
+def _first_out_of_range_a(act, act_map, wi, k):
+    """Record the first out-of-range command element of the world (tick, act_i64 index, value) in
+    wi[WI_SAT_FIRST_*], before the clip (the runner raises ActionRangeError from it under on_out_of_range: error)."""
+    for i in range(act_map.shape[0]):
+        o = act_map[i, 1]
+        lo = act_map[i, 3]
+        hi = act_map[i, 4]
+        for j in range(act_map[i, 2]):
+            v = act[o + j]
+            if v < lo or v > hi:
+                wi[WI_SAT_FIRST_TICK] = k
+                wi[WI_SAT_FIRST_ELEM] = o + j
+                wi[WI_SAT_FIRST_VAL] = v
+                return
+
+
+@njit(cache=True, _nrt=False)
 def _push_act_a(act, act_map, sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, latency):
     """Event-order step 4: clip every actuator to its channel range (in the held vector itself, so the controller
-    sees the clipped command next time as the applied register does), count the clipped elements, and queue the
-    command to latch at k + Controller.latency_ticks."""
+    sees the clipped command next time as the applied register does), count the clipped elements (the first one
+    also in wi[WI_SAT_FIRST_*]), and queue the command to latch at k + Controller.latency_ticks."""
+    if wi[WI_SAT_FIRST_TICK] < 0:
+        _first_out_of_range_a(act, act_map, wi, k)
     wi[WI_SAT_TOTAL] += clip_act_row(act, act_map, sat)
     if not pipe_push_row(pipe_vals, pipe_ticks, pipe_meta, act, k + latency):
         wi[WI_PIPE_OVER] += 1
+
+
+@njit(cache=True, _nrt=False)
+def _active_ring(wi, schedule, n_r):
+    """07 P2-7 ``controller_interface.schedule``: the ring that controller edge j (wi[WI_EDGE_IDX], counted from the
+    controller phase) updates under round_robin, j % N; -1 (every ring) when simultaneous."""
+    if schedule != 0 and n_r > 0:
+        return wi[WI_EDGE_IDX] % n_r
+    return np.int64(-1)
+
+
+@njit(cache=True, _nrt=False)
+def _rr_save_a(act, save):
+    """Round robin: keep the held command of the edge before the controller writes it (save: S.act_tmp[b], free at
+    an edge: the pipeline pop that fills it runs after the edge)."""
+    for i in range(act.shape[0]):
+        save[i] = act[i]
+
+
+@njit(cache=True, _nrt=False)
+def _rr_apply_a(act, save, act_map, active):
+    """Round robin (07 P2-7): of every per-ring actuator channel ((B, N): act_map column 5) only the active ring's
+    command is applied; every other ring keeps its held command of the edge. Channels that are not per ring
+    ((B, L), (B, 1)) are applied whole, as in mrm.control.api.CompositeController."""
+    for i in range(act_map.shape[0]):
+        if act_map[i, 5] == 0:
+            continue
+        o = act_map[i, 1]
+        for j in range(act_map[i, 2]):
+            if j != active:
+                act[o + j] = save[o + j]
 
 
 @njit(cache=True, _nrt=False)
@@ -1839,6 +1896,8 @@ def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, 
         #     docs/handoff/perf.md R2-8)
         if first and resume != 0:
             # Python path: obs of edge k was packed by the previous call and the Python step wrote S.act
+            if P.schedule != 0:
+                _rr_apply_a(c_act, S.act_tmp[b], P.act_map, _active_ring(wi, P.schedule, n_r))
             _push_act_a(c_act, P.act_map, c_sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, P.ctrl_latency)
             _advance_edge_a(wi, P.phase, P.period, P.jitter, key_sched)
         else:
@@ -1851,7 +1910,10 @@ def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, 
                            S.rb_fv[b], S.rb_fr[b], S.rb_fm[b], S.dp_fv[b], S.dp_fr[b], S.dp_fm[b], args_f, args_i,
                            P.mo_pr[b], mo_pw, P.mo_pga, P.mo_shot, P.dp_bs_tau, P.dp_bs_stia, P.dp_rin[b],
                            P.dp_win_bits, P.dp_mode, P.dp_words, P.dp_pre, P.dp_period, P.dp_key_dp[b], c_obs,
-                           P.obs_map)
+                           P.obs_map, _active_ring(wi, P.schedule, n_r))
+                if mode != MODE_OPEN and P.schedule != 0:
+                    # round robin: the held command of the edge, before a controller reset or step changes it
+                    _rr_save_a(c_act, S.act_tmp[b])
                 if mode == MODE_PYTHON:
                     wi[WI_PENDING_EDGE] = k
                     return k - k0
@@ -1864,6 +1926,8 @@ def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, 
                         _sync_act_a(c_act, P.act_map, ri[RI_HE_REG], ri[RI_BI_REG])
                         wi[WI_CTRL_RESET] = 0
                     step_fn(c_pi, c_pf, c_si, c_sf, c_obs, c_act)
+                    if P.schedule != 0:
+                        _rr_apply_a(c_act, S.act_tmp[b], P.act_map, _active_ring(wi, P.schedule, n_r))
                     _push_act_a(c_act, P.act_map, c_sat, pipe_vals, pipe_ticks, pipe_meta, wi, k, P.ctrl_latency)
                 _advance_edge_a(wi, P.phase, P.period, P.jitter, key_sched)
         first = False
@@ -2202,6 +2266,9 @@ def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, 
             rf[RF_P_BG, n] = pb
             po = P.th_pd_obs[n]
             rf[RF_T_PD, n] = t_obs[po] if po >= 0 else rf[RF_T_RING, n]
+            # the ADC reference temperature (ring.monitor.adc_ref_site): the package base at the end of the interval
+            # (a converter on its own die beside the PIC), or the ring's PD observer
+            rf[RF_T_ADC, n] = rf[RF_T_PD, n] if P.mo_adc_site == ADC_REF_MONITOR_PD else wf[WF_T_BASE1]
             # the PD dark current of the interval, once for the monitor and Truth (the expression both used)
             rf[RF_I_DARK, n] = dark_current_a(mo_pw[PW_DARK_I0], rf[RF_T_PD, n], mo_pw[PW_DARK_T0], mo_pw[PW_DARK_EA])
             dl = _decl(assign, r2l, n_l, n)
@@ -2230,7 +2297,7 @@ def _world_loop(step_fn, fast_fn, b, k0, n_ticks, mode, resume, P, S, n_r, n_l, 
                 fr_ = 1.0 / h
                 for n in range(n_r):
                     rf[RF_P_PD, n] = rf[RF_PPD_PREV, n] + fr_ * (out_r[_op.R_DROP_SUM, n] - rf[RF_PPD_PREV, n])
-            monitor_tick_row(kk, rf[RF_P_PD], rf[RF_P_BG], rf[RF_T_PD], rf[RF_T_PD], ri[RI_PGA], r8[R8_FAULT],
+            monitor_tick_row(kk, rf[RF_P_PD], rf[RF_P_BG], rf[RF_T_PD], rf[RF_T_ADC], ri[RI_PGA], r8[R8_FAULT],
                              P.mo_pr[b], P.mo_pw[b], mo_lat, P.mo_phase, P.mo_pga, P.mo_fl[b], P.mo_afe, P.mo_win,
                              P.mo_period, P.mo_cmax, P.mo_shot, P.mo_stuck, P.mo_slot, P.mo_key_adc[b],
                              P.mo_key_shot[b], P.mo_key_dnl[b], S.mo_sf[b], S.mo_si[b], S.mo_fx[b], S.mo_fc[b],

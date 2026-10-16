@@ -180,7 +180,7 @@ def p_sensors(P, S, b, k0, n):
     nts = S.ts_in.shape[1]
     for i in range(n):
         kk = k0 + i
-        monitor_tick_row(kk, rf[K.RF_P_PD], rf[K.RF_P_BG], rf[K.RF_T_PD], rf[K.RF_T_PD], ri[K.RI_PGA], r8[K.R8_FAULT],
+        monitor_tick_row(kk, rf[K.RF_P_PD], rf[K.RF_P_BG], rf[K.RF_T_PD], rf[K.RF_T_ADC], ri[K.RI_PGA], r8[K.R8_FAULT],
                          P.mo_pr[b], P.mo_pw[b], _row(P.mo_lat, b), P.mo_phase, P.mo_pga, P.mo_fl[b], P.mo_afe,
                          P.mo_win, P.mo_period, P.mo_cmax, P.mo_shot, P.mo_stuck, P.mo_slot, P.mo_key_adc[b],
                          P.mo_key_shot[b], P.mo_key_dnl[b], S.mo_sf[b], S.mo_si[b], S.mo_fx[b], S.mo_fc[b],
@@ -207,7 +207,7 @@ def p_monitor(P, S, b, k0, n):
     ri = S.ri[b]
     r8 = S.r8[b]
     for i in range(n):
-        monitor_tick_row(k0 + i, rf[K.RF_P_PD], rf[K.RF_P_BG], rf[K.RF_T_PD], rf[K.RF_T_PD], ri[K.RI_PGA],
+        monitor_tick_row(k0 + i, rf[K.RF_P_PD], rf[K.RF_P_BG], rf[K.RF_T_PD], rf[K.RF_T_ADC], ri[K.RI_PGA],
                          r8[K.R8_FAULT], P.mo_pr[b], P.mo_pw[b], _row(P.mo_lat, b), P.mo_phase, P.mo_pga, P.mo_fl[b],
                          P.mo_afe, P.mo_win, P.mo_period, P.mo_cmax, P.mo_shot, P.mo_stuck, P.mo_slot,
                          P.mo_key_adc[b], P.mo_key_shot[b], P.mo_key_dnl[b], S.mo_sf[b], S.mo_si[b], S.mo_fx[b],

@@ -125,8 +125,18 @@ Physics read-outs:
   response is 21 % at 1 us and 81 % at 10 us (no undercut), 9 % / 42 % with the undercut. z_ratio = Z_opt/Z_heater =
   1.32-1.76 (>= 1, as expected for an external heater). (Pole-by-pole DC shares are not unique between fits; quote
   step fractions.)
-- Crosstalk at 50 um pitch: 0.7-1.0 % of the self DC, first-order-like with a 63 % time of 0.11-0.12 ms (the d^2 law
-  of 04 gives 0.1-0.3 ms at 15-30 um; consistent). The long-range floor is the package: P x R_pkg = 0.002 K/mW
+- Crosstalk at 50 um pitch: 0.7-1.0 % of the self DC with a 63 % time of 0.11-0.12 ms.
+  **[physics_thermal review 2026-10-16] Corrected:** this line also said "first-order-like" and "(the d^2 law of 04
+  gives 0.1-0.3 ms at 15-30 um; consistent)". Both were wrong: the response is not first-order-like
+  (in-ring 160: 10 / 63 / 90 % at 20 us / 0.117 ms / 2.73 ms; a single pole has t90/t63 = 2.3, here 23), and it is
+  not consistent with the interim law. 04 gives 0.1-0.3 ms at 15 um only (0.43-1.0 ms at 30 um), the runtime does
+  not evaluate the law at 15-30 um, and at the g26 pitch the interim model (imec numbers, natural convection with an
+  EIC on top) put the nearest neighbour on one 2.85 ms pole (1.52 ms since the distance-convention fix of the same
+  review: centre distance less the ring radii), 13-24x slower than this FEM, and time_scale_slow (0.5-2) did not
+  close the gap. The difference is the package: this FEM's TEC-held Robin boundary (R_pkg 2 K/W) against imec's large
+  R_pkg. The FEM-like numbers are now the weight-0 choice `uncertainty.thermal.stack: side_by_side_tec_held` (corner
+  `g26_tec_package`, in the named corners); the open conflict is VALIDATION.md closure-crosstalk-dynamics
+  (`tests/closure/test_thermal_crosstalk.py`). The long-range floor is the package: P x R_pkg = 0.002 K/mW
   (R_pkg 2 K/W for the assumed TEC-held package), i.e. 0.07 % of Z_heater->ring per ring; imec's 1.3-2.6 % floor was
   measured with natural convection and an EIC on top (much larger R_pkg). `sub_um` 100 um raises the 50 um crosstalk
   by 43 %; Dirichlet instead of the package Robin lowers it by 9 %.
@@ -431,6 +441,8 @@ more memory. Recorded in the sidecars as `mesh.memory_cap` (every artefact) and 
      1.7 us)". The artefact gives 38.5 % of the DC in poles below 1 us
      (`summary.share_of_dc_in_poles_below_1us_opt_ring`) and 54 % of the step response at 1 us; t63 1.76 us is right.
      Please correct the note (pole shares are not unique between fits; quote the step fraction).
+     **Done 2026-10-16** (physics_thermal review): the note quotes 27 % at 100 ns, 54 % at 1 us, 63 % at 1.76 us and
+     the 38.5 % pole share; `tests/closure/test_thermal_notes.py` recomputes every number from this artefact.
    - [review] In ROM mode `realize` loads one `ring.thermal.rom_file` for every world: the family, film and stack
      hypotheses (`uncertainty.thermal.family`, the film hypothesis, `uncertainty.thermal.stack`) do not select
      different artefacts, and the review's ROM run had to drop them to load. Six artefacts exist (3 families x 2

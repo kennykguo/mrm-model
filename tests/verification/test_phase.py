@@ -150,3 +150,63 @@ def test_drop_over_absorbed_is_kappa_ratio_through_the_optics(pp, pparams):
         r = op.bus_propagate(np.full(lam.shape, 1e-3), o["phi0"][sl], o["k2t"][sl], o["k2d"][sl], o["a0"][sl],
                              o["trt"][sl], o["e0"][sl], method=method, m_orders=1)
         np.testing.assert_allclose(r.drop[0] * ratio, r.absorbed[0], rtol=tol)
+
+
+def test_rigid_comb_against_the_solver_table():
+    """The documented accuracy of the rigid translation (module docstring, equation 2; physics_optics review, finding
+    1): a heated ring's order m + k sits at x_k + delta in the phase model (x_k its cold position), while the bent
+    mode's n_eff(lambda, T) table of the modes artefact (rib160, with L(T) from its expansion) puts it at
+    x_k + delta (1 + kappa (x_k - lambda_res)). Measured kappa = 4.1-4.5e-4 /nm (g26 nominal, the 7.6 nm lock,
+    rings 0, 4, 7, orders +-1 and +-2): +-33 pm (0.10 FWHM) at the adjacent orders, +-66 pm at the second ones.
+    The locked order itself is exact. If the phase law changes, update the module docstring and this bound."""
+    import json
+    from pathlib import Path
+
+    from scipy import integrate, optimize
+
+    from mrm.sim import kernel as K
+    art = json.loads((Path(ph.__file__).resolve().parents[1] / "data" / "extracted" / "modes_rib160.json").read_text())
+    tab = art["n_eff_table"]
+    lam_t = np.asarray(tab["lambda_nm"], float)
+    t_t = np.asarray(tab["t_c"], float) + 273.15
+    n_t = np.asarray(tab["n_eff"], float)
+    basis = lambda lam_nm, t_k: np.array([(lam_nm - 1310.0) ** i * ((t_k - 298.15) / 100.0) ** j
+                                          for i in range(3) for j in range(4)])
+    A = np.array([basis(lv, tv) for lv in lam_t for tv in t_t])
+    coef = np.linalg.lstsq(A, n_t.reshape(-1), rcond=None)[0]
+    assert np.sqrt(np.mean((A @ coef - n_t.reshape(-1)) ** 2)) < 1e-5            # the fit reproduces the table
+    n_tab = lambda lam_m, t_k: float(coef @ basis(lam_m * 1e9, t_k))
+    al = art["alpha_l_per_k"]
+    p_al = np.polyfit(np.asarray(al["t_c"], float), np.asarray(al["value"], float), 2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cfg = params.load("g26")
+        pnom = params.realize(cfg, 1, seeds=0, uncertainty="nominal", variation="off")
+    phs = ph.PhaseParams.from_plant_params(pnom)
+    f = np.asarray(pnom.laser.line_freq_hz)[0]
+    kappas = []
+    for n in (0, 4, 7):
+        rp = phs.ring[0, n]
+        lam_r, ne, ng, dng, ln, t_ref = (rp[ph.RP_LAM_RES], rp[ph.RP_N_EFF], rp[ph.RP_N_G], rp[ph.RP_DNG],
+                                         rp[ph.RP_LEN], rp[ph.RP_T_REF])
+        m = round(ne * ln / lam_r)
+        lam_line = C0 / f[int(pnom.layout.ring_to_line[n])]
+        delta = lam_line - lam_r
+
+        def nl_hot(x, t_k):
+            d = x - lam_r
+            n_cold = ne + (ne - ng) * d / lam_r - 0.5 * dng * d * d / lam_r          # the phase model's cold curve
+            stretch = math.exp(integrate.quad(lambda tc: np.polyval(p_al, tc), t_ref - 273.15, t_k - 273.15)[0])
+            return (n_cold + n_tab(x, t_k) - n_tab(x, t_ref)) * ln * stretch
+
+        t_lock = optimize.brentq(lambda t_k: nl_hot(lam_line, t_k) - m * lam_line, t_ref, t_ref + 400.0)
+        fsr_m = lam_r ** 2 * pnom.optics.fsr_hz[0, n] / C0
+        for k in (-2, -1, 1, 2):
+            x_k = K.cold_coordinate(rp, lam_r - k * fsr_m, float(m + k))
+            solver = optimize.brentq(lambda x: nl_hot(x, t_lock) - (m + k) * x, x_k, x_k + 2.0 * delta, xtol=1e-18)
+            kappas.append((solver - (x_k + delta)) / (delta * (x_k - lam_r) * 1e9))   # per nm of order distance
+        x_m = K.cold_coordinate(rp, lam_r, float(m))
+        assert x_m + delta == pytest.approx(lam_line, abs=1e-16)                    # the locked order: exact
+    kappas = np.asarray(kappas)
+    print(f"\nrigid-comb error rate kappa: {kappas.min():.3e} .. {kappas.max():.3e} per nm (x shift x distance)")
+    assert np.all((kappas > 3.5e-4) & (kappas < 5.0e-4)), kappas

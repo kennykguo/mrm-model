@@ -210,8 +210,10 @@ def test_float_vs_fixed_on_the_same_observations_within_the_derived_bound(record
     assert (diff <= bound).all(), (diff.max(), bound.min())
     assert diff.max() <= 1, diff.max()               # measured: one rounding boundary at most
     # the worst-case gain-quantization part grows with sum |e| (ring 0 reaches ~4e5 ADC codes in 400 steps):
-    # derived bound 1.19 codes at the end of this run; the measured difference stays at one rounding boundary
-    assert 1.0 <= bound.max() < 1.25, bound.max()
+    # derived bound 1.28 codes at the end of this run (1.19 before the 2026-10-16 crosstalk-distance fix, whose
+    # faster aggressor -> ring 0 pole, 0.62 instead of 1.03 ms, gives larger errors; the recording was regenerated,
+    # docs/CHANGELOG.md); the measured difference stays at one rounding boundary
+    assert 1.0 <= bound.max() < 1.32, bound.max()
 
 
 def test_float_vs_fixed_closed_loop(cfg, recorded):

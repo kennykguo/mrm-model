@@ -33,11 +33,15 @@ Public API (stable for the next agents)
   ``factory_table`` (a
   mrm.control.calibration.FactoryCalTable handed to ``controller.load_factory_cal`` before its reset when the
   controller has that method: the warm start of 07 P1-1), ``path`` ('auto' | 'compiled' | 'python'), ``n_threads``,
-  ``oracle``, ``histogram``, ``chunk_ticks`` (ticks per kernel call on the compiled path, default 1e5),
+  ``oracle``, ``histogram``, ``chunk_ticks`` (ticks per kernel call on the compiled and open-loop paths, default
+  1e5; without tick jitter every call ends on a controller edge, so it changes no result: ``_block_end``),
   ``controller_params`` (a mapping, passed to mrm.control.registry.create when ``controller`` is a name), ``cfg``,
   ``auto_max_ticks``, ``oracle_period_ticks``, ``score_from_s`` (the metric accumulators restart at this time:
   the start-up of a controller, e.g. a peak map, is left out of the metrics; records, plant and controller are not
-  touched; first_lock_s and time_to_lock_s are then relative to it), and the engine numerics ``sh_tol_k``
+  touched, under the auto substep policy only when the split is on a controller edge (else ScoreSplitWarning: the
+  split ends a substep) and, for runs longer than metrics.ber_sample_period_s after it, a whole number of BER
+  windows after the reset (the restarted BER windows' ends cap substeps); first_lock_s and time_to_lock_s are then
+  relative to it), and the engine numerics ``sh_tol_k``
   (self-heating root tolerance, K)
   and ``optics_far_hold`` (the far-line hold of the self-heating optics, a bounded approximation, default off;
   mrm.plant.plant.Plant, docs/handoff/perf.md).
@@ -65,14 +69,16 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from mrm.control.api import CompiledController, ControllerSpec, Observation, controller_fast_kernel
+from mrm.control.api import (CompiledController, ControllerSpec, Observation, controller_fast_kernel,
+                             merge_round_robin)
+from mrm.core.channels import OBS_ACTIVE_RING
 from mrm.core.timing import seconds_to_ticks
 from mrm.plant.plant import Plant, Truth
 from mrm.sim import kernel as K
 from mrm.sim.metrics import MetricsSpec, RecordSpec
 
 __all__ = ["run", "RunResult", "quasi_static", "QuasiStaticResult", "load_inputs", "warm_start_codes",
-           "WARM_START_MODES"]
+           "WARM_START_MODES", "DATA_STATE_KEYS", "reset_data_state", "ScoreSplitWarning"]
 
 #: ``run(..., heater_code=<mode>)`` / :func:`warm_start_codes` modes
 WARM_START_MODES = ("quasi_static", "quasi_static_reachable")
@@ -203,6 +209,9 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
         ctrl.reset(spec)
     segments, score_tick = _score_segments(plant, n_ticks, dt, options.get("score_from_s"),
                                            python_path=ctrl is not None and not compiled)
+    chunk = int(options.get("chunk_ticks", DEFAULT_CHUNK_TICKS))
+    if chunk < 1:
+        raise ValueError(f"chunk_ticks must be >= 1, got {chunk}")
     if ctrl is not None and not compiled and spec.tick_jitter_ticks > 0:
         raise NotImplementedError("the Python controller path needs edges shared by every world (no tick "
                                   "jitter); use a CompiledController")
@@ -215,13 +224,15 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
             # kept (mrm.sim.metrics.MetricsState.restart)
             plant.metrics_state.restart(plant.tick, np.ascontiguousarray(plant.S.ri[:, K.RI_HE_REG, :]))
         if ctrl is None:
-            _run_open(plant, n_seg, n_threads)
+            _run_open(plant, n_seg, n_threads, chunk=chunk)
             ctrl_name = None
         elif compiled:
-            chunk = int(options.get("chunk_ticks", 100_000))
             k_end = plant.tick + n_seg
             while plant.tick < k_end:
-                plant.run(min(chunk, k_end - plant.tick), mode=K.MODE_COMPILED, step_fn=ctrl.step_fn, fast_fn=fast)
+                plant.run(_block_end(plant, k_end, chunk) - plant.tick, mode=K.MODE_COMPILED, step_fn=ctrl.step_fn,
+                          fast_fn=fast)
+                if spec.on_out_of_range == "error":
+                    _raise_if_clipped(plant, spec)
             ctrl_name = ctrl.name
         else:
             _run_python(plant, ctrl, spec, n_seg, fast, bind=i_seg == 0)
@@ -242,7 +253,7 @@ def run(cfg_or_params, controller=None, scenario=None, duration_s: float = 1e-3,
           "controller_latency_ticks": lat, "spec_fingerprint": spec.fingerprint(),
           "metrics_settings": m.get("settings"), "world": getattr(pp, "world", None),
           "world_choices": getattr(pp, "world_choices", None),
-          "records": [r.key for r in plant.records_state.specs], "diagnostics": diag,
+          "records": [r.key for r in plant.records_state.specs], "diagnostics": diag, "chunk_ticks": chunk,
           "warm_start": {"heater_code": None if heater_code is None else np.asarray(heater_code).tolist(),
                          "reset_protocol": protocol, "settle": plant.settle_info,
                          "factory_table": options.get("factory_table") is not None,
@@ -267,8 +278,11 @@ def warm_start_codes(plant: Plant, cfg, *, mode: str = "quasi_static", return_no
     ``'quasi_static'``: the oracle lock codes of :func:`quasi_static` (best stable relOMA point of each ring on its
     declared line, 07 P1-1) at each world's base temperature and mean bias voltage at the plant's current (reset)
     tick, each ring on its heater-up order. ``'quasi_static_reachable'``: the same, but a ring whose heater-up order
-    would need a negative heater power locks one order bluer (quasi_static ``order='reachable'``) instead of
-    starting at code_min. Not included: aggressor power, laser power or wavelength offsets of the scenario at the
+    would need a negative heater power locks one order bluer (quasi_static ``order='reachable'``; repeated while the
+    hopped rings' heat pushes other rings below zero) instead of starting at code_min. The data path of the scenario
+    at the reset tick is included (quasi_static ``data_state``, :func:`reset_data_state`): a start with traffic off,
+    squelched or idle gets the codes that hold the traffic-on operating detuning in that state (more heater power
+    without the data heat). Not included: aggressor power, laser power or wavelength offsets of the scenario at the
     start, and the bus filtering by rings that are not locked (quasi_static assumes the whole bank locked). Use
     with ``settle=True`` for a start that is a steady lock. A ring without a finite lock code (sampled worlds whose
     oracle point the heater cannot reach) starts at code_min, with a warning that counts them. A world whose lock
@@ -280,6 +294,18 @@ def warm_start_codes(plant: Plant, cfg, *, mode: str = "quasi_static", return_no
     """
     codes, no_code, _, _ = _warm_start_codes(plant, cfg, mode, stacklevel=3)
     return (codes, no_code) if return_no_code else codes
+
+
+def reset_data_state(plant: Plant) -> dict:
+    """The data path of the scenario at the plant's reset tick as quasi_static's ``data_state`` ((B, N) arrays of
+    driver_enable, swing_scale, transition_density, ones_density; the values the reset filled into S.sc_v0)."""
+    lay = plant.scen_arrays.layout
+    v0 = plant.S.sc_v0
+    out = {}
+    for k in DATA_STATE_KEYS:
+        o, w = lay[f"data.{k}"]
+        out[k] = np.array(v0[:, o:o + w], float)
+    return out
 
 
 def _warm_start_codes(plant: Plant, cfg, mode: str, stacklevel: int = 2
@@ -297,7 +323,8 @@ def _warm_start_codes(plant: Plant, cfg, mode: str, stacklevel: int = 2
     amb_u, a_idx = np.unique(np.round(t_base_c, 6), return_inverse=True)
     v_u, v_idx = np.unique(np.round(bias, 6), return_inverse=True)
     qs = quasi_static(pp, cfg=cfg, ambient_c=amb_u, bias_v=v_u,
-                      order="reachable" if mode == "quasi_static_reachable" else "heater_up")
+                      order="reachable" if mode == "quasi_static_reachable" else "heater_up",
+                      data_state=reset_data_state(plant))
     codes = np.stack([qs.heater_code[a_idx[b], v_idx[b], b] for b in range(B)])
     sup = np.array([bool(qs.supply_limited[a_idx[b], v_idx[b], b]) for b in range(B)])
     hopped = np.stack([qs.order_hopped[a_idx[b], v_idx[b], b] for b in range(B)])
@@ -315,10 +342,58 @@ def _warm_start_codes(plant: Plant, cfg, mode: str, stacklevel: int = 2
     return np.rint(codes).astype(np.int64), bad, sup, hopped
 
 
-def _run_open(plant: Plant, n_ticks: int, n_threads=None) -> None:
+#: ticks per kernel call of the compiled and open-loop paths (``run(..., chunk_ticks=)``)
+DEFAULT_CHUNK_TICKS = 100_000
+
+
+class ScoreSplitWarning(UserWarning):
+    """``score_from_s`` under the auto substep policy at a tick that is not a controller edge: the scoring split ends
+    a substep there, so the plant trajectory is not the unscored run's (docs/ENGINE.md section 2)."""
+
+
+def _block_end(plant: Plant, k_end: int, chunk: int) -> int:
+    """End tick of the next kernel block from plant.tick: plant.tick + chunk moved forward to the next controller edge,
+    at most k_end. A substep of the auto policy never crosses a controller edge, so a block that ends on one leaves
+    the policy's step sequence (and every result) unchanged, whatever chunk_ticks is; a block end elsewhere caps the
+    substep in flight and the growth limit restarts from the shortened step (engine review 2026-10-16: chunk_ticks
+    13 against 1e5 gave 11426 against 10582 substeps). With tick jitter (07 P2-7) the edges differ per world and the
+    end stays plant.tick + chunk: there, under the auto policy, chunk_ticks changes the step sequence."""
+    end = plant.tick + chunk
+    if end >= k_end:
+        return k_end
+    P = plant.P
+    per, ph0 = int(P.period), int(P.phase)
+    if int(P.jitter) == 0 and per > 0:
+        end = ph0 if end <= ph0 else ph0 + -(-(end - ph0) // per) * per
+    return min(end, k_end)
+
+
+def _raise_if_clipped(plant: Plant, spec) -> None:
+    """``controller_interface.on_out_of_range: error`` on the compiled path (07 P1-19): the kernel clips every
+    command and records each world's first out-of-range element (kernel.WI_SAT_FIRST_*: tick, act_i64 index,
+    commanded value); raise :class:`mrm.control.api.ActionRangeError` for the earliest, as the Python path's
+    ActionValidator does at that step. The kernel finishes its block first (up to chunk_ticks), so the run's
+    other outputs are not meaningful."""
+    from mrm.control.api import ActionRangeError
+    wi = plant.S.wi
+    first = wi[:, K.WI_SAT_FIRST_TICK]
+    hit = np.flatnonzero(first >= 0)
+    if hit.size == 0:
+        return
+    b = int(hit[np.argmin(first[hit])])
+    elem, val, tick = int(wi[b, K.WI_SAT_FIRST_ELEM]), int(wi[b, K.WI_SAT_FIRST_VAL]), int(first[b])
+    f = next(f for f in spec.layout.act if f.offset <= elem < f.offset + f.size)
+    ch = spec.channels[f.name]
+    idx = [b, *(int(i) for i in np.unravel_index(elem - f.offset, f.shape))] if f.shape else [b]
+    raise ActionRangeError(f"{f.name}{idx} = {val} outside [{ch.min}, {ch.max}] ({ch.unit}) at tick {tick} "
+                           f"(compiled path: the first out-of-range command; {int(hit.size)} of {wi.shape[0]} worlds "
+                           f"had one); set controller_interface.on_out_of_range: clip to saturate instead")
+
+
+def _run_open(plant: Plant, n_ticks: int, n_threads=None, chunk: int = DEFAULT_CHUNK_TICKS) -> None:
     k_end = plant.tick + n_ticks
     while plant.tick < k_end:
-        plant.run(min(100_000, k_end - plant.tick), mode=K.MODE_OPEN)
+        plant.run(_block_end(plant, k_end, chunk) - plant.tick, mode=K.MODE_OPEN)
 
 
 def _score_segments(plant: Plant, n_ticks: int, dt: float, score_from_s, *, python_path: bool
@@ -337,14 +412,31 @@ def _score_segments(plant: Plant, n_ticks: int, dt: float, score_from_s, *, pyth
             n0 += 1
     if not 0 < n0 < n_ticks:
         raise ValueError(f"score_from_s = {score_from_s} s must lie inside the run (0, {n_ticks * dt} s)")
+    P = plant.P
+    if int(P.policy) == K.POLICY_AUTO:
+        # the split ends a kernel block, which caps the auto substep in flight unless the tick is a controller edge
+        # (a substep never crosses one); with tick jitter the edges differ per world
+        per, ph = int(P.period), int(P.phase)
+        k = plant.tick + n0
+        on_edge = int(P.jitter) == 0 and per > 0 and k >= ph and (k - ph) % per == 0
+        if not on_edge:
+            why = ("the controller edges differ per world (tick jitter)" if int(P.jitter) else
+                   f"tick {k} is not a controller edge (phase {ph} + j x {per} ticks)"
+                   + (", the Python controller path moved it one tick past one" if python_path else ""))
+            warnings.warn(f"score_from_s = {score_from_s} s under the auto substep policy: {why}; the scoring split "
+                          "ends a substep there, so the plant trajectory differs from the unscored run's (another "
+                          "valid step sequence of the policy). Put the split on a controller edge to keep it "
+                          "(docs/ENGINE.md section 2)", ScoreSplitWarning, stacklevel=3)
     return [n0, n_ticks - n0], n0
 
 
 def _run_python(plant: Plant, ctrl, spec, n_ticks: int, fast, bind: bool = True) -> None:
     """Python slow path, vectorized over B (07 P0-9): the kernel stops at every controller edge; the controller
-    steps on an Observation of the released channels; ActionValidator checks shape, dtype and range (07 P1-19); the
-    command enters the controller pipeline when the kernel resumes. ``bind`` False continues a run whose compiled
-    controller is already bound (the second segment of a split run)."""
+    steps on an Observation of the released channels (with ``active``, the ring of the edge under
+    controller_interface.schedule round_robin, 07 P2-7: the kernel then applies only that ring's per-ring commands
+    when it resumes); ActionValidator checks shape, dtype and range (07 P1-19); the command enters the controller
+    pipeline when the kernel resumes. ``bind`` False continues a run whose compiled controller is already bound (the
+    second segment of a split run)."""
     k_end = plant.tick + n_ticks
     resume = False
     truth_fed = bool(getattr(ctrl, "truth_fed", False))
@@ -360,16 +452,29 @@ def _run_python(plant: Plant, ctrl, spec, n_ticks: int, fast, bind: bool = True)
             break
         if int(plant.S.wi[0, K.WI_PENDING_EDGE]) != plant.tick:
             continue
+        ar = int(plant.S.obs[0, OBS_ACTIVE_RING])            # edges are shared by every world on this path
+        held_edge = plant.S.act[:, :nact].copy() if ar >= 0 else None
         if np.any(plant.S.wi[:, K.WI_CTRL_RESET]):           # scenario fault.controller_reset
             ctrl.reset(spec)
             plant.S.wi[:, K.WI_CTRL_RESET] = 0
             if held is not None:
-                # CompiledController.reset allocates a new held command: clip that one from now on (the kernel
-                # restarts its own arrays; hardware review, integrator 2026-10-10)
+                # CompiledController.reset allocates new state and held-command arrays: the kernel's arrays take
+                # their values and the controller uses those again (its fast_kernel runs on them in the kernel), the
+                # held command re-filled from the latched registers, as the kernel's own restart (controllers review
+                # 2026-10-16; before, the fast kernel kept updating the old state); clip the held command from now on
+                plant.restart_compiled(ctrl)
                 held = getattr(ctrl, "act", None)
         sensors, new = plant.sample_sensors()
-        obs = Observation(plant.tick, plant.dt, sensors, new)
+        active = None
+        if ar >= 0:
+            active = np.zeros(spec.n_rings, dtype=bool)
+            active[ar] = True
+        obs = Observation(plant.tick, plant.dt, sensors, new, active)
         actions = ctrl.step(obs, truth=plant.truth()) if truth_fed else ctrl.step(obs)
+        if ar >= 0:
+            # round robin (07 P2-7): only the active ring's per-ring commands apply (the kernel enforces it again
+            # when it resumes); validate, clip and count only those, as the kernel does
+            actions = merge_round_robin(spec, actions, held_edge, ar)
         val = plant.validator.validate(actions)
         spec.layout.pack_act(val, plant.S.act[:, :nact])
         if held is not None and held is not plant.S.act:
@@ -420,7 +525,7 @@ class QuasiStaticResult:
 
 def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, seeds=None, p_in_w=None,
                  n_scan: int = 301, iterations: int = 4, cfg=None, uncertainty=None, variation=None,
-                 order: str = "heater_up") -> QuasiStaticResult:
+                 order: str = "heater_up", data_state: Mapping[str, Any] | None = None) -> QuasiStaticResult:
     """Locked steady state of every ring over ambient and bias (07 P0-10; BND-4), static and with self-heating.
 
     For each (ambient, bias): the junction levels follow the bias DAC transfer and the driver swing
@@ -432,16 +537,32 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
     gives the heater powers of all rings at once (a linear solve), and the driver law with the heater TCR at the
     static heater-resistor temperature gives the code. Loss and coupling are evaluated at the solved temperatures and
     the solve is repeated ``iterations`` times. p_in_w: power per line at the chip (default the plant's own; BND-4
-    is stated at 1 mW into the MRM: pass 1e-3 / input transmission). Light reaching each ring: the chip power
-    times the through transmission of the rings before it at their lock points (single pass). The bank's heater
+    is stated at 1 mW into the MRM: pass 1e-3 / input transmission; the rings after the first in bus order then get
+    the bus segment loss on top, up to 0.6 % less in g26). Light reaching each ring: the chip power
+    times the through transmission of the rings before it at their lock points (single pass) and the bus segment
+    loss between rings (``mrm.plant.phase.bus_t2_from_plant_params``, as the plant). The bank's heater
     powers at the lock codes are checked against the array heater supply limit (``supply_scale``,
     ``supply_limited``; 07 P1-12).
 
     ``order``: which resonance order of each ring locks to its line. 'heater_up' (default): the order whose
     resonance sits blue of (or on) its line at code_min, the first one a heater-up acquisition reaches; a ring that
     is already red of its lock point there needs a negative heater power (``fsr_hop_risk``) and gets no code.
-    'reachable': such a ring takes the next order (one FSR bluer, reached by heating) and the bank is solved again;
-    ``order_hopped`` (A, V, B, N) marks those rings and ``fsr_hop_risk`` still reports the heater-up order's need.
+    'reachable': such a ring takes the next order (one FSR bluer, reached by heating) and the bank is solved again,
+    until no ring needs a negative heater power (at most N + 1 solves): a hopped ring adds about one FSR of heater
+    power, whose crosstalk can push a neighbour that had a heater-up code below zero, and that neighbour hops too
+    (engine review 2026-10-16: before, one re-solve left such rings without a code). ``order_hopped`` (A, V, B, N)
+    marks every hopped ring and ``fsr_hop_risk`` still reports the heater-up order's need (the first solve).
+
+    ``data_state``: the data path the bank holds its lock in, a mapping of ``driver_enable``, ``swing_scale``,
+    ``transition_density`` and ``ones_density`` (each broadcast to (B, N); the scenario signals ``data.*``, as the
+    kernel reads them: enable >= 0.5 is on, the density clipped to [0, 1]). Default (None, or keys left out): traffic
+    on, i.e. driver on, the nominal swing, the config's transition density and ones density 0.5. The lock TARGET is
+    always the traffic-on operating point (the oracle detuning above, with the nominal swing); with a world whose
+    state differs the heat balance is solved a second time in that state, at the same target detuning: junction
+    levels with the scaled swing, absorbed power and through transmission averaged with its ones density, and its
+    data-activity heat (07 P1-8). heater_code, p_heater_w, p_abs_w and t_ring_k are then those of the given state;
+    detuning_target_m and the relOMA maps stay the traffic-on ones. ``warm_start_codes`` passes the state of the
+    scenario at the reset tick (engine review 2026-10-16: a start with traffic off began 65-98 pm blue of the lock).
     """
     from mrm.plant import electrical as el
     from mrm.plant import optics as op
@@ -465,9 +586,12 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
     bus = np.asarray(pp.layout.bus_order)
     p_chip = (np.asarray(pp.laser.power_w, float) * np.asarray(pp.laser.input_transmission, float).reshape(-1, 1)
               if p_in_w is None else np.broadcast_to(np.asarray(p_in_w, float), (B, L)).copy())
+    bus_t2 = ph.bus_t2_from_plant_params(pp)                 # (B, N) bus segment before each ring
     swing = np.nan_to_num(np.asarray(pp.datapath.swing_pp_v, float)) * np.ones((B, N))
     level = np.asarray(pp.datapath.level_convention).reshape(-1)
     fwhm_hz = np.asarray(pp.optics.fwhm_hz, float)
+    td_cfg = np.array([float(np.nan_to_num(pp.datapath.transition_density[b, 0], nan=0.5)) for b in range(B)])
+    ds = _data_state(data_state, B, N, td_cfg)
     shp = (A, V, B, N)
     out = {k: np.full(shp, np.nan) for k in ("det", "rel", "relu", "t_ring", "p_abs", "p_h", "code")}
     code_ok = np.zeros(shp, bool)
@@ -530,15 +654,18 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                 # 'reachable': a ring whose lock at the heater-up order needs a negative heater power (fsr_hop_risk:
                 # its cold resonance already sits red of the lock point) takes the next order (one FSR bluer, reached
                 # by heating) and the whole bank is solved again (integrator 2026-10-10, experiments request 10.4b)
+                # Every ring that the re-solve pushes below zero (the hopped rings' extra heater power reaches it through
+                # the thermal crosstalk) hops too, until no ring needs a negative power: heat only adds, so this is the
+                # smallest consistent set of hops (engine review 2026-10-16; at most N + 1 solves)
                 shift_cold = shift.copy()
                 hopped = np.zeros(N, bool)
                 hop0 = None
-                for attempt in range(2 if reachable else 1):
-                    if attempt == 1:
+                for attempt in range(N + 1 if reachable else 1):
+                    if attempt >= 1:
                         neg = p_h < 0
                         if not np.any(neg):
                             break
-                        hopped = neg.copy()
+                        hopped |= neg
                         m_up[neg] += 1
                         for n in np.nonzero(neg)[0]:
                             l = int(r2l[n])
@@ -550,6 +677,8 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                     rel = np.zeros(N)
                     relu = np.zeros(N)
                     p_abs = np.zeros(N)
+                    ph_at = np.zeros(N)                      # mean phase of each ring's optimum (this iteration)
+                    ph_lock = np.zeros(N)                    # ... of the last iteration (the target of det)
                     for _ in range(max(1, int(iterations))):
                         o = {k: np.zeros((N, L)) for k in ("phi0", "phi1", "a0", "a1", "e0", "e1", "k2t", "k2d", "trt")}
                         shift, cj, rsv, jf = np.zeros((N, 2)), np.zeros((N, 2)), np.zeros((N, 2)), np.zeros(N, np.int8)
@@ -564,6 +693,7 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                         for q in range(N):
                             n = int(bus[q])
                             l = int(r2l[n])
+                            p_ring *= bus_t2[b, n]                   # the bus segment before this ring
                             fwhm = lam_l[b, l] ** 2 * fwhm_hz[b, n] / C0
                             dphi = o["phi1"][n, l] - o["phi0"][n, l]
                             mean = 0.5 * (o["phi0"][n, l] + o["phi1"][n, l])
@@ -591,6 +721,7 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                                     xs = xs + min(max(0.5 * (relx[i_s - 1] - relx[i_s + 1]) / den, -0.5), 0.5) * (
                                         x[1] - x[0])
                             ph_s = 2 * math.pi * m + dpl[n, l] * xs * fwhm
+                            ph_at[n] = ph_s
                             q0 = ring_fn(np.array([ph_s - 0.5 * dphi]), o["k2t"][n, l], o["k2d"][n, l], o["a0"][n, l],
                                          o["trt"][n, l], rb=rb_of(b, n))
                             q1 = ring_fn(np.array([ph_s + 0.5 * dphi]), o["k2t"][n, l], o["k2d"][n, l], o["a1"][n, l],
@@ -639,6 +770,15 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                         t_obs = t_amb + Gb @ u
                         t_ring = t_obs[ring_obs]
                         t_heat = t_obs[heater_obs]
+                        ph_lock[:] = ph_at
+                    if ds["differs"][b]:
+                        # the bank in the data state of the start (data_state): the same target detuning (the
+                        # traffic-on operating point, mean phase ph_lock), the heat balance of that state
+                        p_abs, p_h, t_ring, t_heat = _hold_in_data_state(
+                            ds, b, N, L, vb, swing[b], int(level[b]), rp, grid, dn, al, cc, rs, lam_l[b], t_amb,
+                            t_ring, t_heat, det, ph_lock, m_up, bus, r2l, bus_t2[b], p_chip[b], ring_fn,
+                            lambda n_, b_=b: rb_of(b_, n_), sysm, G[b if G.shape[0] > 1 else 0], ring_obs, heater_obs,
+                            pj_src, pd_src, pp, max(1, int(iterations)))
                     if attempt == 0:
                         hop0 = p_h < 0
                 code = np.full(N, np.nan)
@@ -710,6 +850,105 @@ def quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch: int = 1, 
                                     "averaged with ones density 0.5 and transition density of the config; array "
                                     "heater supply limit checked at the lock codes",),
                              supply_scale=supply_s, supply_limited=supply_s < 1.0, order_hopped=hopped_all)
+
+
+#: the data-path signals of quasi_static's ``data_state`` (the scenario signals data.<key>)
+DATA_STATE_KEYS = ("driver_enable", "swing_scale", "transition_density", "ones_density")
+
+
+def _data_state(data_state, B: int, N: int, td_cfg: np.ndarray) -> dict:
+    """quasi_static's ``data_state`` as (B, N) arrays, with the kernel's reading of the signals (driver on when
+    enable >= 0.5; ones density clipped to [0, 1]), and ``differs`` (B,): the worlds whose state is not the traffic-on
+    state the lock target is defined in (driver on, swing scale 1, the config's transition density td_cfg (B,), ones
+    density 0.5)."""
+    given = dict(data_state or {})
+    bad = sorted(set(given) - set(DATA_STATE_KEYS))
+    if bad:
+        raise ValueError(f"quasi_static data_state keys must be among {DATA_STATE_KEYS}, got {bad}")
+    ones = np.ones((B, N))
+    default = {"driver_enable": ones, "swing_scale": ones, "transition_density": td_cfg[:, None] * ones,
+               "ones_density": 0.5 * ones}
+    out = {}
+    for k in DATA_STATE_KEYS:
+        out[k] = np.broadcast_to(np.asarray(given.get(k, default[k]), float), (B, N)).copy()
+    out["driver_enable"] = (out["driver_enable"] >= 0.5).astype(float)
+    out["ones_density"] = np.clip(out["ones_density"], 0.0, 1.0)
+    out["differs"] = np.zeros(B, bool)
+    for k in DATA_STATE_KEYS:
+        out["differs"] |= np.any(out[k] != default[k], axis=1)
+    return out
+
+
+def _hold_in_data_state(ds, b, N, L, vb, swing_b, level_b, rp, grid, dn, al, cc, rs, lam_b, t_amb, t_ring, t_heat,
+                        det, ph_lock, m_up, bus, r2l, bus_t2_b, p_chip_b, ring_fn, rb_fn, sysm, Gb, ring_obs,
+                        heater_obs, pj_src, pd_src, pp, iterations):
+    """The heat balance of world b's bank in the data state ``ds`` (quasi_static ``data_state``) at the traffic-on
+    lock target: each ring's mean resonance at det[n] (mean phase ph_lock[n] at its line; the mean phase of a
+    detuning does not depend on the junction levels, mrm.plant.phase equation 2), junction levels with the scaled
+    swing, absorbed power and through transmission averaged with the state's ones density
+    (mrm.plant.optics.nrz_average, as the kernel), and the state's data-activity heat (07 P1-8). The same single-pass
+    bus and static thermal map as quasi_static, ``iterations`` times from the given temperatures. Returns (p_abs,
+    p_h, t_ring, t_heat) (N,)."""
+    from mrm.plant import electrical as el
+    from mrm.plant import phase as ph
+    en = ds["driver_enable"][b]
+    td = ds["transition_density"][b]
+    rho = ds["ones_density"][b]
+    vlo, vhi, fl = np.zeros(N), np.zeros(N), np.zeros(N, np.int8)
+    el.nrz_levels_row(np.full(N, vb), swing_b * ds["swing_scale"][b], level_b, el.JUNCTION_GRID_V_MIN,
+                      el.JUNCTION_GRID_V_MAX, vlo, vhi, fl)
+    t_ring = np.array(t_ring, float)
+    t_heat = np.array(t_heat, float)
+    p_abs = np.zeros(N)
+    p_h = np.zeros(N)
+    lam = np.ascontiguousarray(lam_b)
+    bitrate = float(np.nan_to_num(pp.datapath.bitrate_hz[b, 0]))
+    r_out = np.nan_to_num(np.asarray(pp.datapath.driver_output_resistance_ohm[b]))
+    p_static = np.nan_to_num(np.asarray(pp.datapath.driver_static_power_w[b]))
+    e_tr = np.nan_to_num(np.asarray(pp.datapath.driver_energy_per_transition_j[b]))
+    Zh = Gb[np.ix_(ring_obs, sysm.heater_src)]
+    for _ in range(iterations):
+        o = {k: np.zeros((N, L)) for k in ("phi0", "phi1", "a0", "a1", "e0", "e1", "k2t", "k2d", "trt")}
+        shift, cj, rsv, jf = np.zeros((N, 2)), np.zeros((N, 2)), np.zeros((N, 2)), np.zeros(N, np.int8)
+        ph.ring_optics_row(rp, lam, t_ring, t_heat, vlo, vhi, grid, dn, al, cc, rs, o["phi0"], o["phi1"], o["a0"],
+                           o["a1"], o["e0"], o["e1"], o["k2t"], o["k2d"], o["trt"], shift, cj, rsv, jf)
+        p_ring = p_chip_b.copy()
+        t_target = np.zeros(N)
+        for q in range(N):
+            n = int(bus[q])
+            l = int(r2l[n])
+            p_ring *= bus_t2_b[n]
+            dphi = o["phi1"][n, l] - o["phi0"][n, l]
+            q0 = ring_fn(np.array([ph_lock[n] - 0.5 * dphi]), o["k2t"][n, l], o["k2d"][n, l], o["a0"][n, l],
+                         o["trt"][n, l], rb=rb_fn(n))
+            q1 = ring_fn(np.array([ph_lock[n] + 0.5 * dphi]), o["k2t"][n, l], o["k2d"][n, l], o["a1"][n, l],
+                         o["trt"][n, l], rb=rb_fn(n))
+            r1 = float(rho[n])
+            p_abs[n] = p_ring[l] * ((1.0 - r1) * o["e0"][n, l] * float(q0.p_loss[0])
+                                    + r1 * o["e1"][n, l] * float(q1.p_loss[0]))
+            s_t = rp[n, ph.RP_S0] * (1 + rp[n, ph.RP_BETA] * (t_ring[n] - rp[n, ph.RP_T0]))
+            d_now = K.resonance_detuning(rp[n], lam_b[l], 0.5 * (shift[n, 0] + shift[n, 1]), float(m_up[n]))
+            t_target[n] = t_ring[n] + (det[n] - d_now) / s_t
+            p_ring[l] *= (1.0 - r1) * float(q0.p_thru[0]) + r1 * float(q1.p_thru[0])
+        u = np.zeros(sysm.n_src)
+        u[sysm.wg_src] = p_abs
+        pj, pdd = np.zeros(N), np.zeros(N)
+        cje = np.zeros(N)
+        el.junction_swing_capacitance_row(vlo, vhi, grid, cc, rp[:, ph.RP_FILL], rp[:, ph.RP_LEN], cje)
+        el.data_activity_heat_row(cje, vhi - vlo, bitrate, np.ascontiguousarray(td), np.ascontiguousarray(en),
+                                  0.5 * (rsv[:, 0] + rsv[:, 1]), r_out, p_static, e_tr, 0, pj, pdd)
+        for n in range(N):
+            if pj_src.size > n and pj_src[n] >= 0:
+                u[pj_src[n]] = pj[n]
+            if pd_src.size > n and pd_src[n] >= 0:
+                u[pd_src[n]] = pdd[n]
+        rhs = t_target - t_amb - Gb[ring_obs] @ u
+        p_h = np.linalg.solve(Zh, rhs)
+        u[sysm.heater_src] = p_h
+        t_obs = t_amb + Gb @ u
+        t_ring = t_obs[ring_obs]
+        t_heat = t_obs[heater_obs]
+    return p_abs, p_h, t_ring, t_heat
 
 
 def _heater_drive(hp, b, n, code, t_heater_k) -> tuple[float, float, float]:

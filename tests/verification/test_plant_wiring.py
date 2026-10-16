@@ -84,15 +84,17 @@ class ReferencePlant:
         self.t_new = np.zeros((B, N))
         self.n_iter = np.zeros((B, N), np.int64)
         self.u_heater = np.zeros((B, N))
-        # optics: one packed self-heating row per world (mrm.plant.optics.pack_selfheat_args)
+        # optics: one packed self-heating row per world (mrm.plant.optics.pack_selfheat_args), with the bus segment
+        # loss between rings (mrm.plant.phase.bus_t2_from_plant_params)
         self.method = "tcmt" if pp.flags.optics_model else "exact"
         lam0 = C0 / np.asarray(pp.laser.line_freq_hz, float)
+        self.bus_t2 = ph.bus_t2_from_plant_params(pp)
         rows = []
         for b in range(B):
             o = self._optics_inputs(b, lam0[b], np.zeros(N), np.zeros(N))
             rows.append(op.pack_selfheat_args(
                 np.full(L, 1e-3), o["phi0"], o["k2t"], o["k2d"], o["a0"], o["trt"], o["e0"], lam0[b],
-                self.t_ring[b], np.ones(N) * 7e-11, 0.0, bus_order=pp.layout.bus_order,
+                self.t_ring[b], np.ones(N) * 7e-11, 0.0, bus_order=pp.layout.bus_order, bus_t2=self.bus_t2[b],
                 rb=np.asarray(pp.optics.backscatter_rb[b]), nrz={"p1": np.full(N, 0.5), "phi1": o["phi1"],
                                                                  "a1": o["a1"], "eta1": o["e1"]},
                 method=self.method, m_orders=int(pp.optics.tcmt_orders)))
@@ -221,13 +223,14 @@ class ReferencePlant:
                            adc_saturate=ev0["fault.adc_saturate"], dac_glitch_codes=ev0["fault.dac_glitch_codes"])
         p_bus = out_rl[:, op.RL_PIN].sum(axis=2)                                              # (B, N) bus power
         self.mon.tick(k, p_pd_w=out_r[:, op.R_DROP_SUM], p_bg_w=p_bus, t_pd_k=self.t_obs[:, sysm.pd_obs],
-                      fault=fault)
+                      fault=fault, t_base_k=t_base_end)
         line = np.asarray(pp.layout.ring_to_line)
         oma = out_rl[:, op.RL_POUT1, np.arange(N), line] - out_rl[:, op.RL_POUT0, np.arange(N), line]
         self.dp.errors(k, np.abs(oma))
         self.temps.tick(k, self.t_obs[:, sysm.temp_obs])
-        self.last = dict(p_chip=p_chip, lam=lam, rho=rho, bias=bout, v_lo=v_lo, v_hi=v_hi, heater=hout, out_r=out_r,
-                         out_rl=out_rl, out_l=out_l, n_fail=n_fail, pj=pj, pd=pd, oma=oma)
+        self.last = dict(p_chip=p_chip, lam=lam, rho=rho, dens=ev0["data.ones_density"], bias=bout, v_lo=v_lo,
+                         v_hi=v_hi, heater=hout, out_r=out_r, out_rl=out_rl, out_l=out_l, n_fail=n_fail, pj=pj, pd=pd,
+                         oma=oma)
         return self.last
 
     # ---- controller edge at tick k
@@ -244,7 +247,7 @@ class ReferencePlant:
         new.update(n2)
         last = self.last
         self.dp.bitstat_from_monitor(k, self.mon, last["out_r"][:, op.R_DROP_SUM1], last["out_r"][:, op.R_DROP_SUM0],
-                                     np.zeros((self.B, self.N), np.int64), density=last["rho"],
+                                     np.zeros((self.B, self.N), np.int64), density=last["dens"],
                                      rin_per_hz=np.asarray(self.pp.laser.rin_per_hz).reshape(-1))
         s3, n3 = self.dp.release(k)
         sensors.update(s3)
@@ -335,7 +338,11 @@ def test_light_is_conserved_along_the_bus(setup):
     p_out = out["out_l"][:, op.L_POUT]
     drops = out["out_rl"][:, op.RL_DROP].sum(axis=1) + out["out_rl"][:, op.RL_ADD].sum(axis=1)
     loss = out["out_rl"][:, op.RL_LOSS].sum(axis=1) + out["out_rl"][:, op.RL_REFL].sum(axis=1)
-    np.testing.assert_allclose(p_out + drops + loss, p_in, rtol=1e-9)
+    # the bus waveguide between rings: ring k's input is t2_k times the power that entered its segment
+    t2 = plant.bus_t2[:, :, None]                               # (B, N, 1)
+    seg = (out["out_rl"][:, op.RL_PIN] * (1.0 / t2 - 1.0)).sum(axis=1)
+    assert np.all(seg > 0.0) and np.all(t2[:, np.asarray(pp.layout.bus_order)[1:]] < 1.0)
+    np.testing.assert_allclose(p_out + drops + loss + seg, p_in, rtol=1e-9)
     absorbed = out["out_r"][:, op.R_ABS_SUM]
     assert np.all(absorbed <= out["out_r"][:, op.R_LOSS_SUM] + 1e-18)
 
