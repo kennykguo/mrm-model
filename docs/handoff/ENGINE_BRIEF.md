@@ -68,7 +68,7 @@ spec = ControllerSpec.from_config(cfg, n_batch=B, nominal=cfg,  # cfg has finger
 | heater DAC path | `electrical.HeaterDriverParams.from_plant_params(pp, transport_delay=True)`; state `electrical.HeaterBank(params, initial_code)` | adds the thermal transport delay (ThermalSystem.transport_delay_s) as whole ticks of DAC latency; DAC bit errors from `dac_bit_err_z`, INL bow from `inl_bow_u` |
 | bias DAC path | `electrical.BiasDacParams.from_plant_params(pp)`; `electrical.BiasBank(params, initial_code)` | ideal transfer (no bias INL/DNL keys); noise redrawn every `update_period_ticks` |
 | monitor PD/AFE/ADC | `sensing.MonitorHw.from_plant_params(pp)`; `sensing.MonitorBank(hw, noise_seeds, pop_period_ticks=controller period)` | baseline, mux order, stuck flag, flicker floor from MonitorParams; DNL by `pp.seeds["device"]` |
-| reference tap (optional) | `hw.reference_tap(responsivity_a_per_w=..., dark_i0_a=..., adc_full_scale_a=...)` from `pp.monitor.ref_tap_*` (nan = drop PD's) | no controller channel exists yet (integrator.md section 3) |
+| reference tap (optional) | `hw.reference_tap(responsivity_a_per_w=..., dark_i0_a=..., adc_full_scale_a=...)` from `pp.monitor.ref_tap_*` (nan = drop PD's) | no controller channel exists yet (integrator.md section 3); `MonitorHw.from_plant_params` refuses `ref_tap_present` (2026-10-16) |
 | temperature sensors | `sensing.TempSensorsHw.from_plant_params(pp)`; `sensing.TempSensorBank(hw, noise_seeds, pop_period_ticks)` | order = `pp.temp_sensors.names` = `sys.temp_obs` order |
 | heater readback | `sensing.ReadbackHw.from_plant_params(pp)` (raises when `readback_present` is False); `ReadbackBank` | g26: readback absent |
 | data path | `datapath.DatapathHw.from_plant_params(pp)`; `datapath.DatapathBank(hw, noise_seeds, pop_period_ticks)` | BER/sampler hardware from DatapathParams (nan -> module defaults) |
@@ -117,17 +117,19 @@ Tick k is the instant at the END of interval [k-1, k). Per plant interval [k, k+
    Self-heating off (`pp.flags.self_heating == 0`): `bus_propagate_nb` at the ring temperatures, then
    `thermal_advance_b(x, a, c0, c1, lag_src, obs_ptr, u0, u1, src_scale, t_base, t_obs)` with u[wg] = 0.
 10. **Sensors of the interval**: `monitor_tick_row(k, p_pd = out_r[R_DROP_SUM], p_bg = sum_l out_rl[RL_PIN, n, l],
-    t_pd = t_obs[sys.pd_obs], t_adc = t_pd, pga_sel, fault, ...)`; `errors_tick_row(k, oma = |out_rl[RL_POUT1, n,
-    line(n)] - out_rl[RL_POUT0, n, line(n)]|, ...)` with `line = pp.layout.ring_to_line`; `temp_tick_row(k,
-    t_obs[sys.temp_obs], ...)`; `readback_tick_row(k, heater v, i, ...)`.
+    t_pd = t_obs[sys.pd_obs], t_adc = hw.adc_temperature(t_pd, T_base_end), pga_sel, fault, ...)` (t_adc:
+    ring.monitor.adc_ref_site, the package base T_base_end by default, t_pd for monitor_pd; kernel row RF_T_ADC);
+    `errors_tick_row(k, oma = |out_rl[RL_POUT1, n, line(n)] - out_rl[RL_POUT0, n, line(n)]|, ...)` with
+    `line = pp.layout.ring_to_line`; `temp_tick_row(k, t_obs[sys.temp_obs], ...)`; `readback_tick_row(k, heater v,
+    i, ...)`.
 
 At a controller edge k (after the interval [k-1, k)): (1) state at k; (2) release every sensor bank
 (`monitor_release_row`, `temp_release_row`, `readback_release_row`, `errors_release_row`), run the bit-statistics
 window (`MonitorBank.level_codes` -> `bitstat_window_row` on R_DROP_SUM1/R_DROP_SUM0, threshold = actuator
-`datapath.bitstat_threshold`), run the `fast_kernel` once per released monitor sample (07 P0-7); (3) controller
-step; (4) clip `act_i64` to each channel's [min, max] (never cast to uint16 first), latch at k + latency_ticks;
-(5) the DAC FIFOs and slew/settle live in the electrical rows. `tx.heater.applied` / `tx.bias.applied` are the
-latched registers (`reg`).
+`datapath.bitstat_threshold`, density = the scenario's `data.ones_density`, not the tick's realized n1/nb), run
+the `fast_kernel` once per released monitor sample (07 P0-7); (3) controller step; (4) clip `act_i64` to each
+channel's [min, max] (never cast to uint16 first), latch at k + latency_ticks; (5) the DAC FIFOs and slew/settle
+live in the electrical rows. `tx.heater.applied` / `tx.bias.applied` are the latched registers (`reg`).
 
 Reset (07 P0-1 item 6, `pp.timing.reset_protocol`): 0 laser_ramp (ramp the line powers over
 `pp.timing.reset_ramp_ticks` from the cold state, t_prev = -inf), 1 branch_low (t_prev = -inf), 2 branch_high
@@ -171,12 +173,20 @@ make_bus_outputs(N, L) -> (out_rl, out_r, out_l)    make_workspace(L) -> (work, 
 Inputs: `rb = pp.optics.backscatter_rb[b]` (zeros unless `fidelity.backscatter: on`); `method = "tcmt" if
 pp.flags.optics_model else "exact"`, `m_orders = pp.optics.tcmt_orders`; `bus_order = pp.layout.bus_order`;
 `bus_t2[k]` = power transmission of the bus segment before ring k = `exp(-pp.laser.bus_loss_per_m *
-pp.layout.ring_spacing_on_bus_m)` (1 for the first ring in bus order and in g26, where the spacing is absent).
+pp.layout.ring_spacing_on_bus_m)` (1 for the first ring in bus order; g26: 0.073 dB/mm over 50 um, 0.99916 per
+segment), `mrm.plant.phase.bus_t2_from_plant_params(pp)` (B, N); `bus_t2_out` = 1 (the output segment is not
+modelled). Correction (2026-10-16, physics_optics review): this line said the spacing is absent in g26; it is 50 um,
+and until then Plant._build passed no `bus_t2`, so the engine ran every segment at 1 (docs/CHANGELOG.md).
 Outputs: `R_DROP_SUM` (monitor input, rho-weighted, every line and order), `R_ABS_SUM` (self-heating source),
 `R_DROP_SUM1/0` (per level, for the bit statistics), `RL_POUT1/0` (per level at the bus output, OMA), `RL_PIN`
 (bus power at each ring), `L_POUT`, `L_BOUND` (single-pass error bound; large only when several rings sit on one
 line). Each prange worker needs its own `cw, fw, work` and args row. With `selfheat_bounds` use `dt_max_k` >= the
-largest ring temperature change of a step (the wiring test uses 50 K).
+largest ring temperature change of a step (the wiring test uses 50 K). The engine uses 50 K for every step
+(`mrm.plant.plant.DEFAULT_SH_DT_MAX_K`, `KParams.dt_max_k`; nothing scales it with the substep length, and an auto
+substep moves a ring by mK). Measured exceptions (physics_thermal review, 2026-10-16): `Plant.settle`'s first DC
+iterations (~100 K from branch_low, ~240 K from branch_high; `settle()` reports `max_step_k`) and the first tick after
+a reset to a bracket end (~77 K). Without backscatter the 1.25 curvature margin covers |T - T_ref| up to ~136 K at
+g26's beta; the g26 settled states equal those of a covering bound (`test_engine_warm_start.py`).
 
 ### 4.3 `mrm.plant.thermal`
 

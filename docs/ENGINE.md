@@ -87,7 +87,8 @@ comparison (docs/handoff/perf.md).
   `cfg=` (the ControllerSpec is always built from the UNSAMPLED config, 07 P1-1). Options `uncertainty`
   ('sample' | 'lhs' | 'nominal', default `experiment.uncertainty`) and `variation` ('sample' | 'off') choose the
   worlds; `batch` is B. Seeds: an int, or `{device, uncertainty, noise, scenario}` base seeds; world b uses
-  base + b (07 P1-13). Device draws never change with the noise seed.
+  base + b (07 P1-13). Device draws never change with the noise seed. A settled start (section 3) holds the rule
+  too since 2026-10-16: each world stops its own settle, so world b of a batch starts as it does alone.
 - **Scenario.** None (the config's `scenario` section), a registry name, or a `mrm.scenarios.generators.Scenario`
   (`mrm.scenarios.library` builders). Aggressor scenarios (A1, A2, `aggressor_direct`) are calibrated against the
   plant before compiling (`prepare_scenario`: the aggressor power that produces the stated victim-ring trajectory,
@@ -107,20 +108,40 @@ comparison (docs/handoff/perf.md).
 - **Controller.** None (open loop), a registry name with `controller_params=` (mrm.control.registry.create), a
   `module:Class` path, an object with the Controller protocol (Python path), or a `CompiledController` (compiled
   path). Section 5.
-- **Knowledge.** A controller reads device numbers only from `spec.nominal`, filtered by
-  `controller_interface.knowledge` (07 P1-1). g26 releases only `line_grid` and `ring_to_line`. Tokens in use (two
-  vocabularies exist; `mrm.control.calibration.FIELD_TOKENS` maps both onto config keys): coarse
-  `heater_nominal`, `optics_nominal`, `dlambda_dt_nominal`, `monitor_nominal` (controllers B); fine `heater_law`,
+- **Knowledge.** A controller reads device numbers only from `spec.nominal`, the view of the unsampled config
+  filtered by `controller_interface.knowledge` (07 D13, P1-1; `mrm.control.knowledge.NominalView`, since
+  2026-10-16: before, `spec.nominal` was the whole Config, experiment section included, and only the helpers below
+  applied the gate). `spec.nominal.get` / `.si` of a key no granted token releases raise `KnowledgeError`; the
+  experiment section (seeds, world choices) is never released, so the spec fingerprint is the same for every seed
+  and world choice, also when they are config leaves. g26 releases only `line_grid` and `ring_to_line`. Tokens in
+  use (two vocabularies exist; `mrm.control.knowledge.token_keys()` merges them, and
+  `mrm.control.calibration.FIELD_TOKENS` maps both onto the helpers' field groups): coarse `heater_nominal`,
+  `optics_nominal`, `dlambda_dt_nominal`, `monitor_nominal` (controllers B); fine `heater_law`,
   `heater_r_nominal`, `heater_efficiency`, `linewidth`, `thermal_dynamics`, `bias_efficiency` (controllers A,
-  `pi_lock.KNOWLEDGE_KEYS`); `model_nominal` (controllers C, the whole nominal model). Grant them with
-  `overrides=["controller_interface.knowledge=[line_grid,ring_to_line,model_nominal]"]`. The two vocabularies are
-  not unified yet (section 10).
+  `pi_lock.KNOWLEDGE_KEYS`); `model_nominal` (controllers C, the whole nominal model: every key but the experiment
+  section and the scenario beyond its operating point `scenario.ambient_c` / `bias_v` / `bias_offset_v`;
+  `spec.nominal.model_config()` is that design for `mrm.control.models.linearize`). The monitor ADC's ampere scale
+  of the `tx.monitor.samples` / `tx.monitor.latest` channel specs is `monitor_nominal` (or `model_nominal`)
+  knowledge too; without it they carry codes only. Grant tokens with
+  `overrides=["controller_interface.knowledge=[line_grid,ring_to_line,model_nominal]"]`. Still open: the view is of
+  the run's own config, so a corner selected with `alts=` reaches `model_nominal` (no `controller_knowledge` preset,
+  docs/handoff/controllers_c.md section 4).
+- **Exposed sensors.** `controller_interface.expose` (a list of sensor channels; default every channel) limits what
+  the controller reads, on every path (runner, MRMEnv, bridge, vectors): a hidden channel raises
+  `UndeclaredChannelError` on the Python path and has `obs_offset` -1 in the compiled ABI; a sample block brings its
+  count channel. An unknown name is a `ChannelError`. Before 2026-10-16 the key was read by nothing.
 - **Metrics.** `metrics=` a MetricsSpec or a dict of overrides of the config's `metrics` section (schema keys
   `metrics.lock_threshold_pm`, `hysteresis_pm`, `allowed_assignments`, `lock_reference`, `lock_target_pm`, ...).
   `score_from_s=t` restarts the metric accumulators at t (a controller's start-up, e.g. pi_lock's peak map in its
-  first ~3 ms, is then not scored; plant, controller and records are untouched; `MetricsState.restart` keeps the
-  oracle lock reference and the previous controller latch; on the Python path a split on a controller edge moves
-  one tick later).
+  first ~3 ms, is then not scored; `MetricsState.restart` keeps the oracle lock reference and the previous
+  controller latch; on the Python path a split on a controller edge moves one tick later). Under the fixed
+  substep policy plant, controller and records are untouched. Under `auto` the split ends a substep at t (a kernel
+  block ends there, section 4), so they are untouched only when t is a controller edge (g26: a multiple of 10
+  ticks after the phase; elsewhere the runner warns, `runner.ScoreSplitWarning`: an off-edge split gave 240 of 320
+  detuning samples up to 4.6e-14 m and monitor codes up to 9 apart over 20 ms), and the restarted BER windows
+  (`metrics.ber_sample_period_s`, 2 s) cap substeps at their own ends, so a run longer than one window after a
+  split that is not a whole number of windows after the reset takes other substeps after the first window end
+  (correction 2026-10-16, engine review: this said "untouched" for every split).
 
 ## 3. Start states
 
@@ -130,8 +151,8 @@ comparison (docs/handoff/perf.md).
 | `reset_protocol="branch_low"` | lasers on at once; the self-heating root is met from the cold side |
 | `reset_protocol="branch_high"` | lasers on at once; the hot (self-locked) root |
 | `heater_code=(B, N) codes` | the heater registers, FIFO and drive start at these codes (a warm start) |
-| `heater_code="quasi_static"` | the oracle lock codes of `quasi_static` at each world's base temperature and bias at t = 0 (`warm_start_codes`); no aggressor, laser-offset or unlocked-ring bus effects; a ring without a code (g26 seeds 7: 13 of 64 sampled rings) starts at code_min with a warning. Every such ring measured so far is one whose heater-up order needs a negative heater power (it is already red of its lock point at code_min) |
-| `heater_code="quasi_static_reachable"` | the same, but such a ring locks one order bluer (one FSR of heating) instead of starting at code_min (`quasi_static(order="reachable")`; g26 seeds 1000, B = 8: 10 -> 3 rings without a code). Worlds without such a ring get the same codes as `"quasi_static"`. The experiments' `start: warm` uses this mode |
+| `heater_code="quasi_static"` | the oracle lock codes of `quasi_static` at each world's base temperature and bias at t = 0 (`warm_start_codes`), held in the data path of t = 0 (`quasi_static(data_state=)`, `runner.reset_data_state`: driver enable, swing scale, transition and ones density; the target stays the traffic-on operating point); no aggressor, laser-offset or unlocked-ring bus effects; a ring without a code (g26 seeds 7: 13 of 64 sampled rings) starts at code_min with a warning. Every such ring measured so far is one whose heater-up order needs a negative heater power (it is already red of its lock point at code_min) |
+| `heater_code="quasi_static_reachable"` | the same, but such a ring locks one order bluer (one FSR of heating) instead of starting at code_min (`quasi_static(order="reachable")`), and so does every ring that the hopped rings' heat then pushes below zero, until none needs a negative power (g26 seeds 1000, B = 8: 10 -> 0 rings without a code; 14 rings hop, the 10 and 4 that had heater-up codes; worlds 0-2 exceed the array supply limit at their codes). Worlds without such a ring get the same codes as `"quasi_static"`. The experiments' `start: warm` uses this mode |
 | `settle=True` | the thermal state starts at the steady state of the held inputs (below); defaults the protocol to branch_high |
 | `factory_table=table` | `controller.load_factory_cal(table)` before `controller.reset(spec)` (07 P1-1 warm start; `mrm.control.calibration.factory_cal` makes a table) |
 
@@ -154,8 +175,24 @@ ring temperatures move by less than 2 mK, then resets everything except the ther
 plant's own implicit self-heating solve, heater TCR split, bias, data heat and scenario inputs at t = 0, so the start
 is the engine's own fixed point (tested against a 100 ms open-loop run at code 0: within 5 mK). g26 nominal at the
 quasi-static codes settles in ~18 iterations and then holds its detuning within 0.03 pm open loop. The noise draws of
-each iteration limit the convergence to ~0.5 mK. `manifest_inputs["warm_start"]` records the codes, protocol and
-the settle report.
+each iteration (a new tick each time) limit the convergence to ~0.5 mK. Every world stops at its own first
+iteration below the tolerance (`iterations_per_world`, `converged_per_world` in the report), so its start does not
+depend on the other worlds of the batch (07 P1-13). The scenario is held at t = 0 during the settle: every signal
+keeps its value of the reset tick (2026-10-16: before, iteration i saw the scenario of tick i, so an input that
+changed within the first ~20 ticks was settled as if already there; an aggressor switched on at 10 us started ring
+0 18.7 K hot and +1554 pm red instead of at +121 pm, reported converged; the shipped scenarios moved by at most a
+few pm). `manifest_inputs["warm_start"]` records the codes, protocol and the settle report.
+
+**Warm start in a data state other than traffic on.** The quasi-static codes put each ring at its traffic-on
+operating detuning with the heat of the data path at t = 0. A start with traffic off (`traffic_start_stop` with
+t_start > 0) gets 1243-1348 codes more than the static start (the missing data-activity heat, ~1-1.4 K) and settles
+within 1.0 pm of the static start's detuning; a start at ones density 0 (`ones_density_steps`, `idle` at t0 = 0)
+within 0.5-4.6 pm, the residual growing along the bus (quasi_static leaves out the upstream rings' filtering of the
+other lines, which the density changes). Before 2026-10-16 the codes always assumed traffic on: such starts began
+65-98 pm (traffic off) and 13-24 pm (ones density 0) blue of the lock, and in `static +
+traffic_start_stop(0.01)` pi_lock_c's start-up dropped rings 4-7 to their cold branch (-1228 to -1294 pm; the review
+measured ring 6 still at -761 pm at 20 ms). Now it holds every ring through the traffic start (115-118 pm at 20 ms;
+engine review, engine-3).
 
 g26 nominal, settled at the quasi-static codes: the rings sit at +97 to +121 pm (red of their lines) against the
 quasi-static targets of +104 to +105 pm. The difference is the quasi-static solve's simplifications (single bus pass,
@@ -178,7 +215,9 @@ scenario offset); NRZ levels; optics inputs at the previous ring temperature (`m
 only when the line wavelengths move) and the substep caches of the self-heating adapter; self-heating bounds;
 data-activity heat; heater TCR split and heater DAC path (+ fast offset, dac_glitch); the implicit thermal +
 self-heating step (`kernel._implicit_step_eng`, a line-for-line mirror of `mrm.plant.selfheat.implicit_step_b`; the
-optics walk runs inside it); sensors of the interval (monitor, error counter, temperature sensors, readback); Truth,
+optics walk runs inside it, in `layout.bus_order` with the bus segment loss between rings, `mrm.plant.phase`
+equation 6: g26 0.073 dB/mm over 50 um, 0.99916 per segment, 0.59 % less light at ring 7 than at ring 0); sensors of
+the interval (monitor, error counter, temperature sensors, readback); Truth,
 metrics and records of the state at k + 1. Every analog or converter delay lives in its leaf module; the engine owns
 only the controller pipeline (07 P0-6).
 
@@ -186,13 +225,44 @@ only the controller pipeline (07 P0-6).
 `auto_max_ticks` (64) while the actuators are quiescent, the scenario is linear, the detuning rate is small and no
 edge, record window or oracle tick intervenes; a scenario event forces a 1-tick step and h at most doubles per step.
 The thermal step is exact for any h; per-tick sensors still run every tick. Details: engine.md section 3 item 10.
+The end of a kernel block (one `Plant.run` call) also caps the substep in flight, and the growth limit restarts from
+the shortened step, so under `auto` the result depends on where the blocks end. A substep never crosses a
+controller edge, so a block that ends on an edge changes nothing: the runner ends every block of a run without tick
+jitter on a controller edge (`runner._block_end`), and `chunk_ticks` (default 1e5, recorded in
+`manifest_inputs["chunk_ticks"]`) then changes no result, on the compiled and the open-loop path (the Python path
+stops at every edge anyway). With `tick_jitter_s` > 0 the edges differ per world: there `chunk_ticks` and any block
+end change the auto step sequence (another valid sequence of the policy, within its own error). Before 2026-10-16
+the blocks ended every `chunk_ticks` ticks: g26 nominal, pi_lock_c, 20 ms, chunk_ticks 13 against 1e5 gave 11426
+against 10582 substeps and monitor codes up to 9 apart (engine review, engine-4). Calling `Plant.run` directly
+with blocks that do not end on edges still gives a block-dependent auto trajectory.
 
 ## 5. Controllers on the engine
 
 - **Python path** (any object with `reset(spec)`, `step(obs) -> {channel: codes}`, `latency_ticks`): the kernel
   stops at every controller edge, the runner builds an `Observation` from the released channels, validates the
   actions (shape, dtype, range: 07 P1-19) and resumes. Vectorized over B; needs edges shared by every world (no
-  `tick_jitter_s`). Cost: ~100-300 us per edge on top of the plant.
+  `tick_jitter_s`). Cost: ~100-300 us per edge on top of the plant. A CompiledController run here (`path='python'`)
+  after a scenario `fault.controller_reset` restarts as in the kernel: its new init state goes into the kernel's
+  state rows (its `fast_kernel` and its `step` share one state again) and its held command is re-filled from the
+  latched DAC registers (`Plant.restart_compiled`; before 2026-10-16 the fast kernel kept updating the old state,
+  so bias_dither's lock-in stopped after a reset on this path).
+- **Range errors.** `controller_interface.on_out_of_range: error` raises `ActionRangeError` on both paths: the
+  Python path at the step (ActionValidator), the compiled path after the kernel block in which the first command
+  left its range (the kernel still clips; it records each world's first out-of-range element, tick and value,
+  `kernel.WI_SAT_FIRST_*`; the message names them). Before 2026-10-16 the compiled path always clipped and counted.
+  `clip` (the default) saturates and counts on both paths (`diagnostics["commands_clipped"]`,
+  `saturation_counts`).
+- **Schedule** (`controller_interface.schedule`, 07 P2-7). `simultaneous` (default): every ring at every edge.
+  `round_robin` (one datapath time-multiplexed over the rings): controller edge j (counted from the controller
+  phase, `ControllerSpec.active_ring(tick)`) updates ring j % N only. The observation carries it
+  (`Observation.active`, ABI header `OBS_ACTIVE_RING`); of every per-ring (B, N) actuator channel only that ring's
+  command is applied and the other rings keep their held command of the edge (also through a controller reset);
+  (B, L) and (B, 1) channels are applied whole. Both paths, the NumPy reference and MRMEnv (the kernel applies the
+  rule when it resumes) do this; the Python path merges before validating, so only applied commands are
+  range-checked and counted (`mrm.control.api.merge_round_robin`). Each ring is then updated at rate / N (g26:
+  12.5 kHz per ring at 100 kHz). Before 2026-10-16 the setting was stored and ignored: every ring was updated at
+  every edge. A `CompositeController` refuses the interface round robin (it multiplexes its children with its own
+  `schedule`); `kalman_lqg` / `mpc` refuse it (their design assumes every ring's command acts each period).
 - **Compiled path** (`mrm.control.api.CompiledController`: numba `step(p_i64, p_f64, s_i64, s_f64, obs_i64,
   act_i64)` typed `STEP_FT`): runs inside the kernel, per world, with edge jitter. The optional `fast_kernel` runs
   once per released monitor sample; its heater/bias offsets are held, added to the latched command before the DAC
@@ -214,14 +284,24 @@ The thermal step is exact for any h; per-tick sensors still run every tick. Deta
 | fixed-point reference (hardware task) | `fxp_pi` (mrm.control.fxp.FxpPi, compiled) | at the lock (settled warm start); it holds the operating point it starts at | nothing; g26-nominal gains (section 12) |
 
 docs/handoff/controller_scorecard.md has every one of them on the engine (g26 nominal, steady lock and A1, from
-`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (2026-10-10): from the settled warm
-start, pi_lock (Python, compiled, composite), feedforward_pi, kalman_lqg and mpc (Python and compiled) hold all 8
-rings with < 0.1 pm rms jitter (each compiled version gives the same metrics as its Python version); the dither
-locks jitter at the 5 pm level by their own dither; the acquisition controllers without the supervisor lock every
-ring on a foreign line; wdm_supervisor locks all 8 on their lines in 23 ms from a cold start. Under A1 (default
-site, 55 um from PD0), pi_lock, midranging, kalman_lqg and mpc hold rings 1-7 within 6-8 pm, while ring 0 leaves
-its point by 350-365 pm at the hot cusp with its heater at code 0 for 14-15 ms (heater authority); feedforward_pi
-loses every ring (its die sensor sees the aggressor; integrator handoff 6.4). In the stress scenario
+`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (as regenerated 2026-10-16 after
+the engine review and the controllers review; the steady lock now also needs a stationary operating point, drift
+<= 0.1 pm/ms): from the settled warm start, pi_lock (Python, compiled, composite), feedforward_pi, kalman_lqg and
+mpc (Python and compiled) hold all 8 rings with < 0.1 pm rms jitter (each compiled version gives the same metrics
+as its Python version), bias_dither and midranging hold all 8; the dither locks jitter at the 5 pm level by their
+own dither (dither_lockin 4 of 8 within 5 pm). The peak seekers do not lock in 40 ms: es_po falls off the fold
+(the drop peak sits at the self-heating fold of a g26 ring, bistability ratio ~6), and es_sine's 8 rings are still
+drifting toward the drop peak at 0.77-0.95 pm/ms; it parks there after 100-160 ms at ~13 dB OMA penalty (before
+2026-10-16 the scorecard counted es_sine as 8 of 8 locked at 0.3 dB: a snapshot of that transient). The
+acquisition controllers without the supervisor lock every ring on a foreign line (acquire_then_lock 3 of 8 within
+5 pm; bitstat_lock 7 of 8, one ring still settling). These outcomes flip with small plant changes (the plant fixes
+of 2026-10-16, the bus segment loss among them, moved es_po, midranging and acquire_then_lock): they are not
+robust results either way. wdm_supervisor
+locks 7 of 8 rings on their declared lines from a cold start; ring 2 ends on a foreign line (line 0 instead of 2),
+reached at 26.7 ms and still settling at 40 ms. Under A1 (default site, 55 um from PD0), pi_lock, midranging, kalman_lqg and mpc hold rings 1-7
+within 6-8 pm, while ring 0 leaves its point by 350-365 pm at the hot cusp with its heater at code 0 for 14-15 ms
+(heater authority); feedforward_pi loses every ring (its die sensor sees the aggressor, ~+20 K, and its
+feed-forward then runs away to code 0; mrm/control/baselines/feedforward.py). In the stress scenario
 a1_slide10_aggressor_pd_adjacent every controller loses ring 0 (PD0 above 600 degC).
 
 ## 6. Outputs
@@ -315,11 +395,18 @@ FSR-hop and wrong-line risk; per (ambient, bias, world) the array supply droop f
   (Plant.settle swaps the coefficient tables).
 - `kernel_ref.ReferenceEngine` is the NumPy tick built from the leaf modules' public functions (07 P1-18). Parity:
   every Truth field, every observation vector and the metrics, bit for bit, open loop and with Python and compiled
-  controllers, also under `NUMBA_DISABLE_JIT=1`. With `airy=False` (independent optics, above) the parity is within
+  controllers, also under `NUMBA_DISABLE_JIT=1`, with the config scenario and with one that drives every scenario
+  input the kernel reads (aggressor, laser failover with a dark gap, fibre loss, traffic start and stop, bias step,
+  the four faults and a controller reset; `test_parity_with_every_scenario_path`). The reference resets the
+  controller at the first edge after a `fault.controller_reset` rising edge (since 2026-10-16; before it ignored
+  the fault). With `airy=False` (independent optics, above) the parity is within
   1e-9 of each Truth field's range, codes identical.
 - Truth detuning: the resonance of the order nearest the declared line (tx.assignment when the controller owns it),
   computed exactly on the phase model's cold curve (`kernel.resonance_detuning`); the optics slope is
-  `dphi_dlamres = 2 pi c t_rt / (lambda - shift)^2` (engine.md section 3 item 6).
+  `dphi_dlamres = 2 pi c t_rt / (lambda - shift)^2` (engine.md section 3 item 6). `detuning_hwhm` divides by
+  `lambda_line^2 fwhm_hz / (2 c)`; the rigidly translated line of the phase model keeps the cold width
+  `lambda_res^2 fwhm_hz / c` in wavelength, 1.2 % narrower at the 7.6 nm g26 lock (a normalisation of the
+  diagnostic only; section 10, phase model).
 
 ## 8. Extending
 
@@ -376,22 +463,65 @@ approximation that changes closed-loop trajectories, perf.md 5.4) is now ~10 % s
 - **Bias tunes weakly in g26**: a 0.2 V step moves the resonance 0.1-0.5 pm (the FCA heat cancels most of the
   electro-optic shift); bias locks are weak (controllers_a handoff).
 - **Data-activity heat** lifts each ring ~2 K; traffic and squelch steps move rings by this much.
+- **Bus segment loss (since 2026-10-16).** Each ring after the first in bus order sees its lines 0.99916 times the
+  previous ring's through output (g26: 0.073 dB/mm, printed, over the assumed 50 um spacing; ring 7 gets 0.59 % less
+  light than ring 0). Before, `Plant._build` passed no `bus_t2` and the engine, `quasi_static` and
+  `mrm.control.models` ran every segment at 1, while derive and the replicas applied the loss.
+- **Crosstalk dynamics: two packages (since 2026-10-16).** The interim crosstalk pole takes the heat-source-to-victim
+  distance of its imec anchor, the centre distance less both ring radii (r_ref): the g26 nearest neighbour gets
+  1.52 ms at the 50 um pitch (2.85 ms before, with the centre distance), the own monitor PD 0.38 ms (0.71 ms), the
+  A1/A2 aggressor path to ring 0 0.62 ms (1.03 ms). These are imec's natural-convection numbers (3 % nearest, 1.5 %
+  floor, 1.5-9 ms). The in-ring FEM ROM's TEC-held package gives 1.0 % nearest reaching 63 % in 0.12 ms and a 0.09 %
+  floor at 1 mm; that is the weight-0 choice `uncertainty.thermal.stack: side_by_side_tec_held`, corner
+  `g26_tec_package` (in the named corners, so robust and compare runs include it; sampled worlds do not). Which one
+  G26 has is unknown (VALIDATION.md closure-crosstalk-dynamics). The die sensor `die0` sees each heater with the
+  far-site floor (`ring.thermal.site_floor_frac`): 1.5 % of Z_heater->ring (85 K/W, 9 ms) by default, 0.09 % in
+  the corner.
+- **Monitor ADC reference at the package base (since 2026-10-16).** The 20 ppm/K reference tempco
+  (`ring.monitor.adc_ref_tempco_ppm_per_k`, assumed) acts at `ring.monitor.adc_ref_site`: `package_base` (default;
+  `thermal.t_base_k + thermal.xpu_rise_k`, the converter on its own die beside the PIC, 07 P1-3 side_by_side) or
+  `monitor_pd` (each ring's PD observer, the former model; kernel row `RF_T_ADC`). At the g26 lock the PD observers
+  sit ~20 K above the base, so the codes read 17-24 codes (0.04 %) higher than before, and ring 0 under A1 (PD0 at
+  ~93 degC) loses its former 0.14 % gain dip. At 25 degC ambient the reference sits at its trim temperature, where
+  the plant matches `mrm.control.models` (which uses T_ref) exactly. Heater and aggressor heat no longer reach the
+  ADC gain.
+- **Bit statistics under a PRBS (since 2026-10-16).** The `datapath.bitstat_above` window takes the scenario's ones
+  density (kernel row `RF_DENS`, also set at reset for an edge at k0), so under `fidelity.pattern_noise` prbs7 / 9 /
+  15 / 23 its ones count is the exact count of the last 64 bits sent (`RI_BS_N1`). Before, the realized per-tick
+  density n1/nb (0.504 for prbs7) made every window a Binomial(64, n1/nb) draw (std 4.1 instead of 2.8 for prbs7,
+  uncorrelated with the sequence). Binomial mode draws Binomial(64, density). The window's levels at the first edge
+  after a reset are still the reset placeholders (no interval has run yet).
+- **adc_mux (since 2026-10-16).** `round_robin` with `channels_per_adc` C > 1 needs C x window <= ADC period (the C
+  rings take turns on one integrating converter; checked by realize and `MonitorHw.build`), and the C rings share the
+  converter's DNL thresholds and INL bow (keyed by converter n // C). The conversion (de-integration) time is not
+  modelled: a shared dual-slope converter also needs C (W + T_deint) <= P, which the preset's rate must respect.
+- **ROM mode: die-level time scales per pair (since 2026-10-16).** With `fidelity.thermal_model: rom` and unequal
+  `time_scale_fast` / `time_scale_slow`, a mixed-sign FEM pair whose poles straddle 300 us is time-scaled as a whole
+  (`mrm.plant.thermal._whole_pair_time_scales`); per-pole factors made heater -> ring overshoot by up to 21 %
+  (metal_above_160). The interim model is unchanged.
+- **The phase model is a rigid comb** (open item, `mrm.plant.phase` equation 2): a heated ring keeps its cold FSR
+  in wavelength, while the modes artefact's n_eff(lambda, T) table moves order m + k by 0.43 % of the shift per
+  FSR more or less (+-33 pm at the adjacent orders at the 7.6 nm lock, linear in the heater shift). The locked order
+  is exact; the foreign-line heat and monitor background move by <= 0.15 % of P_abs in g26 and ~1 % in the FSR
+  stress corners. The 07 P1-6 law needs a thermo-optic dispersion key and changes every consumer of the curve.
 - **The array heater supply limit binds in some worlds** (section 3): the stacked_eic stack below ~30 degC, the
   g26_low_eta and g26_fsr_edge corners at 0 degC. There no controller can hold the whole bank; LHS quantiles that
   include such worlds measure the supply, not the controller (`warm_start_supply_limited` in the world summaries).
 - **Sampled worlds lose rings under pi_lock_c even from a good warm start.** experiments/examples/mc_pi_lock.yaml
-  (64 sampled worlds, static, 20 ms, lock judged about each ring's own operating point): 26 worlds have a ring off by
-  more than 5 pm, 10 of them with no warm-start flag (no code, order hop or supply limit); median worst-lane OMA
-  penalty 1.6 dB, p95 32 dB. A controller claim over the uncertainty set needs the controllers owners' analysis of
+  (64 sampled worlds, static, 20 ms, lock judged about each ring's own operating point): 27 worlds have a ring off by
+  more than 5 pm, 10 of them with no warm-start flag (no code, order hop or supply limit; worlds 1, 3, 11, 13, 30,
+  32, 33, 39, 43, 48); median worst-lane OMA penalty 1.6 dB, p95 31 dB (rerun 2026-10-16 after the iterated order
+  hop: 1 ring without a code instead of 9, 101 hopped rings, 2 supply-limited worlds; runs/engine_fix/exp). A controller claim over the uncertainty set needs the controllers owners' analysis of
   those worlds (docs/handoff/experiments.md section 12).
 - Acceptance table on g26 nominal with pi_lock_c (docs/handoff/experiments.md section 12): A4 (soak), A7 (relOMA
   plane), B3 (XPU step) and B5 (cold start, wdm_supervisor) pass; A1, A2 (heater authority at the hot end, ring 0),
   A3 (14 pm lag under the 50 nm/s sweep), A6, B2 (set-point moves under power steps) and B1 (squelch) fail.
 - Not built yet: the P1-20 telemetry metrics, `fidelity.data_modulation: lut` (the waveform LUT exists:
-  docs/handoff/waveform.md section 3), the reference-tap and `datapath.bitstat_ones` channels, `DacFacts.law`, one
+  docs/handoff/waveform.md section 3), the reference-tap and `datapath.bitstat_ones` channels (a config with
+  `ring.monitor.reference_tap.present: true` is refused when the plant is built), `DacFacts.law`, one
   knowledge vocabulary, `run_lock_request` for the replicas (docs/handoff/replicas.md section 6), the Verilator /
-  cocotb closed-loop HDL co-simulation (section 12), `mrm report` / the VALIDATION.md generator, an in-kernel bridge
-  (bridged runs take the Python path), per-world reset in the gym env, and the 07 P1-22 throughput (section 13).
+  cocotb closed-loop HDL co-simulation (section 12), an in-kernel bridge (bridged runs take the Python path),
+  per-world reset in the gym env, and the 07 P1-22 throughput (section 13).
 
 ## 11. Experiments, run directories and the CLI (07 P1-17, P0-10, P2-12, 4.8)
 
@@ -424,9 +554,10 @@ experiment:
   vary ~10x per edge; the soak's auto policy runs at ~6.5-7.8 us per tick).
 - **Kinds.** run (one runner.run of `batch` worlds, default records); sweep (Cartesian `experiment.grid` over config
   paths, `alt:<path>`, `corner`, `controller`); mc (`n_mc` worlds, metrics only, chunks of `max_worlds_per_plant`);
-  compare / robust (07 4.8: nominal world, the 12 named corners, `n_mc` LHS worlds; worst corner, quantiles,
-  Kendall-tau rank stability; the first report line is the Q1 caveat); acceptance (criteria that must hold in every
-  world of every case); quasi_static (runner.quasi_static over ambient x bias, plus one survey per corner).
+  compare / robust (07 4.8: nominal world, the named corners (07's 12 and g26_tec_package), `n_mc` LHS worlds;
+  worst corner, quantiles, Kendall-tau rank stability; the first report line is the Q1 caveat); acceptance (criteria
+  that must hold in every world of every case); quasi_static (runner.quasi_static over ambient x bias, plus one
+  survey per corner).
 - **Run directory** `runs/<UTC>_<hash8>/`: `experiment.resolved.yaml` (every leaf with provenance), `manifest.json`
   (schema mrm.run/1: git commit, branch, dirty-diff hash, environment, argv, seeds, source chain, artefact hashes,
   every case's runner manifest), `metrics.json`, `trace.h5` (exact arrays), `inputs/` (the experiment file and its
@@ -554,7 +685,7 @@ $MG --heavy .venv/bin/python -m mrm.validation.report        # every part (~76-8
 $MG --heavy .venv/bin/python -m mrm.validation.report --preset g26_calibrated --out docs/VALIDATION_g26_calibrated.md
 ```
 
-Parts and their cost on g26 (4 kernel threads): predictions ~9 min (every target on the nominal world and the 12
+Parts and their cost on g26 (4 kernel threads): predictions ~9 min (every target on the nominal world and the
 named corners), identifiability ~20 min (the calibration Jacobian), sensitivity ~23-25 min (tornado and Sobol worlds
 under A1), ranking ~28 min (the compare_locks experiment). A part goes stale when a preset it ran on, a target file,
 or its code (`report.CODE_DEPS`: replicas.py, sensitivity.py) changes; the CI test

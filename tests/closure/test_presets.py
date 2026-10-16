@@ -55,9 +55,12 @@ REQUIRED_PRESETS = {"g26", "g25_test_vehicle", "teaching_basic", "g26_slow_therm
 
 #: leaves whose value 07 / ARCHITECTURE 5 say must come from an extraction artefact
 SOLVER_LEAVES = ("ring.optics.n_eff", "ring.optics.n_g", "ring.optics.dn_g_dlambda_per_nm",
-                 "ring.thermal.dlambda_dt_pm_per_k", "ring.thermal.dlambda_dt_beta_per_k",
+                 "ring.thermal.dlambda_dt_pm_per_k",
                  "ring.optics.loss_budget.alpha_bend_radiation_db_per_cm", "ring.geometry.jacobian",
+                 "ring.geometry.jacobian_coupling",
                  "ring.optics.dln_kappa2_through_dlambda_per_nm", "ring.optics.dln_kappa2_drop_dlambda_per_nm")
+#: solver leaves computed from an artefact table (not a from-form): the number is recomputed by a closure test
+SOLVER_COMPUTED_LEAVES = {"ring.thermal.dlambda_dt_beta_per_k": "tests/closure/test_params_notes.py"}
 
 
 # ------------------------------------------------------------------------------------------------ fallback adapter
@@ -336,6 +339,13 @@ def test_solver_leaves_use_the_from_form_with_a_fallback():
         assert FALLBACK in (leaf.get("alternatives") or {}), f"{path}: needs a '{FALLBACK}' alternative"
         fb = leaf["alternatives"][FALLBACK]
         assert "value" in fb and fb.get("provenance") in ("literature", "inferred", "assumed"), path
+    for path, test in SOLVER_COMPUTED_LEAVES.items():
+        # a number fitted to an artefact table (the secant beta over the operating range, params review 2026-10-16):
+        # solver provenance, a fallback, and a note naming the test that recomputes it from the artefact
+        leaf = node(path)
+        assert isinstance(leaf.get("value"), float) and str(leaf.get("provenance")).startswith("solver"), path
+        assert FALLBACK in (leaf.get("alternatives") or {}), f"{path}: needs a '{FALLBACK}' alternative"
+        assert test in leaf.get("note", "") and (ROOT / test).exists(), path
 
 
 def test_inventory_covers_the_checklist():
@@ -578,6 +588,10 @@ def _corner_checks():
                                  ("tau_slow [us]", lambda pp: pp.thermal.inputs.interim["tau_slow_s"] * 1e6, 300.0),
                                  ("xt_nearest", lambda pp: pp.thermal.inputs.interim["xt_nearest_frac"], 0.1),
                                  ("tail share", lambda pp: pp.thermal.inputs.scales["package_tail_share_frac"], 0.0)],
+        "g26_tec_package": [("xt_nearest", lambda pp: pp.thermal.inputs.interim["xt_nearest_frac"], 0.0102),
+                            ("xt_floor", lambda pp: pp.thermal.inputs.interim["xt_floor_frac"], 0.0026),
+                            ("site_floor", lambda pp: pp.thermal.inputs.interim["site_floor_frac"], 0.0009),
+                            ("xt_tau_ref [us]", lambda pp: pp.thermal.inputs.interim["xt_tau_ref_s"] * 1e6, 345.0)],
     }
 
 

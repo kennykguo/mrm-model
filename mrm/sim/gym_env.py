@@ -226,8 +226,9 @@ class RewardSpec:
     """Per-step reward from the kernel's accumulators (module docstring). Per ring n of world b, over the step:
 
     - lock: u = mean(e^2) / s^2 with s = ``lock_scale_pm`` (default: metrics.lock_threshold_pm, the 5 pm lock
-      budget); term -log1p(u) (``shape='log'``, default: 0 at e = 0, -0.69 at an rms error of s, -10.6 at 1000 s;
-      bounded growth keeps a lost ring from swamping the batch) or -min(u, clip) (``shape='quadratic'``);
+      budget); term -log1p(u) (``shape='log'``, default: 0 at e = 0, -0.69 at an rms error of s, -10.6 at 200 s
+      (1000 pm at the default s of 5 pm), -13.8 at 1000 s; bounded growth keeps a lost ring from swamping the batch)
+      or -min(u, clip) (``shape='quadratic'``);
     - oma: mean relOMA / mean oracle relOMA over the step (0 when the oracle relOMA is 0), in [0, ~1];
     - heater: mean heater power over the step, W;
     - wrong line: fraction of the step on a foreign line (07 P1-12, the kernel's wrong-line flag).

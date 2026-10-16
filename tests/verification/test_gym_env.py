@@ -266,9 +266,10 @@ def test_determinism_and_next_step_autoreset():
 def test_an_episode_replays_from_its_seeds_and_a_world_alone():
     """Reproducibility (07 P1-13): an episode replays bit for bit from env.seeds (options={'seeds': ...}); world b of
     a batch replays alone at B = 1 with the seeds base + b from a cold start (plant draws and noise are per world),
-    and its warm-start codes with their jitter are per world too. A SETTLED start (warm, cold_settled) is not
-    bit-exact alone: Plant.settle iterates until the largest change over the whole batch is below its tolerance,
-    so a world's settled state depends on its batch companions (~1 mK; docs/handoff/rl.md)."""
+    and its warm-start codes with their jitter are per world too. Since the engine review of 2026-10-16 a SETTLED
+    start (warm, cold_settled) replays alone too: Plant.settle stops each world at its own iteration (here 9 / 15 /
+    11 for warm, 4 / 6 / 6 for cold_settled). Before, the batch iterated until its slowest world converged, so a
+    world's settled state depended on its batch companions (~1 mK; docs/handoff/rl.md section 6 item 10)."""
     B, n = 3, 8
     rng = np.random.default_rng(0)
     acts = rng.uniform(-0.2, 0.2, (n, B, 8)).astype(np.float32)
@@ -291,11 +292,17 @@ def test_an_episode_replays_from_its_seeds_and_a_world_alone():
     obs1, _ = one.reset(options={"seeds": s1})
     h = e.obs_layout.channel("tx.heater.applied")
     assert np.array_equal(o1[0, 1, h.offset:h.offset + h.size], obs1[0, h.offset:h.offset + h.size])
-    for env in (e, one):
-        env.start = "cold"
-    o3, r3 = roll(e, acts, options={"seeds": seeds})
-    o4, r4 = roll(one, acts[:, 1:2], options={"seeds": s1})
-    assert np.array_equal(o3[:, 1:2], o4) and np.array_equal(r3[:, 1:2], r4)
+    for start in ("cold", "warm", "cold_settled"):
+        for env in (e, one):
+            env.start = start
+        o3, r3 = roll(e, acts, options={"seeds": seeds})
+        its = None if start == "cold" else e.plant.settle_info["iterations_per_world"]
+        for w in range(B):
+            sw = {k: v + w for k, v in seeds.items()}
+            o4, r4 = roll(one, acts[:, w:w + 1], options={"seeds": sw})
+            assert np.array_equal(o3[:, w:w + 1], o4) and np.array_equal(r3[:, w:w + 1], r4), (start, w)
+        if its is not None:
+            assert len(set(its.tolist())) > 1, its          # the worlds needed different settle iterations
     e.close()
     one.close()
 

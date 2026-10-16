@@ -245,6 +245,9 @@ runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heat
    change over every world is below 2 mK, so a world's iteration count and settled state depend on its batch
    companions (measured: g26 seeds 0, B = 4 vs alone: 16 vs 7-16 iterations, start temperatures differ by up to
    0.9 mK, detuning by 0.014 pm after 50 steps). The same holds for `runner.run(..., settle=True)`. Request 7.5.
+   **Resolved 2026-10-16 (engine review, engine-5):** `Plant.settle` stops each world at its own iteration, and
+   settled starts replay alone bit for bit (test_gym_env.py::test_an_episode_replays_from_its_seeds_and_a_world_alone
+   checks warm and cold_settled).
 11. **Scenario randomization is per reset, not per world**: a scenario callable is called once per reset (one
    Plant has one scenario) with a generator seeded by the base scenario seed; every world of the batch shares the
    draw (a world replayed alone gets the draw of its own seed instead).
@@ -271,7 +274,8 @@ runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heat
    item 10). A per-world stop (freeze each world's thermal state once its own change is below `tol_k`) would make a
    settled world replay alone at B = 1; it changes settled starts for B > 1 (the regression scenarios and golden
    traces that use `settle=True` with B > 1 would need a refresh and a CHANGELOG line), so it is a decision for the
-   plant owner and the integrator, not a defect of the env.
+   plant owner and the integrator, not a defect of the env. **Done 2026-10-16** (engine review; CHANGELOG): no
+   golden trace uses B > 1; the regression scenario mc8_pi moved (docs/CHANGELOG.md).
 
 ## 8. Test status at the builder's hand-off (2026-10-10; superseded by section 9.3)
 
@@ -368,8 +372,9 @@ Changes that reach the env through the runner (results of the env unchanged in e
   `runner._warm_start_codes(...)[2]`) and consider excluding those worlds from the reward like the no-code rings.
 - `heater_code="quasi_static_reachable"` / `quasi_static(order="reachable")`: a ring whose heater-up order needs a
   negative heater power locks one order bluer instead of starting at code_min (g26 seeds 1000, B = 8: 10 -> 3 rings
-  without a code). The env's 'warm' start still uses 'quasi_static' (its tests and the tutorial outputs depend on
-  it); switching is a one-line change in `MRMEnv._reset_worlds` for the rl owner.
+  without a code; since 2026-10-16 the hop repeats while hopped rings push others below zero: 10 -> 0). The env's
+  'warm' start still uses 'quasi_static' (its tests and the tutorial outputs depend on it); switching is a one-line
+  change in `MRMEnv._reset_worlds` for the rl owner.
 
-Still open: 7.1 (Python-path per-call cost), 7.2 (vectorized quasi_static), 7.3 (per-world reset), 7.5 (per-world
-settle), the 1e5 steps/s target.
+Still open: 7.1 (Python-path per-call cost), 7.2 (vectorized quasi_static), 7.3 (per-world reset), the 1e5 steps/s
+target. (7.5, the per-world settle stop, was done on 2026-10-16: engine review.)

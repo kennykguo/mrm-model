@@ -69,12 +69,14 @@ class PyStair:
         return {"tx.heater": h.astype(np.int64)}
 
 
-def _setup(B=2, n_ticks=400, lat=0, ovr=(), plant_kw=None, **metrics_kw):
+def _setup(B=2, n_ticks=400, lat=0, ovr=(), plant_kw=None, scenario=None, **metrics_kw):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cfg = params.load("g26", overrides=["sim.reset_ramp_s=2e-4", *ovr])
         pp = params.realize(cfg, B, seeds=7)
     sc = scen_registry.from_config(cfg)
+    if scenario is not None:
+        sc = sc + scenario
     spec = ControllerSpec.from_config(cfg, n_batch=B, nominal=cfg, scenario_drives=sc.drives,
                                       scenario_offsets=sc.offsets)
     plant = Plant(pp, sc, spec, noise_seed=3, scenario_seed=5, controller_latency_ticks=lat,
@@ -161,6 +163,115 @@ def test_compiled_controller_parity():
     np.testing.assert_array_equal(c.state[2], c_ref.state[2])
     sat_k = plant.S.sat[:, :plant.maps.act_size]
     assert sat_k.sum() == sum(v.sum() for v in plant.validator.saturation_counts().values())
+
+
+def _reset_pulse(t_s=210.5e-6):
+    """A die-common scenario controller reset (07 P1-10 fault.controller_reset) rising at t_s, 3 us long."""
+    from mrm.scenarios import generators as g
+    return g.Scenario(name="controller_reset", components=(
+        g.pwl("fault.controller_reset", [0.0, t_s, t_s, t_s + 3e-6, t_s + 3e-6, 1.0], [0, 0, 1, 1, 0, 0],
+              absolute=True),))
+
+
+def _rich_scenario():
+    """Every scenario path of the interval inputs at once (engine review 2026-10-16, engine-7): a square aggressor
+    (FOH power), a laser failover with a dark gap (line enable, frequency and power steps), a fibre loss step, traffic
+    start and stop (driver enable, swing, transition and ones density), a bias offset step, the four sensor and
+    actuator faults and a controller reset."""
+    from mrm.scenarios import generators as g
+    from mrm.scenarios import library as lib
+    faults = g.Scenario(name="faults", components=(
+        g.pulse("fault.adc_drop", 120e-6, 140e-6, 1.0, elements=(1,)),
+        g.pulse("fault.adc_stuck", 160e-6, 180e-6, 1.0, elements=(2,)),
+        g.pulse("fault.adc_saturate", 190e-6, 200e-6, 1.0, elements=(3,)),
+        g.pulse("fault.dac_glitch_codes", 230e-6, 240e-6, 500.0, elements=(4,))))
+    return (lib.aggressor_direct(power_w=0.1, period_s=200e-6, duty=0.5)
+            + lib.laser_failover(line=0, t_fail_s=100e-6, gap_s=20e-6)
+            + lib.fibre_loss_step(t_s=150e-6) + lib.traffic_start_stop(t_start_s=50e-6, t_stop_s=300e-6)
+            + lib.bias_step(t_s=250e-6) + faults + _reset_pulse())
+
+
+def test_compiled_controller_parity_through_a_controller_reset():
+    """07 P1-10 fault.controller_reset (engine review 2026-10-16, engine-7): the kernel restores the compiled
+    controller's post-init state and syncs its held command at the first edge after the rising edge; the reference
+    calls the controller's reset there (its CompiledController protocol re-runs init and syncs from the latched
+    registers). Before, the reference ignored the fault (heater codes 12684 apart from tick 220)."""
+    n = 400
+    cfg, spec, plant = _setup(n_ticks=n, scenario=_reset_pulse())
+    ref = ReferenceEngine(plant)
+    c_ref = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+    c_ref.reset(spec)
+    ref.run(n, c_ref)
+    c = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+    c.reset(spec)
+    plant.bind_compiled(c)
+    plant.run(n, mode=K.MODE_COMPILED, step_fn=c.step_fn)
+    _compare(plant, ref, n)
+    np.testing.assert_array_equal(c.state[2], c_ref.state[2])
+    # the reset is visible: the integrator restarts at the edge after 210.5 us
+    h = plant.traces()["heater_code@1:last"]["value"][:, 0, 0]
+    assert abs(float(h[220]) - float(h[219])) > 1000.0, h[215:225]
+
+
+@pytest.mark.parametrize("ctrl", ["python", "compiled"])
+def test_parity_with_every_scenario_path(ctrl):
+    """The parity under a scenario that drives every interval input the kernel reads from the scenario, including a
+    controller reset (engine review 2026-10-16, engine-7: the parity tests used only the config scenario)."""
+    n = 400
+    cfg, spec, plant = _setup(n_ticks=n, lat=1 if ctrl == "python" else 0, scenario=_rich_scenario())
+    ref = ReferenceEngine(plant)
+    if ctrl == "python":
+        c_ref = PyStair()
+        c_ref.reset(spec)
+        ref.run(n, c_ref)
+        c = PyStair()
+        c.reset(spec)
+        _run_python(plant, c, spec, n, None)
+    else:
+        c_ref = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+        c_ref.reset(spec)
+        ref.run(n, c_ref)
+        c = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+        c.reset(spec)
+        plant.bind_compiled(c)
+        plant.run(n, mode=K.MODE_COMPILED, step_fn=c.step_fn)
+    _compare(plant, ref, n)
+    np.testing.assert_array_equal(plant.S.obs, ref.obs_log[max(ref.obs_log)])
+
+
+@pytest.mark.parametrize("ctrl", ["python", "compiled"])
+def test_round_robin_parity(ctrl):
+    """07 P2-7 controller_interface.schedule round_robin (controllers review 2026-10-16, controllers-3): the kernel
+    (both paths) and the reference pack the active ring j % N of edge j into the observation and apply only that
+    ring's heater command (the others hold), also through a controller reset (the inactive rings keep the held
+    command of the edge on every path), with controllers that write every ring at every edge."""
+    n = 400
+    cfg, spec, plant = _setup(n_ticks=n, lat=1 if ctrl == "python" else 0, scenario=_reset_pulse(),
+                              ovr=("controller_interface.schedule=round_robin",))
+    assert spec.schedule == "round_robin"
+    ref = ReferenceEngine(plant)
+    if ctrl == "python":
+        c_ref = PyStair()
+        c_ref.reset(spec)
+        ref.run(n, c_ref)
+        c = PyStair()
+        c.reset(spec)
+        _run_python(plant, c, spec, n, None)
+    else:
+        c_ref = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+        c_ref.reset(spec)
+        ref.run(n, c_ref)
+        c = CompiledController("integ", integ_init, integ_step, params_i64=[2000, 3])
+        c.reset(spec)
+        plant.bind_compiled(c)
+        plant.run(n, mode=K.MODE_COMPILED, step_fn=c.step_fn)
+        np.testing.assert_array_equal(c.act, c_ref.act)
+        sat_k = plant.S.sat[:, :plant.maps.act_size]
+        assert sat_k.sum() == sum(v.sum() for v in plant.validator.saturation_counts().values())
+    _compare(plant, ref, n)
+    for k, o in ref.obs_log.items():
+        assert o[0, 1] == ((k - spec.phase_ticks) // spec.period_ticks) % spec.n_rings      # OBS_ACTIVE_RING
+    np.testing.assert_array_equal(plant.S.obs, ref.obs_log[max(ref.obs_log)])
 
 
 _SUBPROCESS = textwrap.dedent("""

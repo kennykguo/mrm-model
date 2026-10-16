@@ -95,8 +95,14 @@ def test_spec_fingerprint_and_knowledge_filter():
     assert a.line_grid_hz is None                                   # line_grid not in knowledge
     c = make_spec(line_grid_hz=grid, knowledge=("line_grid",), nominal={"dlambda_dt_nominal_pm_per_k": 70.0})
     assert c.line_grid_hz == tuple(grid) and c.fingerprint() != a.fingerprint()
+    # the nominal design enters the fingerprint through what the knowledge releases (07 D13, controllers review
+    # 2026-10-16): a released key that differs changes it, a withheld one does not (the spec is the same in every
+    # world and for every seed)
     d = make_spec(line_grid_hz=grid, knowledge=("ring_to_line",), nominal={"dlambda_dt_nominal_pm_per_k": 86.0})
-    assert d.fingerprint() != a.fingerprint()                      # nominal enters the fingerprint
+    assert d.fingerprint() == a.fingerprint()
+    e1, e2 = (make_spec(line_grid_hz=grid, knowledge=("ring_to_line",), nominal={"channel_plan.ring_to_line": r2l})
+              for r2l in ([0, 1, 2, 3], [3, 2, 1, 0]))
+    assert e1.fingerprint() != e2.fingerprint()
 
 
 def test_with_period_recomputes_m_and_layout():
@@ -453,7 +459,7 @@ def test_registry_refuses_truth_fed_controllers():
 def test_control_core_modules_do_not_import_truth():
     """07 P1-1 (scoped to this task's files): no import of the plant, the simulator or the validation oracle."""
     files = ["mrm/control/api.py", "mrm/control/registry.py", "mrm/control/fxp.py", "mrm/control/lfsr.py",
-             "mrm/core/channels.py", "mrm/core/timing.py", "mrm/core/rng.py"]
+             "mrm/control/knowledge.py", "mrm/core/channels.py", "mrm/core/timing.py", "mrm/core/rng.py"]
     for f in files:
         tree = ast.parse((ROOT / f).read_text())
         for node in ast.walk(tree):

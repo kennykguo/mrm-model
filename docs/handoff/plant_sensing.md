@@ -32,7 +32,9 @@ Order inside plant interval [k, k+1) (tick convention of `mrm/core/timing.py`):
    rho.
 3. Optics and self-heating.
 4. `MonitorBank.tick(k, p_pd_w = R_DROP_SUM (rho-weighted), p_bg_w = total bus power at ring n,
-   t_pd_k = T at the ROM observer monitor_pd (K), t_adc_k = None, pga_select = actuator monitor.pga_select,
+   t_pd_k = T at the ROM observer monitor_pd (K), t_adc_k = None with t_base_k = thermal.t_base_k +
+   thermal.xpu_rise_k at k + 1 (the bank applies ring.monitor.adc_ref_site: the package base by default, t_pd_k for
+   monitor_pd; MonitorHw.adc_temperature), pga_select = actuator monitor.pga_select,
    fault = sensing.fault_mask(B, N, adc_drop=fault.adc_drop, adc_stuck=fault.adc_stuck,
    adc_saturate=fault.adc_saturate, dac_glitch_codes=fault.dac_glitch_codes))` (`fault_mask_row` in the kernel).
 5. `DatapathBank.errors(k, oma_tx_w = RL_POUT1 - RL_POUT0 of ring n's assigned line at the bus output)`.
@@ -41,8 +43,9 @@ Order inside plant interval [k, k+1) (tick convention of `mrm/core/timing.py`):
 
 At a controller edge (event order step 2 of timing.py): `MonitorBank.release(edge)` and `.channels(rel)`,
 `TempSensorBank.release(edge)`, `ReadbackBank.release(edge)`, then `DatapathBank.bitstat_from_monitor(edge,
-monitor_bank, p1 = R_DROP_SUM1, p0 = R_DROP_SUM0, thr = actuator datapath.bitstat_threshold, density,
-rin_per_hz = pp.laser.rin_per_hz)`, then
+monitor_bank, p1 = R_DROP_SUM1, p0 = R_DROP_SUM0, thr = actuator datapath.bitstat_threshold, density = the
+scenario's data.ones_density of the last interval (not the rho that `pattern` returned), rin_per_hz =
+pp.laser.rin_per_hz)`, then
 `DatapathBank.release(edge)`. `SensingBank.release` merges the sensor dicts. Each bank returns `(sensors, new)` dicts
 with the channel names of `mrm/core/channels.py` and their dtypes: `latest` channels hold their value, `sum`
 channels report only the time since the last release, and every channel has a new-sample flag.
@@ -108,7 +111,9 @@ exceeded. Flicker and binomial pattern noise should stay off in long soaks unles
      over. No Lightmatter value exists.
    - The comparator is code-domain: a sample counts as above when code > thr, that is x >= thr + 0.5.
 8. **Pattern models.**
-   - prbs7/9/15/23 are exact from packed tables (ITU-T O.150 taps) while the scenario density is 0.5.
+   - prbs7/9/15/23 are exact from packed tables (ITU-T O.150 taps) while the scenario density is 0.5, per tick and
+     in the bit-statistics window (which must be given the scenario density; the engine passed the realized
+     n1/nb until the 2026-10-16 review, section 6).
    - prbs31 (256 MB packed) and any other density use Binomial(n, rho). This is a stated approximation: an
      m-sequence window far shorter than the period is close to binomial.
    - Densities 0 and 1 are exact in every mode.
@@ -134,8 +139,12 @@ exceeded. Flicker and binomial pattern noise should stay off in long soaks unles
 12. **Temperature sensors** average over the whole conversion period (boxcar; **assumed** for an integrating or
     sigma-delta converter). `noise_rms_k` is per sample. The flicker corner is applied with S_white = 2 sigma^2 T_s.
     The type (diode, rtd, thermistor) is recorded but changes nothing, because no type-specific data exist.
-13. **adc_mux.** `round_robin` staggers ring n by floor((n mod C) P / C) ticks. `bank` samples every ring at phase 0
-    (simultaneous sample-and-hold; **assumed** meaning). The rate is per ring, as decided in core_control_api.
+13. **adc_mux.** Ring n is served by converter n // C. `round_robin` staggers ring n by floor((n mod C) P / C)
+    ticks: the C rings take turns on one integrating converter, so C W <= P (checked since the 2026-10-16 review).
+    `bank` samples every ring at phase 0 (simultaneous sample-and-hold: a front end per ring ahead of the shared
+    quantizer; **assumed** meaning). Under both, the C rings share the converter's DNL thresholds and INL bow; the
+    per-ring offset and gain error stay per ring. The rate is per ring, as decided in core_control_api. The
+    conversion (de-integration) time is not modelled (adc_latency_s carries it).
 
 ## 3. Physics and contract doubts
 
@@ -285,3 +294,30 @@ Each item says what was wrong, what changed, and the test that now covers it.
 Not changed, still open: the laser RIN seen by an rc AFE with tau near dt is ZOH-held (variance low by
 1 - (2 tau/dt) tanh(dt/(2 tau)), 7.6 % at dt = tau, 0.5 % at dt = tau/4); the compute budget (section 1); the
 cross-module P1-9 tests; the `dac_glitch` application in plant_electrical.
+
+## 6. physics_sensing review (2026-10-16): findings and fixes
+
+Confirmed by an independent verifier; tests in `tests/verification/test_engine_sensing.py` and
+`tests/closure/test_sensing_notes.py`; docs/CHANGELOG.md 2026-10-16.
+
+1. **Bit-statistics window density (engine bug, fixed).** The kernel and `mrm.sim.kernel_ref` passed the realized
+   per-tick density n1/nb to `bitstat_window_row`, so the exact PRBS window (taken only at density 0.5) never ran:
+   every window was Binomial(64, n1/nb) (8 % of edges matched the sequence; prbs7 std 4.1 instead of 2.8). It now
+   takes the scenario density (`RF_DENS`, initialized at reset from the scenario at k0, so the first edge too).
+2. **ADC reference site (physics, fixed).** `t_adc` was each ring's PD observer, an undocumented choice that made
+   the ring's own heater and the aggressor move the monitor gain (-21 to -23 codes at the g26 lock; 0.14 % at PD0
+   under A1). New setting `ring.monitor.adc_ref_site`: `package_base` (default; thermal.t_base_k +
+   thermal.xpu_rise_k, the converter on its own die beside the PIC) or `monitor_pd` (the former model; needs one
+   converter per ring). `MonitorHw.adc_temperature` is the rule; kernel row `RF_T_ADC`; the Python banks take
+   `t_base_k`.
+3. **Reference tap (silently ignored, now refused).** The engine builds no tap and the optics do not take its
+   coupling share; `MonitorHw.from_plant_params` raises NotImplementedError for `reference_tap.present: true`.
+4. **background_fraction (doc, fixed).** It multiplies the TOTAL bus power at the ring (all lines), as section 1
+   says; the schema doc said "the line power". g26 range [0, 0.01] -> [0, 3e-4] (0.01 put 69-191 uA on the 40 uA
+   scale; 3e-4 keeps every nominal drop peak plus the background ~2 uA below full scale).
+5. **Per-world baseline (bug, fixed).** `from_plant_params` flattened `baseline_a` (B, 1) to (B,), which build reads
+   as per ring when B == N; it now passes (B, 1).
+6. **adc_mux (fixed).** Overlapping windows on one converter are rejected (C W <= P) and the DNL thresholds and INL
+   bow are keyed by converter (`PR_ADC_UNIT`, `draw_inl_bow_lsb(channels_per_adc=)`).
+7. Not changed: the bit-statistics LEVELS at the first edge after a reset are the reset placeholders (no interval
+   has run); a controller should ignore the first window.

@@ -38,7 +38,9 @@ sf, obs, act)`, `dither_init`, `dither_step`, `bias_init`, `bias_step`, `bias_fa
    for the tokens in `spec.knowledge` and defines the token -> key table `pi_lock.KNOWLEDGE_KEYS` (07 P1-1 names
    `heater_r_nominal`, `dlambda_dt_nominal`; proposed: `heater_law`, `heater_efficiency`, `linewidth`,
    `thermal_dynamics`, `bias_efficiency`). Please adopt the token list in the schema doc (or tell me the names), and
-   build the knowledge-filtered nominal view (07 D13) so a controller cannot read other keys by accident. g26 lists
+   build the knowledge-filtered nominal view (07 D13) so a controller cannot read other keys by accident
+   (**done 2026-10-16**, controllers review: `mrm.control.knowledge.NominalView`; the table now lives there as
+   `FINE_TOKENS`, re-exported as `pi_lock.KNOWLEDGE_KEYS`; one vocabulary is still open). g26 lists
    only `line_grid, ring_to_line`: every baseline here works without model knowledge (they identify what they need);
    `feedforward_pi` needs `dlambda_dt_nominal + heater_law + heater_efficiency` or a calibrated `ff_codes_per_k`.
 3. **engine (runner / plant).**

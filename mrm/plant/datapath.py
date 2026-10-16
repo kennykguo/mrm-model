@@ -19,9 +19,11 @@ The sensitivity was measured at 56 Gb/s PRBS9 (01); using it at 50 Gb/s is sligh
 Pattern modes. off: n1 = round(rho n) and the optics sees rho exactly; binomial: n1 ~ Binomial(n, rho) per tick;
 prbs<k>: the ITU-T O.150 sequence (x^k + x^t + 1: k/t = 7/6, 9/5, 15/14, 23/18, 31/28; Fibonacci register with
 feedback from stages t and k, all-ones seed), counted exactly from a packed table for k <= 23 while the scenario
-density is 0.5 (normal traffic). prbs31 (period 2^31 - 1 bits = 256 MB packed) and any other density fall back to
-Binomial(n, rho): for windows far shorter than the period an m-sequence's ones count is close to binomial (stated
-approximation). Densities 0 and 1 (idle, training) are exact in every mode.
+density is 0.5 (normal traffic), both per tick and in the bit-statistics window (the window takes the scenario
+density, not a tick's realized n1/nb, which is never exactly 0.5 for an m-sequence). prbs31 (period 2^31 - 1 bits =
+256 MB packed) and any other density fall back to Binomial(n, rho): for windows far shorter than the period an
+m-sequence's ones count is close to binomial (stated approximation). Densities 0 and 1 (idle, training) are exact in
+every mode.
 
 Tick convention as in mrm/core/timing.py: ``*_tick_row(k, ...)`` covers plant interval [k, k+1). Bits in interval k:
 floor((k+1) R dt) - floor(k R dt) (exactly R dt when that is an integer, e.g. 50 Gb/s at 1 us = 50 000).
@@ -343,7 +345,10 @@ def bitstat_window_row(edge, n_win, mode, density, mu1, mu0, sig1, sig0, thr, wo
     """Bit-statistics sampler of one world at controller edge ``edge`` (07 P0-11, Sun et al.).
 
     The window holds the last n_win bits: n1 ones (pattern mode as in :func:`pattern_tick_row`; the PRBS window ends
-    at the lane's current bit position), n0 = n_win - n1 zeros. Each '1' bit reads above the threshold with
+    at the lane's current bit position), n0 = n_win - n1 zeros. density (N,) is the SCENARIO ones density
+    (data.ones_density, clipped here), the same input pattern_tick_row takes, never the realized n1/nb of a tick
+    (out_rho): an m-sequence tick holds 0.5 +- ~0.004 ones, which would miss the exact PRBS window (taken only at
+    density 0.5) and draw Binomial(n_win, n1/nb) instead. Each '1' bit reads above the threshold with
     p1 = P(N(mu1, sig1^2) >= thr + 0.5), each '0' bit with p0 likewise, so
         above = Binomial(n1, p1) + Binomial(n0, p0),   E[above | n1] = n1 p1 + n0 p0.
     mu/sig (N,) in monitor codes from mrm.plant.sensing.monitor_level_codes_row; thr (N,) the threshold code.
@@ -618,7 +623,9 @@ class DatapathBank:
                     self.err_new_tick)
 
     def bitstat(self, edge: int, mu1, mu0, sig1, sig0, thr, density=0.5) -> np.ndarray:
-        """Draw datapath.bitstat_above (B, N) at controller edge ``edge`` (07 P0-11)."""
+        """Draw datapath.bitstat_above (B, N) at controller edge ``edge`` (07 P0-11). density: the scenario's
+        data.ones_density of the last interval (what :meth:`pattern` was given), not the ones density it returned
+        (:func:`bitstat_window_row`)."""
         hw = self.hw
         B, N = hw.B, hw.N
         a = [_arr_bn(x, B, N, nm) for x, nm in ((mu1, "mu1"), (mu0, "mu0"), (sig1, "sig1"), (sig0, "sig0"),
@@ -630,14 +637,15 @@ class DatapathBank:
         return self.bs_above
 
     def bitstat_from_monitor(self, edge: int, monitor, p1_w, p0_w, thr, density=0.5, p_bg_w=0.0, t_pd_k=None,
-                             t_adc_k=None, pga_select=None, rin_per_hz=0.0) -> np.ndarray:
+                             t_adc_k=None, pga_select=None, rin_per_hz=0.0, t_base_k=None) -> np.ndarray:
         """:meth:`bitstat` with the level codes computed by a mrm.plant.sensing.MonitorBank from the per-level PD
         powers p1_w / p0_w (W; optics R_DROP_SUM1 / R_DROP_SUM0) through this sampler's bandwidth. rin_per_hz:
-        the laser RIN (pp.laser.rin_per_hz, (B,) or scalar), which the sampler sees over its whole bandwidth."""
+        the laser RIN (pp.laser.rin_per_hz, (B,) or scalar), which the sampler sees over its whole bandwidth.
+        t_adc_k / t_base_k: the ADC reference temperature, as in MonitorBank.tick."""
         mu1, mu0, s1, s0 = monitor.level_codes(p1_w, p0_w, p_bg_w, t_pd_k, t_adc_k, pga_select,
                                                tau_s=self.hw.bitstat_tau_s,
                                                noise_a_per_rt_hz=self.hw.bitstat_noise_a_per_rt_hz,
-                                               rin_per_hz=rin_per_hz)
+                                               rin_per_hz=rin_per_hz, t_base_k=t_base_k)
         return self.bitstat(edge, mu1, mu0, s1, s0, thr, density)
 
     def release(self, now: int) -> tuple[dict, dict]:

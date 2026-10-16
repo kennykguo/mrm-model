@@ -6,10 +6,12 @@ Knowledge (07 P1-1, D13)
 ------------------------
 A model-based controller may use the nominal, unsampled design and nothing else. The model is built from
 ``realize(nominal_cfg, batch=1, uncertainty="nominal", variation="off")``: every uncertainty entry at its nominal
-choice, no per-device variation. The controller gets ``nominal_cfg`` from ``ControllerSpec.nominal`` and must also find
-the token :data:`KNOWLEDGE_TOKEN` (``"model_nominal"``) in ``controller_interface.knowledge``
-(:func:`check_knowledge`); g26 lists only ``[line_grid, ring_to_line]``, so an experiment that runs a model-based
-controller adds the token explicitly. This module never sees a sampled world: the same functions are reused by the
+choice, no per-device variation. The controller passes ``ControllerSpec.nominal`` (the knowledge-filtered view,
+:class:`mrm.control.knowledge.NominalView`), whose ``model_config()`` is that design without the experiment section
+(no seeds or world choices) and without the scenario beyond its operating point; it exists only with the token
+:data:`KNOWLEDGE_TOKEN` (``"model_nominal"``) in ``controller_interface.knowledge`` (else :class:`KnowledgeError`;
+:func:`check_knowledge`). g26 lists only ``[line_grid, ring_to_line]``, so an experiment that runs a model-based
+controller adds the token explicitly. A plain Config is accepted too (verification and the oracle). This module never sees a sampled world: the same functions are reused by the
 Truth-fed oracle (``mrm.validation.oracle``) with the TRUE PlantParams, which is the oracle's business, not a
 controller's.
 
@@ -23,7 +25,8 @@ Default target: the OMA-optimal detuning among open-loop-stable points of the no
 
 1. ring temperature T_R from the R1 law (``mrm.plant.phase.resonance_shift_row``) so that delta = target;
 2. exact bus optics at the ring temperatures (``ring_optics_row`` + ``bus_propagate``, NRZ-averaged with the ones
-   density): absorbed power P_abs, drop power P_drop, bus power, OMA per ring;
+   density, with the bus segment loss between rings, ``phase.bus_t2_from_plant_params``): absorbed power P_abs, drop
+   power P_drop, bus power, OMA per ring;
 3. data-activity heat (``junction_swing_capacitance_row``, ``data_activity_heat_row``);
 4. thermal DC gains (``mrm.plant.thermal.dc_gain``): heater powers P_h such that every ring observer is at T_R
    (one N x N linear solve, iterated with the heater-resistor temperature for the loss-vs-T term);
@@ -82,6 +85,8 @@ from typing import Any
 import numpy as np
 import scipy.linalg as sla
 
+from mrm.control.knowledge import KnowledgeError, NominalView
+
 __all__ = ["KNOWLEDGE_TOKEN", "KnowledgeError", "check_knowledge", "OperatingPoint", "Conditions", "StaticPoint",
            "LinearModel", "linearize", "linearize_bank", "nominal_plant_params", "conditions_from_config",
            "static_point", "oma_curve", "oma_optimal_detuning", "measurement_age_ticks", "discretize_zoh",
@@ -96,8 +101,10 @@ _DLAM_FD_M = 1e-13         # rigid detuning step, m (0.1 pm)
 _DCODE_FD = 8.0            # heater code step, codes
 
 
-class KnowledgeError(PermissionError):
-    """The controller asked for nominal-model knowledge that controller_interface.knowledge does not grant."""
+def _design(cfg):
+    """The nominal model behind ``cfg``: the model config of a ``ControllerSpec.nominal`` view (needs model_nominal,
+    else KnowledgeError), or ``cfg`` itself (a Config: verification, the oracle)."""
+    return cfg.model_config() if isinstance(cfg, NominalView) else cfg
 
 
 def check_knowledge(knowledge: Iterable[str], required: Sequence[str] = (KNOWLEDGE_TOKEN,), who: str = "controller"
@@ -127,6 +134,7 @@ def nominal_plant_params(cfg):
     The nominal design only: every ``uncertainty`` entry at its nominal choice, no per-device variation (07 P1-1).
     """
     from mrm.params.realize import realize       # local import: the nominal design, never a sampled world
+    cfg = _design(cfg)
     key = _cfg_key(cfg)
     if key is not None and key in _PP_CACHE:
         return _PP_CACHE[key]
@@ -198,6 +206,7 @@ def conditions_from_config(pp, b: int = 0, *, cfg=None, op: OperatingPoint | Non
     ambient (``op.t_base_k`` or scenario.ambient_c), bias (``op.bias_v`` or scenario.bias_v or the reference bias)
     mapped to the two NRZ levels (``electrical.nrz_levels_row`` with ``datapath.swing_pp_v`` and the level
     convention), data statistics from ``op``."""
+    cfg = _design(cfg)
     from mrm.plant import electrical as el
     from mrm.units import C0
     op = OperatingPoint() if op is None else op
@@ -274,8 +283,8 @@ def _ring_temperature_for(pp, b, target_m, cond: Conditions, t0=None) -> np.ndar
 def bank_optics(pp, b: int, t_ring_k, t_heater_k, cond: Conditions, lam_m=None):
     """Exact bus optics of world b at ring/heater temperatures (N,): returns (BusResult, rs (N,) ohm, cj_eff (N,) F).
 
-    Uses mrm.plant.phase.ring_optics_row and mrm.plant.optics.bus_propagate (NRZ-averaged with cond.rho), the same
-    laws as the plant tick."""
+    Uses mrm.plant.phase.ring_optics_row and mrm.plant.optics.bus_propagate (NRZ-averaged with cond.rho, bus segment
+    loss from mrm.plant.phase.bus_t2_from_plant_params), the same laws as the plant tick."""
     from mrm.plant import electrical as el
     from mrm.plant import optics as op
     from mrm.plant import phase as ph
@@ -293,7 +302,7 @@ def bank_optics(pp, b: int, t_ring_k, t_heater_k, cond: Conditions, lam_m=None):
                        P.capacitance[r], P.r_series[r], o["phi0"], o["phi1"], o["a0"], o["a1"], o["e0"], o["e1"],
                        o["k2t"], o["k2d"], o["trt"], sh, cj, rs, fl)
     rb = np.asarray(pp.optics.backscatter_rb)[b]
-    bus_t2 = None
+    bus_t2 = ph.bus_t2_from_plant_params(pp)[b]          # bus segment loss between rings (phase equation 6)
     method = "tcmt" if int(pp.flags.optics_model) else "exact"
     res = op.bus_propagate(np.ascontiguousarray(cond.p_chip_w, dtype=float), o["phi0"], o["k2t"], o["k2d"], o["a0"],
                            o["trt"], o["e0"], bus_order=np.asarray(pp.layout.bus_order, np.int64), bus_t2=bus_t2,
@@ -1069,6 +1078,7 @@ def linearize_bank(nominal_cfg, operating_point: OperatingPoint | None = None, T
     operating point, Ts, latency, measurement)."""
     if knowledge is not None:
         check_knowledge(knowledge, who="linearize")
+    nominal_cfg = _design(nominal_cfg)
     op = OperatingPoint() if operating_point is None else operating_point
     key = None
     if pp is None and cond is None:

@@ -97,9 +97,14 @@ def test_r3_order_and_phase():
     o = p.optics
     np.testing.assert_allclose(o.n_eff * o.length_m, o.order * o.lambda_res_cold_m, rtol=1e-14)
     np.testing.assert_allclose(o.fsr_hz * o.n_g * o.length_m / C0, 1.0, rtol=1e-14)
-    corr = np.abs(o.n_eff - o.n_eff_configured)
-    assert np.all(corr <= o.lambda_res_cold_m / (2 * o.length_m) * (1 + 1e-12))
     assert np.all(o.order == np.rint(o.order))
+    # the order rounding is absorbed by n_eff (|correction| <= lambda/(2L)) for the nominal-geometry device; a device
+    # of a sampled geometry keeps that order and that length (the Jacobians are at fixed r_ref and order)
+    n = run(mini(), 8, variation="off")
+    corr = np.abs(n.optics.n_eff - n.optics.n_eff_configured)
+    assert np.all(corr <= n.optics.lambda_res_cold_m / (2 * n.optics.length_m) * (1 + 1e-12))
+    np.testing.assert_array_equal(o.order, n.optics.order)
+    np.testing.assert_array_equal(o.length_m, n.optics.length_m)
 
 
 def test_r3_overdetermined_and_tolerance():
@@ -159,17 +164,20 @@ def test_r4_q_patterns():
     del d["ring"]["optics"]["q_drop"]
     d["ring"]["geometry"]["jacobian"]["value"]["of"].pop("ln_kappa2_drop_per_nm")
     d["ring"]["optics"]["kappa_d_over_kappa"] = lv(0.02)
-    q = run(d, 2)
+    q = run(d, 2, variation="off")                 # the anchors hold for the nominal-geometry device
     np.testing.assert_allclose(q.optics.q_drop, q.optics.q_loaded / 0.02, rtol=1e-14)
     # q_loaded free, q_through given
     d = mini()
     d["ring"]["optics"]["q_loaded"] = {"value": None, "provenance": "derived"}
     del d["uncertainty"]["q_loaded"]
     d["ring"]["optics"]["q_through"] = lv(7500.0)
-    q = run(d, 2)
+    q = run(d, 2, variation="off")
     np.testing.assert_allclose(1 / q.optics.q_loaded, 1 / q.optics.q_intrinsic + 1 / 7500 + 1 / q.optics.q_drop,
                                rtol=1e-14)
     np.testing.assert_allclose(q.optics.q_through, 7500.0)
+    s = run(d, 2)                                  # sampled geometry: the device's couplers, the rate sum still holds
+    np.testing.assert_allclose(1 / s.optics.q_loaded, 1 / s.optics.q_intrinsic + 1 / s.optics.q_through
+                               + 1 / s.optics.q_drop, rtol=1e-14)
 
 
 def test_r4_inconsistent_and_underdetermined():

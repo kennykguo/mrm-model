@@ -1,0 +1,12 @@
+# Corner (07 section 4.8; physics_thermal review 2026-10-16): the TEC-held package of the in-ring FEM ROM
+# (R_pkg 2 K/W) instead of imec's natural-convection numbers: ring-to-ring crosstalk 1.02 % nearest with a ~0.13 ms
+# pole at the 50 um pitch, 0.51 % next, 0.26 % to the other rings, 0.09 % to a die sensor 1 mm away
+# (uncertainty.thermal.stack side_by_side_tec_held: the side-by-side stack the FEM ROM was solved for, in its package;
+# VALIDATION.md closure-crosstalk-dynamics).
+extends: g26
+meta:
+  name: g26_tec_package
+  kind: corner
+  description: "g26 with uncertainty.thermal.stack pinned to side_by_side_tec_held: fast, small FEM-like crosstalk and a 0.09 % far floor"
+alts:
+  uncertainty.thermal.stack: side_by_side_tec_held

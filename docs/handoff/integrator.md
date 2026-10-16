@@ -43,7 +43,10 @@ Changed in other owners' files (each change is small and keeps the module's desi
    inversion. `lock_slope` divides the sweep-average efficiency by the slope at T_lock (~132 degC, hotter than the
    sweep mean), which gives Z 4.4 % low at the G25 line (5.33 vs 5.58 K/mW) and makes Z follow each ring's sampled
    offset. Every agent that looked at it (params machinery, its reviewer, params content) recommended this. The
-   droop fit y = TCR R_th,H = 0.00904 /mW is kept by lowering `heater_self_ratio` to 1.158. All preset tests
+   droop fit y = TCR R_th,H = 0.00904 /mW is kept by lowering `heater_self_ratio` to 1.158. [Numbers of 2026-10-09,
+   computed with the fallbacks s0 66 pm/K and beta 1.4e-3. Since the params review of 2026-10-16 (modes_rib160,
+   the secant beta 1.2377e-3, Z at the P_FSR line 1309.5 nm): Z 5.704 K/mW on every line, lock_slope 5.475 (4.0 %
+   low), T_lock 134.4 degC, heater_self_ratio 1.132 for y = 0.00904 /mW; docs/CHANGELOG.md.] All preset tests
    (fast and slow, including the 512-world Monte Carlo of every corner) pass with it.
 2. **Thermal transport delay** = extra whole ticks of heater DAC latency (rounded), in
    `HeaterDriverParams.from_plant_params`. It also delays the heater-resistor observer by <= 2 us, which the thermal
@@ -74,8 +77,11 @@ Changed in other owners' files (each change is small and keeps the module's desi
   rewriting those artefacts; on the artefacts present at the end it passes. Clamp exact zeros when saving, or test
   `>= -1e-12 * max|r|`, so a rewrite cannot bring it back.
 - **core_control_api**: optional channels for the reference tap (`tx.monitor_ref.*`, `monitor_ref_valid`,
-  `adc_ref_overrange`) and `datapath.bitstat_ones` (plant_sensing request); the plant can produce them
-  (`MonitorHw.reference_tap`, `DatapathBank` `bs_n1`).
+  `adc_ref_overrange`) and `datapath.bitstat_ones` (plant_sensing request). Only the Python building blocks exist
+  (`MonitorHw.reference_tap`, `SensingBank(ref_tap=...)`, `DatapathBank` `bs_n1`, kernel row `RI_BS_N1`); the engine
+  Plant builds no tap and the optics do not take its `coupling_frac` share of the bus power, so
+  `MonitorHw.from_plant_params` (and with it the Plant) refuses `ring.monitor.reference_tap.present: true`
+  (physics_sensing review, CHANGELOG 2026-10-16).
 - **params_machinery**: tied multi-target draws (Q_L with the loss budget; continuous eta) and an `unset:` field for
   child presets (g26_rom / g26_lut); both are content requests.
 - **calibration**: refit y (CAL-4) with the order-2 thermo-optic model under `fsr_integral`; refit the ER-mechanism
@@ -156,7 +162,8 @@ critical coupling).
 
 1. **Settled warm start = the kernel with DC lag coefficients.** Not a separate static model (controllers_c's
    harness uses `models.static_point`; quasi_static simplifies the bus): the kernel's own implicit solve, heater TCR,
-   bias, data heat and scenario inputs at t = 0, iterated tick by tick with a = 0, c0 = 0, c1 = r, then everything
+   bias, data heat and scenario inputs at t = 0 (held there since 2026-10-16; before, iteration i read the scenario of
+   tick i), iterated tick by tick with a = 0, c0 = 0, c1 = r, then everything
    but the thermal state is reset. Tolerance 2 mK, set by the per-tick noise draws (~0.5 mK). Checked against a
    100 ms open-loop run at code 0 (5 mK) and for steadiness at the quasi-static lock codes (0.03 pm over 3-5 ms).
 2. **g26 loss budget re-solved** for the landed modes_rib160 (n_g 3.9405, alpha_rad 0.119 dB/cm): alpha_i from the
@@ -208,7 +215,9 @@ critical coupling).
   5-8 nm heater shift; engine handoff 6). Not changed here: it moves every harness number of three owners.
 - **core_control_api**: `DacFacts.law` (heater drive law; controllers_b), `datapath.bitstat_ones` and the
   reference-tap channels (plant_sensing, controllers_b).
-- **params**: one knowledge vocabulary and the 07 D13 knowledge-filtered `spec.nominal` view; the waveform keys
+- **params**: one knowledge vocabulary and the 07 D13 knowledge-filtered `spec.nominal` view (the view exists
+  since 2026-10-16, `mrm.control.knowledge.NominalView`, controllers review; still open: one vocabulary and a
+  `controller_knowledge` preset, so that a corner selected with `alts=` does not reach `model_nominal`); the waveform keys
   `driver.rise_time_ps`, `driver.pad_capacitance_ff` and a LUT artefact key (waveform handoff 6).
 - **engine + waveform**: `fidelity.data_modulation: lut` in the kernel (waveform handoff section 3).
 - **controllers**: the scorecard's failures (A1 default layout, since 2026-10-10 the stress scenario of section 7;
@@ -505,8 +514,9 @@ Still open (owner):
   window-A worlds) and in the g26_low_eta and g26_fsr_edge corners at 0 degC; in compare_locks 82 of 256 worlds start
   supply-limited. It dominates every LHS quantile; it needs a source or a range (and a hypothesis if it stays
   uncertain). Also experiments 10.9 (more corner presets).
-- **engine / perf**: rl 7.1 (Python-path per-call cost), 7.3 (per-world reset), 7.5 (per-world settle stop: changes
-  settled starts for B > 1, so it needs a regression baseline refresh); runner: rl 7.2 (vectorized quasi_static).
+- **engine / perf**: rl 7.1 (Python-path per-call cost), 7.3 (per-world reset); runner: rl 7.2 (vectorized
+  quasi_static). (rl 7.5, the per-world settle stop, was done on 2026-10-16 by the engine review fixes; the regression
+  scenario mc8_pi moved, docs/CHANGELOG.md.)
 - **controllers owners**: experiments 10.5; the sampled-world losses of 8.4.3 (worlds without any warm-start flag);
   FxpPi in the scorecard.
 - **scenarios owner**: experiments 10.6, 10.11. **validation / textbook owner**: 10.7, 10.12.

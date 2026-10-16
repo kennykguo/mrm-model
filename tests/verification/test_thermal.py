@@ -6,6 +6,7 @@ artefact integrity, scaling rules, batching, and the interim numbers of 07 P1-2.
 import json
 import math
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -259,9 +260,10 @@ def test_interim_matches_07_p1_2_numbers():
     m = np.flatnonzero((sys.lag_obs == r[0]) & (sys.lag_src == hsrc[0]))
     np.testing.assert_allclose(sys.taus_s[0, m], [3.2e-6, 13e-6, 4e-3])
     np.testing.assert_allclose(sys.res_k_per_w[0, m] / H86_Z0, [0.4085, 0.5415, 0.05])
-    # crosstalk dynamics: first order, tau = max(0.1 ms, 4.1 ms (d/60)^2) in the near field
+    # crosstalk dynamics: first order, tau = max(0.1 ms, 4.1 ms (d/60)^2) in the near field, d the heat-source-to-
+    # victim distance: the 30 um pitch less the two default ring radii (7.5 um)
     m = np.flatnonzero((sys.lag_obs == r[1]) & (sys.lag_src == hsrc[0]))
-    assert m.size == 1 and sys.taus_s[0, m[0]] == pytest.approx(4.1e-3 * (30.0 / 60.0) ** 2)
+    assert m.size == 1 and sys.taus_s[0, m[0]] == pytest.approx(4.1e-3 * ((30.0 - 2 * 7.5) / 60.0) ** 2)
     m = np.flatnonzero((sys.lag_obs == r[7]) & (sys.lag_src == hsrc[0]))
     assert 4.0e-3 <= sys.taus_s[0, m[0]] <= 9.0e-3                  # 210 um: in the 4-9 ms band
     # 63 % point of the two-pole fit alone (04 verification log V5 prints 7.3 us; the exact value is 7.35 us)
@@ -282,6 +284,39 @@ def test_crosstalk_tau_laws():
     lit = th.crosstalk_tau_s(d, tau_far_s=6e-3, law="literal")
     assert lit[6] == pytest.approx(4.1e-3 * (100 / 60) ** 2)            # 07 as written: 11.4 ms at 100 um
     assert lit[7] == pytest.approx(6e-3)
+
+
+def test_crosstalk_tau_takes_the_source_to_victim_distance():
+    """physics_thermal review (2026-10-16): the X2 table and the 60 um anchor of the d^2 law are imec's
+    heat-source-to-victim distances (first neighbour 60 um from the heat source at a 100 um pitch, 04 section 2.5),
+    while the assembly passed centre distances: imec's own geometry gave 4.75 ms for the first neighbour instead of
+    the printed 4.14 ms. With the centre distance less both ring radii, rings of R = 20 um at a 100 um pitch (imec's
+    geometry, inferred) reproduce Table II for neighbours 2-7 and the 4.1 ms FE anchor for the first (Table II prints
+    4.14 ms, within 1 %); site paths subtract the radius of their ring element only."""
+    s = th.assemble(th.InterimRom(ring_radius_um=20.0), th.LayoutSites.line(8, 100.0), 8,
+                    sources=["heater"], observers=["ring_mode_weighted"])
+    taus = []
+    for k in range(1, 8):
+        m = np.flatnonzero((s.lag_obs == s.ring_obs[k]) & (s.lag_src == s.heater_src[0]))
+        assert m.size == 1
+        taus.append(s.taus_s[0, m[0]])
+    np.testing.assert_allclose(taus[1:], th.XT_TABLE_TAU_S[1:], rtol=1e-12)
+    assert taus[0] == pytest.approx(4.1e-3, rel=1e-12) and taus[0] == pytest.approx(th.XT_TABLE_TAU_S[0], rel=0.01)
+    # per-ring radii (B, N): each pair subtracts its own two radii; a PD site (point) only its ring's radius
+    rr = np.array([[5.0, 7.0, 9.0]])
+    lay = th.LayoutSites.line(3, 50.0)
+    s3 = th.assemble(th.InterimRom(ring_radius_um=rr), lay, 3)
+    for (j, i) in ((0, 1), (1, 2), (2, 0)):
+        m = np.flatnonzero((s3.lag_obs == s3.ring_obs[i]) & (s3.lag_src == s3.heater_src[j]))
+        d = abs(i - j) * 50.0 - rr[0, i] - rr[0, j]
+        assert s3.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(d)), rel=1e-12)
+    m = np.flatnonzero((s3.lag_obs == s3.pd_obs[1]) & (s3.lag_src == s3.heater_src[1]))
+    assert s3.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(25.0 - 7.0)), rel=1e-12)
+    # the site coupling (an assumed law) keeps the centre distance: DC unchanged by the radius
+    s0 = th.assemble(th.InterimRom(ring_radius_um=0.0), lay, 3)
+    np.testing.assert_allclose(th.dc_gain(s3), th.dc_gain(s0), rtol=1e-14)
+    with pytest.raises(ValueError, match="ring_radius_um"):
+        th.assemble(th.InterimRom(ring_radius_um=-1.0), lay, 3)
 
 
 def test_scaling_rules():
@@ -635,3 +670,68 @@ def test_rom_driver_sources_and_moved_sites():
     for i in range(2):
         assert G2[s2.observer_index("ring_mode_weighted", i), s2.source_index("driver", i)] == pytest.approx(ref)
     assert s2.meta["rom_sites_off_default"] == ["driver"]
+
+
+# ------------------------------------------------------------------- die-level time scales on a FEM ROM (07 D15)
+_ROM_FILES = sorted((Path(th.__file__).resolve().parents[1] / "data" / "extracted").glob("thermal_rom_*.npz"))
+_T_STEP = np.logspace(-9, 0, 4000)
+_F_RESP = np.logspace(0, 6, 300)
+
+
+def _pair_shape(sys, o, s):
+    """(peak / DC, largest drop below the running maximum / DC, max |H(f)| / H(0)) of one pair."""
+    y = th.step_response(sys, _T_STEP, obs=[o], src=[s])[0, 0, 0]
+    dc = th.dc_gain(sys)[0][o, s]
+    h = np.abs(th.frequency_response(sys, _F_RESP, obs=[o], src=[s])[0, 0, 0])
+    return y.max() / dc, (np.maximum.accumulate(y) - y).max() / dc, h.max() / abs(dc)
+
+
+@pytest.mark.skipif(not _ROM_FILES, reason="no thermal ROM artefact")
+@pytest.mark.parametrize("fast, slow", [(2.0, 0.5), (0.5, 2.0), (1.83, 0.55)])
+@pytest.mark.parametrize("path", _ROM_FILES, ids=lambda p: p.stem)
+def test_rom_layer_time_scales_keep_every_pair_monotone(path, fast, slow):
+    """physics_thermal review (2026-10-16): with unequal die-level time scales (07 D15, g26 draws both in 0.5-2x)
+    a FEM ROM pair must keep the shape of its fit. Per-pole layer factors pulled the cancelling mixed-sign residues of
+    a non-collocated pair apart across tau_split: heater -> ring of metal_above_160 at x2 / x0.5 peaked at 1.21 x DC
+    and dropped by 0.22 x DC (|H| 1.27 x DC near 600 Hz), impossible for a heat-diffusion response. Now each such pair
+    is time-scaled by one blended factor: its peak, dips and |H| stay those of the unscaled fit."""
+    rom = th.load_rom(path, warn=False)
+    lay = th.LayoutSites.line(2, 50.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        base = th.assemble(rom, lay, 2)
+        sysx = th.assemble(rom, lay, 2, th.ThermalScales(time_scale_fast=fast, time_scale_slow=slow))
+    pairs = [(base.ring_obs[0], base.heater_src[0]), (base.heater_obs[0], base.heater_src[0]),
+             (base.ring_obs[0], base.wg_src[0]), (base.ring_obs[1], base.heater_src[0]),
+             (base.heater_obs[1], base.heater_src[0])]
+    for o, s in pairs:
+        p0, d0, h0 = _pair_shape(base, o, s)
+        p1, d1, h1 = _pair_shape(sysx, o, s)
+        tag = f"{base.obs_names[o]} <- {base.src_names[s]}"
+        assert p1 <= max(p0, 1.0) + 1e-3, (tag, p0, p1)
+        assert d1 <= d0 + 1e-3, (tag, d0, d1)
+        assert h1 <= max(h0, 1.0) + 1e-3, (tag, h0, h1)
+    # the whole-pair factor: one factor per pair, s_fast^w s_slow^(1 - w) with w the step fraction at tau_split
+    assert sysx.meta["time_scale_whole_pairs"] > 0
+    ratio = sysx.taus_s[0] / base.taus_s[0]
+    for o, s in pairs[:1]:
+        m = np.flatnonzero((base.lag_obs == o) & (base.lag_src == s))
+        r = base.res_k_per_w[0, m]
+        if np.any(r < 0) and np.any(base.taus_s[0, m] >= th.DEFAULT_TAU_SPLIT_S):
+            w = np.clip(np.sum(r * -np.expm1(-th.DEFAULT_TAU_SPLIT_S / base.taus_s[0, m])) / r.sum(), 0, 1)
+            np.testing.assert_allclose(ratio[m], fast ** w * slow ** (1 - w), rtol=1e-12)
+    # equal factors: exactly the former per-layer scaling (every tau times the common factor)
+    eq = th.assemble(rom, lay, 2, th.ThermalScales(time_scale_fast=1.7, time_scale_slow=1.7))
+    np.testing.assert_array_equal(eq.taus_s, base.taus_s * 1.7)
+    np.testing.assert_array_equal(eq.res_k_per_w, base.res_k_per_w)
+
+
+def test_interim_layer_time_scales_stay_per_pole():
+    """The interim model's residues are all positive: every pole keeps its own layer factor (no whole-pair
+    scaling), so the self path's package tail follows time_scale_slow while its body follows time_scale_fast."""
+    lay = th.LayoutSites.line(3, 50.0)
+    base = th.assemble(th.InterimRom(), lay, 3)
+    sysx = th.assemble(th.InterimRom(), lay, 3, th.ThermalScales(time_scale_fast=2.0, time_scale_slow=0.5))
+    assert sysx.meta["time_scale_whole_pairs"] == 0
+    np.testing.assert_array_equal(sysx.taus_s[0], base.taus_s[0] * np.where(base.lag_layer == th.LAYER_FAST, 2.0,
+                                                                              0.5))

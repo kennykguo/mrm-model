@@ -46,8 +46,17 @@ from mrm.units import C0
 
 __all__ = ["Plant", "Truth", "prepare_scenario", "DEFAULT_SH_DT_MAX_K"]
 
-#: largest ring temperature change within one step that the self-heating bounds must cover (K). ReferencePlant uses
-#: 50 K; a multi-tick auto substep scales it (design choice, see Plant.__init__).
+#: |T - T_ref| (K) that the self-heating bounds cover (mrm.plant.optics.sh_bounds: S = |s0| (1 + |beta| dt_max_k)),
+#: T_ref the ring temperature at the start of the step. One fixed value for every step and substep length (KParams
+#: dt_max_k; ReferencePlant uses the same 50 K): nothing scales it. A tick moves a ring by mK in operation and by up to
+#: ~18 K on a full-scale heater step from cold; an auto substep is capped at sim.max_detuning_step_pm of resonance
+#: (mK). It is exceeded by Plant.settle's first DC iterations (~100 K from branch_low, up to the bracket end ~270 K
+#: from branch_high; settle() reports max_step_k) and by the first tick after a reset to a bracket end (~77 K). There
+#: the curvature bound is low by ((1 + |beta| dT)/(1 + 50 |beta|))^2; without backscatter (g26) the 1.25 curvature
+#: margin of sh_bounds covers dT <= (sqrt(1.25) (1 + 50 |beta|) - 1)/|beta| (136 K at g26's beta), and beyond it the
+#: no-skip guarantee of solve_ring_temperature is not certified (g26: the settled state equals the one with a
+#: covering bound, tests/verification/test_engine_warm_start.py). Correction 2026-10-16 (physics_thermal review): this
+#: comment said that a multi-tick auto substep scales the value; no code ever did.
 DEFAULT_SH_DT_MAX_K = 50.0
 #: |F| tolerance of the implicit self-heating solve (K). The ENGINE_BRIEF suggests 1e-9 K; 1e-7 K (7e-6 pm of
 #: resonance at 70 pm/K) saves about one Newton evaluation per ring and tick (design choice; tested in
@@ -222,15 +231,18 @@ class Plant:
         # phase / junction
         phs = ph.PhaseParams.from_plant_params(pp)
         self.phase = phs
-        # self-heating rows (mrm.plant.optics.pack_selfheat_args), one per world
+        # self-heating rows (mrm.plant.optics.pack_selfheat_args), one per world; the bus segment transmissions are
+        # constants of the world (mrm.plant.phase equation 6), every other row entry is rewritten by the kernel
         method = "tcmt" if int(pp.flags.optics_model) else "exact"
         lam0 = C0 / np.asarray(pp.laser.line_freq_hz, float)
+        bus_t2 = ph.bus_t2_from_plant_params(pp)
         rows = []
         for b in range(B):
             rows.append(op.pack_selfheat_args(
                 np.zeros(L), np.zeros((N, L)), np.full((N, L), 1e-3), np.full((N, L), 1e-4), np.full((N, L), 0.99),
                 np.full((N, L), 1e-13), np.full((N, L), 0.5), lam0[b], np.full(N, 300.0), np.full(N, 7e-11), 0.0,
-                bus_order=np.asarray(pp.layout.bus_order), rb=np.asarray(pp.optics.backscatter_rb[b]),
+                bus_order=np.asarray(pp.layout.bus_order), bus_t2=bus_t2[b], bus_t2_out=1.0,
+                rb=np.asarray(pp.optics.backscatter_rb[b]),
                 nrz={"p1": np.full(N, 0.5), "phi1": np.zeros((N, L)), "a1": np.full((N, L), 0.99),
                      "eta1": np.full((N, L), 0.5)},
                 method=method, m_orders=int(pp.optics.tcmt_orders), far_hold=self.optics_far_hold))
@@ -298,6 +310,7 @@ class Plant:
             ramp_ticks=int(pp.timing.reset_ramp_ticks),
             bias_ctrl=int(spec.bindings.get("tx.bias") == "controller"),
             policy=int(self.substep_policy == "auto"), fast_on=int(self._fast_on),
+            schedule=int(spec.schedule == "round_robin"),
             ph_ring=_c(phs.ring), jt_grid=_c(phs.grid), jt_dn=_c(phs.dneff), jt_al=_c(phs.alpha_fca),
             jt_c=_c(phs.capacitance), jt_rs=_c(phs.r_series),
             jt_cum=_c(K.cumulative_capacitance(phs.grid, phs.capacitance)),
@@ -361,7 +374,7 @@ class Plant:
             mo_slot=int(mhw.slot_base), mo_key_adc=_c(sn._keys(nseeds, B, mhw.stream), u64),
             mo_key_shot=_c(sn._keys(nseeds, B, "shot_noise"), u64),
             mo_key_dnl=_c(sn._keys(mhw.device_seeds if mhw.device_seeds is not None else np.zeros(B, np.int64), B,
-                                   mhw.stream + "_dnl"), u64),
+                                   mhw.stream + "_dnl"), u64), mo_adc_site=int(mhw.adc_ref_site),
             ts_tp=_c(tsh.tp), ts_period=_c(tsh.period_ticks, np.int64), ts_lat=_c(tsh.latency_ticks, np.int64),
             ts_cmax=_c(tsh.code_max, np.int64), ts_fl=_c(tsh.fl_coef), ts_key=_c(sn._keys(nseeds, B, "adc_temp"), u64),
             rb_on=int(rb_on), rb_lsb_v=_b(rbh.lsb_v if rb_on else 1.0, B), rb_lsb_i=_b(rbh.lsb_i if rb_on else 1.0, B),
@@ -474,13 +487,32 @@ class Plant:
         ring / heater / PD temperatures, absorbed and heater powers; the self-heating root continues from the
         settled ring temperature. Pass the same heater_code / bias_code as the reset.
 
-        Convergence: the noise draws of every tick (bias DAC noise, laser RIN, binomial ones density) move the DC
-        fixed point by ~0.5 mK in g26 (~0.04 pm), so ``tol_k`` is 2 mK (0.15 pm at 70 pm/K), not a solver
-        tolerance. From branch_high the first iterates walk down from the hottest root (~10 K per iteration under
-        the solver's iteration limit; those solves count as not converged); g26 nominal settles in ~20 iterations.
+        Held scenario: every iteration sees the scenario values of the reset tick k0 (both ends of its FOH
+        interval). The kernel would evaluate the scenario at the iteration's own tick (k0 + 1, k0 + 2, ...): an input
+        that changes within the first iterations (an aggressor switched on at 10 us, a traffic or bias event, a fast
+        ripple) was then settled as if the plant had already seen it (engine review 2026-10-16: ring 0 18.7 K hot and
+        +1554 pm red at t = 0 with the aggressor still off). During the settle every signal is treated as having no
+        components, so the kernel keeps the values S.sc_v0 / S.sc_v1 that the reset filled from the scenario at k0.
+        The tick still advances per iteration: the noise draws (bias DAC noise, laser RIN, binomial ones density) and
+        a PRBS position are those of a new tick each time, as is the LaserHw drift (keyword-only, zero by default).
 
-        Returns {'iterations', 'max_delta_k', 'converged', 'selfheat_not_converged_last' (B,): self-heating solves
-        that did not converge in the last iteration (0 when the fixed point is a regular root)}.
+        Per-world stop (07 P1-13): each world stops at its own first iteration (>= 3) whose ring temperatures moved by
+        less than ``tol_k``; its thermal state of that iteration is kept, whatever the other worlds of the batch still
+        need, so world b of a batch settles exactly as the same world alone (engine review 2026-10-16, rl request
+        7.5; before, every world ran until the slowest one converged, ~1 mK apart).
+
+        Convergence: the noise draws of every tick move the DC fixed point by ~0.5 mK in g26 (~0.04 pm), so
+        ``tol_k`` is 2 mK (0.15 pm at 70 pm/K), not a solver tolerance. From branch_high the first iterates walk down
+        from the hottest root (~10 K per iteration under the solver's iteration limit; those solves count as not
+        converged); g26 nominal settles in ~20 iterations.
+
+        Returns {'iterations' (the iterations run: the largest per-world count), 'iterations_per_world' (B,),
+        'max_delta_k' (largest last change over the worlds), 'converged' (every world), 'converged_per_world' (B,),
+        'selfheat_not_converged_last' (B,): self-heating solves that did not converge in each world's last
+        iteration (0 when the fixed point is a regular root), 'max_step_k': the largest ring temperature change of
+        one iteration (the |T - T_ref| of its DC solve), 'sh_dt_max_k': the |T - T_ref| the self-heating bounds
+        cover (KParams.dt_max_k, DEFAULT_SH_DT_MAX_K). The first iterations exceed it (~100 K from branch_low,
+        ~240 K from branch_high at the g26 nominal); see DEFAULT_SH_DT_MAX_K}.
         """
         if self.tick != self.k_reset:
             raise RuntimeError("settle() must follow reset() directly")
@@ -489,39 +521,67 @@ class Plant:
             raise ValueError("settle needs the reset protocol branch_low or branch_high (lasers on at the start); "
                              "laser_ramp starts dark")
         k0 = int(self.tick)
+        B = self.B
         shape = P0.th_a.shape                                              # (B|1, n_pow, M)
         res = np.asarray(self.sys.res_k_per_w, np.float64)
         c1 = np.ascontiguousarray(np.broadcast_to(res[:, None, :], shape), dtype=np.float64).copy()
+        held = np.array(P0.sc_sig_i, dtype=np.int64, order="C", copy=True)
+        held[:, sg.SI_NC] = 0                     # no signal is evaluated: S.sc_v0 / sc_v1 keep the values at k0
         self.P = P0._replace(th_a=np.zeros(shape), th_c0=np.zeros(shape), th_c1=c1,
-                             policy=type(P0.policy)(K.POLICY_FIXED))
-        t_prev = self.S.rf[:, K.RF_T_RING, :].copy()
-        delta = math.inf
+                             policy=type(P0.policy)(K.POLICY_FIXED), sc_sig_i=held)
+        S = self.S
+        names = ("th_x", "th_t_obs", "th_g", "th_u0", "th_u1")
+        rows = [K.RF_P_PREV, K.RF_T_RING, K.RF_T_HEATER, K.RF_T_PD, K.RF_T_NEW, K.RF_P_NEW, K.RF_HE_P, K.RF_P_ABS]
+        keep = {name: getattr(S, name).copy() for name in names}
+        keep_rf = S.rf[:, rows, :].copy()
+
+        def freeze(worlds):
+            for name in names:
+                keep[name][worlds] = getattr(S, name)[worlds]
+            keep_rf[worlds] = S.rf[worlds][:, rows, :]
+        t_prev = S.rf[:, K.RF_T_RING, :].copy()
+        live = np.ones(B, bool)
+        conv = np.zeros(B, bool)
+        it_w = np.zeros(B, np.int64)
+        delta_w = np.full(B, math.inf)
+        step_w = np.zeros(B)
+        nf_w = np.zeros(B, np.int64)
         it = 0
-        nf_last = np.zeros(self.B, np.int64)
         try:
             for it in range(1, int(max_iter) + 1):
-                nf0 = self.S.wi[:, K.WI_N_FAIL].copy()
+                nf0 = S.wi[:, K.WI_N_FAIL].copy()
                 self.run(1, mode=K.MODE_OPEN)
-                nf_last = self.S.wi[:, K.WI_N_FAIL] - nf0
-                t_now = self.S.rf[:, K.RF_T_RING, :]
-                delta = float(np.max(np.abs(t_now - t_prev)))
+                t_now = S.rf[:, K.RF_T_RING, :]
+                d = np.max(np.abs(t_now - t_prev), axis=1)                   # (B,) this iteration's change
                 t_prev = t_now.copy()
-                if it >= 3 and delta < tol_k:
+                nf = S.wi[:, K.WI_N_FAIL] - nf0
+                it_w[live] = it
+                delta_w[live] = d[live]
+                nf_w[live] = nf[live]
+                step_w[live] = np.maximum(step_w[live], d[live])
+                if it >= 3:
+                    stop = live & (d < tol_k)
+                    if np.any(stop):
+                        freeze(stop)
+                        conv |= stop
+                        live &= ~stop
+                if not np.any(live):
                     break
         finally:
             self.P = P0
-        S = self.S
-        keep ={name: getattr(S, name).copy() for name in ("th_x", "th_t_obs", "th_g", "th_u0", "th_u1")}
-        rows = [K.RF_P_PREV, K.RF_T_RING, K.RF_T_HEATER, K.RF_T_PD, K.RF_T_NEW, K.RF_P_NEW, K.RF_HE_P, K.RF_P_ABS]
-        keep_rf = S.rf[:, rows, :].copy()
+        if np.any(live):
+            freeze(live)                                   # max_iter reached: the last iterate (not converged)
         self._reset(None, k0=k0, protocol=None, heater_code=heater_code, bias_code=bias_code)
         S = self.S
         for name, val in keep.items():
             getattr(S, name)[...] = val
         S.rf[:, rows, :] = keep_rf
         S.rf[:, K.RF_T_BRANCH, :] = S.rf[:, K.RF_T_RING, :]
-        return {"iterations": int(it), "max_delta_k": delta, "converged": bool(delta < tol_k),
-                "selfheat_not_converged_last": nf_last.copy()}
+        self._init_t_adc()                                  # monitor_pd: the settled PD temperature
+        return {"iterations": int(it), "iterations_per_world": it_w.copy(), "max_delta_k": float(np.max(delta_w)),
+                "converged": bool(np.all(conv)), "converged_per_world": conv.copy(),
+                "selfheat_not_converged_last": nf_w.copy(), "max_step_k": float(np.max(step_w)),
+                "sh_dt_max_k": float(P0.dt_max_k)}
 
     def _reset(self, noise_seed: int | None = None, *, k0: int = 0, protocol: str | None = None, heater_code=None,
                bias_code=None) -> None:
@@ -569,6 +629,11 @@ class Plant:
         rf, ri = S.rf, S.ri
         for idx in (K.RF_T_RING, K.RF_T_HEATER, K.RF_T_BRANCH, K.RF_T_NEW, K.RF_T_PD):
             rf[:, idx, :] = t_amb[:, None]
+        self._init_t_adc()
+        # the scenario's ones density at k0: a controller edge at k0 runs the bit-statistics window before the first
+        # interval sets RF_DENS (the window of the bits before k0, at the density sent at k0)
+        o_dn = lay["data.ones_density"][0]
+        rf[:, K.RF_DENS, :] = out[:, o_dn:o_dn + N]
         proto = int(P.reset_protocol)
         if proto in (0, 1):
             rf[:, K.RF_T_BRANCH, :] = -np.inf                  # the cold branch (07 P0-1 item 6)
@@ -655,6 +720,7 @@ class Plant:
         S.wi[:, K.WI_K_RESET] = k0
         S.wi[:, K.WI_ORACLE_NEXT] = k0
         S.wi[:, K.WI_PENDING_EDGE] = -1
+        S.wi[:, K.WI_SAT_FIRST_TICK] = -1               # no command clipped yet (on_out_of_range: error)
         # a bound compiled controller restarts from its post-init state (kept by bind_compiled; it is also what
         # fault.controller_reset restores), so an episode after reset() repeats the first one exactly
         if self._ctrl is not None:
@@ -664,6 +730,16 @@ class Plant:
         self.records_state.reset()
         self.validator.reset()
         self._pending = False
+
+    def _init_t_adc(self) -> None:
+        """The ADC reference temperature row (ring.monitor.adc_ref_site) of the state at the reset tick: the PD
+        temperature for monitor_pd, the package base temperature for package_base (what the kernel writes each
+        interval; a controller edge at the reset tick releases before the first interval)."""
+        S = self.S
+        if int(self.P.mo_adc_site) == sn.ADC_REF_MONITOR_PD:
+            S.rf[:, K.RF_T_ADC, :] = S.rf[:, K.RF_T_PD, :]
+        else:
+            S.rf[:, K.RF_T_ADC, :] = S.wf[:, K.WF_T_BASE1][:, None]
 
     def _rekey_noise(self) -> None:
         B = self.B
@@ -705,6 +781,41 @@ class Plant:
         self.S = S
         self._ctrl = ctrl
         self._run_block = None
+
+    def restart_compiled(self, ctrl) -> None:
+        """The Python path's half of a scenario ``fault.controller_reset`` for the bound CompiledController, after
+        ``ctrl.reset(spec)``: reset allocates new state and held-command arrays, so their values go into the kernel's
+        arrays and the controller uses those again (its fast_kernel, which the kernel calls, and its step must share
+        one state), and the held command is re-filled from the latched DAC registers, as the kernel's own restart
+        does (mrm.sim.kernel: init state, then ``_sync_act_a``; the other actuators keep their held command)."""
+        if ctrl is not self._ctrl or ctrl.state is None:
+            raise RuntimeError("restart_compiled: the controller is not the one bound to this plant")
+        S = self.S
+        rows = (S.c_pi, S.c_pf, S.c_si, S.c_sf)
+        if all(np.shape(new) == np.shape(old) for new, old in zip(ctrl.state, rows)):
+            for new, old in zip(ctrl.state, rows):
+                old[...] = new
+            ctrl.state = rows
+        else:                                  # init gave other sizes: bind the new arrays (a new kernel type)
+            def own(a, dtype):
+                return np.array(a, dtype=dtype, order="C", copy=True).reshape(self.B, -1)
+            ctrl.state = tuple(own(a, d) for a, d in zip(ctrl.state, (np.int64, np.float64, np.int64, np.float64)))
+            S = S._replace(c_pi=ctrl.state[0], c_pf=ctrl.state[1], c_si=ctrl.state[2], c_sf=ctrl.state[3],
+                           c_si0=ctrl.state[2].copy(), c_sf0=ctrl.state[3].copy())
+            self._run_block = None
+        n = self.maps.act_size
+        if n:
+            act = S.act[:, :n]
+            for i in range(self.maps.act_map.shape[0]):
+                dst, o, sz = (int(x) for x in self.maps.act_map[i, :3])
+                if dst in (0, 1):                    # tx.heater, tx.bias: from the latched registers
+                    act[:, o:o + sz] = S.ri[:, K.RI_HE_REG if dst == 0 else K.RI_BI_REG, :sz]
+            if ctrl.act.shape == S.act.shape and ctrl.act.dtype == S.act.dtype:
+                ctrl.act = S.act
+            else:
+                ctrl.act[...] = act
+        ctrl._act_synced = True
+        self.S = S
 
     def _fn(self):
         if self._run_block is None:

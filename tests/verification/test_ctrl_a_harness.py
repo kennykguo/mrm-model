@@ -223,7 +223,7 @@ class LoopPlant(ReferencePlant):
                            adc_saturate=ev0["fault.adc_saturate"], dac_glitch_codes=ev0["fault.dac_glitch_codes"])
         p_bus = out_rl[:, op.RL_PIN].sum(axis=2)
         self.mon.tick(k, p_pd_w=out_r[:, op.R_DROP_SUM], p_bg_w=p_bus, t_pd_k=self.t_obs[:, sysm.pd_obs],
-                      fault=fault)
+                      fault=fault, t_base_k=t_base_end)
         ar = np.arange(N)
         oma = out_rl[:, op.RL_POUT1, ar, self.line] - out_rl[:, op.RL_POUT0, ar, self.line]
         self.dp.errors(k, np.abs(oma))
@@ -250,8 +250,8 @@ class LoopPlant(ReferencePlant):
         self.p_line_w = p_chip[:, self.line]
         u_ss = u1.copy()
         u_ss[:, sysm.wg_src] = self.p_new
-        self.last = dict(p_chip=p_chip, lam=lam, rho=rho, bias=bout, heater=hout, n_fail=n_fail, out_r=out_r,
-                         out_rl=out_rl, v_lo=v_lo, v_hi=v_hi, u_ss=u_ss)
+        self.last = dict(p_chip=p_chip, lam=lam, rho=rho, dens=ev0["data.ones_density"], bias=bout, heater=hout,
+                         n_fail=n_fail, out_r=out_r, out_rl=out_rl, v_lo=v_lo, v_hi=v_hi, u_ss=u_ss)
         self.k_next = k + 1
         return self.last
 
@@ -508,7 +508,8 @@ class ClosedLoop:
             last = plant.last
             plant.dp.bitstat_from_monitor(k, plant.mon, last["out_r"][:, op.R_DROP_SUM1],
                                           last["out_r"][:, op.R_DROP_SUM0], np.zeros((plant.B, plant.N), np.int64),
-                                          density=last["rho"], rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1))
+                                          density=last["dens"],
+                                          rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1))
             s3, n3 = plant.dp.release(k)
             sensors.update(s3)
             new.update(n3)

@@ -14,21 +14,35 @@ R3_geometry      FSR_f = c / (n_g * L),  L = 2*pi*R;  m = round(n_eff * L / lamb
                  (lambda_res = lambda_line - resonance_offset, the cold resonance; R = r_ref of 07 P1-6). The
                  rounding residual moves into n_eff_phase (|correction| <= lambda/(2L) ~ 0.016), so the cold
                  resonance sits exactly at the configured offset and the FSR keeps its hypothesis.
+                 Sampled geometry (``RelationContext.radius_hold`` / ``order_hold``, set by realize from the solve of
+                 the nominal-geometry device): a free radius is solved once from the nominal n_g and the FSR
+                 hypothesis and held for every device of the world (a mask dimension), so a device's FSR follows its
+                 own n_g (07 P1-16: one geometry error moves the resonance, the FSR and the coupling together); the
+                 order is the nominal device's (the geometry Jacobians are taken at fixed r_ref and order).
 R1_thermo_optic  s(T) = (lambda/n_g) * (dn_eff/dT(T) + n_eff * alpha_L(T)),  s(T) = s0 * (1 + beta*(T - T0))
                  => dn_eff/dT(T0) = s0*n_g/lambda - n_eff*alpha_L(T0),
                     d2n_eff/dT2  = s0*beta*n_g/lambda - n_eff*dalpha_L/dT   (beta = 0 when thermo_optic_order = 1).
-R2_heater_efficiency  efficiency = FSR_lambda / P_FSR  (07 D16: P_FSR is the anchor; FSR_lambda at the line).
+R2_heater_efficiency  efficiency = FSR_lambda / P_FSR  (07 D16: P_FSR is the anchor). FSR_lambda is taken at
+                 ``ring.heater.p_fsr_ref_wavelength_nm`` (the line the P_FSR measurement was made on) when given,
+                 else at each ring's line.
 R2_heater_z      lock_slope (07 as written):  Z_heater->ring(0) = efficiency / s(T_lock), where T_lock solves
                  int_{T_ref}^{T_lock} s(T) dT = resonance_offset mod FSR_lambda (ambient at the offset reference
                  temperature; the heater only red-shifts, so a ring with a negative or > FSR offset locks the
                  nearest order blue of its line).
-                 fsr_integral: Z = dT_FSR / P_FSR with int_{T_meas}^{T_meas + dT_FSR} s(T) dT = FSR_lambda.
+                 fsr_integral: Z = dT_FSR / P_FSR with int_{T_meas}^{T_meas + dT_FSR} s(T) dT = FSR_lambda, the
+                 FSR_lambda of R2_heater_efficiency: at the P_FSR reference wavelength Z is a stack property, the same
+                 on every line (s0 is one value for every line); at each ring's line it follows lambda_line^2.
 R4_loss_budget   alpha_i = alpha_fca + alpha_other_abs + alpha_scatter + alpha_rad,  Q_i = 2*pi*n_g/(lambda_res*alpha_i),
                  eta = (alpha_fca + alpha_other_abs)/alpha_i  (07 P0-2). Or, with no component given:
                  eta and Q_i given -> alpha_heat = eta*alpha_i, alpha_nonheat = (1 - eta)*alpha_i.
 R4_q             1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d  (optional kappa_d_over_kappa = Q_L/Q_d). Derived per-pass couplings
                  use the exact energy decay per round trip: K_j^2 = 1 - exp(-omega*T_rt/Q_j), a = exp(-omega*T_rt/(2*Q_i)),
                  T_rt = n_g*L/c, so the rate sum is exact for the Airy ring (07 P2-4: one parameter set for both forms).
+                 Sampled geometry (``RelationContext.coupling_anchor``): the anchors describe the nominal-geometry
+                 device. Its per-pass couplings K_j,a^2 (solved by realize from the anchors with the nominal n_g,
+                 length and loss) are moved by the device's geometry, K_j^2 = K_j,a^2 exp(dln_kappa2_j); then
+                 Q_j = omega*T_rt/(-ln(1 - K_j^2)) with the device's own omega and T_rt, Q_i from the device's loss
+                 budget, and Q_L and kappa_d_over_kappa follow from the rate sum (07 P1-16).
 R5_latency       one owner per I/O channel (07 P0-6); latency_ticks = round(latency_s * latency_scale / dt).
 """
 from __future__ import annotations
@@ -65,6 +79,7 @@ P_ALPHA_L = "ring.optics.alpha_l_per_k"
 P_ALPHA_L_SLOPE = "ring.optics.alpha_l_slope_per_k2"
 P_PFSR = "ring.heater.p_fsr_mw"
 P_PFSR_T = "ring.heater.p_fsr_ref_temp_c"
+P_PFSR_LAM = "ring.heater.p_fsr_ref_wavelength_nm"
 P_EFF = "ring.heater.efficiency_nm_per_mw"
 P_Z = "ring.thermal.z_heater_ring_k_per_mw"
 P_TLOCK = "ring.thermal.t_ring_lock_c"
@@ -80,6 +95,9 @@ P_A_OTH = _LB + "alpha_other_abs_db_per_cm"
 P_A_SCA = _LB + "alpha_scatter_db_per_cm"
 P_A_RAD = _LB + "alpha_bend_radiation_db_per_cm"
 LOSS_COMPONENTS = (P_A_FCA, P_A_OTH, P_A_SCA, P_A_RAD)
+#: the line and cold-resonance wavelengths (realize records how they come from the channel plan, 07 P1-14)
+_LAM_LINE = "derived.optics.lambda_line_m"
+_LAM_RES = "derived.optics.lambda_res_cold_m"
 
 #: R5: the one config key that owns the latency of each I/O channel (07 P0-6). Temperature sensors own theirs in
 #: the temp_sensors table (field latency_s); the controller declares Controller.latency_ticks in code.
@@ -123,6 +141,12 @@ class RelationContext:
     latency_scale: np.ndarray | float = 1.0
     derivations: dict[str, Derivation] = field(default_factory=dict)
     notes: dict[str, str] = field(default_factory=dict)
+    #: sampled geometry (set by realize from the relation solve of the nominal-geometry device, 07 P1-16): the radius
+    #: (m) a free radius is held at, the order every device keeps, and the anchor per-pass couplings
+    #: {"kappa2_through", "kappa2_drop", "alpha_i_per_m", "dln_kappa2_through", "dln_kappa2_drop"} (B, N)
+    radius_hold: np.ndarray | None = None
+    order_hold: np.ndarray | None = None
+    coupling_anchor: dict | None = None
 
     def known(self, p: str) -> bool:
         return p in self.vals and p in self.given
@@ -223,7 +247,14 @@ def _r3(ctx: RelationContext) -> None:
     free = [m for m, h in ((P_RADIUS, have_r), (P_NG, have_ng), ("fsr", fsr is not None)) if not h]
     if len(free) > 1:
         raise UnderdeterminedError(f"{name}: {len(free)} of radius, n_g, FSR are free ({free}); give all but one")
-    if not free:
+    held = ctx.radius_hold is not None and free == [P_RADIUS]
+    if held:
+        # sampled geometry: the radius of the nominal-geometry device (solved from its n_g and the FSR hypothesis)
+        # is a mask dimension, the same for every device of the world; the device's FSR follows its own n_g
+        ctx.set(P_RADIUS, np.asarray(ctx.radius_hold, float), name, (P_NG, fsr_key),
+                "R = c/(2 pi n_g FSR) of the nominal-geometry device, held for every device of the world",
+                "07 P1-16: a geometry error moves n_g at a fixed mask radius, so the FSR follows the device's n_g")
+    elif not free:
         L = _TWO_PI * ctx.vals[P_RADIUS]
         resid = _rel(fsr * ctx.vals[P_NG] * L / C0, 1.0)
 
@@ -250,12 +281,12 @@ def _r3(ctx: RelationContext) -> None:
     L = _TWO_PI * R
     fsr_hz = np.broadcast_to(C0 / (ng * L), np.broadcast_shapes(np.shape(ng), np.shape(L))).copy()
     # provenance inputs: a given FSR is the FSR (R or n_g was solved from it), so the FSR-derived quantities inherit
-    # the FSR hypothesis' provenance (07 D16), not the weaker n_g's
-    ins = (fsr_key,) if fsr is not None else (P_NG, P_RADIUS)
+    # the FSR hypothesis' provenance (07 D16), not the weaker n_g's; with a held radius the device's n_g enters too
+    ins = (fsr_key, P_NG) if held else ((fsr_key,) if fsr is not None else (P_NG, P_RADIUS))
     ctx.set("derived.optics.length_m", L, name, (P_RADIUS,), "L = 2 pi R")
     ctx.set("derived.optics.fsr_hz", fsr_hz, name, ins, "FSR = c/(n_g L)")
-    ctx.set("derived.optics.fsr_m", fsr_hz * lam_line ** 2 / C0, name, ("derived.optics.fsr_hz",),
-            "FSR_lambda = lambda_line^2 FSR/c")
+    ctx.set("derived.optics.fsr_m", fsr_hz * lam_line ** 2 / C0, name,
+            ("derived.optics.fsr_hz", "derived.optics.lambda_line_m"), "FSR_lambda = lambda_line^2 FSR/c")
     if fsr is None:
         ctx.set(P_FSR_THZ, fsr_hz, name, ins, "FSR = c/(n_g L)")
     ctx.set("derived.optics.round_trip_time_s", ng * L / C0, name, ins, "T_rt = n_g L/c = 1/FSR")
@@ -264,15 +295,24 @@ def _r3(ctx: RelationContext) -> None:
         raise UnderdeterminedError(f"{name}: ring.optics.n_eff is required (07 P1-6)")
     lam_res = ctx.vals["derived.optics.lambda_res_cold_m"]
     neff = ctx.vals[P_NEFF]
-    m = np.rint(neff * L / lam_res)
+    if ctx.order_hold is not None:
+        # sampled geometry: the Jacobians are taken at fixed r_ref and order, so the device keeps the order of the
+        # nominal-geometry device; n_eff_phase = m lambda_res/L is then the device's n_eff at its own resonance
+        m = np.broadcast_to(np.asarray(ctx.order_hold, float), np.broadcast_shapes(np.shape(neff), np.shape(L)))
+        m_formula, m_note = "m of the nominal-geometry device (07 P1-16: fixed order)", \
+            "a geometry error moves the resonance of the same mode order"
+    else:
+        m = np.rint(neff * L / lam_res)
+        m_formula, m_note = "m = round(n_eff L / lambda_res)", ""
     if np.any(m < 1):
         raise ValueError(f"{name}: resonance order below 1 (n_eff*L/lambda = {np.min(neff * L / lam_res):.3g})")
-    ctx.set(P_ORDER, m.astype(np.int64), name, (P_NEFF, P_RADIUS, P_OFFSET), "m = round(n_eff L / lambda_res)")
+    ctx.set(P_ORDER, np.asarray(m).astype(np.int64), name, (P_NEFF, P_RADIUS, P_OFFSET), m_formula, m_note)
     neff_ph = m * lam_res / L
     ctx.set("derived.optics.n_eff_phase", neff_ph, name, (P_ORDER, P_OFFSET, P_RADIUS),
             "n_eff_phase = m lambda_res / L (exact cold resonance at the configured offset)")
     ctx.set("derived.optics.n_eff_correction", neff_ph - neff, name, (P_NEFF,), "n_eff_phase - n_eff",
-            "absorbs the order rounding; |x| <= lambda/(2L)")
+            "absorbs the order rounding; |x| <= lambda/(2L) for the nominal-geometry device (a device of a sampled "
+            "geometry keeps that order, so its correction also holds the n_eff Jacobian's fixed-wavelength term)")
 
 
 def _r3_resid(v: dict) -> float:
@@ -317,7 +357,7 @@ def _r1(ctx: RelationContext) -> None:
                         "dn_eff/dT = s0 n_g/lambda - n_eff alpha_L")
         _overdetermined(ctx, name, resid, [P_S0, P_DNDT], recompute)
     elif have_s:
-        ctx.set(P_DNDT, ctx.vals[P_S0] * ng / lam - neff * aL, name, (P_S0, P_NG, P_NEFF, P_ALPHA_L),
+        ctx.set(P_DNDT, ctx.vals[P_S0] * ng / lam - neff * aL, name, (P_S0, P_NG, P_NEFF, P_ALPHA_L, _LAM_LINE),
                 "dn_eff/dT(T0) = s0 n_g/lambda - n_eff alpha_L(T0)")
     else:
         raise UnderdeterminedError(f"{name}: ring.thermal.dlambda_dt_pm_per_k is the single thermo-optic anchor and "
@@ -326,7 +366,7 @@ def _r1(ctx: RelationContext) -> None:
     ctx.set("derived.optics.alpha_l_slope_eff_per_k2", np.asarray(slope, float), name, (P_ALPHA_L_SLOPE,),
             "dalpha_L/dT (0 when thermo_optic_order = 1)")
     ctx.set("derived.optics.d2n_eff_dt2_per_k2", ctx.vals[P_S0] * beta * ng / lam - neff * slope, name,
-            (P_S0, P_BETA, P_NG, P_ALPHA_L_SLOPE), "d2n_eff/dT2 = s0 beta n_g/lambda - n_eff dalpha_L/dT")
+            (P_S0, P_BETA, P_NG, P_ALPHA_L_SLOPE, _LAM_LINE), "d2n_eff/dT2 = s0 beta n_g/lambda - n_eff dalpha_L/dT")
 
 
 def _r1_resid(v: dict) -> float:
@@ -344,24 +384,43 @@ def _r1_resid(v: dict) -> float:
 
 # ------------------------------------------------------------------------------------------------ R2 heater
 
+P_FSR_SPAN = "derived.heater.p_fsr_span_m"
+
+
+def _p_fsr_span(ctx: RelationContext):
+    """FSR_lambda of the P_FSR measurement: at ``ring.heater.p_fsr_ref_wavelength_nm`` when given (one line for the
+    whole bank, so the efficiency and Z_heater->ring are the same on every line), else at each ring's line."""
+    if ctx.known(P_PFSR_LAM):
+        lam = ctx.vals[P_PFSR_LAM]
+        span = lam * lam * ctx.vals["derived.optics.fsr_hz"] / C0
+        ctx.set(P_FSR_SPAN, span, "R2_heater_efficiency", ("derived.optics.fsr_hz", P_PFSR_LAM),
+                "FSR_lambda at the P_FSR reference wavelength = lambda_ref^2 FSR/c")
+    else:
+        span = ctx.vals["derived.optics.fsr_m"]
+        ctx.set(P_FSR_SPAN, span, "R2_heater_efficiency", ("derived.optics.fsr_m",),
+                "FSR_lambda at the ring's line (no ring.heater.p_fsr_ref_wavelength_nm)")
+    return span
+
+
 def _r2_eff(ctx: RelationContext) -> None:
     name = "R2_heater_efficiency"
-    fsr_m = ctx.vals["derived.optics.fsr_m"]
+    fsr_m = _p_fsr_span(ctx)
+    sp = P_FSR_SPAN
     have_p, have_e = ctx.known(P_PFSR), ctx.known(P_EFF)
     if have_p and have_e:
         resid = _rel(ctx.vals[P_EFF] * ctx.vals[P_PFSR], fsr_m)
 
         def recompute(m):
             if m == P_EFF:
-                ctx.set(P_EFF, fsr_m / ctx.vals[P_PFSR], name, ("derived.optics.fsr_m", P_PFSR), "eff = FSR/P_FSR")
+                ctx.set(P_EFF, fsr_m / ctx.vals[P_PFSR], name, (sp, P_PFSR), "eff = FSR/P_FSR")
             else:
-                ctx.set(P_PFSR, fsr_m / ctx.vals[P_EFF], name, ("derived.optics.fsr_m", P_EFF), "P_FSR = FSR/eff")
+                ctx.set(P_PFSR, fsr_m / ctx.vals[P_EFF], name, (sp, P_EFF), "P_FSR = FSR/eff")
         _overdetermined(ctx, name, resid, [P_PFSR, P_EFF], recompute)
     elif have_p:
-        ctx.set(P_EFF, fsr_m / ctx.vals[P_PFSR], name, ("derived.optics.fsr_m", P_PFSR),
-                "efficiency = FSR_lambda / P_FSR (07 D16)")
+        ctx.set(P_EFF, fsr_m / ctx.vals[P_PFSR], name, (sp, P_PFSR),
+                "efficiency = FSR_lambda / P_FSR (07 D16; FSR_lambda of the P_FSR measurement)")
     elif have_e:
-        ctx.set(P_PFSR, fsr_m / ctx.vals[P_EFF], name, ("derived.optics.fsr_m", P_EFF), "P_FSR = FSR_lambda/efficiency")
+        ctx.set(P_PFSR, fsr_m / ctx.vals[P_EFF], name, (sp, P_EFF), "P_FSR = FSR_lambda/efficiency")
     else:
         raise UnderdeterminedError(f"{name}: ring.heater.p_fsr_mw (the heater anchor) is required")
 
@@ -394,9 +453,9 @@ def _r2_z(ctx: RelationContext) -> None:
         if not ctx.known(P_PFSR_T):
             raise UnderdeterminedError(f"{name}: fsr_integral needs ring.heater.p_fsr_ref_temp_c")
         tm = ctx.vals[P_PFSR_T]
-        t_hot = solve_t_for_shift(tm, ctx.vals["derived.optics.fsr_m"], t0, s0, beta)
-        ctx.set("derived.thermal.dt_fsr_k", t_hot - tm, name, ("derived.optics.fsr_m", P_PFSR_T, P_S0, P_BETA),
-                "int_{T_meas}^{T_meas+dT} s dT = FSR_lambda")
+        t_hot = solve_t_for_shift(tm, ctx.vals[P_FSR_SPAN], t0, s0, beta)
+        ctx.set("derived.thermal.dt_fsr_k", t_hot - tm, name, (P_FSR_SPAN, P_PFSR_T, P_S0, P_BETA),
+                "int_{T_meas}^{T_meas+dT} s dT = FSR_lambda of the P_FSR measurement")
         z = (t_hot - tm) / ctx.vals[P_PFSR]
         formula = "Z_heater->ring(0) = dT_FSR / P_FSR"
         ins = ("derived.thermal.dt_fsr_k", P_PFSR)
@@ -408,14 +467,15 @@ def _r2_z(ctx: RelationContext) -> None:
 
 
 def _r2_resid(v: dict) -> float:
-    r1 = _rel(v[P_EFF] * v[P_PFSR], v["derived.optics.fsr_m"])
+    span = v.get(P_FSR_SPAN, v["derived.optics.fsr_m"])
+    r1 = _rel(v[P_EFF] * v[P_PFSR], span)
     s0, t0, beta = v[P_S0], v[P_T0], v["derived.thermal.beta_eff_per_k"]
     shift = integral_s(v[P_TLOCK], t0, s0, beta) - integral_s(v[P_OFFSET_T], t0, s0, beta)
     r2 = float(np.max(np.abs(shift - np.mod(v[P_OFFSET], v["derived.optics.fsr_m"])) / v["derived.optics.fsr_m"]))
     if "derived.thermal.dt_fsr_k" in v:
         tm = v[P_PFSR_T]
         shift = integral_s(tm + v[P_Z] * v[P_PFSR], t0, s0, beta) - integral_s(tm, t0, s0, beta)
-        r3 = _rel(shift, v["derived.optics.fsr_m"])
+        r3 = _rel(shift, span)
     else:
         r3 = _rel(v[P_Z] * v["derived.thermal.s_lock_m_per_k"], v[P_EFF])
     return max(r1, r2, r3)
@@ -447,10 +507,11 @@ def _r4_budget_components(ctx: RelationContext) -> None:
     if ctx.known(P_QI):
         resid = _rel(ctx.vals[P_QI], qi)
         _overdetermined(ctx, name, resid, [P_QI] + list(LOSS_COMPONENTS),
-                        lambda m: ctx.set(P_QI, qi, name, LOSS_COMPONENTS + (P_NG,), "Q_i = 2 pi n_g/(lambda alpha_i)"))
+                        lambda m: ctx.set(P_QI, qi, name, LOSS_COMPONENTS + (P_NG, _LAM_RES),
+                                          "Q_i = 2 pi n_g/(lambda alpha_i)"))
         qi = ctx.vals[P_QI]
     else:
-        ctx.set(P_QI, qi, name, LOSS_COMPONENTS + (P_NG,), "Q_i = 2 pi n_g/(lambda_res alpha_i), alpha_i = sum")
+        ctx.set(P_QI, qi, name, LOSS_COMPONENTS + (P_NG, _LAM_RES), "Q_i = 2 pi n_g/(lambda_res alpha_i), alpha_i = sum")
     if ctx.known(P_ETA):
         resid = _rel(ctx.vals[P_ETA], eta)
         _overdetermined(ctx, name, resid, [P_ETA] + list(LOSS_COMPONENTS),
@@ -476,6 +537,56 @@ def _r4_budget_eta(ctx: RelationContext) -> None:
 
 def _r4_q(ctx: RelationContext) -> None:
     name = "R4_q"
+    if ctx.coupling_anchor is not None:
+        _r4_q_geometry(ctx, name, ctx.coupling_anchor)
+    else:
+        _r4_q_anchors(ctx, name)
+    # exact per-pass couplings and round-trip amplitude (07 P2-4)
+    v = ctx.vals
+    trt = v["derived.optics.round_trip_time_s"]
+    w = _omega(ctx)
+    ins = (P_NG, P_RADIUS, _LAM_RES)
+    ctx.set("derived.optics.kappa2_through", -np.expm1(-w * trt / v[P_QT]), name, (P_QT,) + ins,
+            "K_t^2 = 1 - exp(-omega T_rt/Q_t)")
+    ctx.set("derived.optics.kappa2_drop", -np.expm1(-w * trt / v[P_QD]), name, (P_QD,) + ins,
+            "K_d^2 = 1 - exp(-omega T_rt/Q_d)")
+    ctx.set("derived.optics.round_trip_amplitude", np.exp(-0.5 * w * trt / v[P_QI]), name, (P_QI,) + ins,
+            "a = exp(-omega T_rt/(2 Q_i))")
+    ctx.set("derived.optics.alpha_i_per_m", _TWO_PI * v[P_NG] / (v["derived.optics.lambda_res_cold_m"] * v[P_QI]),
+            name, (P_QI, P_NG, _LAM_RES), "alpha_i = 2 pi n_g/(lambda Q_i)")
+
+
+def _r4_q_geometry(ctx: RelationContext, name: str, ca: dict) -> None:
+    """R4_q for a device of a sampled geometry (07 P1-16): the anchors (q_loaded, kappa_d_over_kappa, or whichever
+    members the config gives) describe the nominal-geometry device, whose per-pass couplings realize solved with the
+    nominal n_g, length and loss (``ca``). The device's couplers are those couplers moved by its geometry error,
+    K^2 = K_a^2 exp(dln_kappa2), and its Q_L and drop share follow from them and from its own loss: a coupler does not
+    change because the loss or n_g of the device changed, and Q_L does."""
+    v = ctx.vals
+    trt = v["derived.optics.round_trip_time_s"]
+    w = _omega(ctx)
+    anchors = tuple(p for p in (P_QL, P_XD, P_QT, P_QD, P_QI) if p in ctx.prov)
+    if not ctx.known(P_QI):
+        # no loss budget and no given Q_i: the device keeps the nominal device's loss per length
+        ctx.set(P_QI, _TWO_PI * v[P_NG] / (v[_LAM_RES] * ca["alpha_i_per_m"]), name, anchors + (P_NG, _LAM_RES),
+                "Q_i = 2 pi n_g/(lambda_res alpha_i) with the alpha_i of the nominal-geometry device")
+    q = {}
+    for j, pq in (("through", P_QT), ("drop", P_QD)):
+        k2 = np.asarray(ca[f"kappa2_{j}"], float) * np.exp(np.asarray(ca[f"dln_kappa2_{j}"], float))
+        bad = np.isfinite(k2) & ((k2 <= 0.0) | (k2 >= 1.0))     # a non-finite input fails realize's finite check
+        if np.any(bad):
+            raise ValueError(f"{name}: a sampled geometry moves the {j} per-pass coupling outside (0, 1) (worst "
+                             f"{float(k2[bad].flat[0]):.3g}); check the coupling Jacobian and the gap sigmas")
+        q[pq] = w * trt / (-np.log1p(-k2))
+        ctx.set(pq, q[pq], name, anchors + ("derived.geometry.dln_kappa2_" + j, P_NG, P_RADIUS, _LAM_RES),
+                f"Q = omega T_rt/(-ln(1 - K^2)), K^2 = K_a^2 exp(dln_kappa2_{j}): the nominal-geometry device's "
+                f"{j} coupler moved by the device's geometry (07 P1-16)")
+    ql = 1.0 / (1.0 / v[P_QI] + 1.0 / q[P_QT] + 1.0 / q[P_QD])
+    ctx.set(P_QL, ql, name, (P_QI, P_QT, P_QD), "1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d (the device's couplers and loss)")
+    ctx.set(P_XD, ql / q[P_QD], name, (P_QL, P_QD), "kappa_d/kappa = Q_L/Q_d (the device's couplers and loss)")
+
+
+def _r4_q_anchors(ctx: RelationContext, name: str) -> None:
     qs = {p: ctx.known(p) for p in (P_QL, P_QI, P_QT, P_QD)}
     xd = ctx.known(P_XD)
     v = ctx.vals
@@ -518,18 +629,6 @@ def _r4_q(ctx: RelationContext) -> None:
             _overdetermined(ctx, name, resid, [P_QL, P_QI, P_QT, P_QD], recompute)
         else:
             _solve_q(ctx, free[0], name)
-    # exact per-pass couplings and round-trip amplitude (07 P2-4)
-    trt = v["derived.optics.round_trip_time_s"]
-    w = _omega(ctx)
-    ins = (P_NG, P_RADIUS)
-    ctx.set("derived.optics.kappa2_through", -np.expm1(-w * trt / v[P_QT]), name, (P_QT,) + ins,
-            "K_t^2 = 1 - exp(-omega T_rt/Q_t)")
-    ctx.set("derived.optics.kappa2_drop", -np.expm1(-w * trt / v[P_QD]), name, (P_QD,) + ins,
-            "K_d^2 = 1 - exp(-omega T_rt/Q_d)")
-    ctx.set("derived.optics.round_trip_amplitude", np.exp(-0.5 * w * trt / v[P_QI]), name, (P_QI,) + ins,
-            "a = exp(-omega T_rt/(2 Q_i))")
-    ctx.set("derived.optics.alpha_i_per_m", _TWO_PI * v[P_NG] / (v["derived.optics.lambda_res_cold_m"] * v[P_QI]),
-            name, (P_QI, P_NG), "alpha_i = 2 pi n_g/(lambda Q_i)")
 
 
 def _solve_q(ctx: RelationContext, f: str, name: str) -> None:

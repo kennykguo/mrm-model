@@ -89,12 +89,18 @@ def test_worlds_and_devices_use_separate_streams(cfg):
 
 def test_uncertainty_is_per_world_variation_per_ring(cfg):
     p = realize(cfg, 16, 0, thermal_hook=None)
-    q = p.optics.q_loaded                         # die-level epistemic draw: equal across rings
-    assert np.all(q == q[:, :1]) and np.unique(q[:, 0]).size == 16
     r = p.heater.r_cold_ohm                       # per-device variation: differs ring to ring
     assert np.all(np.std(r, axis=1) > 0)
+    # the Q_L anchor is a die-level epistemic draw: it is the Q_L of the nominal-geometry device of each world, equal
+    # across rings; a device of a sampled geometry has its own couplers, so its Q_L follows them (07 P1-16)
+    n = realize(cfg, 16, 0, variation="off", thermal_hook=None)
+    q = n.optics.q_loaded
+    assert np.all(q == q[:, :1]) and np.unique(q[:, 0]).size == 16
     np.testing.assert_allclose(p.world["q_loaded"], q[:, 0])
+    np.testing.assert_array_equal(p.world["q_loaded"], n.world["q_loaded"])
     assert 3500 <= q.min() and q.max() <= 4200
+    assert np.all(np.std(p.optics.q_loaded, axis=1) > 0)
+    np.testing.assert_allclose(p.optics.q_loaded.mean(axis=1), q[:, 0], rtol=0.05)
 
 
 def test_nominal_mode_and_variation_off(cfg):
@@ -121,7 +127,7 @@ def test_hypothesis_frequencies_follow_weights(cfg):
 
 def test_pinned_and_lhs(cfg):
     pinned = load(MINI, alts={"uncertainty.thermo_optic": "H86", "uncertainty.q_loaded": "low_q"})
-    p = realize(pinned, 50, 0, thermal_hook=None)
+    p = realize(pinned, 50, 0, variation="off", thermal_hook=None)     # the anchor (nominal-geometry device)
     np.testing.assert_allclose(p.thermal.dlambda_dt_s0_m_per_k, 86e-12, rtol=1e-15)
     assert np.all(p.optics.q_loaded == 2600)
     lhs = realize(cfg, 40, 0, uncertainty="lhs", variation="off", thermal_hook=None)
@@ -170,10 +176,12 @@ def test_geometry_jacobian_correlation():
     cfg = load(d)
     p = realize(cfg, 3000, 0, uncertainty="nominal", thermal_hook=None)
     off = p.optics.resonance_offset_m.ravel() * 1e9
-    ln_qd = np.log(p.optics.q_drop.ravel())
+    # K_d^2 of each device is the nominal device's times exp(J dg) (mini has no drop dispersion); ln Q_d = ln(omega
+    # T_rt) - ln(-ln(1 - K^2)) also moves with the device's resonance, so the Jacobian statement is about K^2
+    ln_kd = np.log(p.optics.kappa2_drop.ravel())
     var_w = 2.0 ** 2 + 1.0 ** 2
-    pred = (j1 * j2 * var_w) / np.sqrt(j1 ** 2 * var_w * (j2 ** 2 * var_w + j3 ** 2 * 3.0 ** 2))
-    got = np.corrcoef(off, ln_qd)[0, 1]
+    pred = -(j1 * j2 * var_w) / np.sqrt(j1 ** 2 * var_w * (j2 ** 2 * var_w + j3 ** 2 * 3.0 ** 2))
+    got = np.corrcoef(off, ln_kd)[0, 1]
     assert got == pytest.approx(pred, abs=0.03)
     # offset moves by -j1 per nm of width (offset = line - resonance) and its spread is j1*sqrt(var_w)
     assert np.std(off) == pytest.approx(j1 * np.sqrt(var_w), rel=0.05)
@@ -183,9 +191,13 @@ def test_geometry_jacobian_correlation():
 
 
 def test_geometry_jacobian_cannot_move_a_free_member():
+    """A leaf output (n_g, s0, ...) needs a given leaf; a coupler output moves the per-pass coupling whichever R4
+    member is free (test_params_review.py::test_mini_coupling_jacobian_moves_a_free_coupler)."""
     d = mini()
-    d["ring"]["geometry"]["jacobian"]["value"]["of"]["ln_kappa2_through_per_nm"] = [0.01, 0.0]
-    with pytest.raises(RealizeError, match="q_through"):
+    d["ring"]["geometry"]["radius_um"] = {"value": 6.6, "provenance": "assumed", "generation": "none", "source": "TEST"}
+    d["ring"]["optics"]["n_g"] = {"value": None, "provenance": "derived"}
+    d["ring"]["geometry"]["jacobian"]["value"]["of"]["n_g_per_nm"] = [0.001, 0.0]
+    with pytest.raises(RealizeError, match="n_g"):
         realize(load(d), 4, 0, thermal_hook=None)
 
 
@@ -257,7 +269,7 @@ def test_plant_does_not_import_config():
 
 def test_alt_selection_survives_sampling():
     cfg = load(MINI, alts={"ring.optics.q_loaded": "talk"})
-    p = realize(cfg, 6, 0, thermal_hook=None)
+    p = realize(cfg, 6, 0, variation="off", thermal_hook=None)    # the uncertainty draw does not redraw it
     assert np.all(p.optics.q_loaded == 3500)
 
 
@@ -319,6 +331,23 @@ def test_lag_bound_without_hook_and_without_far_keys():
     g_hook = realize(cfg, 2, 0).diagnostics["selfheat_lag_gain"]
     assert 0 < g_none < SELFHEAT_LAG_GAIN_MAX and 0 < g_hook < SELFHEAT_LAG_GAIN_MAX
     assert g_none == pytest.approx(g_hook, rel=1.0)                # same order: one law, two bookkeepings
+
+
+def test_g26_crosstalk_tau_uses_each_rings_radius():
+    """physics_thermal review (2026-10-16): realize passes each ring's r_ref to the interim model, whose crosstalk
+    law takes the heat-source-to-victim distance (centre distance less the ring radii, 04 section 2.5). g26 nominal:
+    the nearest neighbour at the 50 um pitch is 1.52 ms (2.85 ms with the centre distance), the own monitor PD at
+    25 um 0.38 ms."""
+    from mrm.plant import thermal as th
+    cfg = load("g26")
+    p = realize(cfg, 1, 0, uncertainty="nominal", variation="off")
+    sy = p.thermal.system
+    r = p.optics.radius_m[0] * 1e6
+    m = np.flatnonzero((sy.lag_obs == sy.ring_obs[0]) & (sy.lag_src == sy.heater_src[1]))
+    assert sy.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(50.0 - r[0] - r[1])), rel=1e-12)
+    assert sy.taus_s[0, m[0]] == pytest.approx(1.521e-3, rel=2e-3)
+    m = np.flatnonzero((sy.lag_obs == sy.pd_obs[0]) & (sy.lag_src == sy.heater_src[0]))
+    assert sy.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(25.0 - r[0])), rel=1e-12)
 
 
 def test_non_finite_values_are_refused(cfg):

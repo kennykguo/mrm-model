@@ -85,6 +85,7 @@ mrm/
     api.py                 ControllerSpec, Observation, Controller protocol, BaseController, PerRing/PerDie
                            adapters, telemetry, CompositeController (P1-1, P1-19, P1-20, P2-7)
     registry.py            name -> class
+    knowledge.py           controller_interface.knowledge tokens and the filtered view ControllerSpec.nominal (07 D13)
     models.py              linearize(nominal_cfg, op, Ts) -> (A,B,C,D,delay) for model-based controllers
     calibration.py         simulated factory calibration (warm/cold start)
     fxp.py lfsr.py         fixed-point toolkit and the reference fixed-point PI FxpPi (P1-21)
@@ -196,7 +197,14 @@ Step response of any pair: `sum_k r_k (1 - exp(-t/tau_k))`. Mixed-sign residues 
 sidecar records the family, stack, mesh, the time-domain error (< 2 % of steady state, 10 ns .. 10 ms) and the
 frequency-domain error (< 0.3 dB, < 3 deg, DC .. 1 MHz) against the full FEM, and the superposition error of the
 8-ring bank (07 P1-3). Families: `inring_noundercut` (default), `silicide_undercut`, `metal_above`. Films: 160, 200.
-Until the FEM artefacts exist, `thermal.py` builds the interim 3-pole model of 07 P1-2 from preset values.
+All six artefacts exist (`mrm/data/extracted/`). Which model a preset runs is `fidelity.thermal_model`: `interim`
+(the 3-pole model of 07 P1-2 that `thermal.py` builds from preset values; the default, and g26's) or `rom` (the
+artefact named by `ring.thermal.rom_file`). An artefact replaces the interim values only through the calibration split
+of 07 section 4 (07 build order step 3), so g26 stays on `interim` until the FEM ROM passes it: the 8-ring
+superposition check fails (13.9 % against 10 %), VAL-8a/b/c fail, and ROM mode loses the per-ring heater-efficiency
+spread and the per-world family, film and stack hypotheses (one artefact per run). In ROM mode the die-level time
+scales (07 D15) scale a mixed-sign pair whose poles straddle the layer split as a whole (`mrm.plant.thermal`,
+ThermalScales).
 
 ### 5.4 Junction: `junction_<xsec>.json` (schema `junction/1`)
 

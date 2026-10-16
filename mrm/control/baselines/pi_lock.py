@@ -94,6 +94,7 @@ import numpy as np
 
 from mrm.control import api
 from mrm.control.api import BaseController, CompiledController, ControllerSpec, Observation
+from mrm.control.knowledge import FINE_TOKENS
 from mrm.control.registry import register
 from mrm.core.channels import ActId, ObsId
 
@@ -107,18 +108,9 @@ __all__ = [
 
 #: knowledge token -> config keys a controller may read from ``spec.nominal`` when the token is listed in
 #: ``controller_interface.knowledge``. 07 P1-1 names line_grid, ring_to_line, heater_r_nominal and
-#: dlambda_dt_nominal; the others are proposed here (docs/handoff/controllers_a.md).
-KNOWLEDGE_KEYS: dict[str, tuple[str, ...]] = {
-    "heater_law": ("ring.heater.driver_mode", "ring.heater.full_scale_v", "ring.heater.full_scale_a",
-                   "ring.heater.full_scale_w", "ring.heater.r_cold_ohm", "ring.heater.dac_bits"),
-    "heater_r_nominal": ("ring.heater.r_cold_ohm",),
-    "heater_efficiency": ("ring.heater.p_fsr_mw", "ring.optics.fsr_thz"),
-    "dlambda_dt_nominal": ("ring.thermal.dlambda_dt_pm_per_k",),
-    "linewidth": ("ring.optics.q_loaded",),
-    "thermal_dynamics": ("ring.thermal.tau_fast_s", "ring.thermal.tau_slow_s", "ring.thermal.share_fast_frac"),
-    "bias_efficiency": ("ring.junction.eff_at_0v_pm_per_v", "ring.junction.v_bi_v",
-                        "ring.junction.depletion_exponent", "ring.junction.fill_fraction"),
-}
+#: dlambda_dt_nominal; the others are proposed here (docs/handoff/controllers_a.md). The table lives in
+#: mrm.control.knowledge (FINE_TOKENS), which builds the filtered ``spec.nominal`` view from it (07 D13).
+KNOWLEDGE_KEYS: dict[str, tuple[str, ...]] = FINE_TOKENS
 
 _C0 = 299792458.0
 _LAMBDA_DEFAULT_M = 1310e-9      # O-band grid centre (printed G26), used only without the line_grid token

@@ -391,6 +391,7 @@ variation:
     slab:        {die_sigma_nm: 2.0}
     gap_through: {ring_sigma_nm: 2.0}
     gap_drop:    {ring_sigma_nm: 2.0}
+    width_closes_gaps: true    # default false: a width error also closes both edge-to-edge gaps by itself
     jacobians: [ring.geometry.jacobian, ring.geometry.jacobian_coupling]   # default [ring.geometry.jacobian]
     provenance: literature
     generation: none
@@ -414,13 +415,36 @@ artefact format of ARCHITECTURE 5.1). Inputs: `width_nm`, `film_nm` (= `thicknes
 | `resonance_offset_nm_per_nm` | `ring.optics.resonance_offset_nm` | += |
 | `n_eff_per_nm`, `n_g_per_nm` | `ring.optics.n_eff`, `ring.optics.n_g` | += |
 | `dlambda_dt_pm_per_k_per_nm` | `ring.thermal.dlambda_dt_pm_per_k` | += |
-| `ln_kappa2_through_per_nm`, `ln_kappa2_drop_per_nm` | `ring.optics.q_through`, `ring.optics.q_drop` | Q x exp(-sum(J dg)) (Q_c ~ 1/K^2 to first order) |
-| `alpha_rad_db_per_cm_per_nm` | `ring.optics.loss_budget.alpha_bend_radiation_db_per_cm` | += |
+| `ln_kappa2_through_per_nm`, `ln_kappa2_drop_per_nm` | the per-pass couplings K_t^2, K_d^2 (R4_q) | d ln K^2 at a fixed wavelength; see below |
+| `alpha_rad_db_per_cm_per_nm` | `ring.optics.loss_budget.alpha_bend_radiation_db_per_cm` | x exp(sum(d_k dg_k)), d_k = d ln alpha_rad/dp_k from the table's `evaluations` (else J_k/leaf) |
+| `ln_alpha_rad_per_nm` | the same leaf | x exp(sum(J dg)) |
 
-The geometry error of each dimension is `die_sigma_nm*z_die + ring_sigma_nm*(C^(1/2) z)_i`. A Jacobian output whose
-leaf is a free relation member (for example `q_through` when Q_L is the anchor) is an error: the preset must give
-that leaf as an input for the geometry to move it. Unknown inputs or outputs are errors. The direct path-keyed
-sigmas remain available as overrides (07 P1-16). 07 wrote the sigma names as `width_nm_sigma`; that breaks the
+The geometry error of each dimension is `die_sigma_nm*z_die + ring_sigma_nm*(C^(1/2) z)_i`; with
+`width_closes_gaps: true` the gap errors the Jacobians see are the gap draws minus the width error (the coupling
+artefact's derivatives are at fixed edge-to-edge gaps: a lithographic width bias closes each gap by itself, total =
+d/dw - d/dgap). The radiation loss is exponential in the geometry (extract_modes handoff), so its secant is applied
+as a log-slope and stays positive. A leaf output whose leaf is a free relation member is an error: the preset must
+give that leaf as an input for the geometry to move it. Unknown inputs or outputs are errors. The direct path-keyed
+sigmas remain available as overrides (07 P1-16).
+
+**Sampled geometry and the relation anchors** (07 P1-16: one geometry error moves the resonance, the FSR and the
+coupling together). With `variation: sample` and a `variation.geometry`, realize solves the relations twice: once
+for the nominal-geometry device of every world (the arrays after the uncertainty draw and the grid, before any device
+draw, with the device's own draws of the R4 coupling members q_loaded, q_through, q_drop, kappa_d_over_kappa), then
+for the devices. The nominal solve gives
+- the radius: a free radius (R3 solved from the FSR hypothesis and n_g) is held for every device of the world, a mask
+  dimension, so a device's FSR = c/(n_g L) follows its own n_g;
+- the order m, which every device keeps (the Jacobians are at fixed r_ref and order; n_eff_phase = m lambda_res/L is
+  then the device's n_eff at its own resonance, and its correction from the configured n_eff can exceed lambda/(2L));
+- the per-pass couplings K_a^2 the R4 anchors mean. A device's couplers are K^2 = K_a^2 exp(sum_k J_k dg_k +
+  D d lambda_res) at its own cold resonance (D the coupler dispersion: the anchors hold at each device's cold
+  resonance, which the geometry moved by d lambda_res, so at the line, where mrm.plant.phase evaluates K^2, the move
+  is exactly sum_k J_k dg_k), Q_j = omega T_rt/(-ln(1 - K_j^2)) with the device's omega and T_rt, Q_i from the
+  device's own loss budget, and q_loaded and kappa_d_over_kappa follow from the rate sum. A coupler therefore does not
+  change when a device's loss or n_g does, and its Q_L does. The coupling outputs move a coupler whichever R4 member
+  is free. `PlantParams.values` holds `derived.geometry.dln_kappa2_{through,drop}` and
+  `derived.geometry.nominal_kappa2_{through,drop}`, the diagnostics `geometry_dlambda_res_nm`.
+With `variation: off` (derive, nominal runs) none of this applies and the anchors hold for every ring. 07 wrote the sigma names as `width_nm_sigma`; that breaks the
 suffix grammar, so they are `die_sigma_nm` / `ring_sigma_nm` per dimension here.
 
 ## 8. Relations (07 P0-3)
@@ -434,12 +458,12 @@ provenance** is recomputed and `PlantParams.diagnostics["relation_notes"]` says 
 
 | relation | members | equations (SI) |
 |---|---|---|
-| `R3_geometry` | `ring.geometry.radius_um`, `ring.optics.n_g`, `ring.optics.fsr_thz` or `fsr_nm`; `n_eff`, `resonance_offset_nm` -> `order` | FSR = c/(n_g 2 pi R). One of R, n_g, FSR free. m = round(n_eff L/lambda_res), lambda_res = lambda_line - offset; then n_eff_phase = m lambda_res/L (the order rounding moves into n_eff, \|correction\| <= lambda/(2L)), so the cold resonance sits exactly at the offset and the FSR keeps its hypothesis. `fsr_nm` is the wavelength FSR at the assigned line. |
+| `R3_geometry` | `ring.geometry.radius_um`, `ring.optics.n_g`, `ring.optics.fsr_thz` or `fsr_nm`; `n_eff`, `resonance_offset_nm` -> `order` | FSR = c/(n_g 2 pi R). One of R, n_g, FSR free. m = round(n_eff L/lambda_res), lambda_res = lambda_line - offset; then n_eff_phase = m lambda_res/L (the order rounding moves into n_eff, \|correction\| <= lambda/(2L)), so the cold resonance sits exactly at the offset and the FSR keeps its hypothesis. `fsr_nm` is the wavelength FSR at the assigned line. With sampled geometry the radius and the order are the nominal-geometry device's and the FSR follows each device's n_g (section 7.1). |
 | `R1_thermo_optic` | `ring.thermal.dlambda_dt_pm_per_k` (s0), `dlambda_dt_ref_ring_temp_c` (T0), `dlambda_dt_beta_per_k` (beta), `ring.optics.n_g`; -> `ring.optics.dn_eff_dt_per_k` | s(T) = (lambda/n_g)(dn_eff/dT(T) + n_eff alpha_L(T)) = s0 (1 + beta (T - T0)). dn_eff/dT(T0) = s0 n_g/lambda - n_eff alpha_L(T0); d2n_eff/dT2 = s0 beta n_g/lambda - n_eff dalpha_L/dT. beta = 0 when `fidelity.thermo_optic_order` = 1. s0 is the single anchor; setting dn_eff_dt is a load error. |
-| `R2_heater_efficiency` | `ring.heater.p_fsr_mw` (anchor, 07 D16) -> `ring.heater.efficiency_nm_per_mw` | efficiency = FSR_lambda/P_FSR, FSR_lambda at the assigned line. The efficiency in pm/mW therefore inherits the FSR hypothesis (07 D16). |
-| `R2_heater_z` | -> `ring.thermal.z_heater_ring_k_per_mw`, `ring.thermal.t_ring_lock_c` | T_lock solves int_{T_ref}^{T_lock} s dT = resonance_offset mod FSR_lambda (`derived.optics.lock_offset_m`: the heater only red-shifts, so a sampled ring with a negative offset, or one above an FSR, locks the nearest order blue of its line; equal to the offset for 0 <= offset < FSR). `fidelity.heater_anchor: fsr_integral` (default since the integration): Z = dT_FSR/P_FSR with int_{T_meas}^{T_meas+dT_FSR} s dT = FSR_lambda (needs `ring.heater.p_fsr_ref_temp_c`). `lock_slope` (07 as written): Z = efficiency/s(T_lock). See section 13 item 1. |
+| `R2_heater_efficiency` | `ring.heater.p_fsr_mw` (anchor, 07 D16), optional `ring.heater.p_fsr_ref_wavelength_nm` -> `ring.heater.efficiency_nm_per_mw` | efficiency = FSR_lambda/P_FSR, FSR_lambda = lambda_ref^2 FSR/c at the line the P_FSR measurement was made on (`derived.heater.p_fsr_span_m`), so the efficiency and Z are the same on every line; without the key FSR_lambda is at each ring's assigned line (Z then follows lambda_line^2). The efficiency in pm/mW inherits the FSR hypothesis (07 D16). |
+| `R2_heater_z` | -> `ring.thermal.z_heater_ring_k_per_mw`, `ring.thermal.t_ring_lock_c` | T_lock solves int_{T_ref}^{T_lock} s dT = resonance_offset mod FSR_lambda (`derived.optics.lock_offset_m`: the heater only red-shifts, so a sampled ring with a negative offset, or one above an FSR, locks the nearest order blue of its line; equal to the offset for 0 <= offset < FSR). `fidelity.heater_anchor: fsr_integral` (default since the integration): Z = dT_FSR/P_FSR with int_{T_meas}^{T_meas+dT_FSR} s dT = FSR_lambda of R2_heater_efficiency (needs `ring.heater.p_fsr_ref_temp_c`). `lock_slope` (07 as written): Z = efficiency/s(T_lock). See section 13 item 1. |
 | `R4_loss_budget` | `ring.optics.loss_budget.{alpha_fca, alpha_other_abs, alpha_scatter, alpha_bend_radiation}_db_per_cm`, `q_intrinsic`, `heat_fraction` | all four components: alpha_i = sum, Q_i = 2 pi n_g/(lambda_res alpha_i), eta = (fca + other)/alpha_i (07 P0-2). Or no component and `heat_fraction` given: alpha_heat = eta alpha_i with alpha_i from Q_i. A partial budget is an error; neither is an error. |
-| `R4_q` | `q_loaded`, `q_intrinsic`, `q_through`, `q_drop`, optional `kappa_d_over_kappa` | 1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d (with kappa_d_over_kappa = x: Q_d = Q_L/x). Derived per-pass couplings use the exact energy decay per round trip: K^2 = 1 - exp(-omega T_rt/Q), a = exp(-omega T_rt/(2 Q_i)), T_rt = n_g L/c, so one parameter set serves the exact ring and TCMT (07 P2-4). |
+| `R4_q` | `q_loaded`, `q_intrinsic`, `q_through`, `q_drop`, optional `kappa_d_over_kappa` | 1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d (with kappa_d_over_kappa = x: Q_d = Q_L/x). Derived per-pass couplings use the exact energy decay per round trip: K^2 = 1 - exp(-omega T_rt/Q), a = exp(-omega T_rt/(2 Q_i)), T_rt = n_g L/c, so one parameter set serves the exact ring and TCMT (07 P2-4). With sampled geometry the anchors hold for the nominal-geometry device and each device's couplers move with its geometry (section 7.1). |
 | `R5_latency` | one owner per I/O channel: `ring.monitor.adc_latency_s` (tx.monitor), `ring.heater.latency_s` (tx.heater), `ring.bias_dac.latency_s` (tx.bias), `ring.heater.readback.latency_s`, `datapath.error_count_latency_s`; sensors in `temp_sensors[].latency_s`; the controller declares `Controller.latency_ticks` in code | ticks = round(latency_s x latency_scale/dt). The deleted `controller_interface.*_latency_samples` keys are load errors. |
 
 Overdetermined example (radius printed, n_g solver, FSR printed): give `relations: {R3_geometry: {tolerance_rel:
@@ -454,7 +478,8 @@ Order of work (07 P0-4):
 4. variation: geometry Jacobians, then path-keyed entries, then per-device draws of the DAC bit errors, the INL bow
    and the temperature-sensor offsets and gain errors;
 5. conversion to SI;
-6. relations R3, R1, R2, R4, R5 on the arrays;
+6. relations R3, R1, R2, R4, R5 on the arrays; with a sampled geometry first on the nominal-geometry device of every
+   world (its radius, order and anchor couplings, section 7.1), then on the devices;
 7. thermal: `ThermalInputs` is always built; with `thermal_hook="auto"` and `mrm.plant.thermal` importable,
    `assemble(InterimRom(...) | load_rom(path), layout.sites, N, ThermalScales(...), temp_sensors=...,
    ring_pitch_um=...)` builds `PlantParams.thermal.system`. For the ROM model a per-world `dc_scale` =
@@ -490,13 +515,15 @@ value x when the optional key is missing; the list of such fields is in `diagnos
 `PlantParams.select(b)` returns the B = 1 view of element b. It cuts every batched array, including those inside
 `thermal.system` (the ThermalSystem's (B, M) residues and poles and its float (B,) arrays), `thermal.inputs` /
 `thermal_inputs` (gains, interim values, scales, scaling-hypothesis names), `world`, `seeds`, `values` and the
-diagnostics `rom_dc_scale` and `geometry_draws_nm`; element b of a B-run equals a B = 1 run with seed `seeds[b]`.
+diagnostics `rom_dc_scale`, `geometry_draws_nm` and `geometry_dlambda_res_nm`; element b of a B-run equals a B = 1
+run with seed `seeds[b]`.
 
 Top level: `batch, n_rings, n_lines`; groups below; `flags`; `world` {entry: (B,)}; `world_choices`; `seeds`
 {device, uncertainty: (B,)}; `config_hash`; `values` {config path or `derived.*`: SI array} (every leaf and
 derived value, plus `switch.<path>` codes); `derivations` {path: Derivation(relation, inputs, formula)};
-`diagnostics` {relation_residuals, relation_notes, defaults_used, clipped, geometry_draws_nm, selfheat_lag_gain,
-thermal_hook, rom_dc_scale, uncertainty_mode, variation_mode}; `thermal_inputs`.
+`diagnostics` {relation_residuals, relation_notes, defaults_used, clipped, geometry_draws_nm (as drawn, before a
+`width_closes_gaps` correction), geometry_dlambda_res_nm, selfheat_lag_gain, thermal_hook, rom_dc_scale,
+uncertainty_mode, variation_mode}; `thermal_inputs`.
 
 ### optics (`OpticsParams`)
 
@@ -610,7 +637,7 @@ absent -> inf), `settle_tau_s` (s, B,1, absent -> 0), `noise_rms_codes` (B,1, ab
 | `responsivity_a_per_w` | A/W | B,N | drop PD responsivity |
 | `gain_scale` | 1 | B,1 | lumped monitor-gain nuisance factor (absent -> 1) |
 | `dark_i0_a`, `dark_t0_k`, `dark_activation_j` | A, K, J | B,1 | Arrhenius dark current I_d0 exp(-(E_a/k)(1/T - 1/T0)) (absent -> 0; `dark_t0_c` is required when `dark_i0_na` is given, else nan) |
-| `background_fraction` | 1 | B,N | stray light (absent -> 0) |
+| `background_fraction` | 1 | B,N | stray light, a fraction of the total bus power at the ring, summed over every line (absent -> 0) |
 | `afe_type`, `afe_tau_s` | int, s | | 0 rc, 1 integrate_dump |
 | `integration_window_ticks`, `adc_period_ticks` | int | | |
 | `adc_bits` | int | | |
@@ -618,12 +645,13 @@ absent -> inf), `settle_tau_s` (s, B,1, absent -> 0), `noise_rms_codes` (B,1, ab
 | `adc_offset_codes`, `adc_gain_error_frac` | codes, 1 | B,N | absent -> 0 |
 | `adc_inl_lsb`, `adc_dnl_lsb`, `input_noise_a_per_rt_hz`, `flicker_corner_hz`, `adc_ref_tempco_per_k` | | B,1 | absent -> 0 |
 | `pga_gains` | 1 | G | empty when absent |
-| `channels_per_adc` | int | | rings per converter (absent -> 1) |
+| `channels_per_adc` | int | | rings per converter (absent -> 1); ring n on converter n // C, sharing its DNL and INL bow; round_robin needs C x window <= ADC period |
 | `mux_order` | str | | `ring.monitor.adc_mux.order` (round_robin \| bank) |
 | `baseline_a` | A | B,1 | analog baseline subtracted before the ADC (PAT-2; absent -> 0) |
 | `stuck_flagged` | bool | | a stuck converter clears `monitor_valid` |
 | `flicker_band_min_hz` | Hz | float | lowest 1/f pole of the flicker synthesis |
-| `ref_tap_present`, `ref_tap_coupling_frac`, `ref_tap_responsivity_a_per_w`, `ref_tap_dark_i0_a` | -, 1, A/W, A | -, B,1 | reference-tap PD (07 P1-9; nan = absent or the drop PD's value) |
+| `ref_tap_present`, `ref_tap_coupling_frac`, `ref_tap_responsivity_a_per_w`, `ref_tap_dark_i0_a` | -, 1, A/W, A | -, B,1 | reference-tap PD (07 P1-9; nan = absent or the drop PD's value). Carried only: `MonitorHw.from_plant_params` (so the engine) refuses `ref_tap_present` (no channels yet) |
+| `adc_ref_site` | str | | `ring.monitor.adc_ref_site`: package_base (the ADC reference at thermal.t_base_k + thermal.xpu_rise_k) \| monitor_pd (at each ring's PD observer; needs channels_per_adc 1) |
 
 Absent `dark_activation_ev` gives 0.37 eV (`mrm.materials.ge_pd_dark_ea_ev`, inferred), not 0, so the dark current
 keeps the Arrhenius law of 07 P1-9.
@@ -684,7 +712,7 @@ inputs, provenance, warnings)`. Diagnostics (per ring unless stated; display uni
 | `p_in_ring_dbm`, `p_abs_peak_mw` | power at the ring and absorbed power on resonance |
 | `bistability_ratio` | G_sh P_abs,peak/(0.77 FWHM); a warning above 1 (07 P0-1) |
 | `t_ring_lock_c`, `t_amb_order_hop_c` | lock temperature; ambient at which the heater reaches zero (peak lock, BND-2) |
-| `next_order_distance_ghz`, `next_order_distance_fwhm` | other orders of a locked ring to any other line (BND-1; warning below 2 FWHM) |
+| `next_order_distance_ghz`, `next_order_distance_fwhm` | other orders of a ring locked on its own line to any other TX line, from the plant's phase model (the lock-shifted cold comb with dispersion; each order's TCMT FWHM): the BND-1 replica's distance (`derive.next_order_distances`; warning below 2 FWHM) |
 | `monitor_codes_per_uw_at_drop`, `heater_pm_per_code` (on `heater_code_grid`), `fwhm_pm`, `disturbance_pm_per_k`, `selfheat_pm_per_mw_in` | the identifiable block of 07 P1-9 |
 | `heater_efficiency_nm_per_mw`, `z_heater_ring_k_per_mw`, `fsr_thz`, `fsr_nm`, `radius_um`, `rom_dc_scale` | anchors in display units |
 
@@ -711,12 +739,14 @@ while they do not exist).
 
 ## 13. Deviations from 07 and doubts
 
-1. **R2 form.** 07 writes Z_heater->ring(0) = efficiency/dlambda/dT(T_lock). With beta = 1.4e-3 /K and the 7.6 nm
-   offset, T_lock ~ 130 degC, so this Z is 5 to 15 % lower than the Z that makes the integral of s(T) over the
-   P_FSR measurement equal one FSR; with per-ring offset variation it also makes a thermal resistance depend on the
-   ring's offset. The integrator made `fidelity.heater_anchor: fsr_integral` the default (schema and g26): Z depends
-   only on FSR, P_FSR and s(T), the exact inversion of the anchor measurement (07 D16). `lock_slope` (07 as written)
-   stays selectable. The two agree when beta = 0 (docs/handoff/integrator.md).
+1. **R2 form.** 07 writes Z_heater->ring(0) = efficiency/dlambda/dT(T_lock). With the g26 beta (1.24e-3 /K, the
+   secant of the solver curve) and the 7.6 nm offset, T_lock ~ 134 degC, so this Z is 4.0 % lower (5.475 against
+   5.704 K/mW) than the Z that makes the integral of s(T) over the P_FSR measurement equal one FSR; with per-ring
+   offset variation it also makes a thermal resistance depend on the ring's offset. The integrator made
+   `fidelity.heater_anchor: fsr_integral` the default (schema and g26): Z depends only on FSR, P_FSR and s(T), the
+   exact inversion of the anchor measurement (07 D16), taken at the P_FSR measurement line
+   (`ring.heater.p_fsr_ref_wavelength_nm`), so Z is the same on every line. `lock_slope` (07 as written) stays
+   selectable. The two agree when beta = 0 (docs/handoff/integrator.md).
 2. `ring.optics.fsr_thz` was added next to 07's `fsr_nm`, because the 07 P1-6 FSR windows are stated in THz.
 3. Geometry sigmas are `die_sigma_nm` / `ring_sigma_nm` per dimension (07's `width_nm_sigma` breaks the grammar).
 4. Provenance ranks of `private` and `override` are not in 07; see section 2.
@@ -729,7 +759,12 @@ while they do not exist).
    offset (about 11 % of rings for a 7.6 nm mean with the Berkeley 6 nm/2 nm spreads) from getting a lock
    temperature below ambient (and, under lock_slope, a Z from it).
 9. An FSR given by a hypothesis is the FSR: `derived.optics.fsr_hz`, `fsr_m`, the round-trip time and the heater
-   efficiency inherit the FSR leaf's provenance (07 D16), not that of n_g, which R3 solved the radius from.
+   efficiency inherit the FSR leaf's provenance (07 D16), not that of n_g, which R3 solved the radius from (with a
+   sampled geometry a device's FSR also inherits its n_g's). A quantity taken at a ring's line (`fsr_m`, Q_i,
+   K^2, dn_eff/dT) also inherits the channel plan's provenance (center, spacing, line count or the lines table,
+   recorded as the derivation of `derived.optics.lambda_line_m`; 07 P1-14). `channel_plan.ring_to_line` is not an
+   input: it is the design convention per-ring values are stated against (each ring is designed relative to its
+   own line) and only permutes the plan's wavelengths.
 
 ---
 
@@ -757,7 +792,7 @@ is current.
 | `fidelity.pattern_noise` | enum |  |  | setting; enum: off, binomial, prbs7, prbs9, prbs15, prbs23, prbs31; default off | ones-density noise (07 P0-11) |
 | `fidelity.data_modulation` | enum |  |  | setting; enum: mean, lut; default mean | mark-density mean or LUT correction (07 P2-6) |
 | `fidelity.nonlinear_optics` | enum |  |  | setting; enum: off; default off | TPA/FCA/Kerr excluded with a bound (07 P2-1) |
-| `fidelity.heater_anchor` | enum |  |  | setting; enum: lock_slope, fsr_integral; default fsr_integral | R2 form: fsr_integral (default, integrator decision: Z = dT_FSR/P_FSR with the integral of s(T) over the P_FSR sweep equal to one FSR, the exact inversion of the anchor measurement, 07 D16) or lock_slope (07 P0-3 as written: Z = efficiency/s(T_lock); 4-5 % low with beta = 1.4e-3 /K and it makes Z depend on each ring's sampled offset; docs/handoff/integrator.md) |
+| `fidelity.heater_anchor` | enum |  |  | setting; enum: lock_slope, fsr_integral; default fsr_integral | R2 form: fsr_integral (default, integrator decision: Z = dT_FSR/P_FSR with the integral of s(T) over the P_FSR sweep equal to one FSR, the exact inversion of the anchor measurement, 07 D16) or lock_slope (07 P0-3 as written: Z = efficiency/s(T_lock); 4 % low at the g26 nominal, and it makes Z depend on each ring's sampled offset; docs/handoff/integrator.md) |
 | `fidelity.heater_pwm_ripple` | enum |  |  | setting; enum: off, on; default off | dac_pwm ripple term (07 P1-11) |
 | `fidelity.plasma_dispersion` | enum |  |  | setting; enum: nedeljkovic2011, soref_bennett1987; default nedeljkovic2011 | free-carrier model (07 P1-7) |
 | `sim.dt_plant_s` | float |  | s | setting; required | plant tick (07 P0-6) |
@@ -840,6 +875,7 @@ is current.
 | `ring.thermal.xt_next_frac` | float | die | frac | forbidden if fidelity.thermal_model=rom | interim crosstalk to the second rank of neighbours |
 | `ring.thermal.site_ref_um` | float | die | um | forbidden if fidelity.thermal_model=rom | interim site coupling: equals xt_nearest_frac at this distance |
 | `ring.thermal.site_max_frac` | float | die | frac | forbidden if fidelity.thermal_model=rom | interim site coupling cap |
+| `ring.thermal.site_floor_frac` | float | die | frac | forbidden if fidelity.thermal_model=rom | interim site coupling floor at long range (die sensors, far sites), fraction of the self DC: the package term; absent: xt_floor_frac |
 | `ring.thermal.pd_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | monitor PD offset from the ring centre (x, y) |
 | `ring.thermal.temp_sensor_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | ring-attached sensor offset (x, y) |
 | `ring.thermal.driver_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | driver offset from the ring centre (x, y) |
@@ -848,14 +884,15 @@ is current.
 | `ring.thermal.scaling_hypothesis` | enum |  |  | setting; per-world switch; enum: resistance, capacitance, independent; default resistance | how tau scales with the residue (07 P1-2) |
 | `ring.thermal.xt_nearest_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim crosstalk to the nearest neighbour, fraction of the self DC |
 | `ring.thermal.xt_floor_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim crosstalk floor to every other ring |
-| `ring.thermal.xt_tau_ref_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2) (07 P1-2) |
-| `ring.thermal.xt_dist_ref_um` | float | die | um | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | reference distance of xt_tau_ref_s |
+| `ring.thermal.xt_tau_ref_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2) (07 P1-2), d the heat-source-to-victim distance (centre distance less the ring radii) |
+| `ring.thermal.xt_dist_ref_um` | float | die | um | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | reference heat-source-to-victim distance of xt_tau_ref_s (imec: 60 um at a 100 um pitch) |
 | `ring.thermal.xt_tau_min_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | floor of the crosstalk time constant |
 | `ring.thermal.xt_tau_far_s` | float | die | s | forbidden if fidelity.thermal_model=rom | crosstalk time constant beyond xt_far_um (absent: the printed X2 table of 04 section 2.4) |
 | `ring.thermal.xt_far_um` | float | die | um | forbidden if fidelity.thermal_model=rom | distance beyond which xt_tau_far_s applies |
 | `ring.thermal.transport_delay_s` | float | die | s |  | optional per-pair transport delay |
 | `ring.heater.p_fsr_mw` | float | ring | mw | required | heater power per FSR (the heater anchor, 07 D16, R2) |
 | `ring.heater.p_fsr_ref_temp_c` | float | die | c | required if fidelity.heater_anchor=fsr_integral | stage temperature of the P_FSR measurement (fsr_integral form) |
+| `ring.heater.p_fsr_ref_wavelength_nm` | float | die | nm |  | wavelength of the line the P_FSR measurement was made on: R2 takes FSR_lambda there, so the efficiency and Z_heater->ring are the same on every line (absent: each ring's line) |
 | `ring.heater.efficiency_nm_per_mw` | float | ring | nm_per_mw | derived only | FSR/P_FSR (R2; derived) |
 | `ring.heater.r_cold_ohm` | float | ring | ohm | required | heater resistance at r_ref_temp_c |
 | `ring.heater.r_ref_temp_c` | float | die | c | required | temperature of r_cold_ohm |
@@ -888,7 +925,7 @@ is current.
 | `ring.junction.lut_file` | str |  |  | setting; required if fidelity.junction_model=lut; forbidden if fidelity.junction_model=analytic | extracted/junction_<xsec>.json |
 | `ring.junction.eff_at_0v_pm_per_v` | float | ring | pm_per_v | required if fidelity.junction_model=analytic; forbidden if fidelity.junction_model=lut | dlambda/dV at 0 V for the analytic law (derived in LUT mode) |
 | `ring.junction.v_bi_v` | float | die | v | required if fidelity.junction_model=analytic | built-in voltage |
-| `ring.junction.depletion_exponent` | float | die |  | required if fidelity.junction_model=analytic | m of dlambda = A*((V+Vbi)^m - Vbi^m): 1/2 (abrupt) to 2/3 (linearly graded) by charge control, dlambda ~ removed charge (03 section 5.3, plant_electrical note 1); 07 P1-7 wrote 1/3..1/2 (the depletion-width exponents) |
+| `ring.junction.depletion_exponent` | float | die |  | required if fidelity.junction_model=analytic | m of dlambda = A*((V+Vbi)^m - Vbi^m): 1/2 (abrupt) to 2/3 (linearly graded) by charge control, dlambda ~ removed charge (03 section 5.3, plant_electrical note 1); 07 P1-7 wrote 1/3..1/2 (the depletion-width exponents); bounds [1/3, 2/3], the span mrm.plant.electrical.analytic_junction_table accepts |
 | `ring.junction.dqi_dv_frac_per_v` | float | ring | frac_per_v | forbidden if fidelity.junction_model=lut | relative Q_i change per volt (derived in LUT mode) |
 | `ring.junction.loss_ratio_q` | float | die |  |  | q = lambda*d_alpha/(4 pi d_n) of the plasma effect (03 section 5.4) |
 | `ring.junction.capacitance_at_0v_ff` | float | ring | ff |  | junction capacitance |
@@ -898,7 +935,7 @@ is current.
 | `ring.monitor.dark_i0_na` | float | die | na |  | dark current at dark_t0_c (07 D20) |
 | `ring.monitor.dark_t0_c` | float | die | c |  | reference temperature of dark_i0_na |
 | `ring.monitor.dark_activation_ev` | float | die | ev |  | Arrhenius activation energy (07 P1-9) |
-| `ring.monitor.background_fraction` | float | ring |  |  | stray light at the PD, fraction of the line power |
+| `ring.monitor.background_fraction` | float | ring |  |  | stray light at the PD, as a fraction of the total bus power at the ring (all lines, not one line; i += gain_scale R f P_bus, 07 P1-9) |
 | `ring.monitor.afe_type` | enum |  |  | setting; enum: rc, integrate_dump; default integrate_dump | 07 P0-7 |
 | `ring.monitor.integration_window_s` | float | die | s | required if ring.monitor.afe_type=integrate_dump; whole ticks (period) | integrate-and-dump boxcar (07 P0-7) |
 | `ring.monitor.afe_tau_s` | float | die | s | required if ring.monitor.afe_type=rc | RC front-end time constant |
@@ -912,14 +949,15 @@ is current.
 | `ring.monitor.adc_dnl_lsb` | float | die | lsb |  | ADC DNL |
 | `ring.monitor.input_noise_pa_per_rt_hz` | float | die | pa_per_rt_hz |  | input-referred current noise density |
 | `ring.monitor.flicker_corner_hz` | float | die | hz |  | 1/f corner |
-| `ring.monitor.adc_ref_tempco_ppm_per_k` | float | die | ppm_per_k |  | reference tempco |
+| `ring.monitor.adc_ref_tempco_ppm_per_k` | float | die | ppm_per_k |  | tempco of the ADC reference about 25 degC, at the temperature of ring.monitor.adc_ref_site |
+| `ring.monitor.adc_ref_site` | enum |  |  | setting; enum: package_base, monitor_pd; default package_base | where the monitor ADC reference sits, i.e. the temperature its tempco sees: package_base = thermal.t_base_k + thermal.xpu_rise_k (a converter on its own die beside the PIC, 07 P1-3; its own dissipation not modelled); monitor_pd = each ring's PD observer (one converter per ring, next to its PD) |
 | `ring.monitor.pga_gains` | list_float | global |  |  | PGA gain steps (07 P1-10) |
-| `ring.monitor.adc_mux.channels_per_adc` | int | die |  |  | rings per converter (07 P0-7) |
+| `ring.monitor.adc_mux.channels_per_adc` | int | die |  |  | rings per converter (07 P0-7): ring n on converter n // C; they share its DNL and INL; round_robin needs C x integration window <= the ADC period |
 | `ring.monitor.adc_mux.order` | enum |  |  | setting; enum: round_robin, bank; default round_robin | mux order |
 | `ring.monitor.baseline_ua` | float | die | ua |  | analog baseline current subtracted before the PGA and ADC (PAT-2 i_os,det, 07 P1-9); absent -> 0 |
 | `ring.monitor.stuck_flagged` | bool |  |  | setting; default True | a stuck converter clears monitor_valid (07 P1-10); false = silent |
 | `ring.monitor.flicker_band_min_hz` | float |  | hz | setting; default 0.001 | lowest pole of the 1/f noise synthesis (mrm.plant.sensing) |
-| `ring.monitor.reference_tap.present` | bool |  |  | setting; default False | reference-tap PD on the bus before the bank (07 P1-9, 06 S8) |
+| `ring.monitor.reference_tap.present` | bool |  |  | setting; default False | reference-tap PD on the bus before the bank (07 P1-9, 06 S8); not built in the engine yet: true is refused when the plant is built (docs/ENGINE.md section 10) |
 | `ring.monitor.reference_tap.coupling_frac` | float | die | frac | required if ring.monitor.reference_tap.present=True | bus power fraction tapped to the reference PD |
 | `ring.monitor.reference_tap.responsivity_a_per_w` | float | die | a_per_w |  | reference PD responsivity (absent: the drop PD's) |
 | `ring.monitor.reference_tap.dark_i0_na` | float | die | na |  | reference PD dark current (absent: the drop PD's) |

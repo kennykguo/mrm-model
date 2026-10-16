@@ -21,8 +21,11 @@ Conditions (the same for every controller; they are written into the scorecard):
   Each controller runs its own start-up from there (map, capture, ramp, probe, or lock at once).
 - Lock error e = d - d_ref, with d the engine Truth detuning of the ring's resonance (order nearest its DECLARED
   line) from the 10-tick mean / min / max records. Steady: d_ref = the ring's own final lock point (median of the
-  last 5 ms); a ring counts as locked when |e| <= 5 pm from some time on (time to lock = that time); jitter rms and
-  max |e| over the last 10 ms. A1: d_ref = the same ring's steady lock point; scored from the bank's steady time to
+  last 5 ms); a ring counts as locked when |e| <= 5 pm from some time on (time to lock = that time) AND its
+  operating point is stationary: the drift (median d of the last 10 ms minus that of the 10 ms before, per ms) is
+  at most DRIFT_PM_PER_MS = 0.1 pm/ms, i.e. the point moves by less than the 1 pm hysteresis over the 10 ms
+  scoring window (controllers review 2026-10-16: es_sine drifted at ~0.8 pm/ms toward the drop peak and passed as a
+  lock within 40 ms); jitter rms and max |e| over the last 10 ms. A1: d_ref = the same ring's steady lock point; scored from the bank's steady time to
   lock + 1 ms (10 ms when the steady run never locked) to the end; excursions = exits beyond 5 pm with 1 pm
   hysteresis (min/max envelope, so a 1-tick spike counts). OMA penalty = 10 log10(mean oracle relOMA / mean relOMA)
   over the scored window (engine oracle: best stable relOMA point, refreshed every 1 ms; 07 P1-1). Lines: the line
@@ -75,6 +78,7 @@ DEC = 10                                     # record decimation, ticks (= the g
 STEADY_S = float(os.environ.get("MRM_SCORECARD_STEADY_S", 40e-3))
 A1_S = float(os.environ.get("MRM_SCORECARD_A1_S", lib.A1_PERIOD_S))
 SCORE_LAST_S = 10e-3
+DRIFT_PM_PER_MS = 0.1                        # stationary operating point: < the 1 pm hysteresis per 10 ms window
 
 # name -> (controller params, start, extra overrides, note)
 CASES: dict[str, tuple[dict, str, tuple, str]] = {
@@ -183,7 +187,16 @@ def _score_steady(res) -> dict:
     t_lock = np.where(i0 >= 0, t[np.maximum(i0, 0)], np.nan)
     line = _tr(res, f"line_on@{DEC}:last")[-1].astype(int)
     decl = _tr(res, f"declared_line@{DEC}:last")[-1].astype(int)
-    return {"ref_pm": ref, "locked": i0 >= 0, "t_lock_s": t_lock, "rms_pm": np.sqrt((e ** 2).mean(axis=0)),
+    # drift of the operating point: median of the last SCORE_LAST_S against the window before it (shorter windows
+    # for a run shorter than two of them), pm per ms
+    w = min(SCORE_LAST_S, 0.5 * float(t[-1] - t[0]))
+    a_win = t >= t[-1] - w
+    b_win = (t >= t[-1] - 2.0 * w) & ~a_win
+    drift = (np.median(d[a_win], axis=0) - np.median(d[b_win], axis=0)) / (w * 1e3)
+    within = i0 >= 0
+    stationary = np.abs(drift) <= DRIFT_PM_PER_MS
+    return {"ref_pm": ref, "locked": within & stationary, "within_5pm": within, "stationary": stationary,
+            "drift_pm_per_ms": drift, "t_lock_s": t_lock, "rms_pm": np.sqrt((e ** 2).mean(axis=0)),
             "max_pm": e_abs[win].max(axis=0), "exc": _excursions(e_abs[win]), "penalty_db": _penalty_db(res, win),
             "line": line, "declared": decl, "t_pd_max_c": _tr(res, f"t_pd_k@{100 * DEC}:max").max(axis=0) - 273.15}
 
@@ -242,8 +255,9 @@ def test_controller_runs_closed_loop_on_the_engine(name):
         out["path"] = res.manifest_inputs["controller_path"]
         out["engine_oma_penalty_db_run"] = np.asarray(res.metrics["oma_penalty_db"])[0]
         out["settle"] = res.manifest_inputs["warm_start"]["settle"]
-        lk = st["t_lock_s"][st["locked"]]
-        t0 = (float(np.max(lk)) + 1e-3) if st["locked"].any() else 10e-3
+        # the A1 scoring start: the steady time to lock (|e| <= 5 pm from then on), stationary or not
+        lk = st["t_lock_s"][st["within_5pm"]]
+        t0 = (float(np.max(lk)) + 1e-3) if st["within_5pm"].any() else 10e-3
         out["a1_t0_s"] = t0
         for key, a1 in (("a1", lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2)),
                         ("a1_pd_adjacent", lib.a1_slide10_aggressor_pd_adjacent(phase_s=lib.A1_PERIOD_S / 2))):
@@ -285,8 +299,13 @@ def _write_scorecard(results: dict) -> str:
              "state settled (Plant.settle, branch_high). Start `cold`: heaters at code 0, lasers on at t = 0, "
              "thermal state settled at code 0 (branch_low). Each controller then runs its own start-up.",
              f"- Steady: static scenario, 25 degC, {STEADY_S * 1e3:.0f} ms. Lock point d_ref = median detuning of "
-             "the last 5 ms (to the order nearest the declared line); locked = |e| <= 5 pm from some time on; jitter "
-             "rms / max |e| / excursions over the last 10 ms; time to lock from t = 0 (includes the start-up).",
+             "the last 5 ms (to the order nearest the declared line); locked = |e| <= 5 pm from some time on AND a "
+             f"stationary operating point (drift = median d of the last 10 ms minus that of the 10 ms before, per ms, "
+             f"at most {DRIFT_PM_PER_MS} pm/ms: less than the 1 pm hysteresis over the scoring window); a ring "
+             "within 5 pm whose point still drifts is counted under 'drifting' and not as locked (its d_ref is a "
+             "snapshot of a transient); jitter rms / max |e| / excursions over the last 10 ms; time to lock from "
+             "t = 0 (includes the start-up; the A1 runs are scored from the latest time to lock + 1 ms, drifting "
+             "rings included).",
              f"- A1: slide-10 aggressor (rectified sine, 113.6 - 88.5 |sin| degC at ring 0, resonance referencing), "
              f"phase P/2 (t = 0 at the minimum, hot cusp at 65.35 ms), {A1_S * 1e3:.1f} ms. Lock error about the "
              "steady d_ref, scored from the steady time to lock + 1 ms. `a1` = the g26 default site `aggressor` "
@@ -299,20 +318,23 @@ def _write_scorecard(results: dict) -> str:
              "10 log10(mean oracle relOMA / mean relOMA) over the scored window (positive = OMA lost against the "
              "engine's oracle). Lines: rings whose final line (engine line_on) is not the declared line.",
              "", "## Steady lock", "",
-             "| controller | path | start | locked rings | time to lock, max (ms) | jitter rms, median / max (pm) | "
-             "max abs e (pm) | excursions | OMA penalty, mean (dB) | d_ref range (pm) | off declared line |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| controller | path | start | locked rings | drifting rings | drift, max abs (pm/ms) | time to lock, max "
+             "(ms) | jitter rms, median / max (pm) | max abs e (pm) | excursions | OMA penalty, mean (dB) | d_ref "
+             "range (pm) | off declared line |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for name, r in results.items():
         if "steady" not in r:
             lines.append(f"| {name} | - | {r.get('start')} | ERROR: {r['errors'][0][:120] if r['errors'] else ''} "
-                         "| | | | | | | |")
+                         "| | | | | | | | | |")
             continue
         s = r["steady"]
         lk = np.asarray(s["locked"], bool)
+        drifting = np.asarray(s["within_5pm"], bool) & ~np.asarray(s["stationary"], bool)
         tl = np.asarray(s["t_lock_s"], float)
         off = int(np.sum(np.asarray(s["line"]) != np.asarray(s["declared"])))
         lines.append(
-            f"| {name} | {r.get('path')} | {r['start']} | {int(lk.sum())}/8 | "
+            f"| {name} | {r.get('path')} | {r['start']} | {int(lk.sum())}/8 | {int(drifting.sum())} | "
+            f"{_fmt(np.max(np.abs(s['drift_pm_per_ms'])), '{:.3f}')} | "
             f"{_fmt(np.nanmax(tl[lk]) * 1e3 if lk.any() else None, '{:.2f}')} | "
             f"{_fmt(np.median(s['rms_pm']), '{:.2f}')} / {_fmt(np.max(s['rms_pm']), '{:.2f}')} | "
             f"{_fmt(np.max(s['max_pm']), '{:.1f}')} | {int(np.sum(s['exc']))} | "
@@ -341,6 +363,17 @@ def _write_scorecard(results: dict) -> str:
                          f"{_fmt(a['t_pd_max_c'][0], '{:.0f}')} | {_fmt(a['low_rail_ms'][0])} / "
                          f"{_fmt(a['full_scale_ms'][0])} |")
     lines += ["", "## Reading notes (true for every run above)", "",
+              f"- A steady run of {STEADY_S * 1e3:.0f} ms shows a controller's operating point, not where it ends: a "
+              "ring whose point still drifts (column 'drifting') is not counted as locked, and its d_ref, jitter and "
+              "OMA penalty describe a transient. es_sine (default parameters) is the case: it drifts toward the drop "
+              "peak at 0.77-0.95 pm/ms, without a single fall off the fold, and parks at the peak (-0.6 to -1.1 pm) "
+              "after 100-160 ms, where its OMA penalty is 12.9-13.0 dB on every ring (0.4 s run, "
+              "runs/controllers_fix/es_long.log); es_po falls off the fold 2-4 times per ring in its first ~60 ms and "
+              "then parks at the drop peak (rings 0-3 and 7, ~13.1 dB) or on the cold branch ~1 nm blue of the line "
+              "(rings 4-6, ~20 dB). The drop peak is the wrong point for a modulator (04 C5). A ring that locks "
+              "late is also counted as drifting while its point still settles (wdm_supervisor ring 2, locked at "
+              "26.7 ms: -0.24 pm/ms by a least-squares fit over the last 10 ms; bitstat_lock ring 5, locked at "
+              "23.1 ms; runs/controllers_fix/drift_defs.log).",
               "- The detuning envelope includes any deliberate modulation: heater or bias dithers (dither_lockin, "
               "bias_dither, midranging, es_sine, es_po probes) show as jitter and as 5 pm excursions when their "
               "resonance swing is that large.",

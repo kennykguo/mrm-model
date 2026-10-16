@@ -17,7 +17,7 @@ sections of 07 4.9:
 The frozen-targets block at the top of the existing ``docs/VALIDATION.md`` (owned by the target split) is copied
 byte for byte; the report never writes it.
 
-Data flow. The expensive parts (replica predictions over the nominal world and the 12 named corners, the
+Data flow. The expensive parts (replica predictions over the nominal world and the named corners, the
 calibration Jacobian, the tornado / Sobol worlds and the controller compare) are computed into
 ``docs/validation/<preset>/report_data.json``; the Markdown and the charts (``docs/validation/<preset>/*.svg``) are
 rendered from that file plus the cheap live parts (target files, frozen header, preset leaves, derive()). ``--fast``
@@ -146,6 +146,11 @@ CLOSURE_ROWS: tuple[tuple[str, str, str], ...] = (
     ("eo-bandwidth", "EO bandwidth", "35.4 against 34.1 GHz at -2 V . 66.8 GHz (peaked, single device, generation "
      "unclear)"),
     ("rom-dc-scale", "rom_dc_scale", "reported per dlambda/dT hypothesis (07 P1-2)"),
+    ("crosstalk-dynamics", "Ring-to-ring crosstalk and far floor",
+     "imec, natural convection and an EIC on top (04 X1, X2): 3 % nearest, 1.3-2.6 % floor, first-order 4.1-9.0 ms "
+     "poles at a 100 um pitch . in-ring FEM ROM, TEC-held package (R_pkg 2 K/W): 1.0 % at 50 um with t63 0.12 ms "
+     "(0.36 ms at 100 um; not first order, 90 % at 2.7 ms), 0.17-0.34 % at 150-350 um, 0.09 % at 1 mm . the G26 "
+     "package is unpublished (physics_thermal review 2026-10-16)"),
 )
 
 
@@ -1172,6 +1177,28 @@ def _closure_tests() -> dict[str, list[str]]:
     return found
 
 
+def _crosstalk_model(cfg, d, package) -> str:
+    """The closure-crosstalk-dynamics model column: the nominal world's nearest-neighbour crosstalk (DC share of
+    Z_heater->ring and its pole) and the far-site floor, from the assembled thermal system."""
+    sy = getattr(getattr(d.params, "thermal", None), "system", None)
+    if sy is None or sy.n_rings < 2:
+        return "no ring-to-ring path in this preset"
+    if sy.meta.get("model") != "interim":
+        return "the FEM ROM's own cross residues (fidelity.thermal_model rom)"
+    o, s0, s1 = sy.ring_obs[0], sy.heater_src[0], sy.heater_src[1]
+    m0 = np.flatnonzero((sy.lag_obs == o) & (sy.lag_src == s0))
+    m1 = np.flatnonzero((sy.lag_obs == o) & (sy.lag_src == s1))
+    z0 = float(sy.res_k_per_w[0, m0].sum())
+    frac = float(sy.res_k_per_w[0, m1].sum()) / z0
+    tau = float(sy.res_k_per_w[0, m1] @ sy.taus_s[0, m1]) / float(sy.res_k_per_w[0, m1].sum())
+    pitch = float(d.params.layout.ring_distance_m[0, 1]) * 1e6
+    floor = cfg.leaves.get("ring.thermal.site_floor_frac")
+    fl = f"; far-site floor {_num(100 * floor.value)} % of Z_heater->ring" if floor is not None else ""
+    return (f"interim, stack hypothesis {package}: ring 1 -> ring 0 at {_num(pitch)} um: {_num(100 * frac)} % with "
+            f"a {_num(tau * 1e3)} ms pole (heat-source-to-victim distance law){fl}; corner g26_tec_package: the "
+            f"FEM-like numbers")
+
+
 def _closure_model(cfg, d, preds: Mapping[str, Any]) -> dict[str, str]:
     diag = d.diagnostics
     lv = cfg.leaves
@@ -1212,6 +1239,7 @@ def _closure_model(cfg, d, preds: Mapping[str, Any]) -> dict[str, str]:
         "eo-bandwidth": f"CAL-10 replica {pr('CAL-10')} GHz at 1 V, VAL-3a {pr('VAL-3a')} GHz at 2 V",
         "rom-dc-scale": (f"{_fmt(diag['rom_dc_scale'])}" if "rom_dc_scale" in diag else
                          "not computed: the preset uses the interim thermal model (no FEM ROM)"),
+        "crosstalk-dynamics": _crosstalk_model(cfg, d, unom("thermal.stack")),
     }
 
 

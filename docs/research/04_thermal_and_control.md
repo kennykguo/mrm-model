@@ -205,7 +205,7 @@ tau ~5.3 us) scaled to 15 um gives 0.30 ms, at the top of the 0.1 to 0.3 ms band
 | Die / package tail on the self path | one pole 1 to 10 ms carrying 2 to 10 % of DC gain | 0 to 20 % | assumed; motivated by [CO22-TCPMT] circuit-level 4 ms and by EIC heat spreading [CO24-JOM] |
 | Crosstalk static, neighbour at ~pitch | 3 % | 1 to 10 % | X1 to X5 (few % at 10 to 100 um); 10 % kept as pessimistic corner (textbook) |
 | Crosstalk static, all other rings (floor) | 1.5 % each | 0.5 to 2.6 % | X1 (1.3 to 2.6 % out to 300 um, with EIC) |
-| Crosstalk dynamics | first order per pair. Pitch ~100 um: 4.1 ms (1st neighbour) rising to 9.0 ms (7th). Shorter pitch: tau_xt ~ 4.1 ms x (d / 60 um)^2, floor 0.1 ms, where d is the heat-source-to-victim distance as defined in [CO22-TCPMT] (60 um for their 100 um pitch) | x0.3 to x3 | X2 (simulated, printed) plus the derived near-field d^2 law |
+| Crosstalk dynamics | first order per pair. Pitch ~100 um: 4.1 ms (1st neighbour) rising to 9.0 ms (7th). Shorter pitch: tau_xt ~ 4.1 ms x (d / 60 um)^2, floor 0.1 ms, where d is the heat-source-to-victim distance as defined in [CO22-TCPMT] (60 um for their 100 um pitch) [2026-10-16: mrm.plant.thermal takes d as the centre distance less both ring radii (imec R ~ 20 um, inferred), so the g26 50 um pitch with r_ref 6.7 um gives d = 36.5 um and 1.52 ms] | x0.3 to x3 | X2 (simulated, printed) plus the derived near-field d^2 law |
 | Absorbed-light heating | injected at the waveguide node (no heater-node lag) | - | physics; [ARB12], [DEC19] |
 | External aggressors (on-die heater, ASIC, TEC) | separate inputs with their own transfer functions h_agg(t) | - | G26 uses three different aggressor methods (textbook correction 3) |
 

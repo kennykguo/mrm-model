@@ -26,6 +26,20 @@ cold resonance of order m sits at ``lambda_res = optics.lambda_res_cold_m`` with
    "n_eff(lambda) to second order"). phi = 2 pi m exactly when the shifted resonance reaches the line, for any shift,
    and d phi/d delta = 2 pi n_g(x) L / x^2 (the optics' dphi_dlambda_res). The coupler phase is part of the measured
    cold resonance, so ``psi`` = 0 (passing a nonzero psi would count it twice).
+   Accuracy of the rigid translation (a documented deviation from 07 P1-6's phi = 2 pi n_eff(lambda, T, V) L(T) /
+   lambda; physics_optics review, 2026-10-16). Every order moves by the same delta, so the heated ring keeps its cold
+   FSR in wavelength. The bent mode's n_eff(lambda, T) table of the modes artefact (with L(T)) moves order m + k,
+   cold at x_k, by delta (1 + kappa (x_k - lambda_res)) instead, kappa = 4.1-4.5e-4 per nm for rib160 (the
+   thermo-optic dispersion; mrm.params has no key for it, docs/handoff/extract_modes.md: "s(T) at 1310 nm for every
+   line"). Error of the model: kappa delta |x_k - lambda_res|, i.e. 0.43 % of the shift per FSR: +-33 pm (0.10
+   FWHM, ~5.7 GHz) at the adjacent orders and +-66 pm at the second orders for the 7.6 nm g26 lock, linear in the
+   heater shift (~57 pm at the adjacent orders for a 13 nm shift at a cold ambient); the locked order is exact
+   for any shift (tests/verification/test_phase.py::test_rigid_comb_against_the_solver_table). It reaches only the
+   other lines' terms: foreign-line absorption and monitor background (the review measured -0.15 % to +0.14 % of
+   P_abs in g26 and up to ~1 % in the FSR stress corners) and the BND-1 distances in each order's FWHM (model
+   against the solver comb: g26 2.79 / ~2.88, window A 1.68 / ~1.82, fsr_edge 1.33 / ~1.26; same classes). A 07 P1-6
+   phase law needs a key for kappa and changes every consumer of this curve (kernel Truth and oracle,
+   quasi_static, the replicas, the calibration inputs): not done yet (docs/CHANGELOG.md, 2026-10-16).
 3. Group delay t_rt = n_g(x) L / c with n_g(x) = n_g + (dn_g/dlambda) Delta (FSR = 1/t_rt).
 4. Couplings at the LINE (07 P1-5; never at the resonance and never per heater code):
        K^2_j(lambda_l) = K^2_j,0 exp(dln_kappa2_j_dlambda (lambda_l - lambda_res))  (K^2_j,0 = optics.kappa2_*).
@@ -36,6 +50,13 @@ cold resonance of order m sits at ``lambda_res = optics.lambda_res_cold_m`` with
    c_ring, c_heater = optics.dln_alpha_dt_ring_per_k / dln_alpha_dt_heater_per_k (d ln alpha/dT, 07 P1-5), T_H the
    ROM heater-resistor temperature. Integrator choice (documented in docs/handoff/ENGINE_BRIEF.md): the factor
    multiplies the whole alpha_i (the key is d ln alpha/dT) and the added loss is absorptive, so it heats.
+6. Bus segments (:func:`bus_t2_from_plant_params`, the ``bus_t2`` argument of the optics bus walk): the power
+   transmission of the bus waveguide just before ring k is 1 for the first ring in ``layout.bus_order`` (the chip
+   input loss, ``laser.input_transmission``, covers the path from the laser to that ring) and
+       t2 = exp(-laser.bus_loss_per_m * layout.ring_spacing_on_bus_m)
+   for every later ring (optical_path.bus_loss_db_per_mm and ring_spacing_on_bus_um; t2 = 1 when either is absent).
+   The segment after the last ring (``bus_t2_out``) is not modelled (1). This is the law of mrm.params.derive
+   (``p_in_ring_dbm``) and of the replicas' bus walk (mrm.validation.replicas._bus_segment_t2).
 
 Self-heating adapter (mrm.plant.optics.pack_selfheat_args): pass phi_ref = phi at the start-of-substep ring
 temperature T_prev, t_ref_k = T_prev and the local law s(T_prev) = s0 (1 + beta (T_prev - T0)),
@@ -59,7 +80,7 @@ __all__ = ["RP_LAM_RES", "RP_N_EFF", "RP_N_G", "RP_DNG", "RP_LEN", "RP_T_REF", "
            "RP_K2T", "RP_K2D", "RP_DLNK2T", "RP_DLNK2D", "RP_ALPHA_I", "RP_ALPHA_NONHEAT", "RP_CT_RING",
            "RP_CT_HEATER", "RP_FILL", "RP_V_REF", "RP_FDN_REF", "RP_FAL_REF", "N_RP", "PhaseParams",
            "ring_optics_row", "ring_optics_levels_row", "coupling_row", "resonance_shift_row", "local_thermo_optic",
-           "thermal_shift_m"]
+           "thermal_shift_m", "bus_t2_from_plant_params"]
 
 # column indices of PhaseParams.ring (B, N, N_RP); all SI
 RP_LAM_RES = 0       # cold resonance lambda_res (m)
@@ -158,6 +179,25 @@ class PhaseParams:
                    alpha_fca=np.ascontiguousarray(tab.alpha_fca_per_m),
                    capacitance=np.ascontiguousarray(tab.capacitance_f_per_m),
                    r_series=np.ascontiguousarray(tab.r_series_ohm_m))
+
+
+def bus_t2_from_plant_params(pp) -> np.ndarray:
+    """(B, N) power transmission of the bus segment just before each ring (equation 6 of the module docstring): the
+    ``bus_t2`` argument of mrm.plant.optics.pack_selfheat_args / bus_propagate, indexed by ring (not by bus
+    position). 1 for the first ring in ``pp.layout.bus_order``; exp(-bus_loss_per_m * ring_spacing_on_bus_m) of
+    world b for every later ring."""
+    B, N = int(pp.batch), int(pp.n_rings)
+    order = np.asarray(pp.layout.bus_order, dtype=np.int64).reshape(-1)
+    spacing = float(getattr(pp.layout, "ring_spacing_on_bus_m", 0.0) or 0.0)
+    loss = np.broadcast_to(np.asarray(pp.laser.bus_loss_per_m, dtype=float).reshape(-1), (B,))
+    t2 = np.ones((B, N))
+    if N > 1 and spacing > 0.0:
+        seg = np.exp(-loss * spacing)
+        if not np.all(np.isfinite(seg)) or np.any(seg > 1.0):
+            raise ValueError(f"bus segment transmission must lie in [0, 1]: {seg} (bus_loss_per_m {loss}, spacing "
+                             f"{spacing} m)")
+        t2[:, order[1:]] = seg[:, None]
+    return t2
 
 
 @njit(cache=True, _nrt=False)

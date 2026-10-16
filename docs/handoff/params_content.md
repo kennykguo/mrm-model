@@ -182,6 +182,19 @@ PARAMETERS.md after applying it):
   K/mW (lock_slope), so rom_dc_scale = 1.88, just inside the [0.5, 2] warning band. Its heater-resistor ratio is 2.65
   where the G25 droop (y = TCR x R_th,H = 0.00904 /mW) with a doped-Si TCR of 1.4e-3 /K implies 1.21. Both say the
   assumed in-ring geometry is less efficient than the G25 heater; worth a look before the ROM becomes the default.
+- **2026-10-16 (physics_thermal review), g26 changes for the content owner:** (a) a third choice of
+  `uncertainty.thermal.stack`, `side_by_side_tec_held` (weight 0, appended last so no sampled or LHS draw changes: the
+  in-ring FEM ROM's side-by-side stack in its TEC-held package; it selects the `tec_held` alternatives of xt_nearest /
+  xt_next / xt_floor / xt_tau_ref / xt_tau_min and of the new key `ring.thermal.site_floor_frac`; the default and
+  stacked_eic keep imec's natural-convection numbers), and the corner `g26_tec_package` (in NAMED_CORNERS).
+  Weighting side_by_side_tec_held in the sampled set is yours to decide: it changes every sampled-world result; the
+  07 P0-1 lag bound stays far below 0.05 (6e-4 at the nominal). (b) `site_floor_frac` (0.015, the far floor of the site law: die sensor
+  and far sites) follows xt_floor_frac in every other choice (stacked_eic and the textbook family set it too). (c)
+  `heater_node_tau_s` is tagged `assumed` (it is the pole of the excess (h - 1) Z0 only, not the FEM's Z_HH t63);
+  its metal / undercut alternatives are imec's whole-node time constants used the same way. (d) the `selfheat_tau_s`
+  note quotes the ROM's step fractions (the 65 % was an older fit's pole share). (e) The crosstalk tau law now takes
+  the heat-source-to-victim distance (centre distance less the ring radii): g26's nearest neighbour is 1.52 ms
+  instead of 2.85 ms with unchanged keys.
 
 ### extraction (modes, coupling, junction, thermal)
 - The presets read: `modes_rib160.json:{n_eff, n_g, dn_g_dlambda_per_nm, dlambda_dt_pm_per_k (at t_c 25),
@@ -194,7 +207,8 @@ PARAMETERS.md after applying it):
   and `.clad`; an `index_weights.oxide` key would allow it (it is a diagnostic input only).
 - The geometry variation uses width and film; if the rib Jacobian carries `slab_nm`, add a slab sigma.
 - When `modes_rib200.json` exists, the `film_thickness: "200"` choice can move from the SMTAI strip
-  (`strip400x200`, the render the 200 nm hypothesis comes from) to the rib.
+  (`strip400x200`, the render the 200 nm hypothesis comes from) to the rib. [done 2026-10-16, params review:
+  rib200 with rib200_q_anchor 2.03 dB/cm; docs/CHANGELOG.md]
 - The preset's nominal drop share is kappa_d/kappa = 0.007 (07 D7 log-centre; it reproduces the 15.5 uA monitor
   current at a half-maximum lock, see section 7); the coupling artefact's design drop gap uses 0.03. The drop
   dispersion is read at your gap: if it changes much with the gap, report it at 0.007 too.
@@ -243,7 +257,11 @@ PARAMETERS.md after applying it):
    and in `fsr` (stress hypotheses).
 3. **FSR window A** = 1.47 THz, not 07's 1.32-1.48 THz (its interior puts a second order within 2 FWHM of a TX line;
    validation_targets review of BND-1). `g26_fsr_edge` is the G25-cluster stress FSR 1.53 THz; `pdk_size` 1.60 THz
-   is one `--alt` away.
+   is one `--alt` away. Note for the content owner (2026-10-16, physics_optics review): 1.47 THz was checked with
+   derive's former idealized comb (f_line + k FSR, cold FWHM: 2.16-2.19 FWHM). On the plant's comb (the lock shift
+   squeezes the order spacing, plus dispersion and each order's FWHM) ring 0's order +2 sits 1.74 FWHM and ring 7's
+   order -2 1.68 FWHM from a TX line (the BND-1 soft fail of `g26_fsr_window_a` in docs/VALIDATION.md); derive now
+   reports these values. Re-check the window A value on the plant's comb if window A is meant to pass BND-1.
 4. **H86_sensor** needed a key: `ring.thermal.reference_rise_frac` (1 nominal, 0.8 under H86_sensor). The plant does
    not use it; replicas and degC scenario targets read it from `PlantParams.values`.
 5. **monitor.adc_bits** (16 vs about 10, core_control_api) is an alternative only: it is a global int, which a
@@ -307,7 +325,10 @@ Each item has a regression test in `tests/closure/test_presets.py` unless stated
    (1 : 6 : 9 : 10 : 2). Test: `test_eta_choices_keep_q_intrinsic_and_hit_their_label`.
 7. **Through-gap variation missing (added).** 07 P1-16 asks for a gap_through sigma; the Jacobian cannot move Q_t
    (free under the Q_L anchor). Added `variation.ring.optics.q_loaded` rel_sigma 0.015 (d ln K^2/d gap -2 %/nm x
-   ~1.5 nm, assumed), so the per-ring notch spreads around 27.9 dB as near-critical rings do.
+   ~1.5 nm, assumed), so the per-ring notch spreads around 27.9 dB as near-critical rings do. [Superseded 2026-10-16
+   (params review): the coupling Jacobian now moves the per-pass couplings of every device whichever R4 member is
+   free; g26 draws gap_through and gap_drop (one 1.5 nm local sigma) through coupling_rib160 and this stand-in and
+   the kappa_d_over_kappa one are removed.]
 8. **Notes corrected.** q_loaded and coupling_regime notes now state the regime flip (section 3 item 1); the P_FSR
    and R_cold variation notes state that a symmetric lognormal cannot reproduce the skewed G25 wafer maps (1/3 of
    the drawn rings fall below the observed 24.9 mW minimum; the +34 % tail is missing); the heater_self_ratio note

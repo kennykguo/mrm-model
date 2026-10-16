@@ -75,7 +75,7 @@ _VAR_FIELDS = {"level", "dist", "mode", "die_sigma", "ring_sigma", "line_sigma",
                "truncate", "provenance", "generation", "source", "note"}
 _GEOM_DIMS = ("width", "thickness", "slab", "gap_through", "gap_drop")
 _GEOM_DIM_FIELDS = {"die_sigma_nm", "ring_sigma_nm", "corr_length_um"}
-_GEOM_FIELDS = set(_GEOM_DIMS) | {"jacobians", "provenance", "generation", "source", "note"}
+_GEOM_FIELDS = set(_GEOM_DIMS) | {"jacobians", "width_closes_gaps", "provenance", "generation", "source", "note"}
 
 
 class _Loader(yaml.SafeLoader):
@@ -362,6 +362,24 @@ class Config:
     def to_dict(self) -> dict:
         """Alias of :meth:`resolved_tree`."""
         return self.resolved_tree()
+
+    def without(self, prefixes, keep=()) -> "Config":
+        """A copy without the leaves, settings and open values whose path starts with one of ``prefixes`` (e.g.
+        ``"experiment."``), except the paths in ``keep``. The uncertainty, variation, geometry and relation tables
+        are shared, not copied (read them only). Used for the nominal model a controller may realize
+        (mrm.control.knowledge.NominalView.model_config, 07 D13): no experiment section, so no seeds."""
+        prefixes = tuple(prefixes)
+        keep = frozenset(keep)
+
+        def kept(path: str) -> bool:
+            return path in keep or not path.startswith(prefixes)
+        c = copy.copy(self)
+        c.leaves = {p: v for p, v in self.leaves.items() if kept(p)}
+        c.settings = {p: v for p, v in self.settings.items() if kept(p)}
+        c.open_values = {p: v for p, v in self.open_values.items() if kept(p)}
+        c.setting_leaves = {p: v for p, v in self.setting_leaves.items() if kept(p)}
+        c.overrides_applied = {p: v for p, v in self.overrides_applied.items() if kept(p)}
+        return c
 
     def __repr__(self) -> str:
         return f"Config({self.name!r}, {len(self.leaves)} leaves, {len(self.uncertainty)} uncertainty entries)"
@@ -664,6 +682,12 @@ def _merge(parent: _Flat, child: _Flat, child_kind: str, errs: list[str]) -> _Fl
         if "alternatives" in node.leaf and "alternatives" in prev.leaf:
             alts = dict(prev.leaf["alternatives"] or {})
             alts.update(node.leaf["alternatives"] or {})
+            # a child's `name: null` removes the parent's alternative (one whose meaning the child changed, e.g. a
+            # leaf restated at another reference plane)
+            for an in [an for an, a in (node.leaf["alternatives"] or {}).items() if a is None]:
+                if an not in (prev.leaf["alternatives"] or {}):
+                    errs.append(f"{fname}: {path}: alternative {an!r} is null, but the parent has no such alternative")
+                alts.pop(an, None)
             merged.update(node.leaf)
             merged["alternatives"] = alts
         else:
@@ -926,6 +950,10 @@ def _make_leaf(path: str, d: dict, origin: list[str], cfg: Config, errs: list[st
         prov = "assumed"
     alts = {}
     for name, a in (d.get("alternatives") or {}).items():
+        if a is None:
+            errs.append(f"{path}: alternative {name!r} is null; null only removes an inherited alternative in a child "
+                        f"preset")
+            continue
         if isinstance(a, dict) and ("value" in a or "from" in a):
             bad = set(a) - _ALT_FIELDS
             if bad:
@@ -1323,13 +1351,21 @@ def _validate(cfg: Config, errs: list[str]) -> None:
                 _check_provenance_word(a["provenance"], f"{path}.alternatives.{an}", errs)
             av = a.get("value")
             if an != "default" and av is not None and not (isinstance(av, dict) and "from" in av) and "from" not in a:
-                # an alternative is a value of the same key: same type, list length and hard bounds (its own range
-                # check is skipped on purpose: stress alternatives may lie outside the leaf's plausible range)
+                # an alternative is a value of the same key: same type, list length and hard bounds. A selected
+                # alternative is range-checked like any value, so in a preset the leaf's range must include every
+                # alternative (params_content handoff 5.7: the range spans the stress values; the plausible span is
+                # in the note); one outside could never be selected
                 _check_type(key, av, f"{path}.alternatives.{an}", n, errs)
                 if key.type in ("float", "int") and key.bounds is not None and _numeric(av) and not _in_bounds(
                         av, *key.bounds):
                     errs.append(f"{path}.alternatives.{an}: value {av!r} is outside the physical bounds "
                                 f"{list(key.bounds)}")
+                rng = leaf.range
+                if (strict and key.type in ("float", "int") and isinstance(rng, tuple) and len(rng) == 2
+                        and _numeric(list(rng)) and _numeric(av) and not _in_bounds(av, *rng)):
+                    errs.append(f"{path}.alternatives.{an}: value {av!r} lies outside the leaf's range {list(rng)}, "
+                                f"so it can never be selected; widen the range, or remove the alternative (null in a "
+                                f"child preset)")
         if leaf.range is not None and not (isinstance(leaf.range, tuple) and len(leaf.range) == 2
                                            and all(_numeric(x) and not isinstance(x, list) for x in leaf.range)):
             errs.append(f"{path}: range must be [low, high] with two numbers, got {leaf.range!r}")
@@ -1558,11 +1594,19 @@ def _validate_uncertainty(cfg: Config, strict: bool, errs: list[str]) -> None:
                         errs.append(f"{where}: truncate must be [low, high] with low < high")
                     else:
                         lohi = list(tr)
+            vals = lohi + [c["value"] if isinstance(c, dict) else c for c in (e.fields.get("corners") or {}).values()]
+            vals = [x for x in vals if _numeric(x)]
             if tkey is not None and mode == "absolute" and tkey.bounds is not None:
-                vals = lohi + [c["value"] if isinstance(c, dict) else c for c in (e.fields.get("corners") or {}).values()]
-                vals = [x for x in vals if _numeric(x)]
                 if vals and not _in_bounds(vals, *tkey.bounds):
                     errs.append(f"{where}: values {vals} reach outside the physical bounds {list(tkey.bounds)} of {tgt}")
+            rng = cfg.leaves[tgt].range if (tkey is not None and tgt in cfg.leaves) else None
+            if mode == "absolute" and isinstance(rng, tuple) and len(rng) == 2 and _numeric(list(rng)):
+                # a world's value of the target is the drawn or pinned value itself, so the leaf's declared range
+                # must hold every one of them (params_content handoff 5.7: ranges include every selectable value)
+                out = [x for x in vals if not float(rng[0]) <= float(x) <= float(rng[1])]
+                if out:
+                    errs.append(f"{where}: values {out} lie outside the range {list(rng)} of {tgt}; a leaf's range "
+                                f"must include every value a world can take (widen it or move the bound/corner)")
             if tgt is None and e.fields.get("nominal") is None:
                 errs.append(f"{where}: an entry without target needs a nominal value")
             nom = e.fields.get("nominal")
@@ -1641,6 +1685,8 @@ def _validate_variation(cfg: Config, strict: bool, errs: list[str]) -> None:
                 for f, x in g[d].items():
                     if not _numeric(x) or x < 0 or (f == "corr_length_um" and x == 0):
                         errs.append(f"variation.geometry.{d}.{f}: must be a number >= 0 (corr_length_um > 0)")
+        if "width_closes_gaps" in g and not isinstance(g["width_closes_gaps"], bool):
+            errs.append("variation.geometry.width_closes_gaps: must be true or false")
         jac = g.get("jacobians", ["ring.geometry.jacobian"])
         if isinstance(jac, str):
             jac = [jac]
