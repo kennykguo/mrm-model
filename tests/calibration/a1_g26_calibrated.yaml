@@ -1,0 +1,20 @@
+# Acceptance A1 (experiments/acceptance/a1_slide10_aggressor.yaml) on g26_calibrated: the closed-loop check of the
+# calibration task (docs/handoff/calibration.md). Same controller, scenario, start, scoring and criteria as A1.
+extends: g26_calibrated
+meta: {name: acc_a1_on_g26_calibrated, kind: experiment, description: "A1 slide-10 aggressor, pi_lock_c, calibrated"}
+controller: {name: pi_lock_c}
+scenario: {name: a1, params: {phase_s: 0.06535}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: acceptance
+  duration_s: 0.1357
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
+  acceptance:
+    - {id: A1-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
+    - {id: A1-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A1-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
+    - {id: A1-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}
+    - {id: A1-monitor, metric: monitor_error_pct, op: band_either_sign, value: [-2.2, 3.3], source: "BND-3a"}
