@@ -2,8 +2,9 @@
 the arguments of the target file) on the uncalibrated presets and on the calibrated ones.
 
 Owner: calibration. Calibration targets only (07 P0-5): the G25 targets run on ``g25_test_vehicle`` (before) and on
-``g25_test_vehicle`` with the calibrated device leaves (after, :func:`mrm.calibration.preset.bench_config`); every
-other target on ``g26`` (before) and ``g26_calibrated`` (after). The fit protocols differ from the replicas' primary
+``g25_test_vehicle_calibrated`` (after: ``g25_test_vehicle`` with the calibrated device leaves, the preset of
+:func:`mrm.calibration.preset.write_bench_preset`; :func:`mrm.calibration.preset.bench_config` when that file does not
+exist); every other target on ``g26`` (before) and ``g26_calibrated`` (after). The fit protocols differ from the replicas' primary
 in two stated places (an instrument floor on CAL-2, a uniform aggressor and one die for CAL-9): the "after" column
 here is the replica's own protocol, so it shows what the target file's protocol gives on the calibrated plant.
 """
@@ -35,10 +36,14 @@ def _one(t, plant) -> dict:
 
 
 def before_after(results: Mapping[str, Any], *, ids: Sequence[str] | None = None,
-                 preset_path: str | Path = P.PRESET_PATH, log=print) -> dict[str, dict]:
+                 preset_path: str | Path = P.PRESET_PATH, bench_preset_path: str | Path | None = P.BENCH_PRESET_PATH,
+                 log=print) -> dict[str, dict]:
     """{target id: {"before": rec, "after": rec}} for every calibration target (or ``ids``)."""
     T = calibration_targets()
-    bench = P.bench_config(results)
+    if bench_preset_path is not None and Path(bench_preset_path).exists():
+        bench, bench_name = P.bank_config(bench_preset_path), Path(bench_preset_path).stem
+    else:
+        bench, bench_name = P.bench_config(results), "g25_test_vehicle + calibrated device leaves"
     bank = P.bank_config(preset_path)
     out = {}
     with warnings.catch_warnings():
@@ -48,8 +53,8 @@ def before_after(results: Mapping[str, Any], *, ids: Sequence[str] | None = None
                 continue
             before = _one(t, None)
             after = _one(t, bench if t.generation == "G25" else bank)
-            out[tid] = {"before": before, "after": after, "plant_after": "g25_test_vehicle + calibrated device leaves"
-                        if t.generation == "G25" else P.PRESET_NAME, "fit": bool(t.fit)}
+            out[tid] = {"before": before, "after": after, "plant_after": bench_name
+                        if t.generation == "G25" else Path(preset_path).stem, "fit": bool(t.fit)}
             log(f"  {tid}: before {before.get('level')} (|r| {_short(before.get('max_abs_residual'))}) -> after "
                 f"{after.get('level')} (|r| {_short(after.get('max_abs_residual'))})")
     return out

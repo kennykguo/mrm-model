@@ -3,6 +3,55 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-16: calibration and validation-report stage integration
+
+Two tasks, built and reviewed separately, integrated here: calibration (07 P0-5, P1-14, 4.3; details in
+docs/handoff/calibration.md, integrator record in its section 11) and the validation report (07 P1-23, 4.9, with the
+4.3 identifiability screen and the 4.8 propagation; the report task's handoff could not be written to
+docs/handoff/report.md, its record is in docs/handoff/integrator.md section 9.4). Integrator record:
+docs/handoff/integrator.md section 9. No engine or njit code changed: tools/perf_scenarios.py against
+runs/perf_r2/final3: 0 of 476 signals differ; the nine quick acceptance runs on g26 are bit for bit those of
+2026-10-10.
+
+New contracts:
+
+- **Calibration** (`mrm/calibration/`: core, groups, pipeline, preset, report, cli; `python -m mrm.calibration` =
+  `mrm calibrate`, now registered in `mrm.cli.PROVIDERS`): least squares + profile likelihood per fit group (heater,
+  coupling_er, offset, junction, eo, monitor, modulation_depth, dac, laser), hypotheses compared by Birge-scaled
+  likelihood ratios, the 07 4.3 half-prior rule for the `calibrated` tag; reads only targets/calibration.yaml. Fit
+  record `mrm/calibration/latest_fit.json` (schema `mrm.calibration.fit/1`). pytest marker `calibration` in
+  pyproject.toml (`pytest -m calibration tests/calibration`; not CI-blocking, 07 4.1).
+- **Generated presets** (do not edit): `g26_calibrated` (g26 + the fitted leaves; `calibrated` only where the rule
+  holds: P_FSR, R0, heater_self_ratio (for the literature TCR), resonance_offset, laser.line_offset and the two
+  loss-mechanism coefficients; moved but not calibrated: alpha_other, the coupler dispersion (2.2 %/nm, assumed),
+  eff_at_0v (93.6 pm/V at the assumed +4 dBm), R_s (390 ohm, the range top), monitor gain_scale, the line-error
+  sigma; the restated uncertainty entries er_mechanism, coupling_regime and thermo_optic (the H86 world selects its
+  own heater leaves `cal_h86`)), and **new** `g25_test_vehicle_calibrated` (the G25 bench with the same device
+  leaves, written by `preset.write_bench_preset`; the report's G25 companion of g26_calibrated and the before/after
+  table's G25 plant). **The default preset stays g26**: the integrator recommends switching to g26_calibrated in a
+  separate change, with conditions (calibration.md section 11.4).
+- **Validation report** (`mrm/validation/report.py`, `sensitivity.py`, `cli.py`; `mrm report`): the generated
+  docs/VALIDATION.md (g26) and the new **docs/VALIDATION_g26_calibrated.md**, from cached parts in
+  `docs/validation/<preset>/report_data.json` (+ SVG charts). This replaces 07 4.1's "tests/validation writes
+  VALIDATION.md". CI: `tests/verification/test_report.py::test_validation_md_is_current` checks docs/VALIDATION.md and
+  every docs/VALIDATION_<preset>.md (a fast re-render with the file's stamp must equal the file; no cached part may be
+  stale against its presets, target files or code). A preset or target change therefore needs a recompute
+  (predictions ~7-9 min, identifiability ~12-20, sensitivity ~15-24, ranking ~14-28; full ~48-76 min); a new fit
+  record or a new commit needs only `--fast`. How to calibrate and regenerate: docs/ENGINE.md section 14.
+- Report changes at integration: section 3.1 shows a fit record without a `preset` key only in the reports of g26 and
+  g26_calibrated (`report.FIT_RECORD_PRESETS`; before, in every preset's report, test presets included); the
+  profile chart shows the written (nominal) hypothesis; a calibrated preset's section 1 says its calibration rows
+  are fit residuals and flags where the fit's protocol differs from the replica's (`report.CALIBRATED_FLAGS`).
+- Fit record repaired at integration: its `context` (read by `bench_config` and by `--groups` reruns) had kept three
+  pre-review values from the merge of two parallel runs (eff_at_0v 93.86 instead of the fitted 93.64 pm/V);
+  rebuilt from the leaf decisions (`pipeline.context_from_decisions`, tested) and the before/after table rerun. No fit
+  and no preset value changed.
+
+Results (calibration.md section 11): on the held-out targets g26_calibrated scores 5 pass / 9 fail (g26: 2 / 12):
+VAL-2a, VAL-2b and VAL-3a turn from fail to pass, none from pass to fail; calibration targets 13 / 7 (9 / 11). The
+nine quick acceptance experiments keep their verdicts except A1-ber (passes on g26_calibrated); set-point lock errors
+are 7-49 % larger; under A1 the self-heating corners (eta high, z_ratio 2) lose a ring on g26_calibrated only.
+
 ## 2026-10-10: experiments, hardware and RL stage integration
 
 Three tasks, built and reviewed separately, integrated here: experiments (07 P0-10, P1-17, P2-12, 4.8; details in

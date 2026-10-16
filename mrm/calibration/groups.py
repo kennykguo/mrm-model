@@ -275,8 +275,13 @@ def _alpha_for_x0(cc: CouplingConstants, q_loaded: float, x0: float) -> float:
 # =====================================================================================================================
 # CAL-3a/b + CAL-4: heater efficiency (P_FSR anchor), cold resistance and the TCR droop y = TCR x R_th,H
 # =====================================================================================================================
+#: thermo-optic worlds the heater group is fitted in (H_solver: the nominal; H86: the required robustness corner of
+#: 07 D2, constant 86 pm/K). H86_sensor keeps the H_solver plant (only the reported degC differs), and the weight-0
+#: alternatives (bench, imec, ocp, textbook_derived) are not fitted: their worlds keep the H_solver heater leaves
+HEATER_THERMO = ("H_solver", "H86")
+
 def heater_problems(ctx: Context, targets: Mapping[str, Any],
-                    hypotheses=("same_rth_heater", "same_ratio")) -> list[Problem]:
+                    hypotheses=("same_rth_heater", "same_ratio"), thermo=HEATER_THERMO) -> list[Problem]:
     """CAL-3a (P_FSR median), CAL-3b (V_FSR median) and CAL-4 (shift against heater voltage of the swept device).
 
     Free leaves: ``ring.heater.p_fsr_mw`` (prior: leaf range [24.9, 37.0]; R2 anchors it with the FSR at the line,
@@ -284,37 +289,66 @@ def heater_problems(ctx: Context, targets: Mapping[str, Any],
     ``ring.heater.r_cold_ohm`` ([35, 58]: the leaf range [42, 58] widened, see the Param) and ``ring.thermal.heater_self_ratio`` ([1, 4]; with the family's TCR it
     sets y = TCR R_th,H, the droop CAL-4 identifies; TCR and R_th,H are not separable, 06 E1). Nuisance: the swept
     device's own P_FSR (CAL-4 is not the median device: 0.348 against 0.405 nm/mW, 06 E4; prior [22, 40] mW around
-    the 60-die range 24.9-34.1), with the median cold resistance (assumed: one device sweep cannot separate its
-    efficiency from its resistance). Hypotheses for the swept device's droop: ``same_rth_heater`` (the heater's own
+    the 60-die range 24.9-34.1), and its cold resistance R0_dev = R0 x a nuisance ratio with a Gaussian prior on
+    its log from the preset's variation entry (review fix: the first version held R0_dev = R0, although the voltage
+    sweep identifies y / R0_dev of that device, so the fitted y inherited an unstated assumption). The 14 CAL-4
+    shifts share the 0 V read-off error (:data:`CAL4_COMMON_SIGMA_NM`, whitened residuals; review fix: first
+    treated as independent). Hypotheses for the swept device's droop: ``same_rth_heater`` (the heater's own
     thermal resistance R_th,H is a heater property, equal on both devices: ratio_dev = ratio P_FSR,dev / P_FSR, since
-    Z = dT_FSR / P_FSR under the fsr_integral anchor) and ``same_ratio`` (the interim model's ratio leaf as is)."""
+    Z = dT_FSR / P_FSR under the fsr_integral anchor) and ``same_ratio`` (the interim model's ratio leaf as is).
+
+    Each transfer hypothesis is fitted under every thermo-optic world of ``thermo`` (review fix): the droop of
+    CAL-4 is TCR droop plus the curvature of dlambda/dT(T), so y, R0 and the ratio depend on the thermo-optic
+    hypothesis, and a preset world that keeps the H_solver values under H86 (constant 86 pm/K) misses CAL-3b and
+    CAL-4. Hypothesis names: ``<transfer>`` for H_solver (the nominal world), ``<thermo>/<transfer>`` otherwise."""
     t3a, t3b, t4 = targets["CAL-3a"], targets["CAL-3b"], targets["CAL-4"]
-    ctx.ranges.setdefault(P_R0, [35.0, 58.0])
-    # the swept device's ratio under same_rth_heater (ratio x P_FSR,dev / P_FSR) may leave the median's [1, 4]; the
-    # scratch configs allow it (the written leaf keeps its range)
-    ctx.ranges.setdefault(P_RATIO, [1.0, 8.0])
+    # scratch-config ranges (the written R0 leaf restates [35, 58]): the swept device's own R0 (median x the
+    # nuisance ratio below) and its ratio under same_rth_heater (ratio x P_FSR,dev / P_FSR) may leave the median's
+    # ranges; the fitted median leaves keep their priors
+    for path, (lo, hi) in ((P_R0, (25.0, 80.0)), (P_RATIO, (1.0, 8.0))):
+        old = ctx.ranges.get(path, [lo, hi])
+        ctx.ranges[path] = [min(float(old[0]), lo), max(float(old[1]), hi)]
+    # review fix: the swept device's cold resistance is not the median's. CAL-4 (a voltage sweep) identifies the
+    # droop y/R0 of THAT device, so y (and the median's R0 = R_hot/(1 + y P_FSR) and ratio) inherit its R0. The
+    # preset's own variation entry gives the device-to-device spread (lognormal, die and ring sigma); it enters as a
+    # Gaussian prior on ln(R0_dev / R0) (a constraint residual, not a datum).
+    ve = R.load_config(ctx.base(BENCH)).variation.get(P_R0)
+    f = dict(getattr(ve, "fields", {}) or {})
+    s_ln = math.hypot(float(f.get("die_sigma", 0.0)), float(f.get("ring_sigma", 0.0))) or 0.06
     probs = []
-    for hyp in hypotheses:
+    for thermo_h, hyp in [(t, h) for t in thermo for h in hypotheses]:
+        alts = {} if thermo_h == "H_solver" else {"uncertainty.thermo_optic": thermo_h}
+        name = hyp if thermo_h == "H_solver" else f"{thermo_h}/{hyp}"
         params = [Param("p_fsr_mw", P_PFSR, 24.9, 37.0, 25.45, unit="mw", prior_source="leaf range [24.9, 37.0]"),
-                  Param("r_cold_ohm", P_R0, 35.0, 58.0, 45.41, unit="ohm",
+                  Param("r_cold_ohm", P_R0, 35.0, 58.0, 45.41, unit="ohm", declared_range=(42.0, 58.0),
                         prior_source="leaf range [42, 58] widened to 35 ohm: the leaf range was set as R_hot / "
-                                     "(1 + y P_FSR) with the earlier y = 0.00904 /mW, and R0 trades against y"),
+                                     "(1 + y P_FSR) with the earlier y = 0.00904 /mW (its own note), and R0 trades "
+                                     "against y; the half-prior rule is judged on the narrower declared width"),
                   Param("heater_self_ratio", P_RATIO, 1.0, 4.0, 1.158, prior_source="leaf range [1, 4]"),
                   Param("p_fsr_swept_device_mw", None, 22.0, 40.0, 29.5, unit="mw", role="nuisance",
-                        prior_source="assumed [22, 40] mW around the G25 60-die range 24.9-34.1 mW")]
+                        prior_source="assumed [22, 40] mW around the G25 60-die range 24.9-34.1 mW"),
+                  Param("r_cold_swept_device_rel", None, math.exp(-4 * s_ln), math.exp(4 * s_ln), 1.0, log=True,
+                        role="nuisance",
+                        prior_source=f"R0_dev / R0: Gaussian prior on its log, sigma {s_ln:.3g} (variation entry "
+                                     f"of {P_R0}: die and ring sigma), bounds +-4 sigma")]
 
-        def predict(th, hyp=hyp):
+        def predict(th, hyp=hyp, alts=alts):
             med = {P_PFSR: th["p_fsr_mw"], P_R0: th["r_cold_ohm"], P_RATIO: th["heater_self_ratio"]}
-            cfg = ctx.config(BENCH, med)
+            cfg = ctx.config(BENCH, med, alts=alts)
             r3 = R.heater_power_per_fsr(cfg, t3a)
             ratio_dev = th["heater_self_ratio"] * (th["p_fsr_swept_device_mw"] / th["p_fsr_mw"]
                                                    if hyp == "same_rth_heater" else 1.0)
-            dev = dict(med, **{P_PFSR: th["p_fsr_swept_device_mw"], P_RATIO: ratio_dev})
-            r4 = R.resonance_vs_heater_v(ctx.config(BENCH, dev), t4)
+            dev = dict(med, **{P_PFSR: th["p_fsr_swept_device_mw"], P_RATIO: ratio_dev,
+                               P_R0: th["r_cold_ohm"] * th["r_cold_swept_device_rel"]})
+            r4 = R.resonance_vs_heater_v(ctx.config(BENCH, dev, alts=alts), t4)
             return {"CAL-3a": r3.value, "CAL-3b": r3.variants["voltage_v"], "CAL-4": r4.value}
 
-        def derived(th, hyp=hyp):
-            cfg = ctx.config(BENCH, {P_PFSR: th["p_fsr_mw"], P_R0: th["r_cold_ohm"], P_RATIO: th["heater_self_ratio"]})
+        def constraint(th, s_ln=s_ln):
+            return np.array([math.log(th["r_cold_swept_device_rel"]) / s_ln])
+
+        def derived(th, hyp=hyp, alts=alts, thermo_h=thermo_h):
+            cfg = ctx.config(BENCH, {P_PFSR: th["p_fsr_mw"], P_R0: th["r_cold_ohm"], P_RATIO: th["heater_self_ratio"]},
+                             alts=alts)
             _, pp = R.resolve_plant(cfg)
             z = float(np.asarray(pp.thermal.z_heater_ring_k_per_w).ravel()[0])
             tcr = float(np.asarray(pp.heater.tcr_per_k).ravel()[0])
@@ -325,13 +359,25 @@ def heater_problems(ctx: Context, targets: Mapping[str, Any],
                     "efficiency_median_nm_per_mw": fsr_nm / th["p_fsr_mw"],
                     "efficiency_swept_device_nm_per_mw": fsr_nm / th["p_fsr_swept_device_mw"],
                     "r_hot_at_p_fsr_ohm": th["r_cold_ohm"] * (1.0 + y * th["p_fsr_mw"] * 1e-3),
-                    "swept_device_droop_hypothesis": hyp}
-        probs.append(Problem(group="heater", hypothesis=hyp, params=params, targets=[t3a, t3b, t4], predict=predict,
-                             fixed={"preset": BENCH, "swept_device_r_cold": "median (assumed)",
-                                    "driver": "bench voltage source, TCR solved"},
+                    "r_cold_swept_device_ohm": th["r_cold_ohm"] * th["r_cold_swept_device_rel"],
+                    "swept_device_droop_hypothesis": hyp, "thermo_optic": thermo_h}
+        probs.append(Problem(group="heater", hypothesis=name, params=params, targets=[t3a, t3b, t4], predict=predict,
+                             fixed={"preset": BENCH, "thermo_optic": thermo_h,
+                                    "swept_device_r_cold": f"median x nuisance (log prior sigma {s_ln:.3g})",
+                                    "driver": "bench voltage source, TCR solved",
+                                    "cal4_common_readoff_sigma_nm": CAL4_COMMON_SIGMA_NM},
                              starts=[{}, {"heater_self_ratio": 2.0, "p_fsr_swept_device_mw": 31.0}],
-                             derived=derived))
+                             constraint=constraint, derived=derived,
+                             common_sigma={"CAL-4": CAL4_COMMON_SIGMA_NM}))
     return probs
+
+
+#: CAL-4: every shift is the difference of its own read-off and the SAME 0 V read-off (the target's verification:
+#: "sigma = sqrt(2) x 0.03 (or 0.05)"), so the 14 shifts share one error. The diagonal keeps the target's sigma
+#: (0.04 / 0.06 nm, rounded); the shared part is set so that the independent part of the 0.04 nm points is their
+#: stated own read-off error 0.03 nm: sqrt(0.04^2 - 0.03^2) = 0.026 nm (0.03 nm exactly before the rounding of 0.0424
+#: to 0.04; the smaller value does not overstate the shape information that identifies the droop)
+CAL4_COMMON_SIGMA_NM = math.sqrt(0.04 ** 2 - 0.03 ** 2)
 
 
 # =====================================================================================================================
@@ -534,14 +580,17 @@ def modulation_depth_problems(ctx: Context, targets: Mapping[str, Any],
 
 
 def modulation_depth_scan(ctx: Context, targets: Mapping[str, Any], *,
-                          swings=(0.9, 1.3, 1.8, 2.2, 2.6, 3.1, 3.6, 4.5),
+                          swings=(0.9, 1.3, 1.8, 2.2, 2.6, 3.1, 3.6, 4.5, 5.0, 5.5),
                           eff_scales=(1.0, 1.25, 1.5, 2.0, 2.5, 3.0),
-                          conventions=("centered", "one_sided"), mode: str = "oracle") -> dict:
+                          conventions=("centered", "one_sided"), mode: str = "oracle",
+                          alt_effs: Mapping[str, float] | None = None) -> dict:
     """What lumped modulation depth closes CAL-14 (the known gap, 07 D9): relOMA (the CAL-14 replica, oracle) on a
     grid of swing (beyond the prior, to find the closing value) and of a junction-efficiency scale (eff_at_0v x s
-    at the swing of the preset), for both NRZ level conventions. Each row also gives the peak-to-peak resonance
-    swing at the CAL-14 bias (1.075 V) and the depth D = swing_pm / FWHM_pm, the quantity 07 D9 calls the lumped
-    modulation depth. The junction grid of the plant clips the levels at -0.5 V (forward) and 4.0 V."""
+    at the swing of the preset), for both NRZ level conventions. ``alt_effs`` ({name: eff_at_0v}, e.g. the CAL-5
+    P_in -> 0 fit) adds a swing scan at each alternative efficiency (centered levels; rows labelled ``eff_base``).
+    Each row also gives the peak-to-peak resonance swing at the CAL-14 bias (1.075 V) and the depth
+    D = swing_pm / FWHM_pm, the quantity 07 D9 calls the lumped modulation depth. The junction grid of the plant
+    clips the levels at -0.5 V (forward) and 4.0 V."""
     import tempfile
     t14 = targets["CAL-14"]
     rows = []
@@ -551,24 +600,30 @@ def modulation_depth_scan(ctx: Context, targets: Mapping[str, Any], *,
     # may leave the priors; it is deleted after the scan and never written to the package
     tmp = tempfile.TemporaryDirectory(prefix="mrm_cal14_scan_")
     path = widened_child(BANK, {**ctx.ranges, P_SWING: [0.1, 10.0], P_EFF: [1.0, 900.0]}, tmp.name)
+
+    def row(conv, sw, es, base):
+        ov = {P_SWING: sw, P_EFF: eff0 * es, "driver.level_convention": conv}
+        cfg = ctx.config(path, ov)
+        r = R.relOMA_map(cfg, t14, with_variants=False, mode=mode)
+        _, pp = R.resolve_plant(cfg)
+        ring = R.StaticRing(pp)
+        lo, hi = ring.nrz_levels(1.075)
+        d_pm = float((ring.junction_shift_m(hi)[0] - ring.junction_shift_m(lo)[0]) * 1e12)
+        fwhm_pm = float(ring.lam_line / ring.q_loaded * 1e12)
+        return {"level_convention": conv, "swing_pp_v": sw, "eff_scale": es, "eff_base": base,
+                "eff_at_0v_pm_per_v": eff0 * es, "levels_v": [lo, hi], "swing_pm": d_pm,
+                "fwhm_pm": fwhm_pm, "depth": d_pm / fwhm_pm, "reloma_db": r.value}
     for conv in conventions:
         for sw in swings:
             for es in eff_scales:
                 if es != 1.0 and sw != 1.3 and sw != float(base_cfg.get(P_SWING)):
                     continue
-                ov = {P_SWING: sw, P_EFF: eff0 * es, "driver.level_convention": conv}
-                cfg = ctx.config(path, ov)
-                r = R.relOMA_map(cfg, t14, with_variants=False, mode=mode)
-                _, pp = R.resolve_plant(cfg)
-                ring = R.StaticRing(pp)
-                lo, hi = ring.nrz_levels(1.075)
-                d_pm = float((ring.junction_shift_m(hi)[0] - ring.junction_shift_m(lo)[0]) * 1e12)
-                fwhm_pm = float(ring.lam_line / ring.q_loaded * 1e12)
-                rows.append({"level_convention": conv, "swing_pp_v": sw, "eff_scale": es,
-                             "eff_at_0v_pm_per_v": eff0 * es, "levels_v": [lo, hi], "swing_pm": d_pm,
-                             "fwhm_pm": fwhm_pm, "depth": d_pm / fwhm_pm, "reloma_db": r.value})
+                rows.append(row(conv, sw, es, "context"))
+    for name, eff in (alt_effs or {}).items():
+        for sw in swings:
+            rows.append(row("centered", sw, float(eff) / eff0, name))
     tmp.cleanup()
-    return {"mode": mode, "eff_at_0v_base_pm_per_v": eff0, "rows": rows}
+    return {"mode": mode, "eff_at_0v_base_pm_per_v": eff0, "alt_effs": dict(alt_effs or {}), "rows": rows}
 
 
 # =====================================================================================================================

@@ -6,7 +6,8 @@ and the ``python -m mrm.calibration`` entry point. Run it under ``tools/memguard
     mrm calibrate                          every group, then g26_calibrated.yaml and the before/after table
     mrm calibrate --groups heater junction  some groups (the earlier groups' leaves come from latest_fit.json)
     mrm calibrate --quick                  coarser profiles (smoke run)
-    mrm calibrate --write-preset-only      rewrite the preset from latest_fit.json
+    mrm calibrate --write-preset-only      rewrite the presets (g26_calibrated, g25_test_vehicle_calibrated) from
+                                           latest_fit.json
     mrm calibrate --before-after-only      only the before/after replica table from latest_fit.json
 """
 from __future__ import annotations
@@ -24,9 +25,9 @@ def setup(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--groups", nargs="*", choices=list(GROUP_ORDER), default=None, help="fit groups (default all)")
     ap.add_argument("--quick", action="store_true", help="coarser profiles and fewer starts")
     ap.add_argument("--out", default=str(RESULTS_PATH), help="fit record (JSON)")
-    ap.add_argument("--no-preset", action="store_true", help="do not write g26_calibrated.yaml")
+    ap.add_argument("--no-preset", action="store_true", help="do not write the calibrated presets")
     ap.add_argument("--no-before-after", action="store_true", help="skip the before/after replica table")
-    ap.add_argument("--write-preset-only", action="store_true", help="rewrite the preset from --out")
+    ap.add_argument("--write-preset-only", action="store_true", help="rewrite the calibrated presets from --out")
     ap.add_argument("--before-after-only", action="store_true", help="only the before/after table from --out")
 
 
@@ -41,6 +42,8 @@ def run_cmd(args: argparse.Namespace) -> int:
         del run
     if not args.before_after_only and not args.no_preset:
         p = preset.write_preset(res)
+        print(f"wrote {p}")
+        p = preset.write_bench_preset(res)
         print(f"wrote {p}")
     if not args.write_preset_only and not args.no_before_after:
         print("before/after (replica primary protocols, calibration targets only):")

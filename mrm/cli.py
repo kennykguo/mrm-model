@@ -38,6 +38,7 @@ PROVIDERS: list[str] = [
     "mrm.sim.cli:register_cli",            # mrm run | sweep | mc | compare | robust | acceptance | rerun (planned)
     "mrm.validation.cli:register_cli",     # mrm report (planned)
     "mrm.control.cli:register_cli",        # controller utilities (planned)
+    "mrm.calibration.cli:register_cli",    # mrm calibrate
 ]
 _LOADED = False
 

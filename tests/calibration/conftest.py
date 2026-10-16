@@ -2,15 +2,11 @@
 
 Every test here carries the ``calibration`` marker and is skipped unless the marker is selected
 (``pytest -m calibration tests/calibration``), so a plain ``pytest`` run (CI) does not block on calibration
-results. The marker is registered here because pyproject.toml belongs to another owner.
+results. The marker is registered in pyproject.toml.
 """
 from __future__ import annotations
 
 import pytest
-
-
-def pytest_configure(config):
-    config.addinivalue_line("markers", "calibration: calibration fit residuals (07 4.1; reported, not CI-blocking)")
 
 
 def pytest_collection_modifyitems(config, items):

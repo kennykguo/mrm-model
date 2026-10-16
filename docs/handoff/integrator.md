@@ -555,3 +555,134 @@ Still open (owner):
   identical.
 - Every experiment file loads through `mrm.params.load` and gives the same options and experiment hash as
   `mrm.sim.experiment.load` (new test).
+
+## 9. Calibration and validation-report stage integration (2026-10-16)
+
+Scope: integrate the calibration task (build, two adversarial reviews) and the report task (build, review); run the
+fast suite and fix cross-module failures; regenerate docs/VALIDATION.md with the fit; produce the g26_calibrated
+report; run the quick acceptance experiments on g26_calibrated and g26; recommend on the default preset; update the
+docs. CHANGELOG entry "2026-10-16: calibration and validation-report stage integration". The calibration-specific
+record (fixes to the fit record, the held-out results, the acceptance table, the recommendation) is
+docs/handoff/calibration.md section 11. Nothing was committed.
+
+### 9.1 Files changed by the integrator
+
+- `mrm/calibration/pipeline.py`: `context_from_decisions(record)`. `mrm/calibration/preset.py`:
+  `BENCH_PRESET_NAME`, `BENCH_PRESET_PATH`, `bench_preset_document`, `write_bench_preset`.
+  `mrm/calibration/report.py`: `before_after(..., bench_preset_path=BENCH_PRESET_PATH)` runs the G25 rows on the bench
+  preset. `mrm/calibration/cli.py`: `--write-preset-only` writes both presets.
+- Generated: `mrm/calibration/latest_fit.json` (context rebuilt from the decisions, a note, before/after rerun),
+  **new** `mrm/params/presets/g25_test_vehicle_calibrated.yaml`; g26_calibrated.yaml unchanged (regenerates byte for
+  byte).
+- `mrm/validation/report.py`: `FIT_RECORD_PRESETS`, `CALIBRATED_FLAGS`, `_calibrated(preset)`; the fit record only in
+  the reports of g26 and g26_calibrated; section 1 note and flags for a calibrated preset; the profile chart of the
+  nominal hypothesis; the commit label of a `<sha>-dirty` record; the closure-test request points to section 9.4
+  here.
+- `mrm/cli.py` (`mrm.calibration.cli:register_cli`), `pyproject.toml` (marker `calibration`),
+  `tests/calibration/conftest.py` (marker registration removed).
+- Tests: `tests/verification/test_report.py` (the currency check is parametrized over docs/VALIDATION.md and every
+  docs/VALIDATION_<preset>.md; the contamination test reads the 3.2 rows; new test_fit_record_appears_only_in_its_
+  presets_reports; the companion test), `tests/calibration/test_calibrated_preset.py` (context = decisions; the
+  bench preset against the record, g26_calibrated and bench_config, H86 world included; 8 agreement cases).
+- Generated docs: docs/VALIDATION.md (`--fast`: section 3.1 now renders the fit record, profile charts
+  docs/validation/g26/profiles_*.svg), **new** docs/VALIDATION_g26_calibrated.md and docs/validation/g26_calibrated/.
+- Docs: docs/ENGINE.md (new section 14: calibrating and regenerating the report), docs/ARCHITECTURE.md section 2,
+  docs/CHANGELOG.md, docs/handoff/calibration.md (sections 1, 2, 5 and the new 11), this section.
+
+### 9.2 Decisions
+
+1. **docs/handoff/report.md was not written**: the report builder's tool refused it, and so did the integrator's (a
+   tool rule for agents). The report task's handoff (API, deviations, open issues, requests and the reviewer's
+   corrections) is summarized in section 9.4 instead, and the generated report points there.
+2. **The calibrated G25 bench is a preset** (`g25_test_vehicle_calibrated`), generated with g26_calibrated, rather
+   than overrides: the report needs a preset name, and only a preset keeps the alternatives (H86 world, corners).
+3. **The calibrated report is a second committed report** (`docs/VALIDATION_g26_calibrated.md`) under the same CI
+   check. Cost of keeping it current: any change of g26.yaml (which g26_calibrated extends), g25_test_vehicle.yaml,
+   the calibrated presets, a target file, replicas.py or sensitivity.py makes it stale until its parts are
+   recomputed (~48 min in total, measured below).
+4. **The default preset was not switched** (Kenny decides); the recommendation is in calibration.md section 11.4.
+
+### 9.3 Requests: resolved and still open
+
+Resolved here: calibration section 8 (integrator: CLI, marker, CHANGELOG, VALIDATION.md; report owner: the test row
+selection and the held-out run on g26_calibrated); the report builder's integrator items (ARCHITECTURE line,
+CHANGELOG, data and charts next to VALIDATION.md, `--fast` after a fit record) and its calibration-owner item (the
+companion `g25_test_vehicle_calibrated`).
+
+Still open (owner): calibration.md sections 8 and 11.6 (params_machinery: tied hypotheses, a y = TCR x R_th,H key;
+params_content: the R0 range, the dispersion; scenarios: CAL-9 / CAL-12c; junction: LUT or analytic; replicas: VAL-1
+device, CAL-5 read-off grid; calibration: the ratio tag; controllers: the self-heating fragility of g26_calibrated);
+section 9.4 below (report requests); section 8.3 (unchanged).
+
+### 9.4 Report task record (in place of docs/handoff/report.md)
+
+- Files: `mrm/validation/report.py` (generator), `mrm/validation/sensitivity.py` (Sobol / Saltelli + Jansen with
+  bootstrap intervals, the binned given-data S1, the u-map of the 07 4.8 set, design injection, tornado, Jacobian SVD
+  and the half-prior rule; free of target-file access, so mrm/calibration may import it), `mrm/validation/cli.py`
+  (`mrm report`), `tests/verification/test_report.py`, `tests/verification/test_sensitivity.py`,
+  `docs/validation/<preset>/` (report_data.json and SVG charts).
+- API: `generate(preset="g26", *, g25_preset=None, recompute=None|()|parts, out=None, n_base=128,
+  compare_worlds=256, compare_run=None, n_threads=4, stamp=None, log=...) -> Path`; `check(preset=None, out=None) ->
+  list[str]`; `render(data, *, preset, g25_preset=None, stamp=None, doc_text=None, charts=True, chart_dir=None) ->
+  str`; `compute_predictions | compute_identifiability | compute_sensitivity | compute_ranking`; `companion_g25`;
+  `load_data / save_data / data_path / data_dir`; constants `SCHEMA = "mrm.validation.report/1"`, `PARTS`,
+  `CAL_PARAMETERS` (18 leaves), `SENS_METRICS`, `SENS_CONTROLLER = "pi_lock_c"`, `SENS_TOP = 8`, `CODE_DEPS`,
+  `FIT_RECORD_PRESETS`, `CALIBRATED_FLAGS`. CLI `[--preset] [--g25-preset] [--fast | --recompute a,b] [--check]
+  [--out] [--sobol-n 128] [--compare-worlds 256] [--compare-run DIR] [--threads 4]`.
+- Deviations (stated in the report): the half-prior rule only in its linearized form (profile likelihoods come from
+  the calibration record, section 3.1); the band is a range over the nominal world and the 12 named corners, not a
+  probability band; g26_hot_selfheat cannot be applied to the G25 bench (`uncertainty.chip_input_loss` has no
+  `ring_plus8dbm` corner there), so G25 rows count 11 corners; Sobol and tornado use pi_lock_c under A1 with
+  variation off, conditional indices over the top 8; worlds are injected by patching scipy's LatinHypercube (checked
+  against realize per chunk); the Jacobian scale without a printed sigma is a quarter of an interval tolerance or half
+  an abs/rel tolerance.
+- The reviewer's corrections: section 3.1 now reads the real fit record and audits every target id it used
+  (CONTAMINATION for held-out ids; EXC, unknown and fit:false ids flagged); the Jacobian moves a leaf only on plants
+  that share its G26 value; the closure-test scan parses `xfail` decorators (the builder's "1 of 12 rows covered" was
+  a false match: **0 of 12**); section 4 measures the noise share (at most 5e-9 %) and reports the binned S1 (sums
+  0.29-0.63) and the sums of the ST lower bounds (1.09-1.35): interaction dominance is supported; the staleness check
+  covers code (`CODE_DEPS`); and **CAL-10 identifies (R_s + 50 ohm) x C_j, not R_s x C_j** (near-null direction 17,
+  loadings C_j +0.84, R_s -0.54 in prior half-widths). Every published g26 number was reproduced bit for bit by the
+  reviewer's recompute.
+- Requests: **closure owner** (tests/closure): one `xfail(strict=True, reason="VALIDATION.md#closure-<id>: ...")`
+  test per 07 4.6 row: dlambda-dt, fsr, thickness, q, heater-efficiency, rth, reloma-level, reloma-curvature,
+  aggressor-rate, g25-topology, eo-bandwidth, rom-dc-scale (none exists). **params owner**: a public
+  `realize(..., u=(B, D))` (or `uncertainty="design"`) so the LatinHypercube patch can go; the `ring_plus8dbm` corner
+  of `uncertainty.chip_input_loss` in g25_test_vehicle; fill_fraction has no effect on any calibration replica with
+  the analytic junction (zero Jacobian column). **replicas owner**: CAL-9a/b/c recompute the same 8-die protocol 3
+  times per pass (one call would cut the Jacobian by a third).
+- Open: about 30 % of the section 4/5 worlds start supply-limited (the assumed 150 mA / 0.2 W array heater limit,
+  section 8.3); Saltelli S1 is poorly resolved at 128 base rows (ST is resolved; ~1.3 s per world for more);
+  BND-3a/b blocked (named controllers), VAL-7c blocked (no de Cea stack).
+- Costs measured on g26 (2026-10-10): predictions 515 s, identifiability 1167 s, sensitivity 1412 s, ranking
+  1681 s (76 min, peak 1.09 GB); on g26_calibrated (2026-10-16, this stage): 420, 696, 910, 825 s (2856 s with the
+  render, peak 1.07 GB). `--fast` ~5 s.
+
+### 9.5 Findings
+
+1. Held-out targets on g26_calibrated: 5 pass / 9 fail (g26 2 / 12); VAL-2a, VAL-2b, VAL-3a turn to pass, none
+   turns to fail (calibration.md 11.2).
+2. Acceptance: same verdicts except A1-ber (passes on g26_calibrated); lock errors 7-49 % larger; relOMA 0.8 dB higher
+   (calibration.md 11.3).
+3. Under A1, g26_calibrated loses a ring in the self-heating corners (eta high, z_ratio 2) where g26 loses none, at the
+   same static bistability ratio (calibration.md 11.2); fsr window_a is also worse (42.5 against 12.7 dB).
+4. The record's context had been left stale by the review's merge of two parallel runs (calibration.md 11.1); now
+   tested.
+
+### 9.6 Test status and checks (all through tools/memguard.py)
+
+- Fast suite (`-m "not slow"`) at the start of this stage: 1727 passed, 103 skipped, 3 xfailed, **5 failed**
+  (VAL-8a/b/c, `test_validation_md_is_current`, `test_calibrated_leaf_audit_flags_contamination`). At the end:
+  **1735 passed, 113 skipped, 3 xfailed, 3 failed in 299 s** (peak RSS 0.71 GB); the 3 failures are VAL-8a/b/c (the
+  known thermal-artefact targets, unchanged since section 6.5).
+- `pytest -m calibration tests/calibration`: 39 passed. test_report.py, test_sensitivity.py, test_params_cli.py,
+  test_cli_run.py (slow tests included): 52 passed. test_kernel_parity.py, test_validation_isolation.py,
+  test_targets_schema.py: 115 passed. tests/closure/test_presets.py on both calibrated presets (slow Monte Carlo
+  batch included): 8 passed. `python -m mrm.validation.targets_io check`: OK. `mrm report --check` on both reports:
+  current.
+- Engine bit-identity (no njit code changed): tools/perf_scenarios.py against runs/perf_r2/final3: 0 of 476 signals
+  differ (runs/integrator_calib/reg). The nine quick acceptance runs on g26 equal the 2026-10-10 integrator runs bit
+  for bit (every array).
+- After committing: run `python -m mrm.validation.report --fast` and `python -m mrm.validation.report --fast --preset
+  g26_calibrated --out docs/VALIDATION_g26_calibrated.md`, so both stamps name the new commit (nothing is
+  recomputed).
