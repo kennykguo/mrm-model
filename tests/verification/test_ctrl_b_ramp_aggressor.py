@@ -1,9 +1,13 @@
 """Ramp acquisition + red-side lock under the G26 on-die aggressors (07 P1-4; scenarios A2 and A1). Slow.
 
 Ring 0 (the victim of the g26 aggressor site) is acquired on a line with enough heater headroom (PAT-1 [0050]: bias
-the ring above the hottest chip temperature so the heater can back off): line 0 (7.6 nm of tuning) for A2 (80.8 K),
-line 4 one order down (8.74 nm) for A1 (about 101 K, 7 nm, under resonance referencing). The search window comes from
-the nominal design (07 P1-1 knowledge): w = offset / (dlambda/dw) with the heater droop, +-0.035.
+the ring above the hottest chip temperature so the heater can back off): line 4 one order down (8.74 nm of tuning)
+for the full A2 cycle and for A1 (about 101 K, 7 nm, under resonance referencing); line 0 (7.6 nm) for the first
+12 ms of A2. On line 0 the heater's share of ring 0's lock temperature (14.2 mW x 5.70 K/mW = 80.8 K at g26 nominal)
+equals A2's 80.8 K rise, so at the A2 peak the heater reaches code 0 (test_a2_full_cycle_engine[line0], xfail since
+the params review fixes of 2026-10-16; with any one of params-4, -5 or -12 undone the heater keeps 4600-7400 codes).
+The search window comes from the nominal design (07 P1-1 knowledge): w = offset / (dlambda/dw) with the heater
+droop, +-0.035.
 
 Layout (docs/handoff/controllers_b.md, docs/handoff/integrator.md section 7): the g26 default aggressor site is
 (0, -30 um), 55 um from ring 0's monitor PD at its default offset (0, 25 um), so the controller claims below run the
@@ -82,13 +86,31 @@ def test_a2_reference_plant():
     assert np.max(np.abs(e)) < 10.0
 
 
-def test_a2_full_cycle_engine():
-    """A2 through one full 100 ms cycle on the engine (rise and fall at 1616 degC/s, the reversal at the top)."""
-    cfg = load_g26(knowledge=KNOW)
-    spec = make_spec(cfg, 1)
-    lo, hi = _window(spec)
+A2_LINE0_XFAIL = ("heater authority, not the lock: on line 0 the heater's share of ring 0's lock temperature "
+                  "(80.8 K at g26 nominal) equals A2's 80.8 K rise, so the heater reaches code 0 at the A2 peak and "
+                  "the ring is dragged ~170 pm (since the params review fixes of 2026-10-16: Z_heater->ring at the "
+                  "P_FSR line, the secant beta, heater_self_ratio 1.132; with any one undone the heater keeps "
+                  "4600-7400 codes); the A2 acceptance fails the same way (docs/KNOWN_ISSUES.md)")
+
+
+@pytest.mark.parametrize("line", [4, pytest.param(0, marks=pytest.mark.xfail(strict=False, reason=A2_LINE0_XFAIL))],
+                         ids=["line4", "line0"])
+def test_a2_full_cycle_engine(line):
+    """A2 through one full 100 ms cycle on the engine (rise and fall at 1616 degC/s, the reversal at the top). Ring 0
+    on line 4 (8.74 nm of tuning, declared through tx.assignment so the engine's Truth refers to that line), as the
+    A1 test; line 0 (7.6 nm) has no heater headroom at the A2 peak (module docstring)."""
+    if line == 4:
+        from test_ctrl_b_engine import WithAssignment
+        cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
+        spec = make_spec(cfg, 1)
+        lo, hi = _window(spec, offset_nm=8.74)
+    else:
+        cfg = load_g26(knowledge=KNOW)
+        spec = make_spec(cfg, 1)
+        lo, hi = _window(spec)
     ctrl = RampAcquire(rings=[0], w_start=max(lo - 0.04, 0.0), w_lo=lo, w_hi=hi)
-    res = _engine(ctrl, cfg, lib.a2_808_aggressor(), 110e-3,
+    run_ctrl = WithAssignment(ctrl, [4, 1, 2, 3, 4, 5, 6, 7]) if line == 4 else ctrl
+    res = _engine(run_ctrl, cfg, lib.a2_808_aggressor(), 110e-3,
                   [("detuning_m", 100, "mean"), ("detuning_m", 100, "max"), ("detuning_m", 100, "min"),
                    ("heater_code", 100, "min")])
     mean, mx, mn = (_env(res.trace, s)["value"][:, 0, 0] * 1e12 for s in ("mean", "max", "min"))
@@ -97,8 +119,8 @@ def test_a2_full_cycle_engine():
     ref = float(np.median(mean[after]))
     dev = max(float(np.max(mx[after]) - ref), float(ref - np.min(mn[after])))
     codes = [v for k, v in res.trace.items() if k.startswith("heater_code")][0]["value"][:, 0, 0]
-    print(f"\nA2 engine, 110 ms: lock detuning median {ref:.1f} pm, max deviation {dev:.2f} pm, heater code min "
-          f"{codes[after].min():.0f}, state {ctrl.fsm.state[0, 0]}, wall {res.wall_s:.0f} s")
+    print(f"\nA2 engine, line {line}, 110 ms: lock detuning median {ref:.1f} pm, max deviation {dev:.2f} pm, "
+          f"heater code min {codes[after].min():.0f}, state {ctrl.fsm.state[0, 0]}, wall {res.wall_s:.0f} s")
     assert ctrl.fsm.state[0, 0] == ST_LOCK
     assert dev < 10.0
 

@@ -6,8 +6,8 @@ are in the file named on each line. The record of the review is docs/handoff/fin
 ## 1. Stale results (read these first)
 
 1. **The calibration is stale.** `g26_calibrated`, `g25_test_vehicle_calibrated` and `mrm/calibration/latest_fit.json`
-   were fitted before the params fixes (params-1 to -13) and were not refitted. Refit every group (`python -m
-   mrm.calibration`) when the real device parameters arrive (docs/handoff/calibration.md, top note).
+   were fitted at b92c519, before the final-review fixes (params-1 to -13 among them), and were not refitted. Refit
+   every group (`python -m mrm.calibration`) when the real device parameters arrive (calibration.md, top note).
 2. **Both validation reports are stale.** docs/VALIDATION.md and docs/VALIDATION_g26_calibrated.md predate the
    final-review fixes and carry a STALE banner. Regenerate them after the refit (`python -m mrm.validation.report`);
    until then `test_report.py::test_validation_md_is_current` is `xfail(strict=False)`.
@@ -87,40 +87,46 @@ are in the file named on each line. The record of the review is docs/handoff/fin
 34. **feedforward_pi gain runaway under A1.** A fix from a separate session (feed-forward as the heater-law secant,
     anti-windup at the applied rails) is in the tree since checkpoint a62f429 (CHANGELOG "feedforward_pi gain
     schedule"). This review did not review it; treat it as unreviewed.
-35. **wdm_supervisor cold start: ring 1's line labels are marginal.** Its map is fitted alone in the wide FSR prior
-    (the narrowing needs two confident rings), ambiguity 2.15 against the 2.0 threshold. It went to 1.93 after
-    physics_thermal-3 (test_cold_start_locks_every_ring_on_its_line failed) and back after the params fixes. The lock
-    outcome was right both times.
-36. **A1, default site: ring 0 runs out of heater at the hot cusp** (454-473 pm, heater at code 0 for ~15 ms, every
-    controller); A2 the same; the stress site loses ring 0 for every controller (ENGINE.md section 5).
-37. **Sampled worlds lose rings under pi_lock_c from a good warm start** (mc_pi_lock: 10 worlds with no warm-start
+35. **The WDM supervisor's cold start in sampled worlds turns on a 1-3 % heater-law change.** Seed 7 worlds 1 and 3
+    ended on their lines before the params fixes; now they lose 2 and 4 rings (flagged, not vouched for).
+    `test_cold_start_sampled_worlds_1_and_3_end_on_their_lines` is xfail (strict=False).
+36. **The WDM supervisor can still vouch for a wrong line in some worlds.** The final check fixed one path (a
+    narrowed label fit on its window's border). Another remains: with the coupling Jacobian off, seed 7 world 3 ring
+    2 targeted its unfitted first resonance and was vouched for on a foreign line (controllers_b owner).
+37. **wdm_supervisor nominal cold start: ring 1's labels are marginal.** Its map is fitted alone in the wide FSR prior,
+    ambiguity 2.15 against the 2.0 threshold. It was 1.93 after physics_thermal-3
+    (test_cold_start_locks_every_ring_on_its_line failed) and came back with the params fixes; the lock was right.
+38. **Ring 0 runs out of heater at the hot end of A1 and A2** (default site). A1: 454-473 pm, heater at code 0 for
+    ~15 ms, every controller. A2 on line 0: the heater's share of the lock temperature (80.8 K) equals A2's rise, so
+    the full-cycle test runs ring 0 on line 4 and the line-0 case is xfail. The stress site loses ring 0 always.
+39. **Sampled worlds lose rings under pi_lock_c from a good warm start** (mc_pi_lock: 10 worlds with no warm-start
     flag). A claim over the uncertainty set needs that analysis (ENGINE.md section 10).
-38. **The array heater supply limit binds in about 1/3 of the g26 LHS worlds** (0.2 W, 0.15 A, both assumed). There
+40. **The array heater supply limit binds in about 1/3 of the g26 LHS worlds** (0.2 W, 0.15 A, both assumed). There
     no controller can hold the bank; it needs a source or a range (integrator.md 8.3).
-39. **g26_calibrated is fragile to self-heating under A1** (eta high, z_ratio 2: one ring unlocked, one on a foreign
+41. **g26_calibrated is fragile to self-heating under A1** (eta high, z_ratio 2: one ring unlocked, one on a foreign
     line) where g26 is not (calibration.md 11.6).
-40. **Wrong-line capture at power-up**: each cold g26 ring sits ~2 FWHM blue of line n+3 and can self-heat onto it;
+42. **Wrong-line capture at power-up**: each cold g26 ring sits ~2 FWHM blue of line n+3 and can self-heat onto it;
     acquisition controllers need a supervisor (integrator.md section 4).
-41. **A named scenario runs without the config's signal defaults**: bias 1.0 V instead of 1.05 V, ~4 heater codes
+43. **A named scenario runs without the config's signal defaults**: bias 1.0 V instead of 1.05 V, ~4 heater codes
     and up to ~100 pm of transient apart; name-based and config-based results do not compare number for number.
-42. **A corner chosen with `alts=` still reaches `model_nominal`** (controllers-2 part): one knowledge vocabulary and
+44. **A corner chosen with `alts=` still reaches `model_nominal`** (controllers-2 part): one knowledge vocabulary and
     a `controller_knowledge` preset are open (controllers_c.md, integrator.md 6.4).
-43. **Lock-logic limits** (controllers_a 7.4, controllers_b 7.4, controllers_c 6): a fast red step reads as a fall
+45. **Lock-logic limits** (controllers_a 7.4, controllers_b 7.4, controllers_c 6): a fast red step reads as a fall
     (strict xfail); the WDM DOWN scan can take another line's peak as the set-point; KalmanLQG/MPC fail in some
     reachable worlds (xfail); bias tunes weakly in g26 (0.1-0.5 pm per 0.2 V).
-44. **The harnesses use the unshifted phase slope** 2 pi c t_rt / lambda^2 (1-1.2 % of the in-tick thermo-optic phase
+46. **The harnesses use the unshifted phase slope** 2 pi c t_rt / lambda^2 (1-1.2 % of the in-tick thermo-optic phase
     after a 5-8 nm shift); the engine uses the shifted one (integrator.md 6.4).
 
 ## 6. Engine, experiments and tooling
 
-45. **With tick_jitter_s > 0, chunk_ticks still changes the auto-policy step sequence**, and a score_from_s split
+47. **With tick_jitter_s > 0, chunk_ticks still changes the auto-policy step sequence**, and a score_from_s split
     off a controller edge changes the trajectory (it warns ScoreSplitWarning) (engine-4 part; ENGINE.md section 2).
-46. **The code fingerprint cannot tell a comment edit from a real change** (experiments_docs-2 part): any edit of a
+48. **The code fingerprint cannot tell a comment edit from a real change** (experiments_docs-2 part): any edit of a
     fingerprinted file, or a numpy/numba change, invalidates every convergence certificate (2 h or more to remake).
-47. **The mini soak passes the 0.5 pm convergence cap by 0.03 pm** (experiments_docs-4 part): its ring 1 set point
+49. **The mini soak passes the 0.5 pm convergence cap by 0.03 pm** (experiments_docs-4 part): its ring 1 set point
     moves 0.47 pm between factors; any engine change can flip test_experiment_runs.py.
-48. **Not built**: `fidelity.data_modulation: lut` in the kernel, the reference-tap and `datapath.bitstat_ones`
+50. **Not built**: `fidelity.data_modulation: lut` in the kernel, the reference-tap and `datapath.bitstat_ones`
     channels (a reference-tap config is refused), `DacFacts.law`, `run_lock_request`, the Verilator/cocotb HDL
     co-simulation, an in-kernel bridge, per-world reset in the gym env, the 07 P1-22 throughput (ENGINE.md 10).
-49. **Sensing details not modelled**: the bit-statistics window levels at the first edge after a reset are reset
+51. **Sensing details not modelled**: the bit-statistics window levels at the first edge after a reset are reset
     placeholders; a shared integrating ADC's de-integration time is not modelled (ENGINE.md section 10).
