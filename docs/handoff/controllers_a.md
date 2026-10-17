@@ -106,9 +106,12 @@ sf, obs, act)`, `dither_init`, `dither_step`, `bias_init`, `bias_step`, `bias_fa
   mode needs a hand-off inside the half width (|r| peaks at x = 1 and r(x) = r(1/x)).
 - **extremum seeking.** P&O: dwell at u, u+d, u-d (settle 4, average 4 steps), argmax or Newton. Sine: f_d 2 kHz,
   HPF 200 Hz, phase 0.35 rad, u_hat += gain xi/J_lp.
-- **feedforward_pi.** u_ff = -K_ff (T_hat - T_ref), K_ff = (dlambda/dT)/(pm per code at u) (quadratic-law scheduled;
-  relief-independent because the relief divides disturbance and correction alike), T_hat a first-order hold of the
-  sensor (the staircase is worse than no feed-forward). T_ref is taken per ring at its first lock.
+- **feedforward_pi.** u_ff = c - u, c^2 = u^2 - 2 u K_ff(u) (T_hat - T_ref), K_ff = (dlambda/dT)/(pm per code at u)
+  (the secant of the quadratic law from the integrator u, never evaluated at u + u_ff; -K_ff (T_hat - T_ref) for a
+  linear law; relief-independent because the relief divides disturbance and correction alike), T_hat a first-order
+  hold of the sensor (the staircase is worse than no feed-forward). T_ref is taken per ring at each lock; a ring that
+  leaves LOCK takes u_ff into its integrator (bumpless), and the integrator is held where u + u_ff is at a DAC rail.
+  Until 2026-10-16 K_ff was evaluated at u + u_ff and ran away under A1 (docs/CHANGELOG.md).
 - **midranging.** After the PI settles: bias ID +-300 codes (s_b), then b -= k_b (y - y_set)/s_b (clipped to
   b_mid +- 0.6 V), u += k_o (s_b/s_h)(b - b_mid). After a fall and recapture the heater PI settles at the set-point
   again before the bias loop resumes; telemetry `locked` follows the bias loop in RUN.

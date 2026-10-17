@@ -713,6 +713,9 @@ Sources: [PHY], [VAL], [R06] O5.
 - `uncertainty.coupling_regime: under | over`. `fit_coupling` returns every solution branch, written as alternatives
   (P1-14).
 - `uncertainty.er_mechanism: dispersion | ring_t_loss | heater_t_loss` (mixtures allowed).
+  [2026-10-16, params review: the CAL-1/CAL-2 fit ties the branch to the mechanism (dispersion under-coupled, the
+  loss mechanisms over-coupled), so in the calibrated presets `coupling_regime` is a label entry of `er_mechanism`
+  (follows + map), not an independent draw; docs/CHANGELOG.md]
 - `mrm/calibration/er_vs_heater.py` emulates the G25 measurement (a low-power laser sweep at each heater voltage,
   all-pass or add-drop), fits on 0 to 1.2 V only (CAL-2) and predicts 1.4 and 1.5 V (VAL-2). The transfer from G25 to
   the G26 add-drop ring is stated explicitly.
@@ -990,6 +993,10 @@ Sources: [ARCH], [PHY].
 **Why.** One width or thickness error moves the resonance (about 1 to 2 nm per nm), the FSR and the coupling
 together. Independent draws create impossible rings that controllers can overfit to. Monitor gain, the most variable
 per-ring quantity, is absent from `variation.*` today.
+[2026-10-16, params review: in g26 the geometry now moves the couplers through the coupling Jacobian (the R4
+anchors describe the nominal-geometry device of each world; a width error also closes both gaps) and the FSR
+through n_g at the mask radius of that device; the bend radiation follows its exponential law. The test runs on
+g26 (tests/verification/test_params_review.py; docs/CHANGELOG.md)]
 
 ### P1-17. Experiment files, registries and run manifests
 

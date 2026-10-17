@@ -46,26 +46,31 @@ def test_g26_low_power_reaches_the_peak(cls):
     report(f"{c.name} g26 at -10 dBm per ring (peak lock)", m, centre_detuning_pm=float(np.mean(final)))
 
 
-def _g26_nominal_power(cls):
+def _g26_nominal_power(cls, **kw):
     cfg, pp, spec, plant = H.placed(delta_pm=60.0)
-    c = cls()
+    c = cls(**kw)
     loop = H.ClosedLoop(plant, spec, c)
     rec = loop.run(8000)                          # 8 ms
     tel = c.telemetry()
     assert np.all(tel["state"] != E_FAULT)
     d = rec["delta_pm"].astype(float)
     m = H.lock_metrics(rec, slice(0, 500), slice(2000, None), delta_ref=np.zeros(d.shape[1:]))
-    report(f"{c.name} g26 nominal power (peak seeking)", m, falls=float(tel["fall_count"].sum()),
+    report(f"{c.name}{kw or ''} g26 nominal power (peak seeking)", m, falls=float(tel["fall_count"].sum()),
            min_detuning_pm=float(d.min()))
     return d, tel
 
 
 def test_g26_nominal_power_po_falls_at_the_fold():
-    """At +4 dBm per ring the fold sits ~9 pm blue of the peak: es_po's probes reach past it, so it falls off and
-    recaptures (07 P0-1); it never ends in FAULT."""
-    d, tel = _g26_nominal_power(ExtremumSeekingPO)
+    """At +4 dBm per ring the fold sits a few pm blue of the peak: a probe that reaches past it makes es_po fall off
+    and recapture (07 P0-1); it never ends in FAULT. The default +-16-code probe (~6 pm at the peak) reaches the fold
+    only marginally: on the plant of the params review (secant beta, heater_self_ratio 1.132) it does not fall in this
+    8 ms run and falls once on rings 4-7 in 0.4 s on the engine; before the review it fell once on every ring here,
+    and restoring either the tangent beta or the ratio 1.158 alone brings those falls back. So the fall path is
+    exercised with a +-24-code probe (~9 pm), and the default parameters are checked for FAULT only."""
+    d, tel = _g26_nominal_power(ExtremumSeekingPO, delta_codes=24.0)
     assert tel["fall_count"].sum() > 0, tel["fall_count"]
     assert d.min() < -100.0                       # a fall: the ring dropped onto its cold branch
+    _g26_nominal_power(ExtremumSeekingPO)         # default parameters: asserts no FAULT
 
 
 def test_g26_nominal_power_sine_approaches_without_a_fall():

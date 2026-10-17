@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from mrm.params import load
 from mrm.validation import report as rep
 from mrm.validation import targets_io as tio
 
@@ -322,5 +323,6 @@ def test_jacobian_moves_only_plants_that_share_the_leaf(monkeypatch):
     p_q, p_il = I["params"]
     assert p_q["moved_on"] == ["G26", "G25"] and "kept" not in p_q
     assert p_il["moved_on"] == ["G26"] and "G25" in p_il["kept"]
-    assert J[i7, 1] == 0.0 and J[i8, 1] == pytest.approx(10.0 * 4.0)  # d/d(il) x half-range 4 dB
+    lo, hi = load("g26").leaves["optical_path.chip_input_loss_db"].range         # [1, 10] dB since the params review
+    assert J[i7, 1] == 0.0 and J[i8, 1] == pytest.approx(10.0 * (hi - lo) / 2.0)  # d/d(il) x the G26 half-range
     assert J[i7, 0] == pytest.approx(800.0 / 100.0) and J[i8, 0] == pytest.approx(8.0)

@@ -40,9 +40,12 @@ def test_artefacts_used_hash_every_file_the_g26_config_reads():
         warnings.simplefilter("ignore")
         cfg = params.load("g26")
     arts = {a["file"]: a for a in mf.artefacts_used(cfg)}
-    # the leaves that take their value from the rib160 mode solve, and the 200 nm alternative of film_thickness
+    # the leaves that take their value from the rib160 mode solve, the 200 nm alternative of film_thickness (the
+    # rib200 artefact since the params review) and the strip stand-in that stays a plain alternative
     assert "extracted/modes_rib160.json" in arts and arts["extracted/modes_rib160.json"]["selected"]
+    assert "extracted/modes_rib200.json" in arts and not arts["extracted/modes_rib200.json"]["selected"]
     assert "extracted/modes_strip400x200.json" in arts and not arts["extracted/modes_strip400x200.json"]["selected"]
+    assert "extracted/coupling_rib160.json" in arts and arts["extracted/coupling_rib160.json"]["selected"]
     assert "materials.json" in arts
     for a in arts.values():
         assert a["exists"] and len(a["sha256"]) == 64

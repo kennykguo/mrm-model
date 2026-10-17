@@ -773,6 +773,8 @@ def realize(cfg: "Config", batch: int = 1, seeds: int | np.ndarray | dict = 0, g
         lhs_cols = {n: np.clip(u[:, i], 1e-12, 1 - 1e-12) for i, n in enumerate(names)}
     for name in names:
         e = cfg.uncertainty[name]
+        if e.kind == "hypothesis" and e.follows is not None:
+            continue                        # a label entry is not drawn: set from its leader below
         if e.kind == "hypothesis":
             cm = _hyp_choices(e)
             choices = list(cm)
@@ -844,6 +846,20 @@ def realize(cfg: "Config", batch: int = 1, seeds: int | np.ndarray | dict = 0, g
                     arr[e.target] *= x[:, None]
                 else:
                     arr[e.target] += x[:, None]
+    # label entries (follows: + map:): the second axis of a joint hypothesis, e.g. g26_calibrated's coupling
+    # regime, which the CAL-2 fit ties to the extinction mechanism; the label is the one the leader's choice implies
+    for name in names:
+        e = cfg.uncertainty[name]
+        if e.kind != "hypothesis" or e.follows is None:
+            continue
+        choices = list(_hyp_choices(e))
+        lead = world_choices[e.follows]
+        idx = np.array([choices.index(e.label_of(lead[i])) for i in world[e.follows]], dtype=np.int64)
+        if e.pinned is not None and np.any(idx != choices.index(str(e.pinned))):
+            raise RealizeError(f"uncertainty.{name} is pinned to {e.pinned!r} but uncertainty.{e.follows} drew a "
+                               f"choice that implies another label")
+        world[name] = idx
+        world_choices[name] = tuple(choices)
 
     # ---- 3. sweep grid
     for p, vals in (grid or {}).items():

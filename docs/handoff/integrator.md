@@ -88,7 +88,8 @@ Changed in other owners' files (each change is small and keeps the module's desi
   alternatives on CAL-2 with the loss form of decision 4.
 - **content**: `ring.junction.depletion_exponent` range [0.33, 0.67] reaches outside the analytic table's
   [1/3, 2/3] check by rounding (a corner at 0.33 or 0.67 raises in `analytic_junction_table`); use 0.334/0.666 or
-  fractions. `ring.monitor.adc_bits` 16 vs ~10 and the full scale remain one joint hypothesis to write.
+  fractions. [resolved 2026-10-16, params review: range [0.334, 0.666], schema bounds [1/3, 2/3].]
+  `ring.monitor.adc_bits` 16 vs ~10 and the full scale remain one joint hypothesis to write.
 
 ## 3b. Requests resolved here (by owner of the request)
 
@@ -620,7 +621,9 @@ CHANGELOG, data and charts next to VALIDATION.md, `--fast` after a fit record) a
 companion `g25_test_vehicle_calibrated`).
 
 Still open (owner): calibration.md sections 8 and 11.6 (params_machinery: tied hypotheses, a y = TCR x R_th,H key;
-params_content: the R0 range, the dispersion; scenarios: CAL-9 / CAL-12c; junction: LUT or analytic; replicas: VAL-1
+params_content: the dispersion (the R0 range is resolved: [37, 58] since the params review of 2026-10-16, which also
+made g26_calibrated's coupling regime a label of er_mechanism and refitted the calibration; docs/CHANGELOG.md);
+scenarios: CAL-9 / CAL-12c; junction: LUT or analytic; replicas: VAL-1
 device, CAL-5 read-off grid; calibration: the ratio tag; controllers: the self-heating fragility of g26_calibrated);
 section 9.4 below (report requests); section 8.3 (unchanged).
 

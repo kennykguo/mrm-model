@@ -205,26 +205,13 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
             "under-coupled branch (the leaf value); the loss mechanisms select the solver dispersion (alternative "
             "'solver') and fit "
             "only on the over-coupled branch (the mirror solution), so each selects its own coefficient AND its own "
-            "alpha_other (cal_<mechanism>_branch, Q_L at the nominal): the branch is tied to the mechanism and "
-            "overrides uncertainty.coupling_regime in those worlds (entries apply in name order). Likelihood ratios: "
-            "docs/handoff/calibration.md")
+            "alpha_other (cal_<mechanism>_branch, Q_L at the nominal): the branch is tied to the mechanism, so this "
+            "entry is the joint (mechanism, regime) hypothesis and uncertainty.coupling_regime is its label "
+            "(follows: er_mechanism). Likelihood ratios: docs/handoff/calibration.md")
     worlds = ((groups.get("coupling_er") or {}).get("extra") or {}).get("composed_worlds") or {}
-    over = worlds.get("coupling_regime=over")
-    if over and "er_mechanism" in uncertainty:
-        # restate coupling_regime with what the calibration found about its 'over' choice (review: the entry's g26
-        # note says both branches meet CAL-1/CAL-2, which holds here only in the loss-mechanism worlds)
-        cr = copy.deepcopy((raw.get("uncertainty") or {}).get("coupling_regime"))
-        if cr is not None:
-            ok = all(t.get("within_tolerance") for t in (over.get("targets") or {}).values())
-            cr["note"] = (str(cr.get("note", "")) + " [g26_calibrated: the branch names the cold 0 V state. 'over' "
-                          f"with the nominal er_mechanism (dispersion) gives chi2 {float(over['chi2']):.3g} against "
-                          f"{float(over['nominal_chi2']):.3g} for the nominal world and "
-                          + ("meets" if ok else "MISSES") + " the CAL-2 tolerance; the over-coupled worlds that fit "
-                          "CAL-2 are er_mechanism=ring_t_loss / heater_t_loss, which select their own alpha_other "
-                          "(entries apply in name order in realize). The nominal (dispersion) world crosses critical "
-                          "coupling during a heater sweep, so it is over-coupled at the operating line; the loss worlds "
-                          "are the mirror (docs/handoff/calibration.md 4.2)]")
-            uncertainty["coupling_regime"] = cr
+    if "er_mechanism" in uncertainty and (raw.get("uncertainty") or {}).get("coupling_regime") is not None:
+        uncertainty["coupling_regime"] = _coupling_regime_label(raw, groups["coupling_er"], worlds,
+                                                                uncertainty["er_mechanism"])
     for entry, choices in selections.items():
         pu = copy.deepcopy(uncertainty.get(entry) or (raw.get("uncertainty") or {}).get(entry))
         if pu is None:
@@ -243,6 +230,56 @@ def preset_document(results: Mapping[str, Any]) -> tuple[dict, list[str]]:
         doc["variation"] = variation
     header = _header(results)
     return doc, header
+
+
+def _coupling_regime_label(raw: dict, g: Mapping[str, Any], worlds: Mapping[str, Any], er: dict) -> dict:
+    """uncertainty.coupling_regime of the calibrated presets: a label entry of uncertainty.er_mechanism
+    (``follows`` + ``map``, PARAMETERS_FORMAT 6.1), not an independent hypothesis (params review 2026-10-16,
+    params-14). The CAL-1/CAL-2 fit ties the cold 0 V branch to the extinction mechanism: the dispersion world fits
+    only under-coupled, each loss world only over-coupled (its own alpha_other), and the crossed worlds miss the CAL-2
+    tolerance. So each world's label is the branch its mechanism's fit lands on (``derived.branch_at_0v`` of the
+    record), and pinning the label (the g26 corners g26_overcoupled, g26_low_eta, g26_hot_selfheat) selects the
+    mechanisms that give it. Before, g26's independent under | over draw was kept: the 'over' world was the
+    dispersion fit pushed to the branch wall (under-coupled at 0 V, CAL-2 missed) and the loss worlds were labelled
+    'under' while over-coupled, half of all worlds."""
+    branch = {}
+    nominal = g.get("nominal")
+    for mech in er["choices"]:
+        rec = (g["fits"].get(nominal) if mech == er.get("nominal") else worlds.get(f"er_mechanism={mech}")) or {}
+        b = (rec.get("derived") or {}).get("branch_at_0v")
+        if b not in ("under", "over"):
+            raise ValueError(f"coupling_er: the record gives no cold 0 V branch for er_mechanism={mech} "
+                             f"(derived.branch_at_0v {b!r}); cannot label its coupling regime")
+        branch[mech] = b
+    labels = [c for c in ("under", "over") if c in branch.values()]
+    cr = copy.deepcopy((raw.get("uncertainty") or {}).get("coupling_regime")) or {}
+    out = {"kind": "hypothesis", "follows": "er_mechanism", "map": dict(branch), "choices": {c: {} for c in labels},
+           "nominal": branch[er["nominal"]]}
+    out.update({k: cr[k] for k in ("provenance", "generation", "source") if k in cr})
+    over = worlds.get("coupling_regime=over") or {}
+    od = over.get("derived") or {}
+    ok = all(t.get("within_tolerance") for t in (over.get("targets") or {}).values()) if over else None
+    x0 = {m: (worlds.get(f"er_mechanism={m}") or {}).get("derived", {}).get("x0_cold_0v") for m in branch}
+    x0[er["nominal"]] = ((g["fits"].get(nominal) or {}).get("derived") or {}).get("x0_cold_0v")
+    out["note"] = (
+        "07 P1-5 under | over coupled at the 27.9 dB G25 notch. In the calibrated presets the regime is the second "
+        "axis of the joint hypothesis uncertainty.er_mechanism (a label entry: follows er_mechanism, never drawn): "
+        "the CAL-1/CAL-2 fit lands each extinction mechanism on one branch of the cold 0 V state (the G25 bench "
+        "ring, x0 = kappa_e / (kappa_i + kappa_d) of the record), "
+        + ", ".join(f"{m} {b}" + (f" (x0 {_round(float(x0[m]), 4)})" if x0.get(m) is not None else "")
+                    for m, b in branch.items())
+        + ", and the crossed worlds miss the CAL-2 tolerance (docs/handoff/calibration.md 4.2). Pinning the label "
+        "selects the mechanisms that give it (g26_overcoupled: the loss mechanisms; g26_low_eta, g26_hot_selfheat: "
+        "dispersion). The label holds at the nominal Q_L; a q_loaded draw can move a world across critical coupling "
+        "(see uncertainty.q_loaded)."
+        + (f" g26's independent 'over' choice (alpha_other alternative 'over', the dispersion fit on the over branch) "
+           f"is not a world here: chi2 {_round(float(over['chi2']), 3)} against "
+           f"{_round(float(over['nominal_chi2']), 3)} for the nominal world, "
+           + ("within" if ok else "outside") + " the CAL-2 tolerance, and it lands "
+           + (f"{od['branch_at_0v']}-coupled at 0 V (x0 {_round(float(od['x0_cold_0v']), 4)})"
+              if od.get("branch_at_0v") else "on an unknown branch")
+           + "; the leaf alternative keeps its value" if over else ""))
+    return out
 
 
 def _variation_update(variation: dict, raw: dict, d: Mapping[str, Any]) -> None:

@@ -1288,9 +1288,11 @@ def heater_power_per_fsr(plant, target=None, *, ring: int | None = None, **kw) -
                       "fsr_definition": "spacing of the cold order m and the next order red of it at the stage "
                                         "temperature (the spectrum repeats after this shift)"}
     pre = float(np.median([r_["preset_p_fsr_mw"] for r_ in rows]))
-    out.notes.append(f"ring.heater.p_fsr_mw ({pre:.4g} mW) is anchored by R2 with the FSR at the LINE wavelength "
-                     "(mrm.params.relations derived.optics.fsr_m); this protocol measures the FSR between the cold "
-                     "order and the next order red of it, so the two differ by the lambda^2 scaling of the FSR "
+    where = ("ring.heater.p_fsr_ref_wavelength_nm" if "ring.heater.p_fsr_ref_wavelength_nm" in pp.values
+             else "the ring's line")
+    out.notes.append(f"ring.heater.p_fsr_mw ({pre:.4g} mW) is anchored by R2 with the FSR at {where} "
+                     "(mrm.params.relations derived.heater.p_fsr_span_m); this protocol measures the FSR between the "
+                     "cold order and the next order red of it, so the two differ by the lambda^2 scaling of the FSR "
                      f"({(float(agg(p_list)) * 1e3 / pre - 1) * 100:+.2f} % here)")
     return out
 

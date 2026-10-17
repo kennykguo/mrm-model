@@ -67,7 +67,7 @@ _PROV_RE = re.compile(r"^([a-z-]+)(?:\((.*)\))?$")
 
 _UNC_COMMON = {"kind", "provenance", "generation", "source", "note", "textbook", "disagrees"}
 _UNC_FIELDS = {
-    "hypothesis": _UNC_COMMON | {"choices", "target", "nominal", "weights", "select"},
+    "hypothesis": _UNC_COMMON | {"choices", "target", "nominal", "weights", "select", "follows", "map"},
     "interval": _UNC_COMMON | {"target", "mode", "low", "high", "dist", "nominal", "corners", "select"},
     "dist": _UNC_COMMON | {"target", "mode", "dist", "mean", "sigma", "truncate", "nominal", "corners", "select"},
 }
@@ -189,6 +189,17 @@ class UncertaintyEntry:
     @property
     def target(self) -> str | None:
         return self.fields.get("target")
+
+    @property
+    def follows(self) -> str | None:
+        """The hypothesis entry whose choice sets this entry's label (a label entry, ``follows:`` + ``map:``), or
+        None for an entry drawn on its own."""
+        f = self.fields.get("follows")
+        return str(f) if f is not None else None
+
+    def label_of(self, leader_choice: str) -> str:
+        """The choice of this label entry that the leader's ``leader_choice`` implies."""
+        return str((self.fields.get("map") or {})[str(leader_choice)])
 
 
 @dataclass
@@ -894,6 +905,8 @@ def load(preset: str | Path | Mapping, overrides: Mapping[str, Any] | Iterable[s
     # overrides
     for p, v in parse_overrides(overrides).items():
         _apply_override(cfg, p, v, errs)
+    # a pinned label entry pins (or restricts) the entry it follows
+    _resolve_label_entries(cfg, errs)
 
     try:
         _validate(cfg, errs)
@@ -1061,6 +1074,74 @@ def _apply_alt(cfg: Config, path: str, name: str, errs: list[str]) -> None:
         else:
             e.restrict = ok
     cfg.alts_applied[path] = name
+
+
+def _validate_label_entry(cfg: Config, e: UncertaintyEntry, cm: dict, where: str, errs: list[str]) -> None:
+    """A label entry names a joint hypothesis' second axis: its choices set nothing, it is never drawn, and its
+    label is ``map[<leader choice>]`` in every world (PARAMETERS_FORMAT 6.1)."""
+    lead_name, m = e.fields.get("follows"), e.fields.get("map")
+    lead = cfg.uncertainty.get(str(lead_name)) if lead_name is not None else None
+    if lead is None or lead.kind != "hypothesis":
+        errs.append(f"{where}: follows {lead_name!r} must name another hypothesis entry")
+        return
+    if lead.name == e.name or lead.follows is not None:
+        errs.append(f"{where}: follows uncertainty.{lead.name}, which is itself a label entry (or this entry)")
+        return
+    if not isinstance(m, dict):
+        errs.append(f"{where}: a label entry needs map: {{<choice of uncertainty.{lead.name}>: <choice>}}")
+        return
+    lead_ch = list(_hyp_choice_map(lead))
+    m = {str(k): str(v) for k, v in m.items()}
+    if set(m) != set(lead_ch):
+        errs.append(f"{where}: map must name every choice of uncertainty.{lead.name} exactly once ({lead_ch}), "
+                    f"got {sorted(m)}")
+    if set(m.values()) - set(cm):
+        errs.append(f"{where}: map gives labels {sorted(set(m.values()) - set(cm))} that are not choices {sorted(cm)}")
+    unused = set(cm) - set(m.values())
+    if unused:
+        errs.append(f"{where}: choices {sorted(unused)} are never implied by uncertainty.{lead.name} (map)")
+    if any(cm[c] for c in cm):
+        errs.append(f"{where}: the choices of a label entry set nothing (its leader's choices do): "
+                    f"{ {c: v for c, v in cm.items() if v} }")
+    if e.fields.get("weights") is not None or e.target is not None:
+        errs.append(f"{where}: a label entry is not drawn: no weights or target")
+    lead_nom = lead.fields.get("nominal")
+    if lead_nom is not None and str(lead_nom) in m and str(e.fields.get("nominal")) != m[str(lead_nom)]:
+        errs.append(f"{where}: nominal {e.fields.get('nominal')!r} must be the label of uncertainty.{lead.name}'s "
+                    f"nominal {lead_nom!r}: {m[str(lead_nom)]!r}")
+
+
+def _resolve_label_entries(cfg: Config, errs: list[str]) -> None:
+    """A label entry (``follows: <leader>``, ``map: {leader choice: own choice}``) is not drawn: its world label is
+    the one its leader's choice implies (realize). Pinning it (alts) therefore pins its leader to the choices that
+    imply that label: the only one, or a restriction to several (drawn by the leader's weights; in a nominal world
+    the leader's nominal if allowed, else the first allowed). A leader pinned to a choice that implies another
+    label is an error. Malformed entries are left to _validate_uncertainty."""
+    for e in cfg.uncertainty.values():
+        if e.kind != "hypothesis" or e.follows is None or e.pinned is None:
+            continue
+        lead = cfg.uncertainty.get(e.follows)
+        m = e.fields.get("map")
+        if lead is None or lead.kind != "hypothesis" or lead.follows is not None or not isinstance(m, dict):
+            continue
+        allowed = [c for c in _hyp_choice_map(lead) if str(m.get(c)) == str(e.pinned)]
+        if lead.restrict is not None:
+            allowed = [c for c in allowed if c in lead.restrict]
+        if lead.pinned is not None:
+            if str(lead.pinned) not in allowed:
+                errs.append(f"alts: uncertainty.{e.name}={e.pinned} needs uncertainty.{lead.name} in {allowed}, "
+                            f"but it is pinned to {lead.pinned!r} (uncertainty.{e.name} follows uncertainty."
+                            f"{lead.name})")
+            continue
+        if not allowed:
+            errs.append(f"alts: uncertainty.{e.name}={e.pinned}: no allowed choice of uncertainty.{lead.name} implies "
+                        f"it (map {m})")
+        elif len(allowed) == 1:
+            _apply_alt(cfg, f"uncertainty.{lead.name}", allowed[0], errs)
+            lead.origin.append(f"pinned by uncertainty.{e.name}={e.pinned} (a label entry)")
+        else:
+            lead.restrict = allowed
+            lead.origin.append(f"restricted to {allowed} by uncertainty.{e.name}={e.pinned} (a label entry)")
 
 
 def _select_leaf_alt(cfg: Config, path: str, name: str, why: str, errs: list[str]) -> None:
@@ -1494,6 +1575,8 @@ def _validate_uncertainty(cfg: Config, strict: bool, errs: list[str]) -> None:
             if not cm:
                 errs.append(f"{where}: needs choices (a list with target:, or {{choice: {{path: alternative}}}})")
                 continue
+            if "follows" in e.fields or "map" in e.fields:
+                _validate_label_entry(cfg, e, cm, where, errs)
             nom = e.fields.get("nominal")
             if nom is None or str(nom) not in cm:
                 errs.append(f"{where}: nominal {nom!r} must be one of the choices {sorted(cm)}")

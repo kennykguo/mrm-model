@@ -182,6 +182,20 @@ PARAMETERS.md after applying it):
   K/mW (lock_slope), so rom_dc_scale = 1.88, just inside the [0.5, 2] warning band. Its heater-resistor ratio is 2.65
   where the G25 droop (y = TCR x R_th,H = 0.00904 /mW) with a doped-Si TCR of 1.4e-3 /K implies 1.21. Both say the
   assumed in-ring geometry is less efficient than the G25 heater; worth a look before the ROM becomes the default.
+- **2026-10-16 (params review), g26 changes and choices for the content owner** (docs/CHANGELOG.md has the reasons
+  and numbers): (a) `ring.geometry.jacobian_coupling` (coupling_rib160) moves each device's couplers with its
+  width, film and gaps; the gaps share one assumed local sigma, 1.5 nm, and a width error closes both gaps
+  (`variation.geometry.width_closes_gaps`); the q_loaded (rel 0.015) and kappa_d_over_kappa (rel 0.1) stand-in
+  draws are gone. Revisit the 1.5 nm when a gap spread is published. (b) With sampled geometry the radius is the
+  nominal device's (a mask dimension) and the FSR follows n_g (~11 GHz sd at 1.8 THz). (c) The film-200 world is the
+  rib200 artefact; its Jacobian gives a 4.2 nm die resonance spread with the same fabrication sigmas (6.2 nm on
+  rib160): the sigmas are kept as fabrication errors, so the thicker film is less sensitive; if the Berkeley 6 nm is
+  meant per world, the sigmas need a per-film value. (d) `ring.heater.p_fsr_ref_wavelength_nm` 1309.5 (inferred:
+  the G25 operating line of CAL-7) makes Z and the efficiency line-independent. (e) beta is the secant of the solver
+  curve through the nominal lock (1.2377e-3); the modes table ends at 125 degC while the P_FSR sweep reaches
+  ~170 degC (extraction request, extract_modes.md). (f) heater_self_ratio 1.132 holds y = 0.00904 /mW at the new Z.
+  (g) Ranges now hold every selectable value (chip_input_loss_db [1, 10], depletion_exponent [0.334, 0.666],
+  r_cold_ohm [37, 58]); the loader enforces it.
 - **2026-10-16 (physics_thermal review), g26 changes for the content owner:** (a) a third choice of
   `uncertainty.thermal.stack`, `side_by_side_tec_held` (weight 0, appended last so no sampled or LHS draw changes: the
   in-ring FEM ROM's side-by-side stack in its TEC-held package; it selects the `tec_held` alternatives of xt_nearest /
@@ -235,7 +249,9 @@ PARAMETERS.md after applying it):
    ~23.6 dB (under) or to near-critical. Rescale the whole budget by n_g/4.0 to keep Q_i (the CAL-2 test
    `test_g25_ring_reproduces_the_cal2_notch_in_its_labelled_regime` fails otherwise), and recompute
    `alpha_bend_radiation_db_per_cm.alternatives.strip400x200_q_anchor` = (97 + other) x n_g,200/n_g,160 - 96 - other
-   (balanced between the under and over values of `other`).
+   (balanced between the under and over values of `other`). [Since 2026-10-16 the 200 nm world uses
+   `rib200_q_anchor` = alpha_i,160 (n_g,200/n_g,160 - 1) + alpha_rad,160 per regime, then the mean; recomputed by
+   tests/closure/test_params_notes.py.]
 3. `dlambda_dt_pm_per_k`: the 07 expectation for H_solver is 66-69 pm/K at 25 degC; `implied_index_weight` must
    stay below `index_weight_ceiling` (derive diagnostic).
 4. Re-run `pytest tests/closure/test_presets.py -m ""` and regenerate `docs/PARAMETERS.md`.
@@ -309,6 +325,8 @@ Each item has a regression test in `tests/closure/test_presets.py` unless stated
    non-heating loss that keeps the measured Q_i): 28.6 dB in both labelled regimes. Cost: eta x0.92 in those worlds
    (which component carries the extra loss is unknown; only a non-heating term composes with the eta and regime
    hypotheses, because entries apply in sorted order). Test: `test_g25_ring_reproduces_the_cal2_notch_...`.
+   [Superseded 2026-10-16 (params review): the '200' choice is the 400 x 200 nm rib (modes_rib200) with
+   `rib200_q_anchor` 2.03 dB/cm, eta x0.98; the strip stays a plain alternative.]
 3. **Reset ramp too short (fixed).** `sim.reset_ramp_s` 0.5 ms was below 07 P0-1 item 6 (>= 10 tau_slow) for the
    undercut family (2 x 45.7 us x 10 = 0.91 ms) and the textbook corner (3 ms). Now 3 ms.
    Test: `test_reset_ramp_covers_ten_slow_thermal_poles`.

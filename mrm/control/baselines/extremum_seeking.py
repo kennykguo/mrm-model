@@ -24,10 +24,13 @@ controller would chase the wrong side. Both controllers detect the fall (monitor
 DC to below ``fall_level``), ramp the heater up past a guard until the monitor peaked and fell back (as pi_lock), and
 resume. Measured at g26 nominal with the default parameters (controllers review 2026-10-16):
 
-- es_po: its +-delta probes reach past the fold. In the 8 ms harness run of tests/verification/test_ctrl_a_es.py it
-  falls 8 times; on the engine (settled warm start at the oracle lock codes, 0.4 s) it falls 2-4 times per ring in
-  its first ~60 ms and then parks at the drop peak (rings 0-3 and 7) or on the cold branch ~1 nm blue of the line
-  (rings 4-6); it does not keep cycling.
+- es_po: its +-delta probes (~6 pm at the peak) reach the fold only marginally. On the plant of the params review
+  (2026-10-16: secant beta, heater_self_ratio 1.132) it does not fall in the 8 ms harness run of
+  tests/verification/test_ctrl_a_es.py; on the engine (settled warm start at the oracle lock codes, 0.4 s) rings 4-7
+  fall once before 40 ms and every ring then parks at the drop peak (-0.3 to -1.4 pm, OMA penalty 13.0-13.2 dB;
+  runs/params_fix/es_long.log). Before the review (tangent beta, ratio 1.158) it fell once per ring in the harness
+  and 2-4 times per ring on the engine, and rings 4-6 parked on the cold branch ~1 nm blue of the line: whether the
+  probes cross the fold moves with the droop and with s(T) at the lock at the 2 % level. It does not keep cycling.
 - es_sine: its dither does not reach the fold and it never falls. It approaches the peak slowly, at 0.77-0.95
   pm/ms from the warm start (+97 to +121 pm), and parks at the drop peak (-0.6 to -1.1 pm) after 100-160 ms, where
   the OMA penalty is ~13 dB; a run shorter than that sees a transient (docs/handoff/controller_scorecard.md counts
