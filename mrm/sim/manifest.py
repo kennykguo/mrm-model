@@ -18,9 +18,18 @@ Layout of one run directory::
                                    +-inf -> "inf" / "-inf"; floats are written with repr, so they round-trip)
         trace.h5                   exact arrays: /metrics/<case>/..., /trace/<case>/<record key>/{t_s, value},
                                    /truth_final/<case>/<field>, and kind-specific groups (/quasi_static, ...)
-        inputs/<file>.yaml         a copy of the experiment file (extends: of non-preset parents made absolute), the
-                                   file :func:`mrm.sim.experiment.rerun` reloads
+        inputs/<file>.yaml         a copy of the experiment file, the file :func:`mrm.sim.experiment.rerun` reloads
+        inputs/_extends_<i>_<name> every non-preset file of its ``extends:`` chain; each copy's ``extends:`` names
+                                   the copies (a preset given by path: its preset name), so no absolute path is left
+        inputs/_corner_<i>_<name>  every corner file given by path (not a preset) in experiment.corners or a grid
+                                   ``corner`` axis; rerun reads the corner from this copy (manifest
+                                   source.inputs[].corner names the corner as given). The copies are taken when the
+                                   experiment is loaded: the directory reruns, and can be sent elsewhere, without the
+                                   original files
         report.txt                 the human-readable report (compare / robust / acceptance / quasi_static)
+        convergence.json           compressed runs (07 P0-10): the convergence experiment's report and certificate,
+                                   or the reused certificate and the path it came from (``from``); a rerun takes the
+                                   certificate from this file
 
 The directory name is the UTC start time and the first 8 hex digits of the experiment hash (the sha256 of the
 resolved config and the resolved experiment options, :attr:`mrm.sim.experiment.Experiment.hash`). Two runs of the
@@ -29,6 +38,8 @@ same experiment in the same second get a ``_2``, ``_3`` ... suffix.
 Bit-for-bit reproduction needs the same code (git commit and dirty diff), the same environment (numba and numpy
 change floating-point results, 07 P2-11), the same config hash and the same seeds: :func:`compare_runs` compares two
 run directories array by array (every metric and trace in trace.h5, including the sign of zero and NaN positions).
+:func:`code_fingerprint` is the code identity a 07 P0-10 convergence certificate carries: the sources a run executes,
+the data files and the numerics versions.
 """
 from __future__ import annotations
 
@@ -47,7 +58,7 @@ import numpy as np
 
 __all__ = ["MANIFEST_SCHEMA", "TRACE_SCHEMA", "REPO_ROOT", "git_state", "environment", "artefacts_used",
            "file_sha256", "new_run_dir", "to_jsonable", "write_json", "write_trace_h5", "read_trace_h5",
-           "read_run", "compare_runs", "runs_root"]
+           "read_run", "compare_runs", "runs_root", "code_fingerprint", "code_fingerprint_files"]
 
 MANIFEST_SCHEMA = "mrm.run/1"
 TRACE_SCHEMA = "mrm.trace/1"
@@ -122,6 +133,41 @@ def environment() -> dict:
             "cpu_count": os.cpu_count(), "byteorder": sys.byteorder,
             "numba_disable_jit": os.environ.get("NUMBA_DISABLE_JIT", "0"),
             "numba_num_threads": os.environ.get("NUMBA_NUM_THREADS")}
+
+
+#: what a run executes (mrm.sim.experiment, the plant, the engine, the controllers, the scenarios and mrm.params; none
+#: of them imports mrm.validation, mrm.calibration, mrm.extraction or mrm.waveform): the Python sources of these
+#: packages of mrm/ and these top-level modules, plus every file under mrm/data (materials coefficients, the solver
+#: artefacts). Presets are config: the plant fingerprint covers them.
+CODE_PACKAGES = ("core", "plant", "sim", "control", "scenarios", "params")
+CODE_MODULES = ("__init__.py", "units.py", "materials.py")
+#: the environment entries that change floating-point results (07 P2-11)
+CODE_ENVIRONMENT = ("python", "implementation", "numpy", "scipy", "numba", "llvmlite", "machine", "byteorder")
+
+
+def code_fingerprint_files() -> list[Path]:
+    """The files :func:`code_fingerprint` hashes, sorted (CODE_PACKAGES, CODE_MODULES, mrm/data)."""
+    pkg = REPO_ROOT / "mrm"
+    files = [pkg / m for m in CODE_MODULES if (pkg / m).is_file()]
+    for d in CODE_PACKAGES:
+        files += [p for p in (pkg / d).rglob("*.py") if "__pycache__" not in p.parts]
+    files += [p for p in DATA_ROOT.rglob("*") if p.is_file() and "__pycache__" not in p.parts
+              and not p.name.startswith(".")]
+    return sorted(set(files))
+
+
+def code_fingerprint() -> str:
+    """sha256 of the code and numerics a run executes: the relative path and sha256 of every
+    :func:`code_fingerprint_files` file and the CODE_ENVIRONMENT entries of :func:`environment`. A 07 P0-10
+    convergence certificate carries it, and mrm.sim.experiment refuses a certificate whose fingerprint differs: an
+    edit of the engine (a substep heuristic, the self-heating solve, a controller) or another numba / numpy can change
+    how a compressed run converges. Any edit of those files counts, a comment included (it cannot tell)."""
+    h = hashlib.sha256()
+    for p in code_fingerprint_files():
+        h.update(str(p.relative_to(REPO_ROOT)).encode() + b"\0" + file_sha256(p).encode() + b"\n")
+    env = environment()
+    h.update(json.dumps({k: env.get(k) for k in CODE_ENVIRONMENT}, sort_keys=True, default=str).encode())
+    return h.hexdigest()
 
 
 def _artefact_file(spec: str) -> str | None:

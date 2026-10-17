@@ -1,3 +1,6 @@
+> **STALE (2026-10-17).** This report predates the final-review fixes: its parts were computed between commits 735f742 and ad69b43, before the experiments and docs fixes, and section 3.1 shows the stale calibration record. Do not quote its numbers as current.
+> It will be regenerated when the real device parameters arrive: `python -m mrm.validation.report` (every part). Open items: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
 # Validation report
 
 <!-- frozen-targets:begin (owned by the target split; the report generator must copy this block verbatim) -->

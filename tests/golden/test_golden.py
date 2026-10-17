@@ -89,8 +89,10 @@ def test_soak_file_content_and_case():
     assert g.meta["case"] == json.loads(json.dumps(c.definition()))
     assert {k.split("/")[0] for k in g.arrays} == {"pi_lock_c"}
     assert g.meta["runs"]["pi_lock_c"]["controller_path"] == "compiled"
-    # the certified c = 100 run held its lock over the whole 75 K swing (docs/handoff/experiments.md section 7)
-    assert float(g.arrays["pi_lock_c/max_abs_detuning_pm"].max()) < 5000.0
+    # the c = 100 run held its order and line over the whole 75 K swing (docs/handoff/experiments.md section 7): no
+    # change of the order nearest the declared line (a bound on max |detuning| cannot see a hop, since |d| <= FSR/2
+    # by construction) and no wrong-line event
+    assert int(g.arrays["pi_lock_c/order_changes"].sum()) == 0
     assert int(g.arrays["pi_lock_c/world/wrong_line_events"].sum()) == 0
 
 

@@ -2,6 +2,7 @@
  "schema": "mrm.calibration.fit/1",
  "created_utc": "2026-10-16T02:43:48Z",
  "git_commit": "b92c519-dirty",
+ "stale": "STALE (known issue, docs/KNOWN_ISSUES.md): this fit (2026-10-16T02:43:48Z, commit b92c519) predates the params review fixes params-1 to -13 (docs/CHANGELOG.md, 2026-10-16); g26_calibrated and g25_test_vehicle_calibrated, generated from it, inherit those g26 changes, but their fitted values were fitted on the model before them (the recomputed chi2 of the loss-mechanism CAL-2 fits is 7.77 against the recorded 7.51, from the secant beta). No refit was run; refit (python -m mrm.calibration) when the real device parameters arrive. docs/handoff/calibration.md",
  "reject_lr": 0.05,
  "context": {
   "device": {

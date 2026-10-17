@@ -566,19 +566,28 @@ experiment:
   survey per corner).
 - **Run directory** `runs/<UTC>_<hash8>/`: `experiment.resolved.yaml` (every leaf with provenance), `manifest.json`
   (schema mrm.run/1: git commit, branch, dirty-diff hash, environment, argv, seeds, source chain, artefact hashes,
-  every case's runner manifest), `metrics.json`, `trace.h5` (exact arrays), `inputs/` (the experiment file and its
-  non-preset parents, copied when loaded: the directory reruns without the original files), `report.txt`,
-  `convergence.json` (compressed runs). hash8 is the first 8 hex of the experiment hash (config without the
-  experiment-layer keys, plus the resolved options).
+  every case's runner manifest), `metrics.json`, `trace.h5` (exact arrays), `inputs/` (the experiment file, its
+  non-preset parents and its corner files given by path, copied when loaded: the directory reruns, from any working
+  directory, without the original files), `report.txt`, `convergence.json` (compressed runs; a rerun takes a reused
+  certificate from it). hash8 is the first 8 hex of the experiment hash (config without the experiment-layer keys,
+  plus the resolved options and, when the experiment runs corners, each corner's alts: an edit of a corner preset
+  makes `mrm rerun` refuse).
 - **Time compression (07 P0-10).** A compressed scenario (`scenario.time_compression` > 1, the soak) runs only with a
   convergence certificate: the convergence experiment (one slow cycle at `compression_factors`, default 1, 10, 100,
   on the same plant, controller, start and worlds) runs first, or `experiment.convergence_certificate` names a run
   directory whose certificate covers the plant fingerprint (resolved config without the experiment section and the
-  compression, plus start and worlds). The A4 certificate (`runs/acceptance_20261010/20261010T115721Z_d1511028`,
-  validated up to 100) covers g26 nominal + pi_lock_c + warm start + seeds 0.
+  compression, plus start and worlds) and the code fingerprint (`mrm.sim.manifest.code_fingerprint`: the sources of
+  mrm/{core, plant, sim, control, scenarios, params}, mrm/units.py, mrm/materials.py, every file under mrm/data and
+  the numerics versions; since 2026-10-16). The factors must agree per world on max detuning (ring by ring: 0.2 pm or
+  5 %, at most 0.5 pm), wrong-line events, FSR-hop events and order changes, heater range used and integrated
+  errors. The A4 certificate of 2026-10-10 (`runs/acceptance_20261010/20261010T115721Z_d1511028`) no longer covers
+  the tree (the g26 plant changed on 2026-10-16 and it records no code fingerprint): A4 runs its convergence
+  experiment again.
 - **Judging a controller** (07 4.8): world summaries (`mrm.sim.experiment.world_summary`): worst-lane and mean OMA
   penalty against the oracle, excursions (count, longest), time unlocked, rings on a foreign line, time to lock,
-  absolute relOMA, BER, heater rails, and the warm-start flags. A claim holds only if it holds in every world.
+  absolute relOMA, BER, heater rails, FSR hops (`fsr_hop_events`: re-locks on another order; `order_changes`:
+  changes of the order nearest the declared line, lock-independent, the one to judge a hop by, since |detuning|
+  <= FSR/2 holds by construction) and the warm-start flags. A claim holds only if it holds in every world.
 
 ## 12. External controllers: the binary bridge, golden vectors and golden traces (07 P1-21, 4.9)
 

@@ -114,12 +114,12 @@ enum values raise `ExperimentError` with a did-you-mean over both key sets):
 |---|---|---|---|
 | `experiment.start` | cold \| cold_settled \| warm | ResetSpec of the scenario, else cold | cold = heaters at code_min, `sim.reset_protocol` (g26 laser_ramp), cold lags (power-up); cold_settled = code_min, thermal state settled, branch_low; warm = quasi-static oracle lock codes, settled, branch_high |
 | `experiment.record` | list | run: `default_records` (detuning mean + envelope, relOMA, oracle relOMA, heater and monitor codes, monitor current, ring T, line_on; <= 10 000 windows); others: none | `'field@dec:reducer'` (dec ticks or `auto`; reducer mean, min, max, last, envelope) or maps |
-| `experiment.corners` | list | compare/robust: the `NAMED_CORNERS` (07 4.8's 12; g26_tec_package since 2026-10-16); else none | corner preset names or `{name, alts}` |
+| `experiment.corners` | list | compare/robust: the `NAMED_CORNERS` (07 4.8's 12; g26_tec_package since 2026-10-16); else none | corner preset names, corner files by path (copied into `inputs/`) or `{name, alts}`; their alts are part of the experiment hash |
 | `experiment.n_threads` | int | os.cpu_count() | kernel threads |
 | `experiment.self_reference` | map | off | `{duration_s: 0.02, window_s: 0.005}` (positive, window_s <= duration_s): lock error about each ring's own steady operating point (section 5) |
 | `experiment.score_from_s` | float | 0 | metrics accumulate from this time (runner `score_from_s`) |
 | `experiment.acceptance` | list | none | criteria `{id, metric, op, value, reduce, rings, cases, source, note}` (section 5) |
-| `experiment.convergence_certificate` | str | none | a run directory whose 07 P0-10 certificate covers this compressed scenario and plant |
+| `experiment.convergence_certificate` | str | none | a run directory whose 07 P0-10 certificate covers this compressed scenario, plant and code (section 6); recorded as given, a rerun takes the certificate from its own `convergence.json` |
 | `experiment.compression_factors` | list | [1, 10, 100] | factors of the convergence experiment |
 | `experiment.histogram` | bool | false | detuning histogram (~2.1 MB per world) |
 | `experiment.oracle` | bool | true | in-kernel oracle |
@@ -127,14 +127,16 @@ enum values raise `ExperimentError` with a did-you-mean over both key sets):
 | `experiment.max_worlds_per_plant` | int | 512 | MC chunk size (~1.55 MB per world) |
 | `experiment.rank_metrics` | list | `RANK_METRICS` | compare ranking metrics (names of `RANKABLE`: lower is better) |
 
-How they reach the code: `load()` takes them out of the file (and out of every non-preset parent in the `extends:`
-chain, child wins) before `mrm.params.load` validates the rest, from a stripped temp copy whose parents are absolute
-paths (`Config.files` shows the original paths). So `mrm.params.load('exp.yaml')` of a file that uses extension keys
-fails today; `mrm.run('exp.yaml')` / `mrm run exp.yaml` work, and `mrm.run(mrm.params.load('plain.yaml'))` works for
-a file without them. When the integrator adds the keys to mrm/params/schema.py (request 10.1), `load()` stops
-stripping them and reads them back from the Config (`_options_from_cfg`; tested with a monkeypatched schema). `--set
-experiment.<ext>=...` overrides work in both states. `--set experiment.variation=off` is mapped back to the enum word
-(YAML 1.1 reads off as False; mrm.params' own `--set` has the same trap).
+How they reach the code (since the integration of 2026-10-10, section 12.1; corrected 2026-10-16): every key above
+is an mrm/params/schema.py key (record, corners, self_reference and acceptance as open subtrees, `OPEN_PREFIXES`), so
+`mrm.params.load('exp.yaml')` validates a complete experiment file, and `mrm.run(mrm.params.load('exp.yaml'))`,
+`mrm.run('exp.yaml')` and `mrm run exp.yaml` run the same experiment (same options, same hash; every shipped file:
+`tests/verification/test_experiment.py::test_every_shipped_experiment_file_loads_through_mrm_params`). `load()`
+reads the options back from the Config (`_options_from_cfg`) and validates them again with this module's strict
+schema (`EXTENSION_KEYS`: types, enums, criteria, record syntax); it would strip only a key that mrm.params does not
+know (none today). It loads a temp copy of the file whose `extends:` parents are absolute paths (`Config.files` shows
+the original paths). `--set experiment.<key>=...` works on all of them; `--set experiment.variation=off` gives the
+enum word in both loaders (YAML 1.1 reads off as False; request 10.8).
 
 Grid keys (`experiment.grid`, kind sweep): a config path (overrides, config units; `controller.params.<p>` and
 `scenario.params.<p>` included), `alt:<path>` (a leaf alternative or an `uncertainty.<entry>` pin), `corner`,
@@ -194,8 +196,9 @@ is per plant and controller).
 
 ## 6. Run directories, rerun, dry run, time compression
 
-- `runs/<UTC>_<hash8>/` (hash8 = first 8 hex of `Experiment.hash` = sha256 of the config hash and the resolved
-  extension options; `_2`, `_3` on collisions): `experiment.resolved.yaml` (every leaf with provenance, generation,
+- `runs/<UTC>_<hash8>/` (hash8 = first 8 hex of `Experiment.hash` = sha256 of the config hash, the resolved
+  extension options and, when the experiment runs corners, every corner's name and alts (`_corner_contents`; since
+  2026-10-16: a corner is a separate file that the config tree does not hold); `_2`, `_3` on collisions): `experiment.resolved.yaml` (every leaf with provenance, generation,
   source, alternatives, artefact; the resolved options; `_source`: files, overrides, alts, options given),
   `manifest.json` (schema mrm.run/1: run id, kind, status, passed, experiment and config hashes and every case's
   config hash, created_utc, wall_s, rerun_of, git {commit, branch, dirty, diff_sha256 of `git diff HEAD --binary`
@@ -205,13 +208,16 @@ is per plant and controller).
   selected), cases {runner manifest_inputs incl. aggressor calibration, warm start, diagnostics, warnings, wall
   time}, convergence), `metrics.json` (summary + every case's metrics; NaN -> null), `trace.h5` (exact arrays:
   /metrics, /trace, /truth_final, /self_reference, /quasi_static/<case>/<array> with or without corners),
-  `inputs/` (the experiment file and every non-preset file of its `extends:` chain as `_extends_<i>_<name>`, the
-  copies' `extends:` naming each other: the directory reruns, and can be sent elsewhere, without the original files;
+  `inputs/` (the experiment file, every non-preset file of its `extends:` chain as `_extends_<i>_<name>`, the
+  copies' `extends:` naming each other, and every corner file given by path as `_corner_<i>_<name>`, its manifest
+  entry naming the corner as given: the directory reruns, and can be sent elsewhere, without the original files;
   snapshotted when the experiment is loaded, so an edit during a long run is not recorded), `report.txt`,
   `convergence.json` (compressed runs). The manifest's artefacts are the union over the experiment's config and every
   case config (corners and sweep points select their own alternatives).
-- `mrm rerun runs/<id>` reloads `inputs/<file>.yaml` with the recorded overrides, alternatives and options, refuses
-  when the experiment hash differs (presets, artefacts or the loader changed; `--allow-changed-config`), warns when
+- `mrm rerun runs/<id>` reloads `inputs/<file>.yaml` with the recorded overrides, alternatives and options (a corner
+  file given by path from its copy `inputs/_corner_<i>_<name>`, a reused convergence certificate from the run's own
+  `convergence.json`, so the directory reruns from any working directory and elsewhere; review 2026-10-16), refuses
+  when the experiment hash differs (presets, corners, artefacts or the loader changed; `--allow-changed-config`), warns when
   the git commit, dirty diff, numpy / scipy / numba / llvmlite / python differ, runs into a new directory
   (`rerun_of`) and compares every array of trace.h5 bit for bit (NaN payload and the sign of zero included;
   run ids and wall times excluded); `rerun_comparison.json`. Tested for run (sampled worlds, B = 2), compare (2
@@ -234,13 +240,20 @@ is per plant and controller).
   run (kind run or acceptance) needs a certificate: `experiment.convergence_certificate` (a run directory), else the
   convergence experiment runs first: one slow cycle (`Scenario.slow_cycle_s`) at every `compression_factors` value on
   the same plant, controller, start, worlds and seeds, with the same scoring start; per world,
-  `mrm.scenarios.assess_convergence` against factor 1 on CONVERGENCE_METRICS (max detuning, wrong-line and FSR-hop
-  events, heater range used, integrated errors) with DEFAULT_CONVERGENCE_TOLERANCES; validated factor = the smallest
-  over worlds. Then `require_compression_validated` (scenario fingerprint without compression, `plant_fingerprint` =
-  resolved config without the `experiment` section and `scenario.time_compression`, plus the start and the worlds:
-  batch, uncertainty, variation, seeds, scoring start); refused -> status `refused`, convergence results still
-  written. Tested on a mini soak (factors 1, 2; reuse from another experiment of another duration; refusal for
-  another plant and for other worlds) and on the full A4 soak (section 7).
+  `mrm.scenarios.assess_convergence` against factor 1 on CONVERGENCE_METRICS (max detuning ring by ring, wrong-line
+  events, FSR-hop events and order changes, heater range used, integrated errors) with
+  DEFAULT_CONVERGENCE_TOLERANCES; validated factor = the smallest over worlds. Then `require_compression_validated`
+  (scenario fingerprint without compression, `plant_fingerprint` = resolved config without the `experiment` section
+  and `scenario.time_compression`, plus the start and the worlds: batch, uncertainty, variation, seeds, scoring
+  start; and since 2026-10-16 the code fingerprint, `mrm.sim.manifest.code_fingerprint`: the Python sources of
+  mrm/{core, plant, sim, control, scenarios, params}, mrm/units.py, mrm/materials.py, every file under mrm/data and
+  the python / numpy / scipy / numba / llvmlite versions and machine, so a certificate made by other engine code is
+  refused, and so is one that records no code fingerprint, e.g. the A4 certificate of 2026-10-10); refused -> status
+  `refused`, convergence results still written. Max detuning is compared per ring with 0.2 pm or 5 %, at most 0.5 pm
+  (a tenth of the 5 pm lock budget; it was 0.2 pm or 5 % of the worst ring's |d|, which for pi_lock_c's ~125 pm
+  offset allowed +-6.3 pm). Tested on a mini soak (factors 1, 2; reuse from another experiment of another duration;
+  refusal for another plant, for other worlds and for other code; rerun of a reuse run from another working
+  directory without the certificate run) and on the full A4 soak (section 7, before the 2026-10-16 changes).
 
 ## 7. Acceptance table
 
@@ -263,7 +276,7 @@ controller.name=...`. g26 nominal world, seeds 0, runs in `runs/acceptance_20261
 | `a1_slide10_aggressor.yaml` | A1: slide-10 aggressor, rectified sine 113.6 - 88.5 \|sin\| degC at ring 0, one period from the minimum (0.1357 s) | lock <= 5 pm about the operating point (04 sec. 4, assumed); no wrong line (P1-12); no FSR hop (BND-2); mean BER <= 1e-9 (LM26-P); drop-monitor signed error inside [-1.9, 3.0] % +- 0.3, either sign (BND-3a) | **FAIL** (lock, BER, monitor): ring 0 leaves its point by 348.7 pm near the hot cusp (its heater at code 0: heater authority, as in the scorecard), mean BER 1.3e-8, monitor error -69.2 / +2.9 %; rings 1-7 hold; no wrong line or hop; OMA penalty worst lane 0.32 dB; relOMA -6.18 dB (oracle -6.04) |
 | `a2_808_aggressor.yaml` | A2: 808 degC/s, symmetric triangle 25 -> 105.8 degC, 100 ms period, two periods (0.205 s) | as A1, monitor within +-0.5 uA (BND-3b) | **FAIL** (lock, monitor): ring 0 103.2 pm off and unlocked at the end of the hot ramp, monitor deviation 10.2 uA; BER 2.9e-85; no wrong line or hop; OMA penalty worst 1.16 dB |
 | `a3_laser_sweep.yaml` | A3: laser-sweep emulation, 50 nm/s over 4 nm, 0.44 s trapezoid, from 10 ms (0.455 s) | lock, line, hop, BER | **FAIL** (lock): the heater lock lags the 50 nm/s ramps by up to 13.9 pm (8 excursions, longest 0.25 s); BER 6e-230; no wrong line or hop |
-| `a4_soak.yaml` | A4: soak 33 <-> 108 degC, 90 x 20.3 min, compression 100 (1096.2 s simulated), auto policy; convergence experiment at 1, 10, 100 first | no BER window over 1e-9 (LM26-P Fig. 3(a)); no wrong-line event; no FSR hop, judged as max \|detuning\| < 5000 pm < FSR/2 (review change, below); heater never at a rail (BND-2, CAL-9); OMA penalty <= 1 dB (BND-4, VAL-4) | **PASS** (`runs/acceptance_20261010/20261010T115721Z_d1511028`, 4.8 h wall): convergence first, one 20.3 min cycle at c = 1 / 10 / 100 (7905 / 773 / 95 s wall): max detuning 126.4963 / 126.4925 / 126.4958 pm (allowed +-6.32 pm), heater range 26 029 / 26 029 / 26 022 codes (allowed +-260), 0 wrong-line and FSR-hop events, 0 integrated errors at every factor: validated up to 100. Main soak, 1096.2 s simulated in 8547 s: no 2 s BER window over 1e-9 (mean BER 4e-229), no wrong-line event, no hop, heater never at a rail (range 26 023 codes), worst-lane OMA penalty 0.12 dB, relOMA -6.16 dB (oracle -6.04) |
+| `a4_soak.yaml` | A4: soak 33 <-> 108 degC, 90 x 20.3 min, compression 100 (1096.2 s simulated), auto policy; convergence experiment at 1, 10, 100 first | no BER window over 1e-9 (LM26-P Fig. 3(a)); no wrong-line event; no FSR hop, judged since 2026-10-16 as no change of the order nearest the declared line (`order_changes` == 0; before: max \|detuning\| < 5000 pm, which cannot see a hop, review notes below); heater never at a rail (BND-2, CAL-9); OMA penalty <= 1 dB (BND-4, VAL-4) | **PASS** on 2026-10-10 (`runs/acceptance_20261010/20261010T115721Z_d1511028`, 4.8 h wall; judged with the former hop criterion, and the plant, code and convergence rule changed on 2026-10-16: A4 must run again, convergence included): convergence first, one 20.3 min cycle at c = 1 / 10 / 100 (7905 / 773 / 95 s wall): max detuning 126.4963 / 126.4925 / 126.4958 pm (allowed then +-6.32 pm; per ring the factors differ by at most 0.046 pm, inside the 0.5 pm of the 2026-10-16 rule), heater range 26 029 / 26 029 / 26 022 codes (allowed +-260), 0 wrong-line and FSR-hop events, 0 integrated errors at every factor: validated up to 100. Main soak, 1096.2 s simulated in 8547 s: no 2 s BER window over 1e-9 (mean BER 4e-229), no wrong-line event, no hop, heater never at a rail (range 26 023 codes), worst-lane OMA penalty 0.12 dB, relOMA -6.16 dB (oracle -6.04) |
 | `a6_connector_remate.yaml` | A6: ten re-mates, N(0.43, 0.35) dB per facet, every 50 ms from 10 ms (0.52 s) | lock, line, hop, BER | **FAIL** (lock): each power step moves the non-normalized set-point lock by up to 20.7 pm (24 excursions; every ring off its first point at the end); BER 1.5e-203; no wrong line or hop |
 | `a7_reloma_plane.yaml` | A7: relOMA plane, quasi-static over 0..105 degC (12 points) x 1.0..3.75 V (12 points), + the 12 named corners reported | coverage = 1, no FSR-hop point (BND-2), BND-4 variation < 1 dB at every bias, judged on the nominal world | **PASS**: coverage 1, no hop point, BND-4 5e-9 dB (the lock temperature, not the ambient, sets the optics; only g26_heater_loss moves it: 0.064 dB; the FSR corners 0.06 dB). Corners without full coverage (they need an FSR hop somewhere on the plane): g26_hot_selfheat 0.67, g26_h86 0.83, g26_fsr_window_a 0.83, g26_textbook_thermal 0.83, g26_fsr_edge 0.92. Oracle relOMA (bank mean) -5.99 dB at 1.0 V to -9.23 dB at 3.75 V at every ambient: the 07 D9 / CAL-14 gap to the printed -2.1 to -3.0 dB (G25-like drive), reported, not judged |
 | `b1_squelch.yaml` | B1: squelch (swing 0, average kept) 10-30 ms (0.06 s) | lock, line, hop (no BER while squelched) | **FAIL** (lock): the data heat and the bit-averaged monitor level change: 19.2 pm, 16 excursions (each <= 86 us); no wrong line or hop |
@@ -274,12 +287,19 @@ controller.name=...`. g26 nominal world, seeds 0, runs in `runs/acceptance_20261
 **Review (2026-10-10, adversarial reviewer).** (1) A4's hop criterion was vacuous: the engine counts an FSR hop only
 when a ring RE-LOCKS on another order, and with the line reference at 5 pm pi_lock_c never "locks" in A4 (it sits
 ~125 pm red of its line; `ever_locked` is False for every ring in every A4 case, convergence included), so
-`fsr_hop_events` was 0 by construction. A4-hop now asks max |detuning| < 5000 pm (FSR/2 = 5094-5220 pm in g26: the
-order nearest the declared line never changed). Evaluated on the recorded A4 metrics (no rerun of the 4.8 h soak):
-126.5 pm, PASS; every other A4 criterion unchanged and PASS. The edit changes A4's experiment hash (383b0daa), not
-its plant fingerprint, so the recorded certificate still covers it (checked). The same counter is part of the 07
-P0-10 convergence comparison and was 0 = 0 there for the same reason (max detuning, also compared, would catch a
-hop). (2) The nine quick acceptance experiments were re-run after the review fixes into
+`fsr_hop_events` was 0 by construction. A4-hop then asked max |detuning| < 5000 pm (FSR/2 = 5094-5220 pm in g26),
+reasoning that the order nearest the declared line never changed. **Corrected 2026-10-16 (final review,
+experiments_docs-1):** that reasoning is invalid. The detuning is always measured from the order nearest the declared
+line, so |d| <= FSR/2 holds by construction, and a hop shows only if a sampled step lands in the 94-220 pm band
+between 5000 pm and FSR/2 (or the matching band after the wrap). An open-loop heater step from cold (g26 nominal,
+code 52000, 3 ms) hops every ring by one order with max |d| 4884-4989 pm and fsr_hop_events 0
+(`tests/verification/test_experiments_review.py`). A4-hop now judges `order_changes` (new metric of
+mrm.sim.metrics: changes of the order nearest the declared line, lock-independent) == 0, and the same count is part
+of the convergence comparison (CONVERGENCE_METRICS) and of the compressed-soak golden check. Any hop in A4 also
+fails A4-ber and A4-line (a hop transit is dark for hundreds of ticks and crosses foreign lines), so the overall A4
+verdict was never a false PASS; the A4-hop row could be. The recorded A4 run has no `order_changes`; its max |d| of 126.5 pm
+means no ring came within 4.9 nm of FSR/2 at any step, so it had no hop. The new criterion is judged when A4 runs
+again. (2) The nine quick acceptance experiments were re-run after the review fixes into
 `runs/acceptance_review_20261010/` (same pass / fail as the table; values moved by <= 0.001 pm and <= 1e-4 % from
 the exact self-reference window and monitor windows; reruns of those directories are bit-identical; the builder's
 recorded A7 rerun is still bit-identical). The A1-A3, A6, B1-B3 hop criteria are meaningful only for rings that
@@ -287,8 +307,10 @@ re-lock; their max detuning (reported) is the lock-independent check.
 
 A5 (polarization scramble) has no file: 07 D14 / excluded.yaml EXC-1, the 7.7 dB swing is on RX-path monitors, not a
 TX stimulus. Re-run with `mrm acceptance --all --runs-dir runs/...` (A4 took 4.8 h: `--dry-run` first; to skip its
-convergence step, pass `--set experiment.convergence_certificate=runs/acceptance_20261010/20261010T115721Z_d1511028`
-as long as plant, controller and worlds are unchanged).
+convergence step, pass `--set experiment.convergence_certificate=runs/<an A4 run>` as long as plant, controller,
+worlds and code are unchanged: the gate checks the plant and the code fingerprint. The 2026-10-10 certificate
+`runs/acceptance_20261010/20261010T115721Z_d1511028` no longer covers the tree: the g26 plant changed on 2026-10-16
+and it records no code fingerprint).
 
 ## 8. Tests and checks run
 
@@ -342,11 +364,11 @@ was needed; the runner change is plain Python).
 
 ## 9. Deviations, doubts and findings
 
-1. **Extension keys live in this module's schema, not in mrm/params/schema.py** (the task allowed either; changing
-   schema.py is the integrator's). Consequence: `mrm.params.load('exp.yaml')` fails on a file that uses them, so
-   07 P1-17's `mrm.run(mrm.params.load('exp.yaml'))` works only for files without them; `mrm.run('exp.yaml')` and
-   `mrm run` always work. `load()` strips them into a temp copy (parents made absolute). Request 10.1 removes the
-   difference; the code already reads schema-known keys back from the Config.
+1. **Extension keys** (resolved 2026-10-10 by request 10.1, section 12.1): they started in this module's schema
+   only, so `mrm.params.load('exp.yaml')` failed on a file that used them. They are mrm/params/schema.py keys now:
+   `mrm.params.load('exp.yaml')` accepts every shipped file and 07 P1-17's `mrm.run(mrm.params.load('exp.yaml'))` runs
+   the same experiment as `mrm.run('exp.yaml')`; this module reads them back from the Config and validates them again
+   strictly (section 3).
 2. **The acceptance table is reconstructed** (section 7): the textbook's table is not in docs/research. Rows follow
    the textbook scenario ids the scenario library carries; criteria come from the printed G26 results, the frozen
    bounds and the 04 lock budget (an assumption). The acceptance controller is pi_lock_c (assumed G26-like).
@@ -360,8 +382,9 @@ was needed; the runner change is plain Python).
    edge keeps the trajectory, ENGINE.md section 2, correction 2026-10-16). first_lock_s / time_to_lock_s become relative to the
    scoring start. On the Python path a split on a controller edge moves one tick.
 5. **Convergence (07 P0-10)**: implemented with mrm.scenarios' plan, metrics and tolerances (design choices of the
-   scenarios owner: 0.2 pm or 5 % on max detuning, exact event counts, 16 codes or 1 % on heater range, 1 error or
-   10 % on integrated errors). Doubts: (a) integrated errors are compared raw, but a run at compression c spends c
+   scenarios owner: 0.2 pm or 5 % on max detuning, at most 0.5 pm, ring by ring since 2026-10-16 (it was the worst
+   ring, uncapped: +-6.3 pm for a 125 pm side-of-fringe offset); exact event counts (wrong line, FSR hops, order
+   changes); 16 codes or 1 % on heater range; 1 error or 10 % on integrated errors). Doubts: (a) integrated errors are compared raw, but a run at compression c spends c
    times fewer simulated seconds per slow cycle, so a steady error rate gives c times fewer errors; with BER at lock
    ~1e-200 both are ~0 and this does not bite, but a soak with a non-zero steady BER would fail the check for that
    reason alone; the scenarios owner should decide whether to compare rates. (b) Per world, the validated factor is
@@ -457,10 +480,9 @@ was needed; the runner change is plain Python).
     two pieces of plant history across it by hand (the 'oracle' lock reference and the previous latch tick and
     register of the slew accumulator, section 1). A `MetricsState.restart(k0, reg)` in mrm/sim/metrics.py that keeps
     them would be the cleaner home; the runner's workaround is tested against a per-tick trace.
-11. **Scenarios owner (convergence)**: `fsr_hop_events` in CONVERGENCE_METRICS counts re-locks on another order, so
-    it depends on the lock definition: with `lock_reference: line` at 5 pm a side-of-fringe lock never locks and the
-    counter is 0 at every factor (A4: 0 = 0 by construction). A lock-independent order count (the order nearest the
-    declared line changing, i.e. |detuning| crossing FSR/2) would make that comparison meaningful.
+11. **Scenarios owner (convergence)**, done 2026-10-16: `fsr_hop_events` in CONVERGENCE_METRICS counts re-locks on
+    another order, so it depends on the lock definition (A4: 0 = 0 by construction). The lock-independent
+    `order_changes` (the order nearest the declared line changing) is now compared too.
 12. **Validation / textbook owner (criteria)**: B2-relock and A6-lock measure the operating-point shift against the
     pre-run reference (5 pm), not re-acquisition: a side-of-fringe set-point lock legitimately moves its point with a
     power step (A6 re-mates, B2 -1 dB), so they fail on a set-point property rather than on losing the line. Decide
@@ -475,7 +497,7 @@ Reviewed against 07 P0-10, P1-17, P2-12 and 4.8. Fixed in place (each with a tes
 |---|---|---|---|---|
 | 1 | major | runner.py | `score_from_s` with `lock_reference: oracle`: `MetricsState.reset` set the reference to 0 (the line) until the next oracle evaluation (<= 1000 ticks), so the scored lock error was the distance to the line (pi_lock_c: ~125 pm, larger than the unsplit run's 109 pm) and spurious excursions were counted | keep the oracle's current reference across the split |
 | 2 | major | runner.py | `score_from_s`: the previous-latch tick of the slew accumulator was reset to the split, so `peak_slew_codes_per_s` of the scored window depended on where the split fell in the controller period (pi_lock_c under A1: 6e5 to 6e6 codes/s; true 6e5) | keep the previous latch (tick, register) across the split |
-| 3 | major | a4_soak.yaml | A4-hop (`fsr_hop_events == 0`) could not fail: the counter needs re-locks and no ring ever locks with the line reference at 5 pm | judged as max \|detuning\| < 5000 pm (< FSR/2); re-evaluated on the recorded metrics: PASS (section 7) |
+| 3 | major | a4_soak.yaml | A4-hop (`fsr_hop_events == 0`) could not fail: the counter needs re-locks and no ring ever locks with the line reference at 5 pm | judged as max \|detuning\| < 5000 pm (< FSR/2); re-evaluated on the recorded metrics: PASS (section 7). Replaced 2026-10-16 by `order_changes` == 0: \|d\| <= FSR/2 by construction, so the bound could not see a hop (section 7 notes) |
 | 4 | major | experiment.py | `inputs/` held only the leaf file; non-preset parents were referenced by absolute path (a run directory was not self-contained or exchangeable), and the copy was taken at write time (an edit during a 4.8 h run would be recorded as what ran) | copy the whole non-preset chain into `inputs/` at load time |
 | 5 | minor | experiment.py | self reference took the windows with END time >= t_end - window_s: one window more than the last window_s | windows that START inside the last window_s; error if none |
 | 6 | minor | experiment.py | monitor min / max windows of `sf_ticks` left the last `n mod sf` ticks unjudged (A1: last 0.7 ms) | windows of gcd(n, sf) ticks (`_monitor_decimation`) |

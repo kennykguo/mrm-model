@@ -2025,16 +2025,25 @@ def check_time_compression(sc: Scenario, *, fraction: float = COMPRESSION_RATE_F
     return rep
 
 
-#: Metrics the mandatory convergence experiment compares (07 P0-10).
-CONVERGENCE_METRICS = ("max_abs_detuning_pm", "wrong_line_events", "fsr_hop_events", "heater_range_used_codes",
-                       "integrated_errors")
-#: Agreement rule per metric against the uncompressed run: (absolute tolerance, relative tolerance); a metric
-#: passes when |x_c - x_1| <= max(abs, rel * |x_1|). Event counts must match exactly. These tolerances are design
-#: choices (assumed), not physics: 0.2 pm is the 07 P0-10 max_detuning_step_pm; 16 codes is 2**-12 of a 16-bit DAC.
-DEFAULT_CONVERGENCE_TOLERANCES: dict[str, tuple[float, float]] = {
-    "max_abs_detuning_pm": (0.2, 0.05),
+#: Metrics the mandatory convergence experiment compares (07 P0-10: max detuning, wrong-line and FSR-hop events,
+#: heater range used, integrated errors). FSR hops twice: ``fsr_hop_events`` counts re-locks on another order (it
+#: needs a lock, so a side-of-fringe lock judged about its line counts 0 at every factor) and ``order_changes`` the
+#: lock-independent changes of the order nearest the declared line (mrm.sim.metrics).
+CONVERGENCE_METRICS = ("max_abs_detuning_pm", "wrong_line_events", "fsr_hop_events", "order_changes",
+                       "heater_range_used_codes", "integrated_errors")
+#: Metrics the experiment layer passes per ring ((N,) per world, compared ring by ring), not as the world value.
+CONVERGENCE_PER_RING = ("max_abs_detuning_pm",)
+#: Agreement rule per metric against the uncompressed run: (absolute tolerance, relative tolerance[, cap]); a metric
+#: passes when |x_c - x_1| <= min(cap, max(abs, rel * |x_1|)), element by element for per-ring values. Event counts
+#: must match exactly. These tolerances are design choices (assumed), not physics: 0.2 pm is the 07 P0-10
+#: max_detuning_step_pm; the cap of 0.5 pm (a tenth of the 5 pm lock budget, 04 section 4) holds because |d| about
+#: the line is dominated by the lock's static offset (a side-of-fringe lock sits ~125 pm from its line: 5 % of it
+#: alone allowed +-6.3 pm, more than the lock budget); 16 codes is 2**-12 of a 16-bit DAC.
+DEFAULT_CONVERGENCE_TOLERANCES: dict[str, tuple[float, ...]] = {
+    "max_abs_detuning_pm": (0.2, 0.05, 0.5),
     "wrong_line_events": (0.0, 0.0),
     "fsr_hop_events": (0.0, 0.0),
+    "order_changes": (0.0, 0.0),
     "heater_range_used_codes": (16.0, 0.01),
     "integrated_errors": (1.0, 0.10),
 }
@@ -2043,16 +2052,20 @@ DEFAULT_CONVERGENCE_TOLERANCES: dict[str, tuple[float, float]] = {
 @dataclass(frozen=True)
 class ConvergenceCertificate:
     """Evidence that a compressed run of this scenario on this plant agrees with the uncompressed run (07 P0-10).
-    scenario_fingerprint excludes the compression; plant_fingerprint is the caller's config hash."""
+    scenario_fingerprint excludes the compression; plant_fingerprint is the caller's config hash; code_fingerprint
+    the caller's identity of the code and numerics that ran (mrm.sim.manifest.code_fingerprint; "" when the caller
+    gave none, e.g. a certificate written before 2026-10-16)."""
     scenario_fingerprint: str
     plant_fingerprint: str
     factors: tuple[float, ...]
     max_validated_factor: float
     metrics: Mapping[str, Mapping[str, float]]
-    tolerances: Mapping[str, tuple[float, float]]
+    tolerances: Mapping[str, tuple[float, ...]]
+    code_fingerprint: str = ""
 
     def to_dict(self) -> dict:
         return {"scenario_fingerprint": self.scenario_fingerprint, "plant_fingerprint": self.plant_fingerprint,
+                "code_fingerprint": self.code_fingerprint,
                 "factors": list(self.factors), "max_validated_factor": self.max_validated_factor,
                 "metrics": {str(k): dict(v) for k, v in self.metrics.items()},
                 "tolerances": {k: list(v) for k, v in self.tolerances.items()}}
@@ -2061,7 +2074,8 @@ class ConvergenceCertificate:
     def from_dict(cls, d: Mapping) -> "ConvergenceCertificate":
         return cls(scenario_fingerprint=d["scenario_fingerprint"], plant_fingerprint=d["plant_fingerprint"],
                    factors=tuple(float(x) for x in d["factors"]), max_validated_factor=float(d["max_validated_factor"]),
-                   metrics=d["metrics"], tolerances={k: tuple(v) for k, v in d["tolerances"].items()})
+                   metrics=d["metrics"], tolerances={k: tuple(v) for k, v in d["tolerances"].items()},
+                   code_fingerprint=str(d.get("code_fingerprint") or ""))
 
 
 @dataclass(frozen=True)
@@ -2090,13 +2104,13 @@ def convergence_plan(sc: Scenario, factors: Sequence[float] = (1.0, 10.0, 100.0)
     return out
 
 
-def assess_convergence(sc: Scenario, results: Mapping[float, Mapping[str, float]], *,
-                       tolerances: Mapping[str, tuple[float, float]] | None = None,
-                       plant_fingerprint: str = "") -> ConvergenceReport:
+def assess_convergence(sc: Scenario, results: Mapping[float, Mapping[str, Any]], *,
+                       tolerances: Mapping[str, tuple[float, ...]] | None = None,
+                       plant_fingerprint: str = "", code_fingerprint: str = "") -> ConvergenceReport:
     """Compare the metrics of each compressed run with the factor-1 run (07 P0-10: max detuning, wrong-line and
-    FSR-hop events, heater range used and integrated errors must agree). ``results``: {factor: {metric: value}}.
-    Returns a report; its certificate validates every factor up to the largest one for which all smaller tested
-    factors also pass."""
+    FSR-hop events, heater range used and integrated errors must agree). ``results``: {factor: {metric: value}};
+    a value is a number or a per-ring vector (compared element by element, CONVERGENCE_PER_RING). Returns a report;
+    its certificate validates every factor up to the largest one for which all smaller tested factors also pass."""
     tol = dict(DEFAULT_CONVERGENCE_TOLERANCES)
     tol.update(tolerances or {})
     res = {float(k): v for k, v in results.items()}
@@ -2120,15 +2134,31 @@ def assess_convergence(sc: Scenario, results: Mapping[float, Mapping[str, float]
                 failures.append(f"factor {f:g}: metric {m} missing")
                 ok = False
                 continue
-            a, r = tol[m]
-            x1 = float(ref[m])
-            xc = float(res[f][m])
-            allowed = max(a, r * abs(x1))
-            good = abs(xc - x1) <= allowed
-            d[m] = {"reference": x1, "compressed": xc, "allowed": allowed, "pass": float(good)}
+            a, r, *cap = tol[m]
+            x1 = np.asarray(ref[m], float)
+            xc = np.asarray(res[f][m], float)
+            if x1.shape != xc.shape:
+                raise ScenarioError(f"factor {f:g}: {m} has shape {xc.shape}, the factor-1 value {x1.shape}")
+            allowed = np.maximum(a, r * np.abs(x1))
+            if cap:
+                allowed = np.minimum(allowed, cap[0])
+            excess = np.abs(xc - x1) - allowed
+            good = bool(np.all(excess <= 0.0))
+            if x1.ndim == 0:
+                d[m] = {"reference": float(x1), "compressed": float(xc), "allowed": float(allowed),
+                        "pass": float(good)}
+            else:
+                d[m] = {"reference": x1.tolist(), "compressed": xc.tolist(), "allowed": allowed.tolist(),
+                        "pass": float(good)}
             if not good:
                 ok = False
-                failures.append(f"factor {f:g}: {m} = {xc:.6g} vs {x1:.6g} (allowed +-{allowed:.3g})")
+                if x1.ndim == 0:
+                    failures.append(f"factor {f:g}: {m} = {float(xc):.6g} vs {float(x1):.6g} "
+                                    f"(allowed +-{float(allowed):.3g})")
+                else:
+                    i = int(np.argmax(np.where(np.isnan(excess), np.inf, excess)))
+                    failures.append(f"factor {f:g}: {m} ring {i} = {xc.flat[i]:.6g} vs {x1.flat[i]:.6g} "
+                                    f"(allowed +-{allowed.flat[i]:.3g})")
         details[f] = d
         if ok and ok_chain:
             passed_upto = f
@@ -2140,15 +2170,18 @@ def assess_convergence(sc: Scenario, results: Mapping[float, Mapping[str, float]
         cert = ConvergenceCertificate(scenario_fingerprint=sc.fingerprint(include_compression=False),
                                       plant_fingerprint=plant_fingerprint, factors=tuple(sorted(res)),
                                       max_validated_factor=passed_upto,
-                                      metrics={str(k): dict(v) for k, v in res.items()},
-                                      tolerances=tol)
+                                      metrics={str(k): {m: (np.asarray(x).tolist() if np.ndim(x) else x)
+                                                        for m, x in v.items()} for k, v in res.items()},
+                                      tolerances=tol, code_fingerprint=code_fingerprint)
     return ConvergenceReport(passed=passed, details=details, failures=tuple(failures), certificate=cert)
 
 
 def require_compression_validated(sc: Scenario, certificate: ConvergenceCertificate | None, *,
-                                  plant_fingerprint: str = "") -> None:
+                                  plant_fingerprint: str = "", code_fingerprint: str | None = None) -> None:
     """Raise CompressionError unless the scenario is uncompressed or the certificate covers its compression on
-    this plant (07 P0-10: "a convergence test is mandatory before any compressed result is reported")."""
+    this plant (07 P0-10: "a convergence test is mandatory before any compressed result is reported"). With
+    ``code_fingerprint`` (mrm.sim.experiment always passes it) the certificate must also come from the same code
+    and numerics; a certificate that records none is refused."""
     c = float(sc.time_compression)
     if c == 1.0:
         return
@@ -2159,6 +2192,15 @@ def require_compression_validated(sc: Scenario, certificate: ConvergenceCertific
         raise CompressionError("the convergence certificate belongs to a different scenario")
     if certificate.plant_fingerprint != plant_fingerprint:
         raise CompressionError("the convergence certificate belongs to a different plant configuration")
+    if code_fingerprint is not None and certificate.code_fingerprint != code_fingerprint:
+        if not certificate.code_fingerprint:
+            raise CompressionError("the convergence certificate records no engine-code fingerprint (written before "
+                                   "2026-10-16), so it cannot show that the code that runs now converges; run the "
+                                   "convergence experiment again (07 P0-10)")
+        raise CompressionError(f"the convergence certificate was made by other engine code or numerics (code "
+                               f"fingerprint {certificate.code_fingerprint[:12]}, now {code_fingerprint[:12]}: "
+                               f"mrm.sim.manifest.code_fingerprint); run the convergence experiment again "
+                               f"(07 P0-10)")
     if c > certificate.max_validated_factor * (1 + 1e-12):
         raise CompressionError(f"time_compression {c:g} exceeds the validated factor "
                                f"{certificate.max_validated_factor:g}")

@@ -3,15 +3,88 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-16: experiments review fixes (a lock-independent FSR-hop count, code identity and rerun of convergence certificates, the convergence tolerance on max detuning, corners in the experiment hash, doc corrections)
+
+Eleven findings of the experiments / docs review (experiments_docs-1 to -11), confirmed by an independent verifier.
+Tests: tests/verification/test_experiments_review.py (14); all 14 fail on the pre-fix tree
+(runs/experiments_docs_fix/new_tests_before.log). Tests updated for the new metric and convergence metric (no
+tolerance widened): test_metrics.py (order_changes compared with the full-trace reference), test_kernel_parity.py
+(order_changes kernel against kernel_ref), test_scenarios.py (the convergence results carry order_changes),
+tests/golden/test_golden.py (the soak check).
+
+- **A lock-independent FSR-hop count** (experiments_docs-1; 07 P0-8, P0-10, BND-2). New metric `order_changes`
+  (mrm.sim.metrics, per ring and `world`; also in world_summary): steps at whose end the order nearest the declared
+  line differs from the previous step's. The detuning is always measured from that order, so |d| <= FSR/2 by
+  construction: A4-hop's former bound (max |d| < 5000 pm) passed an open-loop heater step from cold in which every
+  g26 ring hopped one order (max |d| 4884-4989 pm, fsr_hop_events 0, which counts only re-locks). A4-hop
+  (experiments/acceptance/a4_soak.yaml) and the compressed-soak golden check now ask order_changes == 0, and
+  CONVERGENCE_METRICS compares it (exact). The njit metrics row changed (numba cache cleared); every other metric is
+  bit-identical (golden comparison before the update: only the new arrays differ,
+  runs/experiments_docs_fix/golden_compare_before_update.log). A hop in A4 also fails A4-ber and A4-line, so the
+  overall A4 verdict was never a false PASS. The A4 PASS of 2026-10-10 was judged with the former criterion.
+- **A convergence certificate carries the code that made it** (experiments_docs-2; 07 P0-10). New
+  `mrm.sim.manifest.code_fingerprint()`: sha256 of the Python sources of mrm/{core, plant, sim, control, scenarios,
+  params}, mrm/__init__.py, units.py, materials.py, every file under mrm/data and the python / numpy / scipy / numba /
+  llvmlite versions and machine. ConvergenceCertificate.code_fingerprint records it; the gate
+  (`require_compression_validated(..., code_fingerprint=)`, always passed by mrm.sim.experiment) refuses a
+  certificate of other code, or one that records none. Before, only the config, start and worlds were compared, so a
+  certificate made before an engine change kept validating compressed runs of the changed engine. Any edit of those
+  files invalidates a certificate (a comment too). The A4 certificate of 2026-10-10
+  (runs/acceptance_20261010/20261010T115721Z_d1511028) no longer covers the tree in any case: the g26 plant
+  fingerprint changed with the 2026-10-16 fixes (b500c0fd... against 8e979786...), and it records no code
+  fingerprint. A4 must run its convergence experiment again (c = 1 took 2.2 h on 2026-10-10, then the soak).
+- **A certificate-reuse run reruns from its own directory** (experiments_docs-3; 07 P1-17). rerun takes the reused
+  certificate from the run's own convergence.json instead of reloading the recorded path (relative to the working
+  directory, and usually git-ignored); the option keeps its recorded value, so the hash is unchanged.
+- **Convergence: max detuning per ring, at most 0.5 pm** (experiments_docs-4; 07 P0-10).
+  DEFAULT_CONVERGENCE_TOLERANCES['max_abs_detuning_pm'] is (0.2 pm, 5 %, cap 0.5 pm) and mrm.sim.experiment
+  compares it ring by ring (CONVERGENCE_PER_RING; assess_convergence takes per-ring vectors). Before: 0.2 pm or 5 % of
+  the worst ring's |d|, which for pi_lock_c's ~125 pm side-of-fringe offset allowed +-6.3 pm, more than the 5 pm lock
+  budget, and a ring that was not the worst was not compared. Near the line (|d| < 10 pm) the rule is unchanged. The
+  cap is a tenth of the lock budget; the mini soak of test_experiment_runs.py needs it: its ring 1 takes one of two
+  pi_lock_c set points 0.47 pm apart depending on the start-up ramp (a peak-map quantum). The recorded A4 convergence
+  differs by at most 0.046 pm per ring.
+- **Corners in the experiment hash and in inputs/** (experiments_docs-5; 07 P1-17). Experiment.hash adds the name
+  and alts of every corner a case runs (experiment.corners, the NAMED_CORNERS of compare / robust, a sweep's corner
+  axis), only when there are corners, so an experiment without corners keeps its hash. An edit of a corner preset now
+  changes hash8 and makes `mrm rerun` refuse ("presets changed") instead of reporting arrays that differ. A corner
+  file given by path (not a preset) is copied into inputs/ as `_corner_<i>_<name>` when the experiment loads (manifest
+  source.inputs[].corner names it as given), and rerun reads it from there. Experiments with corners (compare,
+  robust, A7, sweeps over corner) get a new hash; their recorded runs were already refused by the g26 changes.
+- **Doc corrections** (experiments_docs-6 to -11). -6: ENGINE.md section 10 no longer lists `mrm report` as not
+  built (already done in the 2026-10-16 engine review, test_engine_docs.py). -7: the `start` option doc names
+  heater_code='quasi_static_reachable' and branch_high. -8: mrm/sim/manifest.py's layout lists the `_extends_<i>_<name>`
+  and `_corner_<i>_<name>` copies and convergence.json (no absolute paths). -9: mrm/sim/cli.py's usage names
+  experiments/acceptance/a1_slide10_aggressor.yaml. -10: experiments.md sections 3 and 9 item 1 describe the
+  integrated loader (`mrm.params.load('exp.yaml')` accepts every shipped file; checked on all 21). -11:
+  examples/controllers/README.md says its ~2 pm (type 2: 2.8 pm) A1 figure is the 20 K-swing rate test, and that the
+  full A1 at the default site loses ring 0 by ~455 pm with its heater at code 0 for ~15 ms (rerun today:
+  max_abs_lock_error_pm 454.9 pm on ring 0, rings 1-7 within 14.7 pm; the dither figure is ~120 pm, was ~110).
+  ENGINE.md section 11, docs/handoff/experiments.md (sections 3, 6, 7, 9, 10) and scenarios.md section 5 are
+  updated; experiments/examples/soak_reuse_certificate.yaml states the code condition.
+- golden: tests/golden/g26__static.npz updated (data sha256 db0e87402522): experiments review: new lock-independent metric order_changes (and world/order_changes), the count of changes of the order nearest the declared line; every other metric unchanged (runs/experiments_docs_fix/golden_compare_before_update.log)
+- golden: tests/golden/g26__a1_slide10_aggressor.npz updated (data sha256 b4fcdc12a09a): experiments review: new lock-independent metric order_changes (and world/order_changes), the count of changes of the order nearest the declared line; every other metric unchanged (runs/experiments_docs_fix/golden_compare_before_update.log)
+- golden: tests/golden/g26__soak_compressed.npz updated (data sha256 cc974ca186b4): experiments review: new lock-independent metric order_changes (and world/order_changes), the count of changes of the order nearest the declared line; every other metric unchanged (runs/experiments_docs_fix/golden_compare_before_update.log)
+
 ## 2026-10-16: params review fixes (geometry moves the couplers and the FSR, exponential bend radiation, the rib200 film world, Z at the P_FSR line, secant beta, line provenance, ranges, notes, the calibrated coupling-regime label)
 
 Thirteen findings of the params review (params-1 to -5, -7 to -14), confirmed by an independent verifier. Tests:
-tests/verification/test_params_review.py (19) and tests/closure/test_params_notes.py (4). The 17 tests of params-1 to
--13 fail on the pre-fix tree (runs/params_fix/new_tests_before.log); of the 6 params-14 tests, 4 fail on the pre-fix
+tests/verification/test_params_review.py (21) and tests/closure/test_params_notes.py (4). On the pre-fix tree, 17
+of the params-1 to -13 tests fail (runs/params_fix/new_tests_before.log). Two tests were added later:
+test_calibration_r0_prior_is_the_declared_leaf_range fails with the first version of the groups.py fix
+(runs/params_fix/final/r0_prior_before.log), and test_calibrated_geometry_sigma_keeps_the_coupling_jacobian is a
+regression check of the CAL-9 writer. Of the 6 params-14 tests, 4 fail on the pre-fix
 tree (runs/params_fix/new_tests_before_params14.log) and 2 are regressions that pass before and after (the g26 and
 g25_test_vehicle labels were already right). Records: runs/params_fix/ (pre / post regression scenarios and
-compare_full.log, golden_update.log and golden_compare.log, vectors/, es_long.log, the calibration refit in refit/,
-the before/after tables, the reports before).
+compare_full.log, golden_update.log and golden_compare.log, vectors/, es_long.log, the before/after tables, the
+reports before, final/). The calibration refit started in runs/params_fix/refit/ was stopped and is not used.
+
+- **Not refitted: g26_calibrated, g25_test_vehicle_calibrated and mrm/calibration/latest_fit.json are stale**
+  (known issue, docs/KNOWN_ISSUES.md). They were fitted before every fix below and inherit the g26 changes; only
+  their coupling_regime label (params-14) was rewritten from the same record. Each carries a STALE header (the
+  record a `stale` key) and docs/handoff/calibration.md opens with the note. They must be refit when the real
+  device parameters arrive. tests/calibration::test_loss_worlds_hold_the_solver_dispersion is xfail (strict=False):
+  its recomputed chi2 is 7.77 against the recorded 7.51, from the secant beta.
 
 - **The geometry moves the couplers** (params-1, params-11; 07 P1-16). `ring.geometry.jacobian_coupling` is wired
   to coupling_rib160's Jacobian (d ln K^2 per nm of width, film, slab and the two gaps). The Jacobian could not be

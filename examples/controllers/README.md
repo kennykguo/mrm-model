@@ -57,9 +57,15 @@ Bias controllers need `controller_interface.bind.tx.bias: controller` (and no ab
   below 40 % of it. A fold fall does that; so would a RED step of the line or ring of ~200 pm within ~30 us, which
   is then mistaken for a fall (the recapture ramps the wrong way and gives up: FAULT). A1/A2 rates are far slower;
   `test_ctrl_a_pi.py::test_fast_red_step_is_not_mistaken_for_a_fall` is a strict xfail recording it.
-- The slide-10 aggressor (A1) at its peak rate (2127 degC/s, 183 pm/ms at the victim) is held by the PI within
-  ~2 pm (type 2: 2.7 pm) at the g26 default site, and within ~7-8 pm (type 2: 6.8 pm) at the stress site 5 um from
-  the monitor PD; the heater dither cannot follow it (~110 pm). In the stress scenario
+- The slide-10 aggressor (A1) at its peak rate (2127 degC/s, 183 pm/ms at the victim), in the rate test
+  `tests/verification/test_ctrl_a_scenarios.py::test_aggressor_at_the_printed_rates` (a 20 K swing, so that the cusp
+  arrives within ~15 ms, on the ReferencePlant harness of `test_ctrl_a_harness.py`), is held by the PI within ~2 pm
+  (type 2: 2.8 pm) at the g26 default site, and within ~7-8 pm (type 2: 6.8 pm) at the stress site 5 um from the
+  monitor PD; the heater dither cannot follow it (~120 pm). The full A1 (the 88.5 K swing of
+  `experiments/acceptance/a1_slide10_aggressor.yaml`, on the engine) is not held at the default site: ring 0's
+  heater sits at code 0 for ~15 ms at the hot cusp (heater authority, not loop gain) and the ring leaves its point by
+  ~455 pm (2026-10-16; rings 1-7 within 15 pm), as in the controller scorecard and docs/ENGINE.md section 5. In the
+  stress scenario
   `a1_slide10_aggressor_pd_adjacent` (the aggressor 5 um from ring 0's monitor PD; not a realistic layout, and not
   the g26 default since 2026-10-10) the full A1 trajectory heats the monitor PD ~6x more than the ring; its dark
   current then moves the fraction-of-peak lock point red until lock is lost near the cusp (handoff controllers_a,

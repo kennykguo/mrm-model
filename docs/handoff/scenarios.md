@@ -123,11 +123,16 @@ With several aggressors whose victims differ, pass `model={site: {...}}` (one mo
   K/s; laser frequency via 15 GHz/degC). The soak allows c <= 173. dB signals cannot be checked (warning).
 - Mandatory convergence experiment: `plan = convergence_plan(sc)` -> {1, 10, 100: (scenario, duration of one soak
   cycle)}; run each on the same plant and seeds; `rep = assess_convergence(sc, {c: metrics}, plant_fingerprint=
-  cfg.fingerprint())` with metrics `max_abs_detuning_pm, wrong_line_events, fsr_hop_events, heater_range_used_codes,
-  integrated_errors`; store `rep.certificate.to_dict()` in the run manifest; **reporting code calls
-  `require_compression_validated(sc, certificate, plant_fingerprint=...)`** before publishing a compressed result.
-  Tolerances (`DEFAULT_CONVERGENCE_TOLERANCES`) are design choices: 0.2 pm or 5 % on max detuning, exact event
-  counts, 16 codes or 1 % on heater range, 1 error or 10 % on integrated errors.
+  cfg.fingerprint(), code_fingerprint=...)` with metrics `max_abs_detuning_pm, wrong_line_events, fsr_hop_events,
+  order_changes, heater_range_used_codes, integrated_errors` (a value may be a per-ring vector, compared element by
+  element: mrm.sim.experiment passes max_abs_detuning_pm per ring, `CONVERGENCE_PER_RING`); store
+  `rep.certificate.to_dict()` in the run manifest; **reporting code calls `require_compression_validated(sc,
+  certificate, plant_fingerprint=..., code_fingerprint=...)`** before publishing a compressed result (with a code
+  fingerprint, a certificate of other code, or one that records none, is refused). Tolerances
+  (`DEFAULT_CONVERGENCE_TOLERANCES`, (abs, rel[, cap])) are design choices: 0.2 pm or 5 % on max detuning, at most
+  0.5 pm (since 2026-10-16: the |d| about the line is dominated by a lock's static offset, so 5 % of a 125 pm
+  side-of-fringe offset allowed +-6.3 pm), exact event counts, 16 codes or 1 % on heater range, 1 error or 10 % on
+  integrated errors.
 
 ## 6. Bindings, reset, config
 

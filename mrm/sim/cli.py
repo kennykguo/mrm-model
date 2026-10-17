@@ -8,7 +8,7 @@ Usage::
     mrm run experiments/examples/a1_pi_lock.yaml [--set a.b=c ...] [--alt path=name ...] [--runs-dir runs]
     mrm run exp.yaml --dry-run          # B, step counts, estimated RAM and wall time (nothing is run)
     mrm mc exp.yaml --set experiment.n_mc=64      # sweep | mc | compare | robust force experiment.kind
-    mrm acceptance experiments/acceptance/a1_aggressor.yaml ...  # or --all: every experiments/acceptance/*.yaml
+    mrm acceptance experiments/acceptance/a1_slide10_aggressor.yaml ...  # or --all: every experiments/acceptance/*.yaml
     mrm rerun runs/20261010T120000Z_1a2b3c4d     # reproduce a run and compare it bit for bit
 
 ``mrm run`` runs the kind the file declares (any of run, sweep, mc, compare, robust, acceptance, quasi_static).

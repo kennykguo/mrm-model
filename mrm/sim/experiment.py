@@ -43,9 +43,11 @@ Kinds
   convergence certificate (07 P0-10): from ``experiment.convergence_certificate`` (an earlier run directory), or
   from the convergence experiment this run performs first (one slow cycle at each of ``compression_factors``,
   default 1, 10, 100, on the same plant, controller, start and seeds; per world, every factor must agree on max
-  detuning, wrong-line and FSR-hop events, heater range used and integrated errors within
-  mrm.scenarios.DEFAULT_CONVERGENCE_TOLERANCES). Without a certificate that covers the compression the run is
-  refused (:class:`mrm.scenarios.CompressionError`); the convergence results are still written.
+  detuning (ring by ring), wrong-line events, FSR-hop events and order changes, heater range used and integrated
+  errors within mrm.scenarios.DEFAULT_CONVERGENCE_TOLERANCES). A certificate covers one plant
+  (:func:`plant_fingerprint`) and one code (:func:`mrm.sim.manifest.code_fingerprint`: the sources a run executes,
+  the data files and the numerics versions). Without a certificate that covers the compression the run is refused
+  (:class:`mrm.scenarios.CompressionError`); the convergence results are still written.
 - ``sweep``: the Cartesian product of ``experiment.grid`` axes, one run per point. Axis keys: a config path (values
   in config units, applied as overrides; ``controller.params.<p>`` and ``scenario.params.<p>`` included),
   ``alt:<path>`` (an alternative of a leaf, or an ``uncertainty.<entry>`` pin), ``corner`` (a corner preset name),
@@ -175,14 +177,17 @@ EXTENSION_KEYS: tuple[OptionKey, ...] = (
               "laser_ramp), cold thermal lags (a power-up); 'cold_settled' = heaters at code_min, thermal state "
               "settled from the cold branch, lasers on at t = 0 (branch_low); 'warm' = the quasi-static oracle lock "
               "codes with the thermal state settled on the hot branch (a steady lock; runner heater_code="
-              "'quasi_static', settle=True). Default: the scenario's ResetSpec (warm_start -> warm, cold_start -> "
-              "cold), else cold", STARTS),
+              "'quasi_static_reachable', settle=True, reset_protocol='branch_high': a ring that its heater-up order "
+              "cannot lock is moved to the next, bluer order, so sampled worlds differ from heater_code="
+              "'quasi_static'). Default: the scenario's ResetSpec (warm_start -> warm, cold_start -> cold), else "
+              "cold", STARTS),
     OptionKey("record", "list", None,
               "Truth records for trace.h5: strings 'field@decimation:reducer' (decimation in ticks or 'auto'; "
               "reducer mean | min | max | last | envelope) or {channel, decimation, reducer} maps; [] records "
               "nothing. Default: kind run -> default_records(); every other kind -> nothing (metrics only)"),
     OptionKey("corners", "list", None,
-              "named corners: corner preset names or {name, alts: {path: alternative}} maps. Default: compare and "
+              "named corners: corner preset names, corner files given by path (copied into inputs/) or {name, "
+              "alts: {path: alternative}} maps; their alts are part of the experiment hash. Default: compare and "
               "robust -> NAMED_CORNERS (07 4.8); other kinds -> none"),
     OptionKey("n_threads", "int", None, "kernel worker threads (default os.cpu_count())"),
     OptionKey("self_reference", "map", None,
@@ -199,7 +204,9 @@ EXTENSION_KEYS: tuple[OptionKey, ...] = (
               "max); cases 'all' (default) or case labels (exact, or a prefix ending in '/' or '*')"),
     OptionKey("convergence_certificate", "str", None,
               "a run directory (or its convergence.json) whose 07 P0-10 certificate covers this compressed "
-              "scenario and plant; without it a compressed run performs the convergence experiment first"),
+              "scenario, plant and code (mrm.sim.manifest.code_fingerprint); without it a compressed run performs "
+              "the convergence experiment first. The path is recorded as given; a rerun takes the certificate from "
+              "its own convergence.json"),
     OptionKey("compression_factors", "list", (1.0, 10.0, 100.0),
               "time-compression factors of the convergence experiment (07 P0-10: 1, 10, 100)"),
     OptionKey("histogram", "bool", False, "detuning histogram accumulators (07 P0-8; ~2.1 MB per world)"),
@@ -557,16 +564,24 @@ class Experiment:
 
     @property
     def hash(self) -> str:
-        """sha256 of the resolved config and the resolved extension options (the run directory's hash8).
+        """sha256 of the resolved config, the resolved extension options and the contents of the corners the
+        experiment runs (the run directory's hash8).
 
         The config part is :func:`config_hash_without_options`: the extension keys are hashed once, as resolved
         options, whether mrm.params validated them (they are in mrm/params/schema.py since 2026-10-10) or this
         module stripped them (before); so the hash of an experiment did not change when the keys moved into the
-        schema, and recorded run directories still rerun."""
+        schema, and recorded run directories still rerun. A corner is a separate file that the config tree does not
+        hold, so the (name, alts) of every corner a case runs (:func:`_corner_contents`: experiment.corners, the
+        NAMED_CORNERS of compare / robust, a grid ``corner`` axis) are hashed too, only when there are any (an
+        experiment without corners keeps its former hash): an edit of a corner preset changes the hash, and rerun
+        refuses."""
         opts = {k.name: self.option(k.name) for k in EXTENSION_KEYS}
         from mrm.sim.manifest import to_jsonable
-        blob = json.dumps({"config": config_hash_without_options(self.cfg), "options": to_jsonable(opts)},
-                          sort_keys=True)
+        blob_d: dict = {"config": config_hash_without_options(self.cfg), "options": to_jsonable(opts)}
+        corners = _corner_contents(self)
+        if corners:
+            blob_d["corner_alts"] = to_jsonable(corners)
+        blob = json.dumps(blob_d, sort_keys=True)
         return hashlib.sha256(blob.encode()).hexdigest()
 
     def resolved_options(self) -> dict:
@@ -575,12 +590,13 @@ class Experiment:
                 for k in EXTENSION_KEYS}
 
 
-def load(source, overrides=None, alts=None) -> Experiment:
+def load(source, overrides=None, alts=None, *, corner_files: Mapping[str, str | Path] | None = None) -> Experiment:
     """Load an experiment from a YAML path (or preset name), a Config, or an Experiment (returned with the extra
     overrides/alts applied).
 
     ``overrides``: {path: value} or ["path=value", ...]; ``experiment.<extension>`` paths set extension options,
-    the rest are mrm.params overrides. ``alts``: {path: alternative} as for mrm.params.load.
+    the rest are mrm.params overrides. ``alts``: {path: alternative} as for mrm.params.load. ``corner_files``:
+    {corner as given: file to read it from} (rerun: the copies in inputs/).
     """
     from mrm import params
     from mrm.params.config import Config, _resolve_file
@@ -623,10 +639,12 @@ def load(source, overrides=None, alts=None) -> Experiment:
         else:
             opts[k] = v
     options = _validate_options(opts)
-    return Experiment(cfg=cfg, options=options,
-                      source={"path": str(path), "stripped": str(stripped), "overrides": _plain_override_list(
-                          overrides), "param_overrides": plain, "alts": dict(alts_d), "chain": chain,
-                          "input_copies": _input_copies(path)})
+    exp = Experiment(cfg=cfg, options=options,
+                     source={"path": str(path), "stripped": str(stripped), "overrides": _plain_override_list(
+                         overrides), "param_overrides": plain, "alts": dict(alts_d), "chain": chain,
+                         "input_copies": _input_copies(path)})
+    _snapshot_corners(exp, corner_files)
+    return exp
 
 
 def from_config(cfg, options: Mapping | None = None) -> Experiment:
@@ -651,7 +669,10 @@ def from_config(cfg, options: Mapping | None = None) -> Experiment:
                                       f"mrm.sim.experiment.load (or mrm.run(path))")
             src.update(path=str(last), stripped=str(stripped), overrides=ov, param_overrides=ov, chain=chain,
                        input_copies=_input_copies(last))
-    return Experiment(cfg=cfg, options=opts, source=src)
+    exp = Experiment(cfg=cfg, options=opts, source=src)
+    if src.get("path"):
+        _snapshot_corners(exp)
+    return exp
 
 
 def _deep_merge(base: dict, over: Mapping) -> dict:
@@ -996,7 +1017,8 @@ def world_summary(m: Mapping) -> dict[str, np.ndarray]:
     (sum over rings); wrong_line_rings (rings on a foreign line at the end) and wrong_line_events (sum);
     time_to_lock_s (the last ring's; inf when any ring ends unlocked); unlocked_rings; max_abs_lock_error_pm and
     rms_lock_error_pm (worst ring); mean_reloma_db and oracle_reloma_db (bank means, dB; absolute relOMA = OMA/P_in,
-    07 D9); fsr_hop_events (sum); ber_mean_worst; heater_sat_s / heater_low_rail_s (worst ring, s);
+    07 D9); fsr_hop_events (sum: re-locks on another order) and order_changes (sum: changes of the order nearest
+    the declared line, lock-independent); ber_mean_worst; heater_sat_s / heater_low_rail_s (worst ring, s);
     heater_range_used_codes (largest ring range). From the warm start, when the run had one:
     warm_start_no_code_rings (rings that started at code_min), warm_start_order_hopped_rings (rings locked one order
     bluer than the heater-up order) and warm_start_supply_limited (1 when the world's lock powers exceed the array
@@ -1031,6 +1053,8 @@ def world_summary(m: Mapping) -> dict[str, np.ndarray]:
     out["oma_penalty_db_worst"] = np.where(np.isneginf(out["oma_penalty_db_worst"]), np.nan,
                                            out["oma_penalty_db_worst"])
     out["ber_mean_worst"] = np.where(np.isneginf(out["ber_mean_worst"]), np.nan, out["ber_mean_worst"])
+    if "order_changes" in m:                            # metrics written before 2026-10-16 have none
+        out["order_changes"] = np.asarray(m["order_changes"]).sum(axis=1).astype(float)
     if "warm_start_no_code" in m:
         out["warm_start_no_code_rings"] = np.asarray(m["warm_start_no_code"], bool).sum(axis=1).astype(float)
     if "warm_start_supply_limited" in m:
@@ -1210,24 +1234,87 @@ def _main_controller(exp: Experiment) -> dict | None:
     return _controller_from_cfg(exp.cfg)
 
 
-def _corners(exp: Experiment, default: Sequence[str]) -> list[tuple[str, dict]]:
-    """[(name, alts)] of experiment.corners (preset names or {name, alts}), or the defaults."""
+def _corner_file_data(path) -> dict:
+    """The parsed YAML of a corner file (preset or path)."""
     import yaml
+    return yaml.safe_load(Path(path).read_text()) or {}
+
+
+def _corner_data(exp: Experiment, given: str) -> tuple[Path, dict]:
+    """(file, parsed YAML) of a corner named or given by path: a corner file that is not a preset is read from the
+    copy taken when the experiment was loaded (runs/<id>/inputs/_corner_<i>_<name>), a preset from its file."""
+    import yaml
+    snap = (exp.source.get("corner_copies") or {}).get(str(given))
+    if snap is not None:
+        return Path(snap["original"]), yaml.safe_load(snap["text"]) or {}
     from mrm.params.config import _resolve_file
+    p = _resolve_file(str(given))
+    return p, _corner_file_data(p)
+
+
+def _corner_strings(exp: Experiment) -> list[str]:
+    """Every corner given by name or path (experiment.corners, a grid ``corner`` axis), in order."""
+    out = [str(it) for it in (exp.option("corners") or []) if not isinstance(it, Mapping)]
+    g = exp.grid.get("corner")
+    if isinstance(g, (list, tuple)):
+        out += [str(v) for v in g if not isinstance(v, Mapping)]
+    return list(dict.fromkeys(out))
+
+
+def _snapshot_corners(exp: Experiment, corner_files: Mapping[str, str | Path] | None = None) -> None:
+    """Copy every corner file given by path that is not a preset (07 P1-17: the run directory reruns, and can be
+    sent elsewhere, without the original files): ``exp.source['corner_copies']`` {given: copy} and one more
+    inputs/ entry ``_corner_<i>_<name>`` each, taken now (an edit during a long run must not change what runs).
+    ``corner_files`` maps a corner as given to the file to read instead (rerun: the copies of the recorded run)."""
+    from mrm.params.config import _resolve_file
+    copies = exp.source.setdefault("input_copies", [])
+    snaps = exp.source.setdefault("corner_copies", {})
+    for given in _corner_strings(exp):
+        if given in snaps:
+            continue
+        src = (corner_files or {}).get(given)
+        try:
+            p = Path(src) if src is not None else _resolve_file(given)
+        except Exception:                                       # noqa: BLE001 - _corners reports a missing corner
+            continue
+        if src is None and _is_preset_file(p):
+            continue
+        raw = p.read_bytes()
+        c = {"name": f"_corner_{len(copies)}_{p.name}", "text": raw.decode(), "original": str(p.resolve()),
+             "sha256": hashlib.sha256(raw).hexdigest(), "corner": given}
+        copies.append(c)
+        snaps[given] = c
+
+
+def _corner_entry(exp: Experiment, it) -> tuple[str, dict]:
+    if isinstance(it, Mapping):
+        if "name" not in it or "alts" not in it:
+            raise ExperimentError(f"corner {it!r}: needs name and alts")
+        return str(it["name"]), dict(it["alts"])
+    p, data = _corner_data(exp, str(it))
+    if (data.get("meta") or {}).get("kind") != "corner" or set(data) - {"extends", "meta", "alts"}:
+        raise ExperimentError(f"corner {it!r}: {p} is not a corner preset (meta.kind corner, only alts)")
+    return str(it), dict(data.get("alts") or {})
+
+
+def _corners(exp: Experiment, default: Sequence[str]) -> list[tuple[str, dict]]:
+    """[(name, alts)] of experiment.corners (preset names, corner files or {name, alts}), or the defaults."""
     spec = exp.option("corners")
     items = list(default) if spec is None else list(spec)
-    out = []
-    for it in items:
-        if isinstance(it, Mapping):
-            if "name" not in it or "alts" not in it:
-                raise ExperimentError(f"corner {it!r}: needs name and alts")
-            out.append((str(it["name"]), dict(it["alts"])))
-            continue
-        p = _resolve_file(str(it))
-        data = yaml.safe_load(p.read_text()) or {}
-        if (data.get("meta") or {}).get("kind") != "corner" or set(data) - {"extends", "meta", "alts"}:
-            raise ExperimentError(f"corner {it!r}: {p} is not a corner preset (meta.kind corner, only alts)")
-        out.append((str(it), dict(data.get("alts") or {})))
+    return [_corner_entry(exp, it) for it in items]
+
+
+def _corner_contents(exp: Experiment) -> list[list]:
+    """[[name, alts]] of every corner a case of the experiment runs (Experiment.hash): experiment.corners or the
+    NAMED_CORNERS (compare, robust), and a sweep's grid ``corner`` axis."""
+    kind = exp.kind
+    out: list[list] = []
+    if kind in ("compare", "robust", "acceptance", "quasi_static"):
+        out += [[n, a] for n, a in _corners(exp, NAMED_CORNERS if kind in ("compare", "robust") else ())]
+    if kind == "sweep":
+        g = exp.grid.get("corner")
+        if isinstance(g, (list, tuple)):
+            out += [[n, a] for n, a in _corners_from_names(g, exp)]
     return out
 
 
@@ -1553,7 +1640,7 @@ def _grid_points(exp: Experiment) -> list[tuple[dict, list[str], dict, dict | No
         for k, v in zip(keys, combo):
             assign[k] = v
             if k == "corner":
-                alts.update(_corners_from_names([v])[0][1])
+                alts.update(_corners_from_names([v], exp)[0][1])
             elif k == "controller":
                 centry = _controller_entry(v)
             elif k.startswith("alt:"):
@@ -1564,13 +1651,11 @@ def _grid_points(exp: Experiment) -> list[tuple[dict, list[str], dict, dict | No
     return pts
 
 
-def _corners_from_names(names) -> list[tuple[str, dict]]:
-    import yaml
-    from mrm.params.config import _resolve_file
+def _corners_from_names(names, exp: Experiment) -> list[tuple[str, dict]]:
+    """[(name, alts)] of a grid ``corner`` axis (corner preset names or corner files)."""
     out = []
     for n in names:
-        p = _resolve_file(str(n))
-        data = yaml.safe_load(p.read_text()) or {}
+        _, data = _corner_data(exp, str(n))
         if (data.get("meta") or {}).get("kind") != "corner":
             raise ExperimentError(f"grid corner {n!r} is not a corner preset")
         out.append((str(n), dict(data.get("alts") or {})))
@@ -1603,7 +1688,8 @@ def _worlds_of(exp: Experiment, case: Case) -> dict:
 
 
 def load_certificate(path: str | Path):
-    """A ConvergenceCertificate from a run directory or its convergence.json."""
+    """A ConvergenceCertificate from a run directory or its convergence.json (a relative path is relative to the
+    working directory)."""
     from mrm.scenarios import ConvergenceCertificate
     p = Path(path)
     if p.is_dir():
@@ -1618,12 +1704,14 @@ def load_certificate(path: str | Path):
     return ConvergenceCertificate.from_dict(cert)
 
 
-def _convergence(exp: Experiment, main: Case, sc, log) -> tuple[Any, dict, list[CaseResult]]:
+def _convergence(exp: Experiment, main: Case, sc, log, code_fp: str) -> tuple[Any, dict, list[CaseResult]]:
     """The mandatory 07 P0-10 convergence experiment for a compressed scenario: one slow cycle at every factor on
     the same plant, controller, start, worlds and seeds; per world, every factor's CONVERGENCE_METRICS must agree
-    with factor 1. Returns (certificate or None, report dict, case results)."""
+    with factor 1 (CONVERGENCE_PER_RING ring by ring). ``code_fp``: the code fingerprint the certificate records
+    (mrm.sim.manifest.code_fingerprint, taken when the gate started). Returns (certificate or None, report dict,
+    case results)."""
     from mrm.scenarios import ConvergenceCertificate, assess_convergence, convergence_plan
-    from mrm.scenarios.generators import CONVERGENCE_METRICS
+    from mrm.scenarios.generators import CONVERGENCE_METRICS, CONVERGENCE_PER_RING
     factors = [float(x) for x in exp.option("compression_factors")]
     plan = convergence_plan(sc, factors)
     fp = plant_fingerprint(exp.cfg, main.start, _worlds_of(exp, main))
@@ -1636,13 +1724,16 @@ def _convergence(exp: Experiment, main: Case, sc, log) -> tuple[Any, dict, list[
                                    record=None, record_default=False, group="convergence", meta={"factor": c})
         r = _execute(exp, case, log)
         results.append(r)
-        world[c] = {m: np.asarray(r.metrics["world"][m], float) for m in CONVERGENCE_METRICS}
+        # (B, N) for the per-ring metrics, else the (B,) world value
+        world[c] = {m: np.asarray(r.metrics[m] if m in CONVERGENCE_PER_RING else r.metrics["world"][m], float)
+                    for m in CONVERGENCE_METRICS}
     B = main.batch
     reports = []
     max_ok = math.inf
     for b in range(B):
-        rep = assess_convergence(sc, {c: {m: float(world[c][m][b]) for m in CONVERGENCE_METRICS} for c in world},
-                                 plant_fingerprint=fp)
+        rep = assess_convergence(sc, {c: {m: (world[c][m][b] if world[c][m].ndim > 1 else float(world[c][m][b]))
+                                          for m in CONVERGENCE_METRICS} for c in world},
+                                 plant_fingerprint=fp, code_fingerprint=code_fp)
         reports.append({"world": b, "passed": rep.passed, "failures": list(rep.failures),
                         "details": {str(k): v for k, v in rep.details.items()},
                         "max_validated_factor": rep.certificate.max_validated_factor if rep.certificate else 1.0})
@@ -1654,16 +1745,18 @@ def _convergence(exp: Experiment, main: Case, sc, log) -> tuple[Any, dict, list[
             scenario_fingerprint=sc.fingerprint(include_compression=False), plant_fingerprint=fp,
             factors=tuple(sorted(world)), max_validated_factor=float(max_ok),
             metrics={str(c): {m: world[c][m].tolist() for m in CONVERGENCE_METRICS} for c in world},
-            tolerances=dict(DEFAULT_CONVERGENCE_TOLERANCES))
-    rep = {"factors": sorted(world), "plant_fingerprint": fp,
+            tolerances=dict(DEFAULT_CONVERGENCE_TOLERANCES), code_fingerprint=code_fp)
+    rep = {"factors": sorted(world), "plant_fingerprint": fp, "code_fingerprint": code_fp,
            "scenario_fingerprint": sc.fingerprint(include_compression=False),
            "passed": all(r["passed"] for r in reports), "max_validated_factor": float(max_ok),
            "worlds": reports, "certificate": cert.to_dict() if cert else None,
            "cycle_s": sc.slow_cycle_s,
-           "note": ("07 P0-10: one slow cycle at each factor; per world, max detuning, wrong-line and FSR-hop "
-                    "events, heater range used and integrated errors must agree with factor 1 "
-                    "(mrm.scenarios.DEFAULT_CONVERGENCE_TOLERANCES, design choices). Integrated errors are compared "
-                    "raw (not scaled by the compression).")}
+           "note": ("07 P0-10: one slow cycle at each factor; per world, max detuning (ring by ring: 0.2 pm or 5 %, "
+                    "at most 0.5 pm), "
+                    "wrong-line events, FSR-hop events and order changes, heater range used and integrated errors "
+                    "must agree with factor 1 (mrm.scenarios.DEFAULT_CONVERGENCE_TOLERANCES, design choices). "
+                    "Integrated errors are compared raw (not scaled by the compression). The certificate covers this "
+                    "plant fingerprint and this code fingerprint (mrm.sim.manifest.code_fingerprint).")}
     return cert, rep, results
 
 
@@ -1701,26 +1794,32 @@ def _header(exp: Experiment, controller_report: bool) -> list[str]:
 
 def _compression_gate(exp: Experiment, main: Case, log) -> tuple[bool, list[CaseResult], dict, list[str]]:
     """07 P0-10 gate for a time-compressed scenario: a certificate from experiment.convergence_certificate, or the
-    convergence experiment run here on the main case's plant, controller, start, worlds and seeds. Returns (allowed,
-    convergence case results, extra {'convergence': report}, report lines). An uncompressed scenario passes."""
-    from mrm.scenarios import CompressionError, require_compression_validated
+    convergence experiment run here on the main case's plant, controller, start, worlds and seeds. The certificate
+    must cover the plant fingerprint and the code fingerprint (mrm.sim.manifest.code_fingerprint) of this run. A
+    rerun takes a reused certificate from the recorded run's convergence.json (``exp.source['certificate']``), not
+    from the recorded path. Returns (allowed, convergence case results, extra {'convergence': report}, report
+    lines). An uncompressed scenario passes."""
+    from mrm.scenarios import CompressionError, ConvergenceCertificate, require_compression_validated
+    from mrm.sim import manifest as mf
     sc = main.scenario if main.scenario is not None else _scenario(exp.config(tuple(main.overrides), main.alts))
     if float(sc.time_compression) == 1.0:
         return True, [], {}, []
     fp = plant_fingerprint(exp.cfg, main.start, _worlds_of(exp, main))
+    code_fp = mf.code_fingerprint()
     cpath = exp.option("convergence_certificate")
     results: list[CaseResult] = []
     extra: dict = {}
     if cpath:
-        cert = load_certificate(cpath)
+        copy_d = exp.source.get("certificate")
+        cert = ConvergenceCertificate.from_dict(copy_d) if copy_d else load_certificate(cpath)
         extra["convergence"] = {"certificate": cert.to_dict(), "from": str(cpath)}
     else:
         log(f"time compression {sc.time_compression:g}: running the 07 P0-10 convergence experiment "
             f"(one {sc.slow_cycle_s} s cycle at {exp.option('compression_factors')})")
-        cert, rep, results = _convergence(exp, main, sc, log)
+        cert, rep, results = _convergence(exp, main, sc, log, code_fp)
         extra["convergence"] = rep
     try:
-        require_compression_validated(sc, cert, plant_fingerprint=fp)
+        require_compression_validated(sc, cert, plant_fingerprint=fp, code_fingerprint=code_fp)
     except CompressionError as e:
         return False, results, extra, [f"REFUSED: {e}"]
     return True, results, extra, [f"time compression {sc.time_compression:g}: validated up to "
@@ -2202,7 +2301,10 @@ def _write_run(exp: Experiment, res: ExperimentResult, started, argv, rerun_of, 
         copies = src.get("input_copies") or _input_copies(Path(src["path"]))
         for c in copies:
             (d / "inputs" / c["name"]).write_text(c["text"])
-            inputs.append({"file": f"inputs/{c['name']}", "original": c["original"], "sha256": c["sha256"]})
+            e = {"file": f"inputs/{c['name']}", "original": c["original"], "sha256": c["sha256"]}
+            if c.get("corner") is not None:
+                e["corner"] = c["corner"]
+            inputs.append(e)
     # resolved yaml: the config tree with provenance, the resolved options and the source
     import yaml
     tree = exp.cfg.resolved_tree()
@@ -2281,11 +2383,13 @@ def rerun(run_dir: str | Path, *, runs_dir: str | Path | None = None, write: boo
           log: Callable[[str], None] | None = None, allow_changed_config: bool = False) -> tuple[ExperimentResult,
                                                                                                 dict | None]:
     """Reproduce a run from its directory (07 P1-17 ``mrm rerun runs/<id>``): reload the copied experiment file
-    with the recorded overrides, alternatives and options, check that the experiment hash is the recorded one
-    (else the presets, artefacts or code changed: ExperimentError unless ``allow_changed_config``), run it into a
-    new run directory (``rerun_of`` in its manifest) and compare every array of trace.h5 bit for bit
-    (:func:`mrm.sim.manifest.compare_runs`). Warns when the git commit, dirty diff or environment differ (results
-    may then differ at rounding level). Returns (result, comparison or None)."""
+    with the recorded overrides, alternatives and options (corner files from their copies in inputs/, a reused
+    convergence certificate from the run's own convergence.json, so the directory reruns from any working directory
+    and elsewhere), check that the experiment hash is the recorded one (else the presets, corners, artefacts or code
+    changed: ExperimentError unless ``allow_changed_config``), run it into a new run directory (``rerun_of`` in its
+    manifest) and compare every array of trace.h5 bit for bit (:func:`mrm.sim.manifest.compare_runs`). Warns when
+    the git commit, dirty diff or environment differ (results may then differ at rounding level; a reused
+    certificate from other code is refused). Returns (result, comparison or None)."""
     from mrm.sim import manifest as mf
     log = log or (lambda s: print(s, file=sys.stderr, flush=True))
     d = Path(run_dir)
@@ -2301,9 +2405,17 @@ def rerun(run_dir: str | Path, *, runs_dir: str | Path | None = None, write: boo
     for k, v in (man.get("options") or {}).items():
         if k in _EXT and v is not None and v != _EXT[k].default:
             opts[k] = v
-    exp = load(path, overrides=src.get("overrides") or None, alts=src.get("alts") or None)
+    corner_files = {e["corner"]: d / e["file"] for e in ins if e.get("corner") is not None}
+    exp = load(path, overrides=src.get("overrides") or None, alts=src.get("alts") or None, corner_files=corner_files)
     exp = dataclasses.replace(exp, options=_validate_options({**exp.options, **opts}), _cache={})
     exp.source["path"] = str(path)
+    _snapshot_corners(exp, corner_files)
+    conv = d / "convergence.json"
+    if exp.option("convergence_certificate") and conv.exists():
+        with open(conv) as f:
+            cj = json.load(f)
+        if cj.get("certificate") and "from" in cj:      # the reused certificate, as the run recorded it
+            exp.source["certificate"] = cj["certificate"]
     if exp.kind != man.get("kind"):
         raise ExperimentError(f"rerun: kind {exp.kind} != recorded {man.get('kind')}")
     if exp.hash != man.get("experiment_hash"):

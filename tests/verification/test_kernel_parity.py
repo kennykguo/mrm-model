@@ -99,7 +99,7 @@ def _compare(plant, ref, n_ticks):
                                atol=1e-15)
     mk, mr = plant.metrics(), ref.metrics()
     for key in ("max_abs_detuning_pm", "mean_detuning_pm", "excursion_count", "time_unlocked_s", "first_lock_s",
-                "wrong_line_events", "fsr_hop_events", "heater_energy_j", "code_max_used", "peak_slew_codes_per_s",
+                "wrong_line_events", "fsr_hop_events", "order_changes", "heater_energy_j", "code_max_used", "peak_slew_codes_per_s",
                 "mean_reloma", "mean_p_abs_w", "heater_sat_s"):
         np.testing.assert_allclose(np.asarray(mk[key], float), np.asarray(mr[key], float), rtol=1e-12, atol=0,
                                    equal_nan=True, err_msg=key)

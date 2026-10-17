@@ -1,3 +1,6 @@
+> **STALE (2026-10-17).** This report predates the final-review fixes: g26_calibrated and its fit record (mrm/calibration/latest_fit.json) were fitted before the params fixes and were not refitted, and every part was computed on the old presets (config hash 2ff8585edbe141fc; now c19f06120f0f4e58).
+> It will be regenerated after the refit, when the real device parameters arrive: `python -m mrm.validation.report --preset g26_calibrated --out docs/VALIDATION_g26_calibrated.md`. Open items: [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
 # Validation report
 
 <!-- frozen-targets:begin (owned by the target split; the report generator must copy this block verbatim) -->

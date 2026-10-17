@@ -76,7 +76,7 @@ def _compare(acc, ref, keys):
 KEYS = ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "max_abs_lock_error_pm", "rms_lock_error_pm",
         "time_above_s", "excursion_count",
         "time_unlocked_s", "excursion_max_s", "first_lock_s", "time_to_lock_s", "locked_final", "fsr_hop_events",
-        "wrong_line_s", "wrong_line_events", "wrong_line_final", "mean_reloma", "oma_penalty_db",
+        "order_changes", "wrong_line_s", "wrong_line_events", "wrong_line_final", "mean_reloma", "oma_penalty_db",
         "oma_penalty_unrestricted_db", "mean_p_abs_w", "expected_errors", "heater_energy_j", "heater_sat_s",
         "heater_low_rail_s", "code_min_used", "code_max_used", "heater_range_used_codes", "peak_slew_codes_per_s")
 
@@ -116,6 +116,7 @@ def test_accumulators_equal_trace_metrics_synthetic():
     assert acc["locked_final"][1, 2] == False         # noqa: E712
     assert np.isnan(acc["time_to_lock_s"][1, 2])
     assert np.any(acc["fsr_hop_events"] > 0)
+    assert np.all(acc["order_changes"] == 1)          # the order steps once, at t = 3001, locked or not
     # the histogram holds every tick once
     assert np.all(st.hist.sum(axis=2) == T)
 
@@ -287,8 +288,8 @@ def test_accumulators_equal_trace_metrics_plant(plant_run):
                              code_hi=int(plant.P.he_hi), reg0=np.zeros((2, 8), np.int64), k0=0)
     _compare(acc, ref, ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "time_above_s",
                         "excursion_count", "time_unlocked_s", "excursion_max_s", "first_lock_s", "time_to_lock_s",
-                        "locked_final", "fsr_hop_events", "mean_reloma", "oma_penalty_db", "mean_p_abs_w",
-                        "heater_energy_j", "heater_sat_s", "heater_low_rail_s", "code_min_used", "code_max_used",
+                        "locked_final", "fsr_hop_events", "order_changes", "mean_reloma", "oma_penalty_db",
+                        "mean_p_abs_w", "heater_energy_j", "heater_sat_s", "heater_low_rail_s", "code_min_used", "code_max_used",
                         "peak_slew_codes_per_s"))
     assert np.all(acc["code_max_used"] == 18000)
     assert np.all(acc["peak_slew_codes_per_s"] == pytest.approx(2000 / (1000 * plant.dt)))

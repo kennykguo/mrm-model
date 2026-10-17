@@ -41,7 +41,10 @@ line of the ring, positive = resonance red of the line; FWHM = lambda_line^2 fwh
   |register change| / (ticks since the previous latch) / dt over every controller latch (07 P1-11: report demand).
 - wrong line (07 P1-12): the ring sits within ``wrong_line_window_fwhm`` x FWHM of a line that is not its declared
   line (the kernel decides per tick, honouring metrics.allowed_assignments); ticks, entries (events) and the final
-  state. FSR hop: the ring relocks on a resonance order other than the one of its previous lock (event count).
+  state. FSR hop: the ring relocks on a resonance order other than the one of its previous lock (event count;
+  ``fsr_hop_events``, so it needs a lock). Order changes (``order_changes``, lock-independent): steps at whose end the
+  order nearest the declared line differs from the order at the end of the previous step. d is always measured from
+  that order, so |d| <= FSR/2 by construction and no bound on max |d| can see a hop; this count does.
 - detuning histogram (optional, 07 P0-8): 0.1 pm bins within +-2 FWHM and 10 pm bins out to +-FSR/2, plus one
   under- and one overflow bin; the fine half-width uses the largest FWHM of the bank and the coarse one the largest FSR
   (one bin layout for every world and ring). int64 counts of ticks.
@@ -142,7 +145,9 @@ AI_WIN_TICKS = 22
 AI_T0 = 23              # reset tick
 AI_ABOVE0 = 24          # ticks above time_above threshold i at AI_ABOVE0 + i (up to N_ABOVE_MAX)
 N_ABOVE_MAX = 4
-NAI = AI_ABOVE0 + N_ABOVE_MAX
+AI_ORDER_PREV = AI_ABOVE0 + N_ABOVE_MAX     # order nearest the declared line at the end of the previous step
+AI_ORDER_CHANGES = AI_ORDER_PREV + 1        # steps whose order differs from the previous step's (lock-independent)
+NAI = AI_ORDER_CHANGES + 1
 N_RUNHIST = 48          # log2 run-length bins (2^47 ticks = 4.5 years at 1 us)
 
 # metric parameter vectors
@@ -178,6 +183,7 @@ def metrics_reset_row(k0, reg, af, ai, hist, runhist):
         ai[n, AI_FIRST_LOCK] = -1
         ai[n, AI_LAST_LOCK] = -1
         ai[n, AI_ORDER_LOCK] = _INT_MIN
+        ai[n, AI_ORDER_PREV] = _INT_MIN
         ai[n, AI_CODE_MIN] = reg[n]
         ai[n, AI_CODE_MAX] = reg[n]
         ai[n, AI_PREV_POP_REG] = reg[n]
@@ -286,6 +292,11 @@ def metrics_tick_row(k, h, mpf, mpi, det, ref, order, wrong, reloma, oracle, ora
                 ai[n, AI_EXC_COUNT] += 1
                 ai[n, AI_RUN_CUR] = h
                 ai[n, AI_TICKS_UNLOCKED] += h
+        # order changes (lock-independent FSR hops of the order nearest the declared line)
+        o = order[n]
+        if ai[n, AI_ORDER_PREV] != _INT_MIN and o != ai[n, AI_ORDER_PREV]:
+            ai[n, AI_ORDER_CHANGES] += 1
+        ai[n, AI_ORDER_PREV] = o
         # wrong line (decided by the kernel against the declared assignment)
         if wrong[n]:
             ai[n, AI_WRONG_TICKS] += h
@@ -669,8 +680,8 @@ def _db(x):
 def summarize(state: MetricsState, *, k_now: int | None = None) -> dict[str, Any]:
     """Reduce the accumulators to the acceptance metrics (07 P0-8). Per-ring values are (B, N) arrays; the
     world-level values used by the compression convergence check (mrm.scenarios.assess_convergence:
-    max_abs_detuning_pm, wrong_line_events, fsr_hop_events, heater_range_used_codes, integrated_errors) are (B,)
-    arrays under ``world``."""
+    wrong_line_events, fsr_hop_events, order_changes, heater_range_used_codes, integrated_errors; max_abs_detuning_pm
+    is compared per ring) are (B,) arrays under ``world``."""
     af, ai, dt, spec = state.af, state.ai, state.dt_s, state.spec
     ticks = ai[:, :, AI_TICKS].astype(float)
     tk = np.where(ticks > 0, ticks, np.nan)
@@ -700,6 +711,7 @@ def summarize(state: MetricsState, *, k_now: int | None = None) -> dict[str, Any
     out["wrong_line_events"] = ai[:, :, AI_WRONG_EVENTS].copy()
     out["wrong_line_final"] = ai[:, :, AI_WRONG_STATE].astype(bool)
     out["fsr_hop_events"] = ai[:, :, AI_FSR_HOPS].copy()
+    out["order_changes"] = ai[:, :, AI_ORDER_CHANGES].copy()
     s_rel, s_or, s_oru = af[:, :, AF_SUM_RELOMA], af[:, :, AF_SUM_ORACLE], af[:, :, AF_SUM_ORACLE_UNR]
     out["mean_reloma"] = _ratio(s_rel, tk)
     out["mean_reloma_db"] = _db(_ratio(s_rel, tk))
@@ -729,6 +741,7 @@ def summarize(state: MetricsState, *, k_now: int | None = None) -> dict[str, Any
         "max_abs_detuning_pm": out["max_abs_detuning_pm"].max(axis=1),
         "wrong_line_events": out["wrong_line_events"].sum(axis=1),
         "fsr_hop_events": out["fsr_hop_events"].sum(axis=1),
+        "order_changes": out["order_changes"].sum(axis=1),
         "heater_range_used_codes": out["heater_range_used_codes"].max(axis=1),
         "integrated_errors": out["expected_errors"].sum(axis=1),
         "excursion_count": out["excursion_count"].sum(axis=1),
@@ -803,6 +816,8 @@ def metrics_from_trace(spec: MetricsSpec, dt_s: float, *, det_m, order, wrong, r
     out["time_to_lock_s"] = np.where((last >= 0) & locked_final, (last - k0) * dt_s, np.nan)
     out["locked_final"] = locked_final
     out["fsr_hop_events"] = hops
+    o = np.asarray(order, np.int64)
+    out["order_changes"] = (o[1:] != o[:-1]).sum(axis=0).astype(np.int64)
     w = np.asarray(wrong, bool)
     out["wrong_line_s"] = w.sum(axis=0) * dt_s
     entries = w.copy()
