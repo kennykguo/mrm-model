@@ -185,3 +185,25 @@ Still open (for the integrator and the content agent):
   with `q_intrinsic` instead of the budget. The content agent should state which.
 - An absolute uncertainty entry on a ring-level leaf written as a per-ring list replaces the stagger with one value
   per world (by design: one draw per world); use `mode: scale` or `offset` to keep a designed stagger.
+
+## 6. Params review (2026-10-16): machinery added
+
+Details and numbers: docs/CHANGELOG.md (params review entry); formats: PARAMETERS_FORMAT.md 5, 6.1, 6.2 and 7.1.
+
+- **Sampled geometry solves the relations twice** (07 P1-16). With `variation: sample` and a `variation.geometry`,
+  realize first solves the nominal-geometry device of every world (after the uncertainty draw and the grid, with the
+  device's own draws of the R4 coupling members) and hands R3 and R4_q its radius, order and per-pass couplings
+  (`RelationContext.radius_hold`, `order_hold`, `coupling_anchor`): a free radius is a mask dimension held for every
+  device (the FSR follows n_g), the order is the nominal device's, and the coupler Jacobian moves each device's K^2
+  whichever R4 member is free. New Jacobian target kinds: `kappa2` (the coupling outputs), `exp` (a secant applied
+  as d ln value/dp from the table's stored evaluations: the bend radiation) and the `ln_alpha_rad_per_nm` output;
+  `variation.geometry.width_closes_gaps`.
+- **R2 at the P_FSR line**: `ring.heater.p_fsr_ref_wavelength_nm` (`derived.heater.p_fsr_span_m`).
+- **Provenance of the line wavelengths**: derivations of `derived.optics.lambda_line_m` / `lambda_res_cold_m`.
+- **Ranges** hold every selectable value: absolute interval ends and corners against the target leaf's range;
+  alternatives against their leaf's range in strict presets; `name: null` removes an inherited alternative in a
+  child preset.
+- **Label entries** (`follows` + `map` on a hypothesis entry; config `_validate_label_entry`,
+  `_resolve_label_entries`; realize sets the label after the drawn entries; sensitivity treats it as pinned): the
+  second axis of a joint hypothesis, never drawn. This resolves the "tied hypotheses (branch x mechanism)" request of
+  calibration.md section 8; tied draws of numeric leaves (Q_L with the loss budget, a continuous eta) are still open.

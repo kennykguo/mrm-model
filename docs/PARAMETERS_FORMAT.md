@@ -217,10 +217,14 @@ ring:
 **Alternatives on a leaf** (07 D3, P1-14) hold disputed values without forking presets. Each alternative is
 `{value | from, provenance, generation?, source?, note?}`; missing generation and source are inherited from the
 leaf. In strict presets an alternative must be a mapping, not a bare number. An alternative's value is checked like
-the leaf's (type, list length, the schema's hard bounds) but not against the leaf's `range`, because stress
-alternatives may lie outside the plausible range. Every leaf with alternatives also gets an implicit alternative
-`default` (its own value), so a world can switch back. Alternatives are part of the resolved config and of
-`Config.hash()`.
+the leaf's (type, list length, the schema's hard bounds) and, in strict presets, against the leaf's `range`: a
+selected alternative is range-checked like any value, so one outside the range could never be selected (params
+review 2026-10-16; params_content handoff 5.7: the range spans every selectable value, stress alternatives included,
+and the note states the plausible span). A child preset removes an inherited alternative whose meaning it changed
+with `name: null` (g25_test_vehicle restates `laser.power_per_line_dbm` at the ring and drops g26's
+`guide_16_lines`, a laser-module output); `null` naming no inherited alternative is an error. Every leaf with
+alternatives also gets an implicit alternative `default` (its own value), so a world can switch back. Alternatives
+are part of the resolved config and of `Config.hash()`.
 
 **`alts: {path: name}`** (in a file, or the `alts=` argument, or `--alt path=name`):
 - a leaf path selects one of its alternatives: value, provenance, generation and source are replaced, and
@@ -244,7 +248,8 @@ alternatives may lie outside the plausible range. Every leaf with alternatives a
   path without an entry creates one (provenance `override`);
 - unknown paths are errors with a did-you-mean.
 
-Order inside `load`: extends merge -> `alts` of the files -> `alts` argument -> overrides -> validation.
+Order inside `load`: extends merge -> `alts` of the files -> `alts` argument -> overrides -> label entries (a pinned
+label entry pins or restricts its leader, section 6.1) -> validation.
 
 ## 6. Uncertainty entries (07 P0-4, section 4.8)
 
@@ -296,6 +301,30 @@ uses voltage drive. The `nominal` choice must select what the config already hol
 alternative, each switch at that value), because derive(), the parameter table and explain show the config as
 written; to make another choice nominal, change the leaves or pin the entry with `alts`.
 
+**Label entries** (`follows` + `map`; params review 2026-10-16). A joint hypothesis whose second axis must be a
+world label of its own (so corners can pin it and results can be grouped by it) is written as a label entry:
+
+```yaml
+uncertainty:
+  coupling_regime:                   # g26_calibrated: the CAL-2 fit ties the branch to the mechanism
+    kind: hypothesis
+    follows: er_mechanism            # the leader: another hypothesis entry, not itself a label entry
+    map: {dispersion: under, ring_t_loss: over, heater_t_loss: over}   # every leader choice -> one label
+    choices: {under: {}, over: {}}   # set nothing: the leader's choices set the leaves
+    nominal: under                   # = map[leader's nominal]
+    provenance: assumed
+    generation: none
+    source: D07
+```
+
+A label entry is never drawn (no `weights`, no `target`; every choice is implied by some leader choice): realize
+sets its world label to `map[<leader's choice>]` in every world, after the drawn entries. Pinning it (`alts:
+uncertainty.coupling_regime=over`, as the g26 corner presets do) pins its leader to the one choice that implies the
+label, or restricts the leader to several (drawn by the leader's weights; a nominal world takes the leader's nominal
+if allowed, else the first allowed choice); a leader pinned to a choice that implies another label is a load error.
+`mrm.validation.sensitivity` treats a label entry as pinned (its leader's axis carries the joint hypothesis), so the
+tornado and Sobol analyses do not list it.
+
 ### 6.2 `kind: interval` and `kind: dist`
 
 ```yaml
@@ -329,8 +358,11 @@ Values are in the units of the target key (or of the entry name's suffix). `mode
 `offset` adds to it. Targets must be given physical leaves (not free relation members, not derived-only keys).
 Load checks: low <= high; loguniform needs low > 0; a triangular mode (`nominal`) inside [low, high]; lognormal
 needs mean > 0; `truncate` is [low, high]; for `mode: absolute` the low/high (or truncate) values and the corners lie
-inside the target's hard bounds. Pinning an absolute entry without a `nominal` to `nominal` keeps the leaf's own
-value.
+inside the target's hard bounds and inside the target leaf's declared `range` (a world's value of the target is the
+drawn or pinned value itself, so the range must hold every value a world can take; before the params review of
+2026-10-16 only the hard bounds were checked, and g26's corner `ocp_ring_plus9dbm` = 1 dB lay outside the [2, 10] dB
+range of `optical_path.chip_input_loss_db`, now [1, 10]). Pinning an absolute entry without a `nominal` to
+`nominal` keeps the leaf's own value.
 
 ### 6.3 World variables (entries without a target)
 

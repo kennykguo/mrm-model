@@ -535,11 +535,13 @@ def _group_heater(ctx, T, *, n_grid, inner, quick, log):
         ident = _identifiable(par, {h: pr[par.name] for h, pr in profs.items() if h in nominal_set}, fits, rej)
         extra, rng = "", None
         if par.path == G.P_R0:
+            dlo, dhi = par.declared_range if par.declared_range is not None else (par.lo, par.hi)
             extra = (f"hot resistance at P_FSR {_fmt(der['r_hot_at_p_fsr_ohm'])} ohm (CAL-3b: 1.195^2/25.45 = 56.1); "
-                     f"the prior was widened from the leaf range [42, 58] because that range was computed with the "
-                     f"earlier droop y = 0.00904 /mW (R0 = R_hot/(1 + y P_FSR), the leaf's own note); the "
-                     f"half-prior fraction is taken on the declared 16 ohm width")
-            rng = [35.0, 58.0]
+                     f"the prior widens the leaf range [{_fmt(dlo)}, {_fmt(dhi)}] (R0 = R_hot/(1 + y P_FSR) over "
+                     f"the droops of the thermo-optic worlds, the leaf's own note) to [{_fmt(par.lo)}, "
+                     f"{_fmt(par.hi)}], as R0 trades against y; the half-prior fraction is taken on the declared "
+                     f"{_fmt(dhi - dlo)} ohm width")
+            rng = [float(par.lo), float(par.hi)]
         if par.path == G.P_RATIO:
             extra = (f"y = TCR x R_th,H = {_fmt(der['y_per_mw'])} /mW at TCR {_fmt(der['tcr_per_k'])} /K "
                      f"(R_th,H {_fmt(der['r_th_heater_k_per_mw'])} K/mW, Z_heater->ring "

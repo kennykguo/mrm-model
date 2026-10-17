@@ -286,7 +286,7 @@ def heater_problems(ctx: Context, targets: Mapping[str, Any],
 
     Free leaves: ``ring.heater.p_fsr_mw`` (prior: leaf range [24.9, 37.0]; R2 anchors it with the FSR at the line,
     the bench protocol measures the FSR between the cold order and the next red order, 0.2-0.4 % apart),
-    ``ring.heater.r_cold_ohm`` ([35, 58]: the leaf range [42, 58] widened, see the Param) and ``ring.thermal.heater_self_ratio`` ([1, 4]; with the family's TCR it
+    ``ring.heater.r_cold_ohm`` ([35, 58]: the leaf range, [37, 58] since the params review, widened, see the Param) and ``ring.thermal.heater_self_ratio`` ([1, 4]; with the family's TCR it
     sets y = TCR R_th,H, the droop CAL-4 identifies; TCR and R_th,H are not separable, 06 E1). Nuisance: the swept
     device's own P_FSR (CAL-4 is not the median device: 0.348 against 0.405 nm/mW, 06 E4; prior [22, 40] mW around
     the 60-die range 24.9-34.1), and its cold resistance R0_dev = R0 x a nuisance ratio with a Gaussian prior on
@@ -312,18 +312,24 @@ def heater_problems(ctx: Context, targets: Mapping[str, Any],
     # droop y/R0 of THAT device, so y (and the median's R0 = R_hot/(1 + y P_FSR) and ratio) inherit its R0. The
     # preset's own variation entry gives the device-to-device spread (lognormal, die and ring sigma); it enters as a
     # Gaussian prior on ln(R0_dev / R0) (a constraint residual, not a datum).
-    ve = R.load_config(ctx.base(BENCH)).variation.get(P_R0)
+    bench_cfg = R.load_config(ctx.base(BENCH))
+    ve = bench_cfg.variation.get(P_R0)
     f = dict(getattr(ve, "fields", {}) or {})
     s_ln = math.hypot(float(f.get("die_sigma", 0.0)), float(f.get("ring_sigma", 0.0))) or 0.06
+    # the R0 leaf's declared range (params review 2026-10-16: [37, 58], the G25 hot range over 1 + y P_FSR for every
+    # droop the thermo-optic worlds need); the fit bounds reach 35 ohm, and the half-prior rule takes the declared
+    # width when it is narrower (Param.declared_range)
+    r0_lo, r0_hi = (float(x) for x in bench_cfg.leaves[P_R0].range)
     probs = []
     for thermo_h, hyp in [(t, h) for t in thermo for h in hypotheses]:
         alts = {} if thermo_h == "H_solver" else {"uncertainty.thermo_optic": thermo_h}
         name = hyp if thermo_h == "H_solver" else f"{thermo_h}/{hyp}"
         params = [Param("p_fsr_mw", P_PFSR, 24.9, 37.0, 25.45, unit="mw", prior_source="leaf range [24.9, 37.0]"),
-                  Param("r_cold_ohm", P_R0, 35.0, 58.0, 45.41, unit="ohm", declared_range=(42.0, 58.0),
-                        prior_source="leaf range [42, 58] widened to 35 ohm: the leaf range was set as R_hot / "
-                                     "(1 + y P_FSR) with the earlier y = 0.00904 /mW (its own note), and R0 trades "
-                                     "against y; the half-prior rule is judged on the narrower declared width"),
+                  Param("r_cold_ohm", P_R0, min(35.0, r0_lo), max(58.0, r0_hi), 45.41, unit="ohm",
+                        declared_range=(r0_lo, r0_hi),
+                        prior_source=f"leaf range [{r0_lo:g}, {r0_hi:g}] (R_hot / (1 + y P_FSR) for the droops of "
+                                     f"the thermo-optic worlds, its own note) widened to 35 ohm, as R0 trades against "
+                                     f"y; the half-prior rule is judged on the narrower declared width"),
                   Param("heater_self_ratio", P_RATIO, 1.0, 4.0, 1.158, prior_source="leaf range [1, 4]"),
                   Param("p_fsr_swept_device_mw", None, 22.0, 40.0, 29.5, unit="mw", role="nuisance",
                         prior_source="assumed [22, 40] mW around the G25 60-die range 24.9-34.1 mW"),

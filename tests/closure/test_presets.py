@@ -452,7 +452,8 @@ def _exact_ring(pp, b: int = 0, i: int = 0) -> tuple[float, str, float]:
 ])
 def test_g25_ring_reproduces_the_cal2_notch_in_its_labelled_regime(alts, regime, tol_db):
     """07 P1-5 / D1: at the nominal Q_L both coupling branches give the G25 27.9 dB notch at 0 V, and the 200 nm film
-    world keeps the measured Q_i (strip400x200_q_anchor) instead of turning both branches over-coupled."""
+    world (the rib200 artefact since the params review) keeps the measured Q_i (rib200_q_anchor) instead of turning
+    both branches over-coupled."""
     pp = realize(load("g25_test_vehicle", alts=alts) if alts else load("g25_test_vehicle"), 1, seeds=0,
                  uncertainty="nominal", variation="off")
     notch, got, _ = _exact_ring(pp)

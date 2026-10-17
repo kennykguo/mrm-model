@@ -284,24 +284,30 @@ with blocks that do not end on edges still gives a block-dependent auto trajecto
 | fixed-point reference (hardware task) | `fxp_pi` (mrm.control.fxp.FxpPi, compiled) | at the lock (settled warm start); it holds the operating point it starts at | nothing; g26-nominal gains (section 12) |
 
 docs/handoff/controller_scorecard.md has every one of them on the engine (g26 nominal, steady lock and A1, from
-`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (as regenerated 2026-10-16 after
-the engine review and the controllers review; the steady lock now also needs a stationary operating point, drift
-<= 0.1 pm/ms): from the settled warm start, pi_lock (Python, compiled, composite), feedforward_pi, kalman_lqg and
-mpc (Python and compiled) hold all 8 rings with < 0.1 pm rms jitter (each compiled version gives the same metrics
-as its Python version), bias_dither and midranging hold all 8; the dither locks jitter at the 5 pm level by their
-own dither (dither_lockin 4 of 8 within 5 pm). The peak seekers do not lock in 40 ms: es_po falls off the fold
-(the drop peak sits at the self-heating fold of a g26 ring, bistability ratio ~6), and es_sine's 8 rings are still
-drifting toward the drop peak at 0.77-0.95 pm/ms; it parks there after 100-160 ms at ~13 dB OMA penalty (before
-2026-10-16 the scorecard counted es_sine as 8 of 8 locked at 0.3 dB: a snapshot of that transient). The
-acquisition controllers without the supervisor lock every ring on a foreign line (acquire_then_lock 3 of 8 within
-5 pm; bitstat_lock 7 of 8, one ring still settling). These outcomes flip with small plant changes (the plant fixes
-of 2026-10-16, the bus segment loss among them, moved es_po, midranging and acquire_then_lock): they are not
-robust results either way. wdm_supervisor
-locks 7 of 8 rings on their declared lines from a cold start; ring 2 ends on a foreign line (line 0 instead of 2),
-reached at 26.7 ms and still settling at 40 ms. Under A1 (default site, 55 um from PD0), pi_lock, midranging, kalman_lqg and mpc hold rings 1-7
-within 6-8 pm, while ring 0 leaves its point by 350-365 pm at the hot cusp with its heater at code 0 for 14-15 ms
-(heater authority); feedforward_pi loses every ring (its die sensor sees the aggressor, ~+20 K, and its
-feed-forward then runs away to code 0; mrm/control/baselines/feedforward.py). In the stress scenario
+`tests/validation/test_controllers_on_engine.py`), with the conditions. In short (as regenerated 2026-10-16 20:02,
+on the plant of the engine, controllers and params reviews and the feedforward_pi fix; the steady lock also needs
+a stationary operating point, drift <= 0.1 pm/ms): from the settled warm start, pi_lock (Python, compiled,
+composite), feedforward_pi, kalman_lqg and mpc (Python and compiled) hold all 8 rings with <= 0.1 pm rms jitter
+(each compiled version gives the same metrics as its Python version), bias_dither and midranging hold all 8; the
+dither locks jitter at the 5 pm level by their own dither (dither_lockin 4 of 8 within 5 pm). The peak seekers end
+at the drop peak, the wrong point for a modulator (the peak sits at the self-heating fold of a g26 ring, bistability
+ratio ~6): es_po's default probes cross the fold only marginally (on this plant rings 4-7 fall once before 40 ms
+and recapture, so 4 of 8 count as locked at 40 ms and 4 still settle; every ring parks at the peak at 13.0-13.2 dB
+OMA penalty, runs/params_fix/es_long.log), and es_sine's 8 rings are still drifting toward the peak at 0.77-0.95
+pm/ms at 40 ms; it parks there after 100-160 ms at ~13 dB (before 2026-10-16 the scorecard counted es_sine as 8 of 8
+locked at 0.3 dB: a snapshot of that transient). The acquisition controllers without the supervisor lock every ring
+on a foreign line (acquire_then_lock 4 of 8 within 5 pm and 4 still settling; bitstat_lock 8 of 8). These outcomes
+flip with small plant changes (the plant fixes of 2026-10-16 moved es_po, midranging, acquire_then_lock, bitstat_lock
+and wdm_supervisor; es_po's falls come and go with a 2 % change of the droop or of s(T) at the lock): they are not
+robust results either way. wdm_supervisor locks all 8 rings from a cold start on the lines it assigns (a barrel
+shift: ring 2 on line 0, tx.assignment). Under A1 (default site, 55 um from PD0), pi_lock, midranging, kalman_lqg
+and mpc hold rings 1-7 within 12.5-15.4 pm (pi_lock: ring 4 14.7 pm, ring 5 6.4 pm, the others within 2.5 pm),
+while ring 0 leaves its point by 454-473 pm at the hot cusp with its heater at code 0 for
+14.7-16.4 ms (heater authority; 347-362 pm before the params review: the A1 target is a resonance trajectory and
+the model's s at the lock is 2.1 % lower, so the same pm swing is a 2.1 % larger ring rise for the heater to cancel);
+feedforward_pi holds every ring as pi_lock does (its die sensor sees the aggressor, ~+20 K;
+until the gain-schedule fix of 2026-10-16 its feed-forward ran away to code 0 and it lost every ring;
+mrm/control/baselines/feedforward.py). In the stress scenario
 a1_slide10_aggressor_pd_adjacent every controller loses ring 0 (PD0 above 600 degC).
 
 ## 6. Outputs

@@ -654,25 +654,32 @@ uncertainty:
     note: '07 P1-5, calibrated on CAL-1/CAL-2: ''dispersion'' (nominal) is the coupler dispersion fitted with the under-coupled
       branch (the leaf value); the loss mechanisms select the solver dispersion (alternative ''solver'') and fit only on
       the over-coupled branch (the mirror solution), so each selects its own coefficient AND its own alpha_other (cal_<mechanism>_branch,
-      Q_L at the nominal): the branch is tied to the mechanism and overrides uncertainty.coupling_regime in those worlds
-      (entries apply in name order). Likelihood ratios: docs/handoff/calibration.md'
+      Q_L at the nominal): the branch is tied to the mechanism, so this entry is the joint (mechanism, regime) hypothesis
+      and uncertainty.coupling_regime is its label (follows: er_mechanism). Likelihood ratios: docs/handoff/calibration.md'
   coupling_regime:
     kind: hypothesis
+    follows: er_mechanism
+    map:
+      dispersion: under
+      ring_t_loss: over
+      heater_t_loss: over
     choices:
       under: {}
-      over:
-        ring.optics.loss_budget.alpha_other_abs_db_per_cm: over
+      over: {}
     nominal: under
     provenance: assumed
     generation: none
     source: D07
-    note: '07 P1-5 under | over coupled at the same 27.9 dB G25 notch (exact ring, 1301.9 nm, Q_L 3850; the 200 nm world
-      within 0.7 dB); the fit of CAL-1/CAL-2 returns both branches. The label holds only for Q_L near its nominal (see uncertainty.q_loaded)
-      [g26_calibrated: the branch names the cold 0 V state. ''over'' with the nominal er_mechanism (dispersion) gives chi2
-      49.2 against 10.5 for the nominal world and MISSES the CAL-2 tolerance; the over-coupled worlds that fit CAL-2 are
-      er_mechanism=ring_t_loss / heater_t_loss, which select their own alpha_other (entries apply in name order in realize).
-      The nominal (dispersion) world crosses critical coupling during a heater sweep, so it is over-coupled at the operating
-      line; the loss worlds are the mirror (docs/handoff/calibration.md 4.2)]'
+    note: '07 P1-5 under | over coupled at the 27.9 dB G25 notch. In the calibrated presets the regime is the second axis
+      of the joint hypothesis uncertainty.er_mechanism (a label entry: follows er_mechanism, never drawn): the CAL-1/CAL-2
+      fit lands each extinction mechanism on one branch of the cold 0 V state (the G25 bench ring, x0 = kappa_e / (kappa_i
+      + kappa_d) of the record), dispersion under (x0 0.9692), ring_t_loss over (x0 1.037), heater_t_loss over (x0 1.037),
+      and the crossed worlds miss the CAL-2 tolerance (docs/handoff/calibration.md 4.2). Pinning the label selects the mechanisms
+      that give it (g26_overcoupled: the loss mechanisms; g26_low_eta, g26_hot_selfheat: dispersion). The label holds at
+      the nominal Q_L; a q_loaded draw can move a world across critical coupling (see uncertainty.q_loaded). g26''s independent
+      ''over'' choice (alpha_other alternative ''over'', the dispersion fit on the over branch) is not a world here: chi2
+      49.2 against 10.5 for the nominal world, outside the CAL-2 tolerance, and it lands under-coupled at 0 V (x0 0.9955);
+      the leaf alternative keeps its value'
   thermo_optic:
     kind: hypothesis
     choices:

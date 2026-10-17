@@ -3,6 +3,170 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+## 2026-10-16: params review fixes (geometry moves the couplers and the FSR, exponential bend radiation, the rib200 film world, Z at the P_FSR line, secant beta, line provenance, ranges, notes, the calibrated coupling-regime label)
+
+Thirteen findings of the params review (params-1 to -5, -7 to -14), confirmed by an independent verifier. Tests:
+tests/verification/test_params_review.py (19) and tests/closure/test_params_notes.py (4). The 17 tests of params-1 to
+-13 fail on the pre-fix tree (runs/params_fix/new_tests_before.log); of the 6 params-14 tests, 4 fail on the pre-fix
+tree (runs/params_fix/new_tests_before_params14.log) and 2 are regressions that pass before and after (the g26 and
+g25_test_vehicle labels were already right). Records: runs/params_fix/ (pre / post regression scenarios and
+compare_full.log, golden_update.log and golden_compare.log, vectors/, es_long.log, the calibration refit in refit/,
+the before/after tables, the reports before).
+
+- **The geometry moves the couplers** (params-1, params-11; 07 P1-16). `ring.geometry.jacobian_coupling` is wired
+  to coupling_rib160's Jacobian (d ln K^2 per nm of width, film, slab and the two gaps). The Jacobian could not be
+  wired before: its outputs targeted q_through / q_drop, which are free under the R4 anchors (q_loaded,
+  kappa_d_over_kappa), and an output on a free member raised. Now the anchors describe the nominal-geometry device:
+  with sampled geometry realize solves the relations once for that device of every world, and each device's
+  per-pass couplings are its couplers moved by exp(sum_k J_k dg_k + D d lambda_res) at its own cold resonance (D the
+  coupler dispersion, so at the line, where mrm.plant.phase evaluates K^2, the move is exactly J dg: no double count).
+  Q_t, Q_d then follow with the device's own omega and T_rt, and Q_L and kappa_d_over_kappa from the rate sum with the
+  device's loss. `variation.geometry.width_closes_gaps` (new, true in g26) applies the artefact's own rule (a width
+  bias closes both edge-to-edge gaps: total = d/dw - d/dgap). The gaps share one local sigma, 1.5 nm (assumed); the
+  stand-in draws of q_loaded (rel 0.015, femwell's strip slope -2 %/nm x 1.5 nm) and kappa_d_over_kappa (rel 0.1,
+  -2 %/nm x 5 nm) are gone. g26, 1000 sampled dies (die means): corr(offset, ln K^2 at the line) 0.958 (through) and
+  0.983 (drop), sd 0.092 and 0.153 (the verifier's litho-corrected prediction: 0.962 / 0.985, 0.093 / 0.157; before:
+  half that amplitude, the model held K^2 at each ring's cold resonance); within a die 3.3 % and 5.0 %; Q_L rel sd
+  3.1 % (was 1.5 %), kappa_d/kappa 6.4 % (was 10 %, the strip slope over 5 nm).
+- **The FSR follows n_g at the mask radius** (params-2). With sampled geometry a free radius is solved once per world
+  from the nominal n_g and the FSR hypothesis and held for every device; the order is the nominal device's (the
+  Jacobians are at fixed r_ref and order). Before, R absorbed every n_g draw (FSR exactly 1.8 THz, orders 78-80).
+  g26: FSR sd 11.7 GHz (0.65 %), window A 8.7 GHz, the g25_cluster corner 9.0 GHz.
+- **The bend radiation is exponential in the geometry** (params-10). The Jacobian's alpha_rad secant is applied as
+  d ln alpha_rad/dp from the artefact's stored evaluations (rib160: -0.0485, -0.1785, +0.4104 per nm of width, film,
+  slab; new Jacobian target kind `exp`, plus `ln_alpha_rad_per_nm`). 13 % of g26's sampled rings had a negative
+  radiation loss (to -0.30 dB/cm); now none (minimum 0.0054 dB/cm in 8000 rings).
+- **The 200 nm film world is the rib200 artefact** (params-3). uncertainty.film_thickness '200' selects modes_rib200
+  (80 nm slab, n_g 4.0116, s0 66.91 pm/K, its Jacobian) with `rib200_q_anchor` 2.03 dB/cm (the anchor recipe of the
+  former strip term, so the measured G25 Q_i holds): eta 0.833 (the strip's fictitious 11.09 dB/cm gave 0.771). The
+  strip stays a plain alternative. Its die resonance spread is 4.2 nm with the same fabrication sigmas (6.2 nm on
+  rib160): the sigmas stay fabrication errors (params_content.md).
+- **Z_heater->ring is the same on every line** (params-4). New key `ring.heater.p_fsr_ref_wavelength_nm` (g26 1309.5,
+  inferred: the G25 operating line of CAL-7): R2 takes FSR_lambda at the P_FSR measurement wavelength
+  (`derived.heater.p_fsr_span_m`) instead of each ring's line, where Z followed lambda_line^2 (2.3 % across the bank).
+  g26: Z 5.704 K/mW and efficiency 0.4046 nm/mW on every ring (were 5.696-5.570 and 0.410-0.400 at the old beta).
+- **beta is fitted over the operating range** (params-5). g26's beta is the secant of the modes_rib160 s(T) (its
+  quadratic fit, residual 0.003 pm/K) from 25 degC to the nominal lock, 1.2377e-3 /K (rib200: 1.2308e-3); the
+  artefact's tangent at 25 degC (1.4723e-3, alternative `tangent_25`) overstated s at the lock by 2.25 %. g26: s at
+  the lock 73.89 pm/K (was 75.44; solver 73.85 at the model's lock), T_lock 134.38 degC (was 133.17; the solver
+  curve gives 133.98), Z 0.16 % above the solver curve (was 1.2 % below), t_amb_order_hop 113.1 degC (was 111.9).
+  Extending the modes table above 125 degC (the P_FSR sweep reaches ~170 degC) is left to the extraction owner.
+- **The line wavelengths carry the channel plan's provenance** (params-7; 07 P1-14). realize records how
+  `derived.optics.lambda_line_m` (channel_plan center, spacing, line count or the lines table) and
+  `lambda_res_cold_m` are made, and fsr_m, Q_i, K^2, dn_eff/dT and d2n_eff/dT2 list them as inputs: the per-ring
+  FSR in nm and the efficiency are `inferred`, not `printed`. `channel_plan.ring_to_line` is not an input (it only
+  permutes the plan's wavelengths over the rings).
+- **Ranges hold every value a world can take** (params-8, params-9, params-13). The loader now checks the corners and
+  interval ends of an absolute entry against the target leaf's range and, in strict presets, every alternative
+  against its leaf's range (a selected alternative is range-checked, so one outside could never be selected). A
+  child preset removes an inherited alternative with `name: null`. Fixed by it: depletion_exponent [0.33, 0.67] ->
+  [0.334, 0.666] (schema bounds [1/3, 2/3], the analytic table's span; 0.33 and 0.67 passed load and realize and
+  raised in mrm.plant.electrical); chip_input_loss_db [2, 10] -> [1, 10] (holds the OCP +9 dBm corner, 1 dB);
+  g25_test_vehicle drops g26's guide_16_lines (8 dBm at the laser module, not at its bench ring); r_cold_ohm
+  [42, 58] -> [37, 58] (the G25 hot range over 1 + y P_FSR for every droop the thermo-optic worlds need: 0.00904,
+  and 0.0141 / 0.0161 of g26_calibrated's order-2 CAL-4 refits; the calibrated 41.29 ohm was refused as a g26
+  override). The calibration's R0 prior now takes its declared width from the leaf (mrm.calibration.groups; it was
+  hard-coded [42, 58]). Not changed (the verifier refuted this part): the dispersion leaves keep no range (a prior
+  declared after the 0.0222 fit would be chosen after the fact; calibration.md section 3).
+- **Notes quote their sources** (params-12). heater_self_ratio 1.158 -> 1.132 keeps y = 0.00904 /mW at the new Z
+  (its stated intent; the tin and textbook alternatives move the same way); the Z, heater, bend-radiation and
+  variation.geometry notes and PARAMETERS_FORMAT's lock_slope gap (4.0 %, was "5 to 15 %") quote the realized model
+  and the loaded artefacts; tests/closure/test_params_notes.py recomputes every quoted number. (a), the self-heating
+  pole share, was fixed by the physics_thermal review.
+- **The calibrated presets label the coupling regime truthfully** (params-14; 07 P1-5). The CAL-1/CAL-2 fit ties the
+  cold 0 V branch to the extinction mechanism (dispersion: under-coupled; ring_t_loss, heater_t_loss: over-coupled,
+  their own alpha_other), but g26_calibrated kept g26's independent under | over draw: its 'over' world (the
+  dispersion fit on the over branch, chi2 49.2, CAL-2 missed) is under-coupled at 0 V, and the loss worlds were
+  labelled 'under' while over-coupled, half of all worlds. New params machinery: a **label entry** (`follows:
+  <entry>`, `map: {leader choice: label}`, empty choices; PARAMETERS_FORMAT 6.1): never drawn, its label is the one
+  the leader's choice implies; pinning it pins or restricts the leader (the g26 corners: g26_overcoupled now selects
+  the over-coupled CAL-2 worlds, g26_low_eta and g26_hot_selfheat the dispersion world); a contradictory pin is a
+  load error; mrm.validation.sensitivity treats it as pinned (the leader's axis carries the joint hypothesis). The
+  calibration's preset generator (mrm.calibration.preset) writes g26_calibrated's and g25_test_vehicle_calibrated's
+  coupling_regime as the label of er_mechanism with the branch of each mechanism's fit from the record. The sampled
+  set loses the CAL-2-missing over/dispersion sixth of the worlds.
+- **No engine code changed; the plant parameters of g26 did** (beta, Z, heater_self_ratio for every run; the
+  coupler, FSR and bend-radiation laws for sampled devices). tools/perf_scenarios.py (runs/params_fix/pre, equal to
+  runs/controllers_fix/post, against runs/params_fix/post; compare_full.log): 303 of 476 signals differ. Steady
+  states: T_ring +1.2 K at the lock (T_lock), heater codes -290 (ring 7) to +195 (ring 0) (Z is now 5.704 K/mW on
+  every ring: +0.1 % at ring 0, +2.4 % at ring 7; T_lock +1.2 K), settled
+  detuning within 0.07 pm (steady_pi), 0.12 pm (laser_step), 0.40 pm (idle_traffic). Transients move: steady_pi's
+  start-up lock transient by up to 102 pm around 2.5 ms; heater_sweep's fold crossing (up to 10.4 nm instantaneous,
+  final within 8.5 pm); a1_pi: ring 0 sits on its low heater rail 0.9 ms longer (14.7 against 13.8 ms) and leaves
+  its point by 580 pm (was 472); rings 1-7 peak within 0.5 pm of before, and ring 4's dip at the hot cusp is 9 pm
+  deeper (107.6 pm against 116.6, its point 122.4 pm). The A1 target is a resonance trajectory (pm),
+  and the model's s at the lock is now 2.1 % lower, so the calibrated aggressor makes a 2.1 % larger ring rise
+  (prepare_scenario, ring_t0 'lock'), ~110 pm of the 5.1 nm open-loop swing, which ring 0's heater cannot cancel at
+  its rail. mc8_pi: the sampled devices changed (couplers, FSR, film-200 world): 65 of 82 signals, every world.
+- golden: tests/golden/g26__static.npz updated (data sha256 4682f10d7792): params review: g26's beta is the secant of the modes_rib160 s(T) from 25 degC to the nominal lock (1.2377e-3 /K, was the 25 degC tangent 1.4723e-3), Z_heater->ring is the same on every line (R2 at the P_FSR line, ring.heater.p_fsr_ref_wavelength_nm 1309.5: 5.704 K/mW) and heater_self_ratio 1.132 keeps the G25 droop y = 0.00904 /mW: T_lock +1.2 K, lock codes -290 to +195, settled detuning within 0.07 pm; A1 ring 0 sits on the low heater rail 0.9 ms longer (peak 468 -> 572 pm)
+- golden: tests/golden/g26__a1_slide10_aggressor.npz updated (data sha256 7c830afa52c9): params review: g26's beta is the secant of the modes_rib160 s(T) from 25 degC to the nominal lock (1.2377e-3 /K, was the 25 degC tangent 1.4723e-3), Z_heater->ring is the same on every line (R2 at the P_FSR line, ring.heater.p_fsr_ref_wavelength_nm 1309.5: 5.704 K/mW) and heater_self_ratio 1.132 keeps the G25 droop y = 0.00904 /mW: T_lock +1.2 K, lock codes -290 to +195, settled detuning within 0.07 pm; A1 ring 0 sits on the low heater rail 0.9 ms longer (peak 468 -> 572 pm)
+- golden: tests/golden/g26__soak_compressed.npz updated (data sha256 37a9e8b6c23f): params review: g26's beta is the secant of the modes_rib160 s(T) from 25 degC to the nominal lock (1.2377e-3 /K, was the 25 degC tangent 1.4723e-3), Z_heater->ring is the same on every line (R2 at the P_FSR line, ring.heater.p_fsr_ref_wavelength_nm 1309.5: 5.704 K/mW) and heater_self_ratio 1.132 keeps the G25 droop y = 0.00904 /mW: T_lock +1.2 K, lock codes -290 to +195, settled detuning within 0.07 pm; A1 ring 0 sits on the low heater rail 0.9 ms longer (peak 468 -> 572 pm)
+- golden vectors: tests/golden/vectors/fxp_pi__g26__aggressor_square.npz updated (sha256 bebb27c774cb): re-recorded with the README command after the params review (secant beta, Z at the P_FSR line, heater_self_ratio 1.132; 13935 of 98400 observation words and 3200 of 9600 action words differ; spec fingerprint e99109b0fca142d3 unchanged)
+- Golden metrics (golden_compare.log): static and soak locks within 0.07 pm and 0.08 pm, lock codes as above; A1
+  pi_lock_c / fxp_pi ring 0 472 -> 580 / 468 -> 572 pm, rings 1-7 maxima within 0.5 pm; A1 open loop: ring 0
+  unchanged (5136 pm), rings 4-7 +4 to +45 pm (s(T) on the way up).
+- **Controller scorecard**: regenerated on this plant by the feedforward_pi entry above (its "plant moved the rest"
+  list is this change: under A1 the robust locks leave ring 0's point by 454-473 pm, was 347-362, as in a1_pi above;
+  es_po no longer falls in the steady run, 4 of 8 locked and 4 still settling; acquire_then_lock 4/8, bitstat_lock
+  and wdm_supervisor 8/8). Its reading note on es_po (generated by tests/validation/test_controllers_on_engine.py) and
+  docs/ENGINE.md section 5 are updated; the extremum-seeking docstring states the new behaviour: es_po's default
+  probes cross the fold only marginally (on the engine, 0.4 s: rings 4-7 fall once before 40 ms, every ring parks at
+  the drop peak at 13.0-13.2 dB; runs/params_fix/es_long.log).
+- **Tests restated for the new plant** (no tolerance changed): test_ctrl_a_es.py's fold test asserted that es_po's
+  default probes fall in the 8 ms harness run; they no longer do (either the tangent beta or the ratio 1.158 alone
+  brings the falls back: a 2 % margin), so the fall-and-recapture path is exercised with a +-24-code (~9 pm) probe and
+  the default is checked for FAULT. test_report.py's identifiability test takes the chip-loss half-range from the
+  leaf (4.5 dB now). test_manifest.py lists the rib200 and coupling_rib160 artefacts.
+
+## 2026-10-16: feedforward_pi gain schedule (no runaway, anti-windup at the applied rails, bumpless exit from LOCK)
+
+The defect the verifier of controllers-7 found (controllers review below, "Not fixed"): `FeedForwardPI.step` set
+ff = -K_ff(u + ff) dT, the gain evaluated at the applied code. With the quadratic heater law K_ff(c) c is a constant
+k, so the update ff <- -k dT / (u + ff) has no fixed point once u^2 < 4 k dT: a large negative feed-forward raised
+its own gain until it ran away, and it then stayed frozen, because ff was updated only while locked. Under A1 (g26
+nominal, settled warm start, phase P/2, knowledge dlambda_dt_nominal + heater_law + heater_efficiency) the die sensor
+sees ~+20 K of the aggressor (real physics, controllers-7); on the plant of the 19:37 commit (below) ring 0's ff
+went to -6.2e3 codes at 54 ms and -7.9e7 at 58 ms, its heater stayed at code 0 and the ring went to FAULT at ~78 ms
+with ff at ~-1.1e8, and ring 7 ran away at ~84 ms (runs/ff_runaway_fix/repro_before.log). Tests: three new in
+tests/verification/test_ctrl_a_feedforward.py: test_feedforward_gain_cannot_run_away and
+test_feedforward_leaves_the_lock_bumpless_and_rereferences (a toy ring with the quadratic heater law, ~2 s each),
+test_feedforward_holds_every_ring_under_a1_on_the_engine (slow, 80 ms of A1). All three fail on the pre-fix code
+(runs/ff_runaway_fix/new_tests_before.log: ff -3.9e7 with the heater at code 0; ff frozen at -392 codes through the
+recapture; ring 0 FAULT) and pass after (new_tests_after.log). The other feed-forward tests (base ramp, staircase,
+A1/A2 rates, knowledge gate, per-ring start, the controllers-7 docstring test) pass (ctrl_tests.log). Records:
+runs/ff_runaway_fix/.
+
+- **The feed-forward is the heater-law secant from the PI integrator u** (`_ff_codes`): c^2 = u^2 - 2 u K_ff(u) dT,
+  ff = c - u for the quadratic law (exactly the heater tuning -dlambda/dT dT; to first order the former -K_ff dT),
+  -K_ff dT for a linear law (power or dac_pwm drive). ff no longer depends on itself; u + ff >= 0 and is clipped to
+  the DAC range; the PI's u_ref / u gain schedule stays exact (the tuning goes as u^2 - const).
+- **Anti-windup at the applied code's rails** (`_u_range`): where u + ff reaches code_lo or code_hi the integrator is
+  held there and its type-2 velocity stopped, as PiLock's own clamp of u. Without it ring 0's u wound down to 0
+  inside the dead zone u < sqrt(2 u K_ff dT) (~15000 codes at the A1 cusp) and had to climb back before any heat
+  flowed (time at code 0 15.9 ms, against 14.9 ms with it). Telemetry integrator_saturated now reports the applied
+  code's rails.
+- **Leaving LOCK**: a ring that leaves LOCK (a fall: RECAPTURE) takes ff into its integrator and its recapture guard
+  (the applied code does not jump; its recapture and fault codes are applied codes); ff is 0 and T_ref is dropped
+  while it is not locked, and its next lock takes a new T_ref (ff_codes_per_k keeps its first-lock reference code).
+- **Effect, same plant** (the pre-fix controller scored by the scorecard's own code on the same plant,
+  runs/ff_runaway_fix/ff_fix_compare_same_plant.log): steady lock unchanged in every discrete field, continuous
+  fields within 0.005 pm (max |e|), 0.0002 pm (rms) and 0.0003 pm (d_ref); A1: 8/8 rings locked at the end (was
+  0/8), ring 0 454 pm at the hot cusp with its heater at code 0 for 14.9 ms (was 5187 pm and 74.5 ms), rings 1-7
+  within 15 pm (was up to 5005 pm, ring 7 at code 0 for 48.6 ms), as pi_lock (454.5 pm, 14.7 pm, 14.7 ms); the
+  stress scenario a1_pd_adjacent still loses ring 0 as every controller does (1/8 locked at the end before and
+  after), but no ring's heater latches at code 0 any more (rings 2 and 7 were there for 31 and 49 ms).
+- **docs/handoff/controller_scorecard.md / .json regenerated** (runs/ff_runaway_fix/scorecard_compare.log, against
+  the stored 17:48 scorecard). The stored scorecard predates the params changes of the commit "Final review fixes
+  ... (params fix in progress)" (g26.yaml, realize, relations; 18:28-18:56), so every controller moved, and only
+  feedforward_pi's move is this fix (above). Both runs (20:02 and the same-plant run, 20:03) are on the plant of
+  that commit; the params edits made after it (from 20:05 on, uncommitted) are not in them. The plant moved the rest
+  (runs/ff_runaway_fix/plant_change_summary.log): under A1 pi_lock, midranging, kalman_lqg and mpc now leave ring 0's point by 454-473 pm (was 347-362) and hold
+  rings 1-7 within 12.5-15.4 pm (was 5.9-8.0); bias_dither holds 8/8 under A1 (was 6/8); in steady state es_po locks
+  4/8 (was 0/8, 4 still drifting), acquire_then_lock 4/8 (3), bitstat_lock 8/8 (7) and wdm_supervisor 8/8 (7: it now
+  assigns ring 2 to line 0). docs/ENGINE.md section 5 has the new feedforward_pi sentence; its other numbers still
+  describe the 17:48 scorecard and are left to the params change.
+- docs/handoff/controllers_a.md section 3 states the new law.
+
 ## 2026-10-16: controllers review fixes (expose, the D13 knowledge view, round robin, range errors on the compiled path, fast-kernel restart, FxpMlp proof, scorecard stationarity, docstrings)
 
 Eleven findings of the controllers review, confirmed by an independent verifier. Tests:

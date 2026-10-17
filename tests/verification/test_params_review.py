@@ -338,3 +338,87 @@ def test_film_200_world_is_the_rib200_artefact():
     assert cfg.get(rel.P_A_RAD) == pytest.approx(2.03)
     np.testing.assert_allclose(pp.optics.q_intrinsic, base.optics.q_intrinsic, rtol=2e-3)
     assert float(pp.optics.heat_fraction[0, 0]) == pytest.approx(0.833, abs=0.005)
+
+
+# ------------------------------------------------------------------------------------------------ params-14
+
+def _cold_regime(pp):
+    """The regime of every ring's cold 0 V state from the exact add-drop ring (t1 > a t2: under-coupled)."""
+    o = pp.optics
+    t1, t2 = np.sqrt(1.0 - o.kappa2_through), np.sqrt(1.0 - o.kappa2_drop)
+    return np.where(t1 > o.round_trip_amplitude * t2, "under", "over")
+
+
+@pytest.mark.parametrize("name", ["g26", "g25_test_vehicle", "g26_calibrated", "g25_test_vehicle_calibrated"])
+def test_coupling_regime_label_is_the_realized_cold_regime(name):
+    """params-14: in every world a preset offers, the coupling_regime label is the regime of the cold 0 V ring at the
+    nominal Q_L (07 P1-5). In g26_calibrated the CAL-2 fit ties the branch to the extinction mechanism, so the regime
+    is a label entry of er_mechanism (follows + map); before, the independent under | over draw labelled the loss
+    worlds 'under' while over-coupled and kept a dispersion world on the over branch that is under-coupled at 0 V."""
+    cfg = _load(name)
+    cr, er = cfg.uncertainty["coupling_regime"], cfg.uncertainty["er_mechanism"]
+    crs = [None] if cr.fields.get("follows") else list(cr.fields["choices"])
+    worlds = 0
+    for e in er.fields["choices"]:
+        for c in crs:
+            for film in cfg.uncertainty["film_thickness"].fields["choices"]:
+                alts = {"uncertainty.er_mechanism": e, "uncertainty.film_thickness": film,
+                        "uncertainty.q_loaded": "nominal"}
+                if c is not None:
+                    alts["uncertainty.coupling_regime"] = c
+                pp = realize(_load(name, alts=alts), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
+                label = pp.world_choices["coupling_regime"][int(pp.world["coupling_regime"][0])]
+                assert np.all(_cold_regime(pp) == label), (name, alts, label, _cold_regime(pp))
+                worlds += 1
+    assert worlds >= 6
+    if name.endswith("_calibrated"):
+        assert cr.fields.get("follows") == "er_mechanism"
+        assert cr.fields["map"] == {"dispersion": "under", "ring_t_loss": "over", "heater_t_loss": "over"}
+
+
+def test_pinning_a_label_entry_pins_its_leader():
+    """The g26 corners pin coupling_regime; on g26_calibrated that selects the mechanisms giving the regime (the over
+    corner is an over-coupled CAL-2 world, not the CAL-2 miss), and a contradictory pin is a load error."""
+    over = _load("g26_calibrated", alts={"uncertainty.coupling_regime": "over", "uncertainty.q_loaded": "nominal"})
+    assert over.uncertainty["er_mechanism"].restrict == ["ring_t_loss", "heater_t_loss"]
+    pp = realize(over, 6, 0, uncertainty="sample", variation="off", thermal_hook=None)   # the label holds at Q_L 3850
+    assert {pp.world_choices["er_mechanism"][i] for i in pp.world["er_mechanism"]} <= {"ring_t_loss", "heater_t_loss"}
+    assert np.all(_cold_regime(pp) == "over")
+    nom = realize(over, 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
+    assert nom.world_choices["er_mechanism"][int(nom.world["er_mechanism"][0])] == "ring_t_loss"
+    under = _load("g26_calibrated", alts={"uncertainty.coupling_regime": "under"})
+    assert under.uncertainty["er_mechanism"].pinned == "dispersion"
+    with pytest.raises(ConfigError, match="follows"):
+        _load("g26_calibrated", alts={"uncertainty.coupling_regime": "over", "uncertainty.er_mechanism": "dispersion"})
+    # every corner of the robustness set still loads on the calibrated preset
+    from mrm.sim.experiment import NAMED_CORNERS
+    for corner in NAMED_CORNERS:
+        doc = yaml_load((ROOT / "mrm" / "params" / "presets" / f"{corner}.yaml").read_text())
+        _load("g26_calibrated", alts=dict(doc.get("alts") or {}))
+
+
+def test_label_entry_validation():
+    """A label entry is never drawn and sets nothing: follows names a hypothesis, map covers every leader choice with
+    a label of its own choices, its choices are empty, and its nominal is the leader nominal's label."""
+    base = copy.deepcopy(yaml_load(MINI.read_text()))
+    base["uncertainty"]["thermo_label"] = {
+        "kind": "hypothesis", "follows": "thermo_optic", "map": {"H_solver": "rising", "H86": "flat", "bench": "rising"},
+        "choices": {"rising": {}, "flat": {}}, "nominal": "rising", "provenance": "assumed", "generation": "none",
+        "source": "D07"}
+    cfg = load(copy.deepcopy(base))
+    p = realize(cfg, 32, 0, uncertainty="sample", variation="off", thermal_hook=None)
+    lead = [p.world_choices["thermo_optic"][i] for i in p.world["thermo_optic"]]
+    lab = [p.world_choices["thermo_label"][i] for i in p.world["thermo_label"]]
+    assert lab == [base["uncertainty"]["thermo_label"]["map"][x] for x in lead] and len(set(lead)) > 1
+    bad = {"follows": "nope", "map": {"H_solver": "rising"}, "nominal": "flat"}
+    for k, v in bad.items():
+        d = copy.deepcopy(base)
+        d["uncertainty"]["thermo_label"][k] = v
+        with pytest.raises(ConfigError):
+            load(d)
+    d = copy.deepcopy(base)
+    d["uncertainty"]["thermo_label"]["choices"]["flat"] = {"ring.thermal.dlambda_dt_beta_per_k": "const"}
+    with pytest.raises(ConfigError, match="set nothing"):
+        load(d)
+    pinned = load(copy.deepcopy(base), alts={"uncertainty.thermo_label": "flat"})
+    assert pinned.uncertainty["thermo_optic"].pinned == "H86"

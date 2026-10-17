@@ -382,7 +382,10 @@ class UncertaintySpace:
                 wv = wv / wv.sum()
                 nom = str(f.get("nominal"))
                 nom = nom if nom in allowed else allowed[0]
-                self.axes[name] = EntryAxis(name, "hypothesis", e.target, e.pinned, f, choices, tuple(wv),
+                # a label entry (follows: + map:) is not drawn: realize sets it from its leader, so it is not an
+                # axis of u (its leader's axis carries the joint hypothesis)
+                pin = e.pinned if e.follows is None else (e.pinned or f"follows {e.follows}")
+                self.axes[name] = EntryAxis(name, "hypothesis", e.target, pin, f, choices, tuple(wv),
                                             tuple(np.cumsum(wv)), nom)
             else:
                 kind = "interval" if e.kind == "interval" else "dist"

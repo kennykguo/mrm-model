@@ -402,13 +402,18 @@ batch).
   critical coupling at 0-0.6 V heater.
 - **params_machinery**: tied hypotheses (branch x mechanism; Q_L with alpha_other) - the data say "loss mechanism <=>
   over-coupled branch at 0 V"; the name-order trick in g26_calibrated is a workaround, and `Config.get` with explicit
-  `--alt` pairs follows the given order while realize follows name order. An absolute R_th,H key (or a tied ratio)
+  `--alt` pairs follows the given order while realize follows name order. [Branch x mechanism resolved 2026-10-16
+  (params review, params-14): a label entry (`follows` + `map`, PARAMETERS_FORMAT 6.1); the generator writes
+  g26_calibrated's coupling_regime as the label of er_mechanism, so the label is the realized cold 0 V branch and a
+  pinned regime selects its mechanisms; section 12.] An absolute R_th,H key (or a tied ratio)
   so a fitted y holds across worlds; until then the heater leaves carry per-world alternatives (H86 here; the weight-0
   thermo-optic alternatives bench / imec / ocp / textbook_derived keep the H_solver heater leaves and would miss
   CAL-3b / CAL-4 by similar amounts).
 - **params_content / extraction (coupling)**: the dispersion world needs 2.2 %/nm against the rib160 artefact's
   0.77 %/nm; re-check the coupler solve (curved gap, rib slab) or accept that the loss mechanisms are the physical
   ones. The R0 leaf range [42, 58] should follow the droop of the thermo-optic world (H_solver 38.8-42.7 ohm).
+  [R0 resolved 2026-10-16 (params review, params-13): g26's range is [37, 58], and the heater group takes the
+  declared width from the leaf; section 12.]
 - **scenarios / layout**: CAL-9 fits better with temperature referencing of the slide-10 degC and a uniform aggressor;
   under the resonance default the heater runs out at the hot cusp (ring 0 at code 0 in A1 as well). The aggressor site
   30 um from ring 0 is the first suspect (replicas handoff 4.2). CAL-12c conversion per line.
