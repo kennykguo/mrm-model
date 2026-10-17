@@ -96,8 +96,8 @@ class RampParams:
     drop_frac: fall after the maximum that confirms it, fraction of the rise (0.15, at least 0.01 FS);
     jump_frac: one-step rise counted as a bistability jump, fraction of full scale (0.08);
     lock_bw_hz: crossover of the integral lock (3 kHz: ~70 deg margin over the 3-13 us thermal poles and ~10 us of
-        ADC/DAC/period delay; type-1 lag ramp / (2 pi f_c), ~6 pm at 1616 degC/s and 70 pm/K: measured 6.4 pm
-        max over a full A2 cycle, tests/verification/test_ctrl_b_ramp_aggressor.py);
+        ADC/DAC/period delay; type-1 lag ramp / (2 pi f_c), ~6 pm at 1616 degC/s and 70 pm/K: measured 3.6 pm
+        max over a full A2 cycle with ring 0 on line 4, tests/verification/test_ctrl_b_ramp_aggressor.py);
     lost_frac, lost_steps: loss-of-lock test; max_retries: searches before FAIL (a retry repeats the failed search
         from the window's low edge);
     retry_reset_s: a lock held this long clears the retry count (10 ms), so occasional losses over a long run do

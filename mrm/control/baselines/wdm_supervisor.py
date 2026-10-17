@@ -514,7 +514,11 @@ class WdmSupervisor(BaseController):
         bank map was taken (cyclic / any); else, once two rings of this world have confident fresh-map fits, their
         median FSR, exponent and curvature narrow it (one design, one heater family: the same narrowing as the bank
         fit, built up ring by ring); else the knowledge-gated FSR window. The narrowing removes labellings that need
-        another FSR, which a single map's ambiguity test counts against it (g26 nominal: ring 2 at 1.96 alone)."""
+        another FSR, which a single map's ambiguity test counts against it (g26 nominal: ring 2 at 1.96 alone).
+        A narrowed fit whose best FSR or curvature lies on the border of the narrow window is not confident: the
+        ring's map then lies outside this world's reference, and the ambiguity test compares only the labellings
+        inside the window (sampled g26 world, seed 7 world 1 ring 6: best curvature on the window's border,
+        ambiguity 5.8 in the window, 2.0 in the prior; its target, labelled line 6, was line 7; 07 P1-20)."""
         grid = self.spec.line_grid_hz
         w = self.events[b][n]
         if grid is None or w.size < 3:
@@ -532,12 +536,11 @@ class WdmSupervisor(BaseController):
             sel = ff[ff[:, 1] == gm] if np.any(ff[:, 1] == gm) else ff
             ref = (float(np.median(sel[:, 0])), gm, float(np.median(sel[:, 2])))
         if ref is not None:
-            # narrowed around this world's confident fits; the narrow window's border is not the prior's, so a fit
-            # on it is not suspicious (require_interior False)
+            # narrowed around this world's confident fits; a fit on the narrow window's border is a guess, as on the
+            # prior's border (require_interior, the default)
             fsr, gm, c = ref
             fit = label_lines_by_pattern(wf, grid, fsr_range_hz=(0.985 * fsr, 1.015 * fsr), n_fsr=61,
-                                         curvature_range=(c - 0.15, c + 0.15), n_curv=13, exponents=(gm,),
-                                         require_interior=False)
+                                         curvature_range=(c - 0.15, c + 0.15), n_curv=13, exponents=(gm,))
         else:
             fit = label_lines_by_pattern(wf, grid, fsr_range_hz=fsr_prior_hz(self.d), exponents=self.exponents)
         if fit["ok"] and bank is None:
