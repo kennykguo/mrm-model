@@ -91,7 +91,7 @@ are in the file named on each line. The record of the review is docs/handoff/fin
     (the narrowing needs two confident rings), ambiguity 2.15 against the 2.0 threshold. It went to 1.93 after
     physics_thermal-3 (test_cold_start_locks_every_ring_on_its_line failed) and back after the params fixes. The lock
     outcome was right both times.
-36. **A1, default site: ring 0 runs out of heater at the hot cusp** (~455 pm, heater at code 0 for ~15 ms, every
+36. **A1, default site: ring 0 runs out of heater at the hot cusp** (454-473 pm, heater at code 0 for ~15 ms, every
     controller); A2 the same; the stress site loses ring 0 for every controller (ENGINE.md section 5).
 37. **Sampled worlds lose rings under pi_lock_c from a good warm start** (mc_pi_lock: 10 worlds with no warm-start
     flag). A claim over the uncertainty set needs that analysis (ENGINE.md section 10).
