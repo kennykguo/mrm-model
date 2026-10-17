@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRM Bank Viewer</title>
+<meta name="description" content="The g26 microring-modulator plant model running: 8 rings on one bus, heater lock, aggressor, laser step, cold start.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2214%22 r=%229%22 fill=%22none%22 stroke=%22%23eb6834%22 stroke-width=%224%22/%3E%3Crect x=%222%22 y=%2226%22 width=%2228%22 height=%223%22 fill=%22%2300a3b8%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.27.0/plotly.min.js"></script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="bar-row">
+    <div class="brand"><strong>MRM bank</strong><span>g26 plant model, running</span></div>
+    <label class="ctl">Scenario
+      <select id="scenario" aria-label="Scenario"></select>
+    </label>
+    <div class="ctl" role="group" aria-label="Selected ring">
+      <span>Ring</span>
+      <div id="rings" class="segs"></div>
+    </div>
+    <div class="ctl">
+      <button id="play" type="button" class="primary" aria-label="Play">Play</button>
+      <label>Speed
+        <select id="speed" aria-label="Playback speed">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="4">4×</option>
+        </select>
+      </label>
+      <span id="rate" class="muted small"></span>
+    </div>
+    <button id="theme" type="button" class="ghost"></button>
+  </div>
+  <div class="bar-row scrub-row">
+    <div class="scrub">
+      <input id="scrub" type="range" min="0" max="1" step="1" value="0" aria-label="Time">
+      <div id="events" class="events" aria-hidden="true"></div>
+    </div>
+    <output id="time" class="time" for="scrub">t = 0.00 ms</output>
+  </div>
+  <p id="desc" class="desc"></p>
+</header>
+
+<main>
+  <div id="status" class="status" role="status"></div>
+
+  <section class="card" id="card3d">
+    <div class="card-head">
+      <div>
+        <h2>What is happening on the die right now?</h2>
+        <p class="sub">The 8 rings on one bus waveguide, to scale, with their heaters, monitor PDs, drivers and the aggressor site.
+          Drag to orbit, scroll to zoom, hover for numbers, click a ring to select it.</p>
+      </div>
+      <div class="tools">
+        <div class="segs" role="group" aria-label="Ring colour" id="colorMode">
+          <button type="button" data-v="temp">Ring: temperature</button>
+          <button type="button" data-v="err">Ring: lock error</button>
+          <button type="button" data-v="det">Ring: detuning</button>
+        </div>
+        <div class="segs" role="group" aria-label="Temperature map" id="mapMode">
+          <button type="button" data-v="flat">Map: flat</button>
+          <button type="button" data-v="height">Map: height</button>
+          <button type="button" data-v="off">Map: off</button>
+        </div>
+        <div class="segs">
+          <button type="button" id="reset">Reset view</button>
+          <button type="button" id="top">Top view</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div id="keynote" class="keynote"></div>
+      <div id="tooltip" class="tooltip" hidden></div>
+    </div>
+    <div id="legend3d" class="legend3d" aria-label="3-D colour and size legend"></div>
+    <p class="foot">Waveguides are drawn 3× their 0.4 µm width so they show at full view; the model has no layout beyond the site positions (README, Limits).</p>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="cardSpec">
+      <h2>Where is this ring's resonance relative to its laser line?</h2>
+      <p class="readout"></p>
+      <div class="plotwrap"><div class="plot"></div></div>
+      <p class="foot">Each ring alone, from the model's phase model and exact ring at its state at the key frame. The notch bottom is the exact value (the 12.5 pm grid cannot resolve it).</p>
+    </section>
+
+    <section class="card" id="cardTraces">
+      <h2>What is the controller doing over time?</h2>
+      <p class="readout"></p>
+      <div class="plotwrap"><div class="plot"></div></div>
+      <p class="foot">Frame means (band: min to max detuning in each frame; grey: start-up, not scored); codes are the value at the frame end. Click a trace to jump there; drag to zoom, double-click to reset.</p>
+    </section>
+  </div>
+
+  <section class="card" id="cardHeat">
+    <h2>How hot is the die?</h2>
+    <p class="readout"></p>
+    <div class="plotwrap"><div class="plot"></div></div>
+    <p class="foot">The model's point-site heat law on a 4 × 2.5 µm grid, not a 3-D field solve. Exact at the PDs; it reads low inside a ring, so each ring is filled with its own engine temperature.</p>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="cardBist">
+      <h2>Why is the ring bistable?</h2>
+      <p class="readout"></p>
+      <div class="tools left">
+        <div class="segs" role="group" aria-label="Light at the ring" data-role="powers"></div>
+        <div class="segs" role="group" aria-label="Vertical axis" data-role="yaxis">
+          <button type="button" data-y="drop" aria-pressed="true">Drop power</button>
+          <button type="button" data-y="det" aria-pressed="false">Detuning</button>
+        </div>
+      </div>
+      <div class="plotwrap"><div class="plot"></div></div>
+      <p class="foot">The ring's own light heats it and pulls its resonance red. Between the two folds one heater code holds two stable temperatures; the middle branch cannot be held open loop. Not tied to the scrubber.</p>
+    </section>
+
+    <section class="card" id="cardSum">
+      <h2>How well is it locked overall?</h2>
+      <p class="readout"></p>
+      <div class="tablewrap"><table class="summary"></table></div>
+      <p class="foot note"></p>
+    </section>
+  </div>
+
+  <section class="card limits">
+    <h2>Limits</h2>
+    <ul id="limits"></ul>
+    <p id="prov" class="foot"></p>
+  </section>
+</main>
+</body>
+</html>
