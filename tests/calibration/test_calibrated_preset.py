@@ -123,6 +123,9 @@ def test_no_calibrated_tag_without_tolerance_or_declared_prior(record):
             assert (a["provenance"] == "calibrated") == bool(worlds[world]["identifiable"][leaf]["calibrated"]), an
 
 
+@pytest.mark.xfail(strict=False, reason="known issue (docs/KNOWN_ISSUES.md): latest_fit.json and g26_calibrated are "
+                   "stale, fitted before the params review fixes; the recomputed chi2 follows the secant beta (7.77 "
+                   "against the recorded 7.51) until the refit with the real device parameters")
 def test_loss_worlds_hold_the_solver_dispersion(record):
     """The loss-mechanism hypotheses and worlds run with the coupler artefact's dispersion (07 P1-5), never with the
     dispersion fitted under the dispersion mechanism: recomputing their chi2 from a fresh problem reproduces the

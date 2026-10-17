@@ -327,8 +327,8 @@ def test_convergence_plan_assessment_and_certificate():
     plan = S.convergence_plan(sc)
     assert sorted(plan) == [1.0, 10.0, 100.0]
     assert plan[100.0][1] == pytest.approx(L.SOAK_CYCLE_S / 100) and plan[100.0][0].time_compression == 100.0
-    ref = {"max_abs_detuning_pm": 3.0, "wrong_line_events": 0, "fsr_hop_events": 0, "heater_range_used_codes": 21000,
-           "integrated_errors": 50.0}
+    ref = {"max_abs_detuning_pm": 3.0, "wrong_line_events": 0, "fsr_hop_events": 0, "order_changes": 0,
+           "heater_range_used_codes": 21000, "integrated_errors": 50.0}
     ok = {1.0: ref, 10.0: dict(ref, max_abs_detuning_pm=3.1), 100.0: dict(ref, heater_range_used_codes=21100)}
     rep = S.assess_convergence(sc, ok, plant_fingerprint="abc")
     assert rep.passed and rep.certificate.max_validated_factor == 100.0

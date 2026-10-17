@@ -10,11 +10,13 @@
 # Criteria and sources:
 #   ber      no 2 s BER window above 1e-9 on any lane (LM26-P Fig. 3(a))
 #   line     no ring on a foreign line at the end, no wrong-line event (07 P1-12)
-#   hop      no FSR hop (BND-2): the detuning from the resonance order nearest the declared line stays below FSR/2
-#            (5094-5220 pm in g26: 1.8 THz at 1302-1319 nm; 5000 pm used) at every tick, so that order never
-#            changed. The engine's fsr_hop_events counter only counts RE-LOCKS on another order, and with the line
-#            reference at 5 pm a side-of-fringe lock never "locks" (pi_lock_c sits ~125 pm red of its line), so that
-#            counter is 0 by construction here and cannot judge a hop (it is still reported).
+#   hop      no FSR hop (BND-2): the order nearest the declared line never changes (order_changes == 0, the
+#            lock-independent count of mrm.sim.metrics). The engine's fsr_hop_events counter only counts RE-LOCKS on
+#            another order, and with the line reference at 5 pm a side-of-fringe lock never "locks" (pi_lock_c sits
+#            ~125 pm red of its line), so that counter is 0 by construction here (it is still reported). A bound on
+#            max |detuning| cannot judge a hop either: the detuning is measured from the order nearest the line, so
+#            |d| <= FSR/2 holds by construction (the former criterion max |d| < 5000 pm passed open-loop runs in
+#            which every ring hopped; review 2026-10-16).
 #   rails    the heater never at code_min or code_max (BND-2 range; CAL-9 code range)
 #   oma      worst-lane OMA penalty against the oracle <= 1 dB (BND-4 / VAL-4: relOMA spread below 1 dB, 0-105 degC)
 extends: g26
@@ -35,8 +37,8 @@ experiment:
   acceptance:
     - {id: A4-ber, metric: ber_windows_over_limit, reduce: sum, op: "==", value: 0, source: "LM26-P Fig. 3(a)"}
     - {id: A4-line, metric: wrong_line_events, reduce: sum, op: "==", value: 0, source: "07 P1-12"}
-    - {id: A4-hop, metric: max_abs_detuning_pm, op: "<", value: 5000.0,
-       source: "BND-2 (|d| < FSR/2 at every tick: no order change)"}
+    - {id: A4-hop, metric: order_changes, reduce: sum, op: "==", value: 0,
+       source: "BND-2 (the order nearest the declared line never changes)"}
     - {id: A4-rail-hi, metric: heater_sat_s, op: "==", value: 0.0, source: "BND-2, CAL-9"}
     - {id: A4-rail-lo, metric: heater_low_rail_s, op: "==", value: 0.0, source: "BND-2, CAL-9"}
     - {id: A4-oma, metric: oma_penalty_db, op: "<=", value: 1.0, source: "BND-4, VAL-4"}

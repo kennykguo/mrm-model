@@ -1,5 +1,20 @@
 # Handoff: calibration (`mrm/calibration/`, `g26_calibrated.yaml`)
 
+**STALE until the real device parameters arrive (known issue, docs/KNOWN_ISSUES.md).** The fit record
+`mrm/calibration/latest_fit.json` (run 2026-10-16T02:43:48Z, commit b92c519) and the presets generated from it,
+`g26_calibrated.yaml` and `g25_test_vehicle_calibrated.yaml`, predate the params review fixes params-1 to -13
+(docs/CHANGELOG.md, 2026-10-16): the secant beta (params-5), Z_heater->ring at the P_FSR line (params-4), the R0
+range [37, 58] that the heater group's prior now reads (params-13), the rib200 film-200 world (params-3), the couplers,
+FSR and bend radiation moved by the sampled geometry (params-1, -2, -10, -11), the new ranges (params-8, -9) and the
+notes (params-7, -12). Both presets extend g26 and so run with these changes, but their fitted values were fitted on
+the model before them. Only their coupling_regime label (params-14) was rewritten, by the generator from the same
+record. No refit was run (a refit started for the params review was stopped and is not used). On the present model
+38 of the 39 `pytest -m calibration` tests still pass; `test_loss_worlds_hold_the_solver_dispersion` is marked
+xfail (strict=False): its recomputed loss-world chi2 is 7.77 against the recorded 7.51, and the tangent beta brings
+back the recorded value. Refit every group (`python -m mrm.calibration`, section 1) when the real device parameters
+arrive; `--write-preset-only` from this record does not make the presets current. Every number below is from this
+stale record.
+
 Owner files: `mrm/calibration/` (`core.py`, `groups.py`, `pipeline.py`, `preset.py`, `report.py`, `cli.py`,
 `__init__.py`, `__main__.py`, the generated fit record `latest_fit.json`), `mrm/params/presets/g26_calibrated.yaml`
 and `g25_test_vehicle_calibrated.yaml` (generated; the second added by the integrator, section 11), `tests/calibration/` (`conftest.py`, `test_fit_machinery.py`, `test_calibrated_preset.py`,

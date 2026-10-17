@@ -622,7 +622,9 @@ companion `g25_test_vehicle_calibrated`).
 
 Still open (owner): calibration.md sections 8 and 11.6 (params_machinery: tied hypotheses, a y = TCR x R_th,H key;
 params_content: the dispersion (the R0 range is resolved: [37, 58] since the params review of 2026-10-16, which also
-made g26_calibrated's coupling regime a label of er_mechanism and refitted the calibration; docs/CHANGELOG.md);
+made g26_calibrated's coupling regime a label of er_mechanism; the calibration was NOT refitted, so latest_fit.json
+and both calibrated presets are stale until the real device parameters arrive: calibration.md, docs/CHANGELOG.md,
+docs/KNOWN_ISSUES.md);
 scenarios: CAL-9 / CAL-12c; junction: LUT or analytic; replicas: VAL-1
 device, CAL-5 read-off grid; calibration: the ratio tag; controllers: the self-heating fragility of g26_calibrated);
 section 9.4 below (report requests); section 8.3 (unchanged).
