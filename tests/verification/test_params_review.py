@@ -320,6 +320,49 @@ def test_r_cold_range_holds_the_calibrated_droop_worlds():
     _load("g26", overrides={"ring.heater.r_cold_ohm": cal})
 
 
+def test_calibration_r0_prior_is_the_declared_leaf_range():
+    """params-13, calibration side: the CAL-3/CAL-4 fit judges R0's half-prior rule on the leaf's declared range
+    [37, 58] (fit bounds [35, 58]). heater_problems first widens the scratch range of the R0 leaf to [25, 80] for the
+    swept device; the declared range must be read from the preset as written, not from that scratch child (the first
+    version of this fix read the scratch child, so the refit's prior was [25, 80])."""
+    from mrm.calibration import core as CC
+    from mrm.calibration import groups as G
+    ctx = G.Context()
+    probs = G.heater_problems(ctx, CC.calibration_targets())
+    assert ctx.ranges[G.P_R0] == [25.0, 80.0]                  # the swept device's scratch range
+    declared = tuple(float(x) for x in _load(G.BENCH).leaves[G.P_R0].range)
+    assert declared == (37.0, 58.0)
+    assert probs
+    for pr in probs:
+        par = next(x for x in pr.params if x.path == G.P_R0)
+        assert par.declared_range == declared, pr.hypothesis
+        assert (par.lo, par.hi) == (35.0, 58.0), pr.hypothesis
+        assert "[37, 58]" in par.prior_source
+
+
+def test_calibrated_geometry_sigma_keeps_the_coupling_jacobian(tmp_path):
+    """params-1, calibration side (a regression check): when CAL-9 writes its per-ring sigma scale, g26_calibrated
+    restates variation.geometry's width and thickness; the loader merges a child's geometry key by key, so the
+    child keeps g26's gap dimensions, width_closes_gaps and coupling Jacobian, and only the width / film ring sigmas
+    are scaled."""
+    from mrm.calibration import preset as P
+    raw = P._raw_g26()
+    var: dict = {}
+    P._variation_update(var, raw, {"path": "variation.geometry.ring_sigma_scale", "value": 0.5,
+                                   "provenance": "calibrated", "targets": ["CAL-9a"], "note": "test"})
+    import yaml
+    f = tmp_path / "g26_child.yaml"
+    f.write_text(yaml.safe_dump({"extends": "g26", "meta": {"name": "t", "kind": "preset"}, "variation": var}))
+    cfg = _load(str(f))
+    g, g0 = cfg.geometry, _load("g26").geometry
+    assert g["jacobians"] == g0["jacobians"] and "ring.geometry.jacobian_coupling" in g["jacobians"]
+    assert g["width_closes_gaps"] is True and g["gap_through"] == g0["gap_through"] and g["gap_drop"] == g0["gap_drop"]
+    for dim in ("width", "thickness"):
+        assert g[dim]["ring_sigma_nm"] == pytest.approx(0.5 * g0[dim]["ring_sigma_nm"])
+        assert g[dim]["die_sigma_nm"] == g0[dim]["die_sigma_nm"]
+    assert g["provenance"] == "calibrated" and g["source"] == g0["source"]
+
+
 # ------------------------------------------------------------------------------------------------ params-3
 
 def test_film_200_world_is_the_rib200_artefact():

@@ -318,8 +318,9 @@ def heater_problems(ctx: Context, targets: Mapping[str, Any],
     s_ln = math.hypot(float(f.get("die_sigma", 0.0)), float(f.get("ring_sigma", 0.0))) or 0.06
     # the R0 leaf's declared range (params review 2026-10-16: [37, 58], the G25 hot range over 1 + y P_FSR for every
     # droop the thermo-optic worlds need); the fit bounds reach 35 ohm, and the half-prior rule takes the declared
-    # width when it is narrower (Param.declared_range)
-    r0_lo, r0_hi = (float(x) for x in bench_cfg.leaves[P_R0].range)
+    # width when it is narrower (Param.declared_range). Read from the preset as written: bench_cfg is the scratch
+    # child whose R0 range was widened to [25, 80] above for the swept device (that range is not a prior)
+    r0_lo, r0_hi = (float(x) for x in R.load_config(BENCH).leaves[P_R0].range)
     probs = []
     for thermo_h, hyp in [(t, h) for t in thermo for h in hypotheses]:
         alts = {} if thermo_h == "H_solver" else {"uncertainty.thermo_optic": thermo_h}
