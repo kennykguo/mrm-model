@@ -99,12 +99,26 @@ grep -n "# ---" mrm/sim/kernel.py                       # sections of the compil
 grep -n "textbook\|disagrees" mrm/params/presets/g26.yaml   # where the model departs from the book
 grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/research/07_design_critique.md
 \end{lstlisting}
-For each plant module, \cd{tests/verification/test_<module>.py} shows its functions in use. Read first: \cd{docs/EXPLAINED.md}
-(written for you), \cd{docs/ENGINE.md} sections 3--6, \cd{docs/ARCHITECTURE.md} section 2 (its note ``EXPLAINED.md
-not written yet'' is stale), \cd{docs/KNOWN_ISSUES.md}. \cd{docs/PARAMETERS.md} has the derived table (line 201),
-the diagnostics (line 237) and the textbook comparison (line 569). Stale: \texttt{g26\_calibrated}, both
-\cd{docs/VALIDATION*.md} reports, the old A4 pass, the \texttt{InterimRom} defaults (not g26), and the header comment
-of \cd{experiments/examples/a1_pi_lock.yaml} (350\,pm, now 454--473\,pm).
+\textbf{Read these four documents first, in this order.}
+\begin{enumerate}[nosep]
+  \item \cd{docs/EXPLAINED.md}: a plain overview of the model, written for you.
+  \item \cd{docs/KNOWN_ISSUES.md}: what is still wrong or out of date.
+  \item \cd{docs/ENGINE.md}, sections 3--6: how one simulation step runs.
+  \item \cd{docs/ARCHITECTURE.md}, section 2: which folder holds which part.
+\end{enumerate}
+
+\textbf{To see a function in use,} open its test file. Each file in \cd{mrm/plant/} has a test file
+\cd{tests/verification/test_<name>.py}. For example, \cd{optics.py} has \cd{test_optics.py}.
+
+\textbf{To look up a number,} use \texttt{mrm params explain} (above), or open \cd{docs/PARAMETERS.md}.
+
+\textbf{Do not trust these yet.} They are out of date. Each one is listed in \cd{docs/KNOWN_ISSUES.md}.
+\begin{itemize}[nosep]
+  \item The preset \texttt{g26\_calibrated}. It was fitted before the last fixes.
+  \item The two validation reports, \cd{docs/VALIDATION.md} and \cd{docs/VALIDATION_g26_calibrated.md}.
+  \item The pass of the 30-hour soak test (A4). It must run again.
+  \item The comment at the top of \cd{experiments/examples/a1_pi_lock.yaml}. It says 350\,pm. The model now gives 454--473\,pm.
+\end{itemize}
 
 \textbf{Where things are.}
 {\small
