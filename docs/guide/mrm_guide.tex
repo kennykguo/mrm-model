@@ -15,6 +15,8 @@
 \usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{2pt}
@@ -30,6 +32,8 @@
 \newcommand{\uW}{\,\ensuremath{\mu}W}
 \newcommand{\degC}{\,\ensuremath{^\circ}C}
 \newcommand{\cd}[1]{\path{#1}}
+\newcommand{\eq}[1]{(eq.~#1)}
+\newcommand{\nib}{(not in the textbook)}
 \newcolumntype{R}{>{\raggedright\arraybackslash}X}
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
 
@@ -53,48 +57,359 @@
 \begin{center}
 {\LARGE\bfseries The mrm model after Chapter 5}\\[3pt]
 {\large A reading guide: where things are, and what the code computes}\\[4pt]
-{\small For Kenny Guo. 19 October 2026. Model at commit \texttt{f3a8629} (\texttt{\textasciitilde/mrm-model}).}
+{\small For Kenny Guo. 21 October 2026. Model at commit \texttt{3db791e} (\texttt{\textasciitilde/mrm-model}). The
+code is the same as at \texttt{f3a8629}.}
 \end{center}
 
 \section*{How to use this guide}
 
-You know textbook chapters 0 to 5. This guide connects that knowledge to the rest of the physics, and shows where
-that physics is in the code. Section~1 shows the model on one page. Section~2 lists the core code in reading order.
-Section~3 is the bridge, one short part per concept. Section~4 lists what remains and the first commands.
+You know textbook chapters 0 to 5. This guide starts from that knowledge. It explains how the model works and shows
+where each part is in the code.
+\begin{enumerate}
+  \item Section~\ref{sec:five} gives five ideas that you need before you read any code. Read it first.
+  \item Section~\ref{sec:words} defines the words that the code and this guide use.
+  \item Section~\ref{sec:one} shows the whole model on one page.
+  \item Section~\ref{sec:map} lists the core code in reading order.
+  \item Section~\ref{sec:bridge} explains each physics part, from your Ch05 ring to the full model.
+  \item Section~\ref{sec:next} lists what remains to learn and the first commands to run.
+\end{enumerate}
 
-\textbf{Numbers.} Every number comes from the model preset \texttt{g26} at commit \texttt{f3a8629}
-(\cd{mrm/params/presets/g26.yaml} and \cd{docs/PARAMETERS.md}). The textbook's numbers are not verified. A row
-``Book'' tells you where the textbook uses another value or another method. Do not use a textbook value as a design
-value. The words ``my arithmetic'' mark a number that I calculated from model values. No model output states it.
+\textbf{Equation numbers.} ``\eq{5.26}'' means equation 5.26 in textbook chapter 5. This guide always writes the
+equation out. ``Not in the textbook'' marks an equation that the textbook does not have.
 
-\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{\textbf{Sign convention (read this first).}
-The model detuning is $d=\lambda_{res}-\lambda_{line}=-\delta$, with $\delta=\lambda_L-\lambda_r$ from the end of
-Ch05. A positive $d$ means that the resonance is red of its laser line. The laser then sits on the blue flank of the
-resonance. This is the stable lock side in the model and in the book. Two sign conventions are in use, so always say
-where the resonance is relative to the laser. The code writes $i$ for your $j$: time dependence $e^{+i\omega t}$, and
-one round trip multiplies a field by $a\,e^{-i\phi}$. This is your Ch05 convention.}}
+\textbf{Numbers.} Every model number comes from the preset \texttt{g26}: the file \cd{mrm/params/presets/g26.yaml},
+or the command \texttt{mrm params explain g26 <key>}. The textbook's own numbers are not verified, so do not use them
+as design values. A row ``Book'' tells you where the textbook uses another value or another method. ``My arithmetic''
+marks a number that I calculated from model values. No model output gives it directly.
+
+\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{\textbf{Sign convention.} The model detuning is
+$d=\lambda_{res}-\lambda_{line}$. Ch05 uses $\delta=\lambda_L-\lambda_r$, so $d=-\delta$. A positive $d$ means that
+the resonance is red of (at a longer wavelength than) its laser line. The laser is then on the blue flank of the
+dip. This is the stable lock side. Two sign conventions are in use, so always say where the resonance is relative to
+the laser. The code writes $i$ for your $j$. Time dependence is $e^{+i\omega t}$, and one round trip multiplies a
+field by $a\,e^{-i\phi}$. This is your Ch05 convention.}}
 
 %=====================================================================================================================
-\section{The model on one page}
+\section{Five ideas you need first}\label{sec:five}
+
+The numbers here are for ring 0 of g26, cold and at its own resonance. The model gives these inputs:
+\begin{itemize}
+  \item loaded $Q_L=3850$ (the Q of the whole ring, with every loss, \texttt{ring.optics.q\_loaded}), FSR $=1.8$\,THz (\texttt{ring.optics.fsr\_thz}),
+  resonance wavelength $\lambda=1311.04$\,nm, so $f=c/\lambda=228.67$\,THz;
+  \item power coupling per pass $\kappa_1^2=0.09402$ (through) and $\kappa_2^2=0.00145$ (drop), round-trip amplitude
+  $a=0.94784$;
+  \item so $t_1=\sqrt{1-0.09402}=0.9518$, $t_2=\sqrt{1-0.00145}=0.99927$, and $t_1t_2a=0.9518\times0.99927\times0.94784=0.9015$.
+\end{itemize}
+The product $t_1t_2a$ is the fraction of the field that one lap keeps. For the add-drop ring it takes the place of
+the $ta$ of the all-pass ring.
+
+\subsection{The comb of dips: FSR, linewidth, finesse and Q}\label{sec:comb}
+
+Plot the through power against wavelength (Figure~\ref{fig:comb}). You get a comb of narrow dips. Four numbers
+describe the comb.
+\begin{enumerate}
+  \item \textbf{Where the dips are.} A dip occurs when a whole number $m$ of wavelengths fits around the ring:
+  $\phi=2\pi m$ \eq{5.9}.
+  \item \textbf{FSR} (free spectral range): the spacing between two dips. $\Delta f_{FSR}=c/(n_gL)$ \eq{5.14} and
+  $\Delta\lambda_{FSR}=\lambda^2/(n_gL)$ \eq{5.13}. Model: $\Delta\lambda_{FSR}=\lambda^2\Delta f_{FSR}/c
+  =(1311.04\,\mathrm{nm})^2\times1.8\,\mathrm{THz}/c=10.32$\,nm.
+  \item \textbf{Linewidth} (FWHM): the width of one dip at half depth.
+  $\Delta\lambda_{FWHM}=(1-ta)\lambda^2/(\pi n_gL\sqrt{ta})$ \eq{5.21}. In frequency this is
+  $\Delta f_{FWHM}=(1-ta)\Delta f_{FSR}/(\pi\sqrt{ta})=0.0985\times1800\,\mathrm{GHz}/(\pi\times0.9495)=59.4$\,GHz,
+  which is 0.341\,nm. The model's exact value is 59.39\,GHz, 340.5\,pm (\texttt{fwhm\_pm}).
+  \item \textbf{Finesse} $\mathcal{F}$: the FSR divided by the linewidth, $\mathcal{F}=\pi\sqrt{ta}/(1-ta)$ \eq{5.25}.
+  It says how sharp the dips are compared with their spacing. It depends only on $ta$, the field kept per lap.
+  Model: $\mathcal{F}=1800\,\mathrm{GHz}/59.39\,\mathrm{GHz}=30.3$.
+  \item \textbf{Q} (quality factor): the light's own frequency divided by the linewidth,
+  $Q=\lambda/\Delta\lambda_{FWHM}=f/\Delta f_{FWHM}$ \eq{5.22}. Model: $Q=228.67\,\mathrm{THz}/59.39\,\mathrm{GHz}=3850$.
+\end{enumerate}
+\textbf{How they are linked.} Divide \eq{5.22} by \eq{5.25}: $Q=\mathcal{F}\times f/\Delta f_{FSR}$. Model:
+$30.3\times(228.67/1.8)=30.3\times127.0=3850$. Equation 5.23 gives the same link with $\sqrt{ta}$ set to 1.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[name=wide, width=0.58\linewidth, height=4.4cm, xmin=-13, xmax=13, ymin=0, ymax=1.32, clip=false,
+  xlabel={$\lambda-\lambda_{res}$ (nm)}, ylabel={through power $T$}, ylabel style={font=\footnotesize},
+  xlabel style={font=\footnotesize}, tick label style={font=\scriptsize}, ytick={0,0.5,1}]
+\addplot[blue!70!black, thick, samples=1301, domain=-13:13]
+  {(0.897105 - 2*0.901530*cos(360*x/10.32) + 0.905977)/(1 - 2*0.901530*cos(360*x/10.32) + 0.812757)};
+\draw[{Stealth[length=2mm]}-{Stealth[length=2mm]}] (axis cs:0,1.1) -- node[above,font=\scriptsize,inner sep=1pt]{FSR $=10.32$\,nm} (axis cs:10.32,1.1);
+\end{axis}
+\begin{axis}[at={(wide.east)}, anchor=west, xshift=1.1cm, width=0.38\linewidth, height=4.4cm, xmin=-0.8, xmax=0.8,
+  ymin=0, ymax=1.32, xlabel={$\lambda-\lambda_{res}$ (nm)}, xlabel style={font=\footnotesize},
+  tick label style={font=\scriptsize}, ytick={0,0.5,1}]
+\addplot[blue!70!black, thick, samples=401, domain=-0.8:0.8]
+  {(0.897105 - 2*0.901530*cos(360*x/10.32) + 0.905977)/(1 - 2*0.901530*cos(360*x/10.32) + 0.812757)};
+\draw[{Stealth[length=2mm]}-{Stealth[length=2mm]}] (axis cs:-0.170,0.50) -- (axis cs:0.170,0.50);
+\node[font=\scriptsize, anchor=west] at (axis cs:-0.78,1.18) {FWHM $=0.34$\,nm};
+\end{axis}
+\end{tikzpicture}
+\caption{Through power of ring 0 from \eq{5.30}, with the model's $t_1$, $t_2$, $a$. Left: the comb. The dips repeat
+every FSR. Right: one dip, enlarged 16 times, with the FWHM arrow at half depth. The finesse is the ratio of the two arrows: $10.32/0.34\approx30$.}
+\label{fig:comb}
+\end{figure}
+
+\subsection{Photon lifetime and steady state}\label{sec:life}
+
+\textbf{The RC picture.} Apply a voltage step $V_s$ to an RC circuit. The capacitor voltage is
+$v(t)=V_s\,(1-e^{-t/RC})$. It settles to a constant value. After $4.6\,RC$ it is within 1\,\% of $V_s$, because
+$e^{-4.6}=0.01$. ``Steady state'' means this settled condition: nothing changes any more.
+
+\textbf{The ring stores energy like a capacitor.} Let $U$ be the optical energy in the ring. Ch05 (section ``Quality
+factor, finesse, lifetime, build-up'', part ``Finesse, photon lifetime, build-up'') derives the free decay. Start
+from $Q=\omega U/P$ \eq{5.22}, with lost power $P=-dU/dt$:
+\[
+\frac{dU}{dt}=-\frac{\omega U}{Q}\ \Rightarrow\ U(t)=U(0)\,e^{-t/\tau_p},\qquad
+\tau_p=\frac{Q}{\omega}=\frac{Q\lambda}{2\pi c}\ \text{\eq{5.26}}.
+\]
+$\tau_p$ is the \emph{photon lifetime}. Ch00 calls it the ring's ringdown time. Model:
+$\tau_p=3850\times1.311\times10^{-6}\,\mathrm{m}/(2\pi\times2.998\times10^{8}\,\mathrm{m/s})=2.68$\,ps.
+
+\textbf{Check from the laps.} One lap takes $T_{rt}=1/\Delta f_{FSR}=1/1.8\,\mathrm{THz}=0.556$\,ps. Per lap the
+field keeps $t_1t_2a=0.9015$, so the power keeps $0.9015^2=0.8128$. After $n$ laps $U_n=U_0\,(0.8128)^n$. So
+$\tau_p=T_{rt}/(-\ln0.8128)=0.556\,\mathrm{ps}/0.2073=2.68$\,ps. This agrees. In laps, the lifetime is
+$\tau_p/T_{rt}=\mathcal{F}/2\pi=30.3/6.28=4.8$ laps.
+
+\textbf{The build-up after the input turns on.} The field decays twice as slowly as the energy, with time constant
+$2\tau_p$ (Ch05 states this). The lap sum \eq{5.6} shows the build-up. After $n$ laps, the field misses the terms of
+lap $n$ and later. Their sum is exactly $(t_1t_2a)^n$ times the final field. So the missing part shrinks by 0.9015
+per lap. That is the RC step response, with $RC=2\tau_p=5.4$\,ps (Figure~\ref{fig:build}). The field is within 1\,\%
+of its final value after $\ln100/(-\ln0.9015)=44$ laps, which is $44\times0.556=24.7$\,ps.
+
+\textbf{Steady state of the ring.} After that time the stored energy is constant, so the through and drop powers are
+constant. Equation 5.30 gives the powers in this state only:
+\[
+T_{through}=\frac{t_2^2a^2-2t_1t_2a\cos\phi+t_1^2}{1-2t_1t_2a\cos\phi+(t_1t_2a)^2},\qquad
+T_{drop}=\frac{(1-t_1^2)(1-t_2^2)\,a}{1-2t_1t_2a\cos\phi+(t_1t_2a)^2}\quad\text{\eq{5.30}}.
+\]
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.5\linewidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth, height=4.3cm, xmin=0, xmax=60, ymin=0, ymax=1.08,
+  xlabel={laps $n$ (1 lap $=0.556$\,ps)}, ylabel={fraction of final value}, xlabel style={font=\footnotesize},
+  ylabel style={font=\footnotesize}, tick label style={font=\scriptsize}, legend style={font=\scriptsize, at={(0.98,0.04)}, anchor=south east}]
+\addplot[only marks, mark=*, mark size=0.9pt, blue!70!black, samples at={0,1,...,60}] {1-0.901530^x};
+\addlegendentry{field, $1-0.9015^n$}
+\addplot[only marks, mark=o, mark size=0.9pt, orange!80!black, samples at={0,1,...,60}] {(1-0.901530^x)^2};
+\addlegendentry{energy}
+\addplot[gray, dashed, domain=0:60, samples=100] {1-exp(-x/9.647)};
+\addlegendentry{RC, $RC=2\tau_p$}
+\draw[dotted] (axis cs:44,0) -- (axis cs:44,1);
+\node[font=\scriptsize, anchor=east] at (axis cs:44,0.78) {44 laps};
+\end{axis}
+\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}{0.47\linewidth}
+\caption{The ring fills like an RC circuit. The dots are the lap sum \eq{5.6} cut after $n$ laps. The dashed line
+is the RC step response with $RC=2\tau_p=5.36$\,ps, which is 9.6 laps. The two agree. After 44 laps (24.7\,ps) the
+field is within 1\,\% of its final value. The energy is the square of the field.}
+\label{fig:build}
+\end{minipage}
+\end{figure}
+
+\subsection{Why the model can use the steady-state formulas}\label{sec:why}
+
+The model is a program that moves time forward in fixed steps. One step is a \emph{tick}. One tick is 1\us{}
+(\texttt{sim.dt\_plant\_s}).
+\begin{itemize}
+  \item One tick holds $1\us/0.556\,\mathrm{ps}=1.8$ million laps.
+  \item The ring settles in about 44 laps (24.7\,ps). So at every tick the ring is long settled.
+  \item So the program does not add laps one at a time. It does not simulate the light as it travels. Once per ring
+  and per tick, it puts the present $\phi$ into \eq{5.30}.
+\end{itemize}
+\textbf{What changes between ticks is the temperature.} The silicon index rises with temperature. In the model the
+effective index rises by $1.88\times10^{-4}$ per kelvin at 25\degC{} (\texttt{dn\_eff\_dt}). So $\phi$ rises and the
+resonance moves red. Your shift formula $\Delta\lambda_r=(\lambda/n_g)\,\Delta n_{eff}$ \eq{5.32} gives the slope.
+With the small thermal expansion of the ring added, the model has 65.1\,pm/K at 25\degC{} and 73.9\,pm/K at the lock
+temperature (134\degC). Ch09 covers this effect. Heat changes slowly, like the voltage of an RC circuit. The thermal
+time constants of the model go from 0.4\us{} to several milliseconds.
+
+So each tick does three things:
+\begin{enumerate}
+  \item Update every temperature, like one RC step over 1\us.
+  \item Compute $\phi$ from the new temperature.
+  \item Put $\phi$ into \eq{5.30}.
+\end{enumerate}
+\textbf{EE picture.} The optics is a resistor divider: its output follows its input at once, and it has no memory.
+The heat is a capacitor: it keeps its value from one tick to the next.
+
+\subsection{Self-heating and the Newton solve}\label{sec:newton}
+
+\textbf{Self-heating.} The ring loses part of its light. This is the loss $a$. By energy conservation the lost
+power is $P_{in}(1-T_{through}-T_{drop})$, with both powers from \eq{5.30}. Most of it is absorbed and becomes heat:
+\[
+P_{abs}=\eta\,P_{in}\,(1-T_{through}-T_{drop}),\qquad \eta=0.848\ \text{(the absorbed share of the loss)}.
+\]
+The heat raises the ring temperature, like a current through a resistor raises a voltage. Over one tick the
+model uses
+\[
+T=T_{other}+g\,P_{abs},\qquad g=\sum_j\big(1-e^{-h/\tau_j}\big)\,r_j\quad\text{\nib}.
+\]
+Here $h=1\us$ is the tick. $T_{other}$ is the temperature that the ring would have at the end of the tick with no
+absorbed light in this tick. Each pole $j$ is one RC section of the heat path, with DC gain $r_j$ and time constant
+$\tau_j$. The factor $1-e^{-h/\tau_j}$ is how far that RC section charges in one tick. Model (ring 0, light to ring):
+$g=4.34(1-e^{-1/0.4})+2.31(1-e^{-1/3.18})+3.10(1-e^{-1/13.0})+0.29(1-e^{-1/3000})=3.98+0.62+0.23+0.00=4.83$\,K/mW.
+The DC value (the sum of all $r_j$) is 10.0\,K/mW. This guide calls this whole step ``the heat model over one tick''.
+
+\textbf{Why a few kelvin matter.} One linewidth is $340.5\,\mathrm{pm}/73.9\,\mathrm{pm/K}=4.6$\,K. At the lock
+each ring absorbs about 1.5\,mW (the model's lock solve \texttt{quasi\_static}, 25\degC, 1.05\,V bias). At DC that gives
+$10.0\,\mathrm{K/mW}\times1.5\,\mathrm{mW}=15$\,K, about 1.1\,nm of resonance shift.
+
+\textbf{The loop.} Temperature sets $\phi$. $\phi$ sets $P_{abs}$. $P_{abs}$ sets the temperature. The optics has no
+delay inside a tick. So the end-of-tick temperature must satisfy one equation per ring:
+\[
+f(T)=T-T_{other}-g\,P_{abs}\big(\phi(T)\big)=0.
+\]
+The function has a cosine inside a fraction, so there is no algebraic solution. The program uses \emph{Newton's
+method} (Figure~\ref{fig:newton}):
+\begin{enumerate}
+  \item Start from the previous tick's temperature $T_0$.
+  \item Draw the tangent line of $f$ at $T_0$. Its zero crossing is the next guess: $T_1=T_0-f(T_0)/f'(T_0)$.
+  \item Repeat until $|f(T)|<10^{-7}$\,K (\texttt{DEFAULT\_SH\_TOL\_K} in \cd{mrm/plant/plant.py}). The code allows at
+  most 10 evaluations.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.42\linewidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth, height=4.0cm, xmin=0.5, xmax=4.2, ymin=-0.9, ymax=1.6, axis lines=middle,
+  xlabel={$T$}, ylabel={$f(T)$}, xtick=\empty, ytick=\empty, xlabel style={font=\footnotesize},
+  ylabel style={font=\footnotesize}]
+\addplot[blue!70!black, thick, domain=0.6:4.1, samples=60] {0.08*x^2+0.4*x-1.2};
+\addplot[orange!80!black, domain=2.1:4.1, samples=2] {1.2768+0.976*(x-3.6)};
+\draw[dotted] (axis cs:3.6,0) -- (axis cs:3.6,1.2768);
+\node[font=\scriptsize, below] at (axis cs:3.6,0) {$T_0$};
+\node[font=\scriptsize, below] at (axis cs:2.29,0) {$T_1$};
+\fill (axis cs:2.11,0) circle (1.2pt);
+\node[font=\scriptsize] (rt) at (axis cs:1.2,0.6) {root};
+\draw[-{Stealth[length=1.5mm]}] (rt) -- (axis cs:2.07,0.04);
+\end{axis}
+\end{tikzpicture}
+\end{minipage}\hfill
+\begin{minipage}{0.55\linewidth}
+\caption{One Newton step (a sketch). The tangent at $T_0$ crosses zero at $T_1$, close to the root. Each step
+roughly squares the error near the root. The model stops at $|f|<10^{-7}$\,K. That is
+$10^{-7}\,\mathrm{K}\times73.9\,\mathrm{pm/K}=7\times10^{-6}$\,pm of resonance, far below the 340\,pm linewidth.}
+\label{fig:newton}
+\end{minipage}
+\end{figure}
+
+\textbf{How accurate and how fast.} Near the root, each step roughly squares the error. In a steady g26 run I
+measured 1 to 2 evaluations per ring and tick, mean 1.8 (my measurement, 3000 ticks).
+
+\textbf{Near a fold.} With strong self-heating, one heater power can give two stable ring temperatures. Ch10 calls
+this \emph{bistability}. Each stable solution is a \emph{branch}. A branch ends at a \emph{fold}, where $f'(T)\to0$.
+There a plain Newton step can jump to the wrong root. So the code shortens each step to a distance that cannot
+contain a root. It always follows the root that the ring was already on (section~\ref{sec:bist}).
+
+\subsection{What one tick does}\label{sec:tick}
+
+First, four parts of the hardware:
+\begin{itemize}
+  \item \textbf{Monitor photodiode (PD):} a germanium photodiode on each ring's drop port. Its current is
+  $0.95\,\mathrm{A/W}\times$ the drop power.
+  \item \textbf{ADC} (analog-to-digital converter): turns the PD current into an integer, the \emph{ADC code}.
+  It has 16 bits (codes 0 to 65\,535). One code is $40\uA/65\,535=0.610$\,nA.
+  \item \textbf{Heater:} a resistor inside each ring. Its power heats the ring and moves the resonance red.
+  \item \textbf{DAC} (digital-to-analog converter): turns an integer, the \emph{heater code}, into a voltage. It has
+  16 bits. Code 0 gives 0\,V and code 65\,535 gives 1.6\,V.
+\end{itemize}
+At each tick (1\us), for every ring:
+\begin{enumerate}
+  \item At every 10th tick (100\,kHz), your controller runs. It reads the ADC codes that arrived since its last
+  run. It writes new heater codes. A code reaches the DAC after a delay (latency) of 1\us.
+  \item The scenario sets the outside inputs: ambient temperature, disturbance heat, laser powers and frequencies,
+  data on or off.
+  \item The DAC turns the heater code into a voltage. The heater power is $P=V^2/R$.
+  \item The phase model computes $\phi$ at each laser line. It uses the ring temperature and the data voltage on
+  the ring's PN junction (section~\ref{sec:mod}).
+  \item The heat model over one tick moves every temperature forward. For each ring, in the order that the light
+  meets them, the Newton solve of section~\ref{sec:newton} finds the end-of-tick temperature. The light that a ring
+  passes goes on to the next ring.
+  \item The monitor PD collects the drop current. Every 4 ticks the ADC makes one code. The code reaches the
+  controller 2\us{} later.
+  \item The program records the true state, for example the true detuning. Your controller never sees it.
+\end{enumerate}
+The loop closes like this: heater code $\to$ heater power $\to$ ring temperature $\to$ $\phi$ $\to$ drop power
+$\to$ ADC code $\to$ your controller $\to$ heater code.
+
+%=====================================================================================================================
+\section{Words you will meet}\label{sec:words}
+
+{\small
+\begin{xltabular}{\linewidth}{@{}P{3.3cm} R@{}}
+\toprule
+Word & Meaning\\\midrule
+\endhead
+\multicolumn{2}{@{}l}{\textbf{The program}}\\
+tick, controller edge & One time step of 1\us. A controller edge is a tick at which your controller runs (every 10th tick).\\
+kernel & The compiled inner loop that runs one tick (\cd{mrm/sim/kernel.py}).\\
+numba, \texttt{@njit} & A tool that compiles a Python function to machine code the first time it runs. \texttt{@njit} marks such a function.\\
+NumPy twin & \cd{kernel_ref.py}: the same tick in plain NumPy. It is slow but readable. A \emph{parity test} checks that both give the same bits.\\
+preset, leaf, key & A preset is a YAML file with every device number. A leaf is one number in it. Its key is its path, for example \texttt{ring.optics.q\_loaded}.\\
+provenance & A word that says where a number comes from. \emph{printed}: in a Lightmatter publication. \emph{read-off}: read from a published figure. \emph{calibrated}: fitted to data by the model. \emph{inferred}: worked out from published facts. \emph{solver}: from a mode or heat simulation. \emph{literature}: from other papers. \emph{assumed}: a reasoned guess. \emph{derived}: computed from other leaves.\\
+relations R1--R5 & The formulas in \cd{mrm/params/relations.py} that compute derived numbers. R1: thermo-optic slope. R2: heater efficiency. R3: geometry and FSR. R4: Q values and loss. R5: latencies.\\
+\texttt{realize}, \texttt{PlantParams} & \texttt{realize()} converts a preset to SI units for each world. It returns one read-only object, \texttt{PlantParams}.\\
+world, nominal, corner & A world is one complete set of device numbers, shared by every ring of the die. The nominal world has every number at its preset value. A corner is a named world with some numbers at an extreme.\\
+variation, LHS & Variation is the ring-to-ring spread inside one world. LHS (Latin hypercube sampling) spreads $N$ random worlds evenly over every range.\\
+Truth, oracle & Truth is the true state (for example the true detuning). The program knows it, your controller does not. The oracle is a benchmark that reads Truth and finds the best stable operating point. You may not use it as your controller.\\
+warm start, cold start & A warm start begins with every ring near its lock. A cold start begins with the heaters off.\\
+start protocol & How the first tick picks the self-heating branch: \texttt{branch\_low}, \texttt{branch\_high} or \texttt{laser\_ramp}.\\
+diagnostic & A check number that the model computes from the preset, for example \texttt{fwhm\_pm}.\\
+excursion & A time interval in which a ring is out of lock.\\
+harness, telemetry & A harness is a simpler test setup outside the engine. Telemetry is the debug output of a controller.\\
+test and tag names & A1--A4, B3, B5: Lightmatter's acceptance tests (Ch18). A1 is the aggressor test. CAL-$n$, VAL-$n$, BND-$n$: the model's calibration, validation and bound checks. ``07 P0-1'', ``07 D9'', ``Q4'': items in \cd{docs/research/07_design_critique.md}.\\
+knowledge tokens & Names in the preset that say which design numbers your controller may read.\\
+latch, FIFO & A latch is a register that holds a command until the hardware takes it. A FIFO (first in, first out) is a queue. Here it is a delay line for a command.\\
+trace, metrics & A trace is a recorded time signal. Metrics are the summary numbers of a run.\\
+\multicolumn{2}{@{}l}{\textbf{The device and the physics}}\\
+G25, G26, imec & G25 and G26 are generations of Lightmatter's device. imec is a research institute. The model borrows its thermal data.\\
+WDM, line & Wavelength-division multiplexing: 8 laser lines share one waveguide, the \emph{bus}. Each ring modulates its own line.\\
+foreign line, wrong line & A foreign line is the line of another ring. A wrong-line ring has locked onto a foreign line.\\
+bus order & The order in which the light meets the rings (ring 0 first).\\
+NRZ & Non-return-to-zero data. Each bit holds one of two levels for one bit time.\\
+PN junction & A diode across the ring waveguide. Reverse bias removes free carriers, so $n_{eff}$ rises and the loss falls (Ch06).\\
+OMA, relOMA & OMA (optical modulation amplitude) is the difference between the output powers for a ``1'' and a ``0''. relOMA is the OMA divided by the ring's input power.\\
+extinction ratio & The ratio of the ``1'' and ``0'' output powers.\\
+BER & Bit error ratio: the fraction of received bits that are wrong.\\
+side-of-fringe lock & A lock with the laser on a flank of the dip, not at its bottom. There a small shift gives the largest change of power.\\
+thermo-optic effect & The index of silicon rises with temperature (Ch09).\\
+self-heating, branch, fold, bistability & See section~\ref{sec:newton} and Ch10.\\
+self-heating relief & The factor by which self-heating divides the heater's effect on the red side (section~\ref{sec:sh}).\\
+heater authority & The range of heat that the heater can supply. It can only add heat, never remove it.\\
+TCR & Temperature coefficient of resistance: the fractional change of the heater resistance per kelvin.\\
+supply limit & All heaters share one supply. Above its power or current limit, every heater gets less power.\\
+thermal pole & One first-order lag of a heat path, like one RC section: a DC gain $r$ (K/W) and a time constant $\tau$.\\
+Foster sum & A heat path written as a sum of poles, $\sum_k r_k/(1+s\tau_k)$: parallel RC sections in series.\\
+ZOH, FOH & Zero-order hold: the input is constant across a tick. First-order hold: the input changes linearly across a tick.\\
+explicit, implicit & An explicit update uses the previous tick's value. An implicit update solves for the end-of-tick value (section~\ref{sec:newton}).\\
+crosstalk & Heat from one heater or ring that reaches another ring.\\
+aggressor & An on-die heater next to ring 0. The test drives it as a disturbance (scenario A1).\\
+dark current & The current of a photodiode with no light. It grows with temperature.\\
+TCMT & Temporal coupled-mode theory, an approximate ring model. g26 does not use it.\\
+\bottomrule
+\end{xltabular}}
+
+%=====================================================================================================================
+\section{The model on one page}\label{sec:one}
 
 \textbf{What it is.} The model simulates the device that your lock controller will drive: the transmit bank of
-Lightmatter's G26 link. Eight microring modulators sit on one bus waveguide. Each ring has a heater inside it, a PN
-junction for the data, and a monitor photodiode (PD) on its drop port. Eight laser lines sit on a 400\,GHz grid near
-1310\,nm, with 50\,Gb/s NRZ data. The plant steps in ticks of 1\us. Your controller runs every 10 ticks (100\,kHz). It
-reads ADC codes and writes heater DAC codes, as firmware does.
-
-\textbf{Why one tick can solve the optics in steady state.} The photon lifetime is $\tau_p=Q\lambda/(2\pi c)\approx
-2.7$\,ps (your 5.26, with $Q=3850$). Heat moves in microseconds to milliseconds. So each tick computes the ring in
-steady state at the present temperature, and a thermal network carries the slow state from tick to tick.
-
-
+Lightmatter's G26 link. Eight microring modulators sit on one bus waveguide. Each ring has a heater, a PN junction
+for the data, and a monitor PD on its drop port. Eight laser lines sit on a 400\,GHz grid near 1310\,nm. The data is
+50\,Gb/s NRZ. The model advances in ticks of 1\us. Your controller runs every 10 ticks (100\,kHz). It reads ADC codes
+and writes heater DAC codes, as firmware does. Section~\ref{sec:why} explains why each tick can use the
+steady-state ring formulas.
 
 \textbf{How to find things.} Run these from \texttt{\textasciitilde/mrm-model}:
 \begin{lstlisting}
 .venv/bin/mrm params explain g26 <key>    # one number: value, source, worlds, textbook value ("disagrees:")
                                           # <key>: a leaf (ring.thermal.tau_fast_s) or a diagnostic (fwhm_pm)
 grep -n "^def \|^class " mrm/plant/optics.py            # function map of a module (read its docstring first)
-grep -n "q_loaded" mrm/params/r*.py                     # where a leaf enters the plant (grep the last part of its key)
+grep -n "q_loaded" mrm/params/r*.py                     # where a leaf enters the code (grep the last part of its key)
 grep -n "# ---" mrm/sim/kernel.py                       # sections of the compiled tick
 grep -n "textbook\|disagrees" mrm/params/presets/g26.yaml   # where the model departs from the book
 grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/research/07_design_critique.md
@@ -107,7 +422,7 @@ grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/r
   \item \cd{docs/ARCHITECTURE.md}, section 2: which folder holds which part.
 \end{enumerate}
 
-\textbf{To see a function in use,} open its test file. Each file in \cd{mrm/plant/} has a test file
+\textbf{To see a function in use,} open its test file. Most files in \cd{mrm/plant/} have a test file
 \cd{tests/verification/test_<name>.py}. For example, \cd{optics.py} has \cd{test_optics.py}.
 
 \textbf{To look up a number,} use \texttt{mrm params explain} (above), or open \cd{docs/PARAMETERS.md}.
@@ -124,12 +439,12 @@ grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/r
 {\small
 \begin{xltabular}{\linewidth}{@{}P{4.2cm} R@{}}
 \toprule
-\cd{mrm/params/} & Presets (\cd{presets/g26.yaml}), the loader, the relations R1--R5, \cd{realize.py} (draws the worlds and makes the frozen \texttt{PlantParams}).\\
+\cd{mrm/params/} & Presets (\cd{presets/g26.yaml}), the loader, the relations R1--R5, and \cd{realize.py} (makes the worlds and \texttt{PlantParams}).\\
 \cd{mrm/plant/} & The physics of one tick: \cd{phase.py}, \cd{optics.py}, \cd{selfheat.py}, \cd{thermal.py}, \cd{electrical.py}, \cd{sensing.py}, \cd{laser.py}, \cd{datapath.py}.\\
-\cd{mrm/scenarios/} & The disturbances (A1/A2 aggressor, soak, laser drift, traffic, faults) and the aggressor calibration.\\
-\cd{mrm/control/} & The controller API, the knowledge tokens, and \cd{baselines/} (\texttt{pi\_lock}, dither, \texttt{wdm\_supervisor}, \ldots).\\
-\cd{mrm/sim/} & The compiled tick (\cd{kernel.py}), its NumPy twin (\cd{kernel_ref.py}), the runner, the metrics, the experiments, the CLI.\\
-\cd{mrm/validation/} & Published targets, the oracle, the validation report (the report is stale).\\
+\cd{mrm/scenarios/} & The disturbances (A1 and A2 aggressor, soak, laser drift, traffic, faults) and the aggressor calibration.\\
+\cd{mrm/control/} & The controller interface, the knowledge tokens, and \cd{baselines/} (shipped controllers: \texttt{pi\_lock}, dither, \texttt{wdm\_supervisor}, \ldots).\\
+\cd{mrm/sim/} & The compiled tick (\cd{kernel.py}), its NumPy twin (\cd{kernel_ref.py}), the runner, the metrics, the experiments, the command line.\\
+\cd{mrm/validation/} & Published targets, the oracle, the validation report (out of date).\\
 \cd{experiments/}, \cd{examples/} & Experiment files (\cd{examples/}, \cd{acceptance/}). Controller templates and \cd{tutorial.ipynb}.\\
 \cd{docs/} & \cd{EXPLAINED.md}, \cd{ENGINE.md}, \cd{ARCHITECTURE.md}, \cd{PARAMETERS.md}, \cd{KNOWN_ISSUES.md}, \cd{handoff/} (one design note per module), \cd{research/}.\\
 \cd{runs/} & One folder per run: \cd{report.txt}, \cd{metrics.json}, \cd{trace.h5}, \cd{experiment.resolved.yaml}.\\
@@ -146,14 +461,14 @@ grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/r
   arr/.style={-{Stealth[length=2mm]}, thick},
   lab/.style={font=\scriptsize, inner sep=1.5pt, align=center}]
 \node[blk=blue!8]    (ctrl)  at (0,0)       {\textbf{Your controller}\\every 10 ticks:\\codes in, codes out};
-\node[blk]           (heat)  at (5.9,0)     {\textbf{Heater path}\\latch, 1\us{} DAC FIFO,\\$P=V^2/R(T_H)$, supply limit};
-\node[blk=orange!15] (therm) at (11.8,0)    {\textbf{Thermal network}\\Foster poles,\\exact ZOH/FOH update};
+\node[blk]           (heat)  at (5.9,0)     {\textbf{Heater path}\\latch, 1\us{} delay,\\$P=V^2/R(T_H)$, supply limit};
+\node[blk=orange!15] (therm) at (11.8,0)    {\textbf{Heat model}\\sums of RC lags,\\exact update per tick};
 \node[blk]           (scen)  at (11.8,1.85) {\textbf{Scenario}\\ambient, aggressor power,\\traffic, laser events};
 \node[blk]           (mon)   at (0,-2.2)    {\textbf{Monitor}\\PD + dark current,\\2\us{} window, 16-bit ADC};
-\node[blk=orange!15] (opt)   at (5.9,-2.2)  {\textbf{Ring optics}\\exact add-drop ring per\\line, bus walk, 2 levels};
+\node[blk=orange!15] (opt)   at (5.9,-2.2)  {\textbf{Ring optics}\\eq.~5.30 per ring and\\line, bus, 2 data levels};
 \node[blk=orange!15] (ph)    at (11.8,-2.2) {\textbf{Phase model}\\$\Delta\lambda(T,V)$, then $\phi$,\\$a$, $\eta$, $K^2$ at each line};
 \node[blk=gray!12]   (truth) at (0,-4.4)    {\textbf{Truth and scoring}\\detuning, relOMA, oracle,\\metrics (you never see them)};
-\node[blk]           (las)   at (5.9,-4.4)  {\textbf{Laser lines}\\8 lines, RIN, drift,\\6\,dB chip input loss};
+\node[blk]           (las)   at (5.9,-4.4)  {\textbf{Laser lines}\\8 lines, noise, drift,\\6\,dB chip input loss};
 \node[blk]           (bias)  at (11.8,-4.4) {\textbf{Bias and data}\\NRZ levels $V_0$, $V_1$,\\data heat};
 \draw[arr] (ctrl) -- node[lab,above]{heater\\codes} (heat);
 \draw[arr] (heat) -- node[lab,above]{$P_H$} (therm);
@@ -167,102 +482,108 @@ grep -rn "07 P0-1" mrm docs                             # follow a tag of docs/r
 \draw[arr] (mon) -- node[lab,right]{ADC\\codes} (ctrl);
 \draw[arr,dashed] (opt.south west) -- node[lab,below,sloped]{levels} (truth.north east);
 \end{tikzpicture}
-\caption{The signal flow of one tick. The orange blocks are solved together inside each tick (implicit
-self-heating). For each ring in bus order, a Newton solve finds the temperature at which absorbed power and heat
-agree. The PD temperature also goes to the monitor (not drawn). Code order per tick: edge, latch, scenario,
-laser, NRZ levels, phase model (previous temperature), heater, thermal and self-heating step, monitor, Truth, metrics.}
+\caption{The signal flow of one tick. The three orange blocks are solved together inside each tick, ring by ring in
+bus order, with the Newton solve of section~\ref{sec:newton}. The monitor also gets the PD temperature (not drawn).
+The code order in one tick is: controller edge, latch, scenario, laser, NRZ levels, phase model, heater, heat and
+self-heating step, monitor, Truth, metrics.}
 \end{figure}
 
-
-
 %=====================================================================================================================
-\section{Core lines of code to read, in order}
+\section{Core lines of code to read, in order}\label{sec:map}
 
-Line numbers are for commit \texttt{f3a8629}. Read the docstrings first. Skip \cd{mrm/sim/kernel.py} until you need
+Line numbers are for commit \texttt{3db791e}. Read the docstrings first. Skip \cd{mrm/sim/kernel.py} until you need
 it. It calls the leaf modules, and it copies the self-heating step line for line. \cd{kernel_ref.py} is the readable
 version of the same tick.
 
 {\footnotesize
 \begin{xltabular}{\linewidth}{@{}r P{6.2cm} P{2.0cm} R@{}}
 \toprule
-\# & File and symbol & Lines & What to take from it\\\midrule
+\# & File and symbol & Lines & What to take from it, and why\\\midrule
 \endfirsthead
 \toprule
-\# & File and symbol & Lines & What to take from it\\\midrule
+\# & File and symbol & Lines & What to take from it, and why\\\midrule
 \endhead
 \bottomrule
 \endfoot
 \grp{A. Your side of the interface (start here, to know the goal)}
-1 & \cd{examples/controllers/template_python_controller.py} \cd{MyIntegralLock} & 26--57 & The file you copy. A plain integral lock of the monitor to a fraction of a known peak code.\\
-2 & \cd{mrm/control/api.py} docstring; \cd{ControllerSpec}, \cd{Observation} & 1--41; 145--481, 573--611 & What a controller sees: \texttt{reset(spec)} once, \texttt{step(obs)} at each edge, integer codes back.\\
-3 & \cd{mrm/core/channels.py} \cd{V1_CHANNEL_TABLE} & 367--430 & Every channel name: \texttt{tx.heater}, \texttt{tx.monitor.samples}, \texttt{tx.heater.applied}, \texttt{temp.<name>}, \ldots\\
-4 & \cd{mrm/control/baselines/pi_lock.py} docstring & 1--85 & Which side to lock on and why, the MAP--RETURN--LOCK algorithm, the PI law, the failure modes.\\
+1 & \cd{examples/controllers/template_python_controller.py} \cd{MyIntegralLock} & 26--57 & The file you copy to start. A plain integral loop holds the monitor code at a fraction of a known peak code. It is the smallest working controller.\\
+2 & \cd{mrm/control/api.py} docstring; \cd{ControllerSpec}, \cd{Observation} & 1--40; 145--481, 573--611 & What your controller gets and returns. \texttt{reset(spec)} runs once. \texttt{step(obs)} runs at each controller edge and returns integer codes.\\
+3 & \cd{mrm/core/channels.py} \cd{V1_CHANNEL_TABLE} & 367--432 & The name, unit and rate of every signal, for example \texttt{tx.heater} and \texttt{tx.monitor.samples}. Look up a signal name here.\\
+4 & \cd{mrm/control/baselines/pi_lock.py} docstring & 1--85 & The shipped lock. Which side of the dip to lock on and why, the start-up steps (MAP, RETURN, LOCK), the PI law, the failure modes. Read it before you design your own.\\
 \grp{B. Optics: from your Ch05 ring to the model ring}
-5 & \cd{mrm/plant/optics.py} docstring & 9--42, 91--117 & Conventions and ports (0 in, 1 through, 2 drop to the monitor, 3 add). The bus and the NRZ averaging.\\
-6 & \cd{mrm/plant/optics.py} \cd{_airy_line} & 528--560 & Your eq.\ (5.30), exact: $T$, $D$, the loss fraction and their $\phi$ derivatives.\\
-7 & \cd{mrm/plant/phase.py} docstring, equations 1--6 & 10--64 & The phase model on one page: shift, phase at the line, group delay, $K^2$ at the line, loss and $\eta$, bus segments.\\
-8 & \cd{mrm/plant/phase.py} \cd{thermal_shift_m}, \cd{resonance_shift_ws}, \cd{_fill_level} & 203--206, 229--238, 248--275 & The same equations as code: the shift per ring, then $\phi$, $a$, $\eta$, $T_{rt}$ per line.\\
-9 & \cd{mrm/params/relations.py} docstring R3, R4 & 13--21, 35--47 & FSR and order from the geometry. Q values and the loss budget converted to $K_t^2$, $K_d^2$, $a$.\\
-10 & \cd{mrm/plant/optics.py} \cd{ring_lines_nb} & 1029--1126 & One ring at all 8 lines: both NRZ levels, the ones-density average, $P_{abs}=\eta\mathcal{L}P_{in}$, sums for the monitor.\\
-11 & \cd{mrm/plant/optics.py} \cd{ring_exact} & 2701--2718 & Python API. Use it in a notebook to check the line shape against Ch05.\\
+5 & \cd{mrm/plant/optics.py} docstring & 9--42, 91--117 & The sign conventions and the four ports (0 in, 1 through, 2 drop to the monitor, 3 add). The bus, and the average over the two data levels.\\
+6 & \cd{mrm/plant/optics.py} \cd{_airy_line} & 528--560 & Your add-drop ring \eq{5.30}, exact: $T$, $D$, the loss fraction, and their slopes in $\phi$. The core of the optics.\\
+7 & \cd{mrm/plant/phase.py} docstring, equations 1--6 & 10--64 & Where $\phi$ comes from: how temperature and voltage move the resonance, and how that gives $\phi$, $a$, $\eta$, $K^2$ at each line.\\
+8 & \cd{mrm/plant/phase.py} \cd{thermal_shift_m}, \cd{resonance_shift_ws}, \cd{_fill_level} & 203--206, 229--238, 248--275 & The same equations as code. Use it to check one equation against its code.\\
+9 & \cd{mrm/params/relations.py} docstring R3, R4 & 13--21, 35--45 & How the preset's FSR, Q values and loss become $L$, $m$, $K_t^2$, $K_d^2$ and $a$. This is where $t_1$, $t_2$, $a$ come from.\\
+10 & \cd{mrm/plant/optics.py} \cd{ring_lines_nb} & 1029--1126 & One ring at all 8 lines and both data levels. It averages over the data and adds up the absorbed and monitor powers.\\
+11 & \cd{mrm/plant/optics.py} \cd{ring_exact} & 2701--2718 & A Python function for one ring. Call it in a notebook to compare the line shape with Ch05.\\
 \grp{C. Modulation}
-12 & \cd{mrm/plant/electrical.py} \cd{depletion_shift_m}, \cd{analytic_junction_table_from_ring} & 1491--1505, 1540--1568 & The square-root depletion law, and the index and loss change of the junction.\\
-13 & \cd{mrm/plant/electrical.py} \cd{nrz_levels_row} & 649--684 & The two junction voltages from the bias and the swing.\\
-14 & \cd{mrm/sim/kernel.py} \cd{_truth_a} (relOMA lines) & 1328--1334 & relOMA $=|P_{thru,1}-P_{thru,0}|/P_{in}$ at the ring's own through port.\\
-\grp{D. Heat: self-heating, thermal network, heater}
-15 & \cd{mrm/plant/selfheat.py} docstring & 1--42 & The implicit per-ring solve, branch continuation, the start protocols.\\
-16 & \cd{mrm/plant/selfheat.py} \cd{solve_ring_temperature} & 73--162 & Newton from the previous root. It never skips a root and follows the branch.\\
-17 & \cd{mrm/plant/selfheat.py} \cd{lorentzian_folds}, \cd{bistability_ratio} & 463--489 & The analytic fold points and the bistability ratio for one line.\\
-18 & \cd{mrm/plant/thermal.py} docstring; \cd{foh_scalar} & 1--55; 140--162 & Foster sums, one lag per (observer, source, pole), the exact hold update.\\
-19 & \cd{mrm/plant/thermal.py} \cd{InterimRom} (docstring) & 737--781 & $Z_{RH}$, $Z_{RR}$, $Z_{HH}$ and the crosstalk rules. Its defaults are not g26.\\
-20 & \cd{mrm/plant/thermal.py} \cd{crosstalk_tau_s}, \cd{site_fraction} & 823--862 & The crosstalk pole against distance. The static coupling of PDs, sensors and the aggressor.\\
-21 & \cd{mrm/plant/electrical.py} docstring; \cd{heater_power_row}; \cd{supply_limit_row} & 1--43; 374--479; 482--509 & Code to heater power: DAC, driver law with TCR solved in the tick, array supply limit.\\
+12 & \cd{mrm/plant/electrical.py} \cd{depletion_shift_m}, \cd{analytic_junction_table_from_ring} & 1491--1505, 1540--1568 & How the junction voltage changes $n_{eff}$ and the loss (a square-root law). This is how data moves the resonance.\\
+13 & \cd{mrm/plant/electrical.py} \cd{nrz_levels_row} & 649--684 & The two junction voltages $V_0$, $V_1$ from the bias and the swing.\\
+14 & \cd{mrm/sim/kernel.py} \cd{_truth_a} (relOMA lines) & 1328--1334 & relOMA $=|P_{thru,1}-P_{thru,0}|/P_{in}$ at the ring's own through port. The score uses it.\\
+\grp{D. Heat: self-heating, heat paths, heater}
+15 & \cd{mrm/plant/selfheat.py} docstring & 1--42 & The per-ring self-heating solve of section~\ref{sec:newton}, how it stays on its branch, the start protocols.\\
+16 & \cd{mrm/plant/selfheat.py} \cd{solve_ring_temperature} & 73--162 & The Newton solve. It starts from the previous root and never jumps over a root.\\
+17 & \cd{mrm/plant/selfheat.py} \cd{lorentzian_folds}, \cd{bistability_ratio} & 463--489 & Where the folds are, and the ratio that says whether a ring is bistable.\\
+18 & \cd{mrm/plant/thermal.py} docstring; \cd{foh_scalar} & 1--55; 140--162 & Heat paths as sums of RC lags, and the exact update of one lag over one tick.\\
+19 & \cd{mrm/plant/thermal.py} \cd{InterimRom} (docstring) & 736--781 & The heater-to-ring and light-to-ring paths, and the crosstalk rules. Its default numbers are not the g26 numbers.\\
+20 & \cd{mrm/plant/thermal.py} \cd{crosstalk_tau_s}, \cd{site_fraction} & 823--862 & How crosstalk gets weaker and slower with distance.\\
+21 & \cd{mrm/plant/electrical.py} docstring; \cd{heater_power_row}; \cd{supply_limit_row} & 1--43; 374--479; 482--509 & From heater code to heater power: the DAC, $P=V^2/R$ with $R$ that changes with temperature, the shared supply limit.\\
 \grp{E. Monitor}
-22 & \cd{mrm/plant/sensing.py} docstring & 1--68 & The signal chain from drop power to ADC code, and the exact noise per sample.\\
-23 & \cd{mrm/plant/sensing.py} \cd{monitor_tick_row} & 291--416 & Per tick: integrate the current, take a code every 4 ticks, push it with its release tick.\\
-24 & \cd{mrm/control/baselines/pi_lock.py} \cd{monitor_block_mean}, \cd{block_inputs} & 273--293 & How a controller averages the samples released since its last step.\\
-\grp{F. The engine}
-25 & \cd{mrm/core/timing.py} docstring & 1--61 & Integer ticks, one owner per delay, the order of events at a controller edge.\\
-26 & \cd{mrm/sim/kernel_ref.py} \cd{ReferenceEngine.step} & 220--402 & The readable NumPy tick. Bit-identical to the kernel. Run it line by line in a debugger.\\
-27 & \cd{mrm/sim/kernel.py} \cd{_world_loop} & 1873--2365 & The compiled tick. Markers: 1894 edge, 2060 optics inputs, 2156 heater, 2221 self-heating, 2281 sensors, 2332 Truth, 2343 metrics.\\
-28 & \cd{mrm/sim/runner.py} \cd{run} & 159--271 & Build the plant, warm start, controller reset, run, collect metrics and traces.\\
+22 & \cd{mrm/plant/sensing.py} docstring & 1--68 & From drop power to ADC code, with the noise of each sample. This is what one monitor code means.\\
+23 & \cd{mrm/plant/sensing.py} \cd{monitor_tick_row} & 291--416 & Each tick the monitor collects current. Every 4 ticks it makes a code and queues it with its release tick.\\
+24 & \cd{mrm/control/baselines/pi_lock.py} \cd{monitor_block_mean}, \cd{block_inputs} & 273--293 & How a controller averages the codes that arrived since its last step.\\
+\grp{F. The engine (the program that runs the ticks)}
+25 & \cd{mrm/core/timing.py} docstring & 1--61 & Time in integer ticks. Each delay has one owner. The order of events at a controller edge.\\
+26 & \cd{mrm/sim/kernel_ref.py} \cd{ReferenceEngine.step} & 220--402 & The readable NumPy tick. It gives the same bits as the kernel. Step through it in a debugger.\\
+27 & \cd{mrm/sim/kernel.py} \cd{_world_loop} & 1873--2365 & The compiled tick. Section markers: 1894 controller edge, 2060 optics inputs, 2156 heater, 2221 self-heating, 2281 sensors, 2332 Truth, 2343 metrics.\\
+28 & \cd{mrm/sim/runner.py} \cd{run} & 159--271 & One run: build the plant, warm start, reset the controller, run, collect metrics and traces.\\
 \grp{G. Scoring, scenarios and parameters}
-29 & \cd{mrm/validation/oracle.py} docstring & 1--46 & The OMA-optimal stable target, the oracle, and the OMA penalty.\\
-30 & \cd{mrm/sim/metrics.py} docstring; \cd{summarize} & 1--55; 680--755 & Lock error, lock state, excursions, relOMA, wrong line. The summary columns.\\
-31 & \cd{mrm/sim/experiment.py} \cd{_execute} (self-reference pre-run) & 1429--1452 & How the example files judge the lock about each ring's own operating point.\\
-32 & \cd{mrm/scenarios/library.py} \cd{a1_slide10_aggressor} & 139--189 & The A1 trajectory, the site, and the referencing choice.\\
-33 & \cd{mrm/scenarios/calibrate.py} docstring & 1--38 & How the aggressor power is solved so that ring 0 follows the target.\\
+29 & \cd{mrm/validation/oracle.py} docstring & 1--46 & How the best stable operating point is found, and the OMA penalty against it.\\
+30 & \cd{mrm/sim/metrics.py} docstring; \cd{summarize} & 1--55; 680--755 & Lock error, lock state, excursions, relOMA, wrong line. These are the columns of the report.\\
+31 & \cd{mrm/sim/experiment.py} \cd{_execute} (self-reference pre-run) & 1429--1452 & How the example files measure each ring's lock error from its own operating point.\\
+32 & \cd{mrm/scenarios/library.py} \cd{a1_slide10_aggressor} & 139--189 & The A1 aggressor: its temperature curve, its site, and how it is referenced.\\
+33 & \cd{mrm/scenarios/calibrate.py} docstring & 1--38 & How the aggressor power is found that makes ring 0 follow the published curve.\\
 34 & \cd{mrm/params/presets/g26.yaml} sections & 233--1481 & fidelity 233, laser 279, ring 338 (optics 417, thermal 649, heater 877, junction 971, monitor 1002), controller\_interface 1143, metrics 1161, uncertainty 1168, variation 1447.\\
-35 & \cd{mrm/params/realize.py} docstring; \cd{realize} & 1--28; 715--1119 & Worlds, devices, SI conversion, relations, thermal assembly, latencies in ticks.\\
-36 & \cd{experiments/examples/steady_pi_lock.yaml}, \cd{a1_pi_lock.yaml} & whole files & An experiment file: preset, controller, scenario, start state, scoring.\\
+35 & \cd{mrm/params/realize.py} docstring; \cd{realize} & 1--28; 715--1119 & How a preset becomes \texttt{PlantParams}: worlds, ring spread, SI units, relations, heat paths, latencies in ticks.\\
+36 & \cd{experiments/examples/steady_pi_lock.yaml}, \cd{a1_pi_lock.yaml} & whole files & An experiment file: preset, controller, scenario, start state, scoring. Copy one to make your own.\\
 \end{xltabular}}
 
 %=====================================================================================================================
-\section{The bridge: from your ring to the whole model}
+\section{The bridge: from your ring to the whole model}\label{sec:bridge}
 
-\subsection{The model ring is your add-drop ring}
-The model uses your add-drop equations (5.30) exactly, without the Lorentzian approximation. For each ring and each of
-the 8 lines, \cd{_airy_line} computes the through power $T$, the drop power $D$ and the intrinsic-loss fraction
+Each part ends with a short table. ``Code'' gives the place in the code. ``g26'' gives the model numbers. ``Book''
+gives the difference from the textbook.
+
+\subsection{The model ring is your add-drop ring}\label{sec:ring}
+The model uses your add-drop equations \eq{5.30} exactly, without the Lorentzian approximation. For each ring and
+each of the 8 lines, \cd{_airy_line} computes the through power $T$, the drop power $D$ and the loss fraction
 $\mathcal{L}$, per watt of input:
 \begin{gather*}
 t_j=\sqrt{1-K_j^2},\qquad k_j=\sqrt{K_j^2},\qquad a=e^{-\alpha_i L/2},\qquad
 \mathcal{D}(\phi)=1-2t_1t_2a\cos\phi+(t_1t_2a)^2,\\
-T(\phi)=\frac{t_1^2-2t_1t_2a\cos\phi+t_2^2a^2}{\mathcal{D}(\phi)},\qquad D(\phi)=\frac{k_1^2k_2^2\,a}{\mathcal{D}(\phi)},\\
+T(\phi)=\frac{t_1^2-2t_1t_2a\cos\phi+t_2^2a^2}{\mathcal{D}(\phi)},\qquad D(\phi)=\frac{k_1^2k_2^2\,a}{\mathcal{D}(\phi)},\qquad
 \mathcal{L}(\phi)=\frac{k_1^2}{\mathcal{D}(\phi)}\,(1-a)\,(1+t_2^2a),\qquad P_{abs}=\eta\,\mathcal{L}\,P_{in}.
 \end{gather*}
-The cosine makes each formula periodic in $\phi$, so one evaluation includes every resonance order. The loss term
-$\mathcal{L}$ is new to you. The factor $k_1^2/\mathcal{D}$ is the power that circulates just after the input coupler
-(your build-up factor 5.27, with $ta\to t_1t_2a$). The factor $1-a$ is the power fraction lost in one half of the
-ring. The factor $t_2^2a$ is the power that continues into the second half, after the drop coupler. Only the
-fraction $\eta$ of that loss is absorption that heats the ring.
+$T$ and $D$ are \eq{5.30}. The cosine makes each formula periodic in $\phi$, so one evaluation covers every
+resonance order. The loss term $\mathcal{L}$ is not in the textbook. It has three factors:
+\begin{itemize}
+  \item $k_1^2/\mathcal{D}$ is the power that circulates just after the input coupler. At resonance it is your
+  build-up factor $\kappa^2/(1-ta)^2$ \eq{5.27}, with $ta$ replaced by $t_1t_2a$.
+  \item $1-a$ is the power fraction lost in one half of the ring.
+  \item $1+t_2^2a$ adds the second half: the power $t_2^2a$ continues past the drop coupler.
+\end{itemize}
+Only the fraction $\eta$ of that loss is absorption that heats the ring. The rest is scattering.
 
 The preset does not give $t_1$, $t_2$ and $a$. It gives the loaded Q, the drop share $\kappa_d/\kappa$ and a loss
-budget. \cd{relations.py} (R4) converts them with the exact energy decay over one round trip of duration $T_{rt}$.
-This is your (5.24) with a third loss channel, the drop coupler:
+budget. \cd{relations.py} (R4) converts them with the exact energy decay over one round trip $T_{rt}$
+\nib:
 \[
 K_j^2=1-\exp(-\omega T_{rt}/Q_j),\quad a=\exp\!\left(-\frac{\omega T_{rt}}{2Q_i}\right),\quad
 \frac1{Q_L}=\frac1{Q_i}+\frac1{Q_t}+\frac1{Q_d},\quad Q_d=\frac{Q_L}{\kappa_d/\kappa}.
 \]
+The sum of reciprocals is your $1/Q\approx1/Q_{int}+1/Q_c$ \eq{5.24}, with a third channel for the drop coupler.
 
 {\small
 \begin{tabularx}{\linewidth}{@{}l l l R@{}}
@@ -273,96 +594,110 @@ $a$, $\phi$ & $a$, $\phi$ & \texttt{a\_rt}, \texttt{phi} & $\phi$ is absolute: a
 $n_gL/c$ & $T_{rt}=1/\mathrm{FSR}$ & \texttt{t\_rt} & Group delay of one round trip.\\
 $Q$, $Q_{int}$, $Q_c$ & $Q_L$, $Q_i$, $Q_t$, $Q_d$ & \texttt{q\_loaded}, \ldots & Loaded, intrinsic, through-coupler and drop-coupler Q.\\
 $\delta=\lambda_L-\lambda_r$ & $d=\lambda_{res}-\lambda_{line}$ & \texttt{detuning\_m} & $d=-\delta$. Half width $w=\Delta\lambda_{FWHM}/2$ (HWHM).\\
-(5.12), (5.32) & $\partial\phi/\partial\lambda_{res}$, $\Delta\lambda$ & \cd{dphi_dlamres}, \cd{resonance_shift_ws} & Same physics, opposite sign: $\partial\phi/\partial\lambda_{res}=+2\pi n_gL/\lambda^2$. \cd{kernel.py} line 341, \cd{phase.py} line 230.\\
+$d\phi/d\lambda$ \eq{5.12} & $\partial\phi/\partial\lambda_{res}$ & \cd{dphi_dlamres} & Same physics, opposite sign: $\partial\phi/\partial\lambda_{res}=+2\pi n_gL/\lambda^2$. \cd{kernel.py} line 341.\\
+$\Delta\lambda_r$ \eq{5.32} & $\Delta\lambda$ & \cd{resonance_shift_ws} & The resonance shift. \cd{phase.py} line 230.\\
 \bottomrule
 \end{tabularx}}
 
-\hard{The drop coupler is a weak tap: $Q_L/Q_d=0.007$. So the through port acts almost like your all-pass ring. The
-drop port takes about 1\,\% of the input at the peak. To see this, put a small $\kappa_2$ into (5.31):
-$T_{drop,max}$ stays small and the linewidth hardly changes. With the g26 values below, (5.31) gives a linewidth of
-about 340\,pm and a drop peak of about 1.3\,\% (my arithmetic).}
+\hard{The drop coupler is a weak tap: $Q_L/Q_d=3850/550\,000=0.007$. So the through port acts almost like your
+all-pass ring. The drop port takes about 1\,\% of the input at the peak. Check it with
+$T_{drop,max}=\kappa_1^2\kappa_2^2a/(1-t_1t_2a)^2$ \eq{5.31}:
+$0.09402\times0.00145\times0.9478/0.0985^2=0.013$, so 1.3\,\%. The linewidth of \eq{5.31} is 341\,pm, almost the
+same as without the drop port (my arithmetic).}
 
-\trail{\cd{optics.py} \cd{_airy_line} 528--560, \cd{ring_lines_nb} 1029--1126; \cd{relations.py} 35--47. A TCMT
+\trail{\cd{optics.py} \cd{_airy_line} 528--560, \cd{ring_lines_nb} 1029--1126; \cd{relations.py} 35--45. A TCMT
 form (\texttt{fidelity.optics\_model: tcmt}, a sum over the 3 nearest orders) exists. g26 does not use it.}
 {$Q_L=3850$, $Q_i$ 7451--7543, $Q_t$ 7978--8084, $Q_d=5.5\times10^5$, $K_t^2$ 0.0940--0.0963, $K_d^2$
 0.00145--0.00147, $a=0.94784$, $\eta=0.848$, FWHM 336--341\,pm, $L=42.27\um$ ($R=6.727\um$), $n_g=3.94$,
-$T_{rt}=0.5556$\,ps. Under-coupled at the cold resonance: $t_1\approx0.952>t_2a\approx0.947$. The G25 device shows a
+$T_{rt}=0.5556$\,ps. Under-coupled at the cold resonance: $t_1=0.952>t_2a=0.947$. The G25 device shows a
 27.9\,dB notch at 0\,V.}
 {Q 3500, FWHM 374\,pm, $n_g$ 4.2, $R$ 6.3\um. The model uses 3850, the middle of 3500--4200.}
 
 \subsection{Where the resonance is: the phase model}
-Your master formula (5.32) says that a resonance moves by $(\lambda/n_g)\Delta n_{eff}$. The model computes this shift
-once per ring and tick, from the ring temperature $T$ and the junction voltage $V$ (\cd{phase.py} equation 1):
+Your shift formula $\Delta\lambda_r=(\lambda/n_g)\Delta n_{eff}$ \eq{5.32} moves a resonance. The model computes this
+shift once per ring and tick, from the ring temperature $T$ and the junction voltage $V$ (\cd{phase.py} equation 1,
+not in the textbook):
 \[
 \Delta\lambda(T,V)=s_0\Big[(T-T_{ref})+\tfrac{\beta}{2}\big((T-T_0)^2-(T_{ref}-T_0)^2\big)\Big]+\frac{\lambda_{res}}{n_g}\Big[f\,\Delta n_{eff}(V)-f\,\Delta n_{eff}(V_{ref})\Big].
 \]
-The first term is the heat (section~\ref{sec:to}). The second term is the junction (section~\ref{sec:mod}). Then the model moves the whole cold phase curve by that shift (a ``rigid comb''), and reads the phase at each laser
-line (equation 2):
+The first term is the heat (section~\ref{sec:to}). The second term is the junction (section~\ref{sec:mod}). The model
+then moves the whole cold phase curve by that shift. This is a ``rigid comb'': every order moves by the same amount.
+It reads the phase at each laser line (equation 2, not in the textbook):
 \begin{gather*}
 x=\lambda_l-\Delta\lambda,\qquad \Delta=x-\lambda_{res},\qquad
 n(x)=n_{eff}+(n_{eff}-n_g)\frac{\Delta}{\lambda_{res}}-\frac{n_g'\,\Delta^2}{2\lambda_{res}},\qquad \phi=\frac{2\pi\,n(x)\,L}{x}.
 \end{gather*}
-$\phi=2\pi m$ exactly when the shifted resonance reaches the line. Each ring is built 7.6\,nm blue of its own line,
-so $\lambda_{res}^{cold}=\lambda_{line}-\Delta\lambda_{off}$. The order is $m=\mathrm{round}(n_{eff}L/\lambda_{res})$.
-\cd{relations.py} (R3) then sets $n_{eff}^{ph}=m\lambda_{res}/L$, so the cold resonance sits exactly at the offset. The couplings are taken at the
-line, $K_j^2(\lambda_l)=K_{j,0}^2\exp[\partial_\lambda\ln K_j^2\,(\lambda_l-\lambda_{res})]$. So under lock the notch
-depth does not follow the heater code. The loss follows the junction and the temperature:
-$\alpha_i=[\alpha_{i,ref}+f\alpha_{fca}(V)-f\alpha_{fca}(V_{ref})]\,e^{c_R(T-T_{ref})+c_H(T_H-T_{ref})}$ and
-$\eta=\alpha_{heat}/\alpha_i$ (equation 5).
+\begin{itemize}
+  \item $\phi=2\pi m$ \eq{5.9} exactly when the shifted resonance reaches the line.
+  \item Each ring is built 7.6\,nm blue of its own line: $\lambda_{res}^{cold}=\lambda_{line}-\Delta\lambda_{off}$.
+  The heater must close this gap.
+  \item The order is $m=\mathrm{round}(n_{eff}L/\lambda_{res})$. R3 then sets $n_{eff}=m\lambda_{res}/L$, so the cold
+  resonance sits exactly at the offset.
+  \item The couplings are taken at the line: $K_j^2(\lambda_l)=K_{j,0}^2\exp[\partial_\lambda\ln K_j^2\,(\lambda_l-\lambda_{res})]$.
+  So under lock the dip depth does not change with the heater code.
+  \item The loss follows the junction:
+  $\alpha_i=[\alpha_{i,ref}+f\alpha_{fca}(V)-f\alpha_{fca}(V_{ref})]\,e^{c_R(T-T_{ref})+c_H(T_H-T_{ref})}$, and
+  $\eta=\alpha_{heat}/\alpha_i$ (equation 5). In g26 $c_R=c_H=0$.
+\end{itemize}
 
-\hard{The rigid comb moves every order by the same shift, so a heated ring keeps its cold FSR in wavelength. The
-locked order is exact. The adjacent orders are off by $\pm33$\,pm at the 7.6\,nm lock (KNOWN\_ISSUES item 15). This
-error reaches only the foreign-line terms.}
+\hard{The rigid comb keeps the cold FSR in wavelength when the ring heats. The locked order is exact. The adjacent
+orders are off by $\pm33$\,pm at the 7.6\,nm lock (KNOWN\_ISSUES item 15). This error reaches only the terms of the
+foreign lines.}
 
 \trail{\cd{phase.py} docstring 10--64, \cd{_fill_level} 248--275, \cd{coupling_row} 316--328; \cd{realize.py} line 1169 (cold resonance).}
 {Ring 0 on 1318.6\,nm \ldots\ ring 7 on 1302.6\,nm. Cold resonances 1311.0 \ldots\ 1295.0\,nm. $m=79$ (ring 7: 80).
-FSR 1.8\,THz = 10.19--10.44\,nm. $T_{ref}=25\degC$, $V_{ref}=0$\,V, $c_R=c_H=0$.}
+FSR 1.8\,THz $=$ 10.19--10.44\,nm at the lines. $T_{ref}=25\degC$, $V_{ref}=0$\,V.}
 {Keeps a measured FSR bound above 14.1\,nm. The model treats that bound as unsupported and uses the 1.8\,THz design value.}
 
 \subsection{Modulation: the PN junction and the two data levels}\label{sec:mod}
-Free carriers lower the silicon index and absorb light (the plasma-dispersion effect). A PN junction runs around a
-fraction $f$ of the ring. Reverse bias widens the depletion region and removes carriers. So $n_{eff}$ rises, the
-resonance moves red, and the loss falls. In an abrupt junction the depletion width, and so the removed charge, grows
-as $\sqrt{V+V_{bi}}$. So the model uses a square-root law. Here $m=0.5$ is the depletion exponent, not the resonance order:
+Free carriers lower the silicon index and absorb light (the plasma-dispersion effect, Ch06). A PN junction runs
+around a fraction $f$ of the ring. Reverse bias widens the depletion region (the zone with no free carriers). So
+$n_{eff}$ rises, the resonance moves red, and the loss falls. In an abrupt junction the depletion width grows as
+$\sqrt{V+V_{bi}}$, with $V_{bi}$ the built-in voltage. So the model uses a square-root law (not in the textbook). Here
+$m=0.5$ is the depletion exponent, not the resonance order:
 \begin{gather*}
 \Delta\lambda_J(V)=A\big[(V+V_{bi})^{m}-V_{bi}^{m}\big],\qquad A=\frac{\mathrm{eff}_0\,V_{bi}^{1-m}}{m},\qquad
 \frac{d\lambda}{dV}=A\,m\,(V+V_{bi})^{m-1},\\
 \Delta n_{eff}(V)=\frac{n_g}{\lambda}\,\Delta\lambda_{full}(V),\qquad \alpha_{fca}(V)=\alpha_0-\frac{4\pi q}{\lambda}\,\Delta n_{eff}(V).
 \end{gather*}
-Here $\mathrm{eff}_0$ is the shift per volt at 0\,V, $\alpha_0$ the free-carrier loss at 0\,V, and $q=\lambda\Delta\alpha/(4\pi\Delta n)$ the
-scaled ratio of loss change to index change. $\Delta\lambda_{full}=\Delta\lambda_J/f$ is the shift that a junction around the full ring
-would give. The code multiplies the index and loss change by $f$ again at run time. The data swings the junction
-between $V_0=V_b-V_{pp}/2$ and $V_1=V_b+V_{pp}/2$ (bias $V_b$, swing $V_{pp}$). Level 1 has the higher reverse
-voltage, so it is redder and has less loss. The ring is solved at both levels every tick. Every output is the
-average over the ones density $p_1$: $\bar X=p_1X(\phi_1,a_1,\eta_1)+(1-p_1)X(\phi_0,a_0,\eta_0)$.
+\begin{itemize}
+  \item $\mathrm{eff}_0$ is the shift per volt at 0\,V. $\alpha_0$ is the free-carrier loss at 0\,V.
+  \item $q=\lambda\Delta\alpha/(4\pi\Delta n)$ is the scaled ratio of loss change to index change.
+  \item $\Delta\lambda_{full}=\Delta\lambda_J/f$ is the shift of a junction around the full ring. The code multiplies
+  the index and loss change by $f$ again at run time.
+  \item The data swings the junction between $V_0=V_b-V_{pp}/2$ and $V_1=V_b+V_{pp}/2$ (bias $V_b$, swing $V_{pp}$).
+  Level 1 has the higher reverse voltage, so it is redder and has less loss.
+  \item The ring is solved at both levels every tick. Every output is the average over the ones density $p_1$:
+  $\bar X=p_1X(\phi_1,a_1,\eta_1)+(1-p_1)X(\phi_0,a_0,\eta_0)$.
+\end{itemize}
 
 \hard{Bias moves the ring in two ways at once. The index change moves it red. The loss change alters the absorbed
-heat, and that moves it back. At the g26 lock a 0.2\,V bias step moves the resonance only 0.1--0.5\,pm, against
-about 10\,pm from the index law alone. This is an open physics check. Data also heats each ring by about 2\,K
-(junction charging and the driver), so traffic start, stop and squelch are thermal steps.}
+heat, and that moves it back. At the g26 lock a 0.2\,V bias step moves the resonance only 0.1--0.5\,pm. The index
+law alone gives about 10\,pm. This is an open physics check. Data also heats each ring by about 2\,K (junction
+charging and the driver). So traffic start, traffic stop and squelch (driver off) are thermal steps.}
 
 \trail{\cd{electrical.py} \cd{depletion_shift_m} 1491--1505, \cd{analytic_junction_table_from_ring} 1540--1568,
 \cd{nrz_levels_row} 649--684, \cd{data_activity_heat_row} 879--911. \cd{materials.py} \cd{plasma_dispersion}
-680--715 is used offline only.}
-{$\mathrm{eff}_0=72.5$\,pm/V at 0\,V, about 32\,pm/V at 3.75\,V. $A=137.6$\,pm/V$^{1/2}$, $V_{bi}=0.9$\,V, $f=0.8$,
-$q=0.06$. Bias 1.05\,V, swing 1.3\,Vpp, so $V_0=0.40$\,V and $V_1=1.70$\,V. By the index law the two levels sit
-about 65\,pm apart (my arithmetic).}
+680--704 is used offline only.}
+{$A=137.6$\,pm/V$^{1/2}$, $V_{bi}=0.9$\,V, $f=0.8$, $q=0.06$. So $\mathrm{eff}_0=Am\,V_{bi}^{m-1}=68.8/0.949=72.5$\,pm/V
+at 0\,V, and $68.8/\sqrt{4.65}=32$\,pm/V at 3.75\,V. Bias 1.05\,V, swing 1.3\,Vpp, so $V_0=0.40$\,V and $V_1=1.70$\,V.
+The two levels sit $137.6\times(\sqrt{2.6}-\sqrt{1.3})=65$\,pm apart by the index law (my arithmetic).}
 {Interpolates the G25 bias ladder up to 1.6\,V and lists a flat 50\,pm/V. Lists 0.9\,Vpp as the bench swing. The
 model reads 0.9\,V as the pattern-generator swing and uses 1.3\,V. No absorbed-heat term in the bias shift.}
 
 \subsection{OMA and relOMA}
 The receiver decides between the two data levels. So the useful signal is the difference of the two through powers,
-the optical modulation amplitude (OMA):
+the OMA (none of these equations is in the textbook):
 \begin{gather*}
 \mathrm{relOMA}=\frac{|P_{thru,1}-P_{thru,0}|}{P_{in}},\qquad \mathrm{OMA}_{bus}=|P_{out,1}-P_{out,0}|,\\
-\mathrm{BER}=\tfrac12\,\mathrm{erfc}\!\big(Q/\sqrt2\big),\qquad Q=q_{ref}\,\mathrm{OMA}_{rx}/\mathrm{OMA}_{sens}.
+\mathrm{BER}=\tfrac12\,\mathrm{erfc}\!\big(Q/\sqrt2\big),\quad Q=q_{ref}\,\mathrm{OMA}_{rx}/\mathrm{OMA}_{sens}.
 \end{gather*}
-Here $q_{ref}$ is the Q-factor at the receiver sensitivity $\mathrm{OMA}_{sens}$. For a small level separation, the
-OMA is about $P_{in}\,|dT/d\lambda|$ times the separation. So the OMA follows the slope of the notch at the operating
-point, not the depth of the notch.
+Here $Q$ is the receiver's signal-to-noise measure, not the ring's Q. $q_{ref}$ is its value at the receiver
+sensitivity $\mathrm{OMA}_{sens}$. For a small level separation, the OMA is about $P_{in}\,|dT/d\lambda|$ times the
+separation. So the OMA follows the slope of the dip at the operating point, not the depth of the dip.
 
-\hard{A deep notch (large extinction ratio) does not give a large OMA. To see this, sketch the notch and project the
-two resonance positions onto it. At the notch bottom the two powers are almost equal.}
+\hard{A deep dip (large extinction ratio) does not give a large OMA. Sketch the dip and mark the two resonance
+positions on it. At the bottom of the dip the two powers are almost equal.}
 
 \trail{\cd{kernel.py} \cd{_truth_a} 1328--1334 (relOMA), 2276--2278 (bus OMA and BER); \cd{datapath.py} \cd{ber_from_oma} 185--193.}
 {About $-6.1$\,dB at the lock (CAL-14: $-6.07$\,dB), against the printed $-2.1$\,dB. This target fails (KNOWN\_ISSUES
@@ -372,30 +707,30 @@ the gap. That reading is the open question Q4.}
 its own line (07 D9).}
 
 \subsection{The operating point: a side-of-fringe lock}
-For a Lorentzian notch, the slope $|dT/d\lambda|$ is largest at a distance $\mathrm{FWHM}/(2\sqrt3)$ from the
+For a Lorentzian dip, the slope $|dT/d\lambda|$ is largest at a distance $\mathrm{FWHM}/(2\sqrt3)$ from the
 resonance, about 0.29 FWHM. The OMA is largest there. Near that point the OMA loss grows as the square of the lock
 error. The monitor also gives a signed error on one flank. So the lock point is a set-point on a flank, not the
-resonance. \texttt{pi\_lock} sets its target at a fraction $f$ of the measured drop peak. For a pure Lorentzian
-that puts the ring at
+resonance. \texttt{pi\_lock} sets its target at a fraction $f$ of the measured drop peak. For a pure Lorentzian that
+puts the ring at (not in the textbook)
 \[
 d_{set}\approx w\sqrt{1/f-1}\qquad(w=\mathrm{HWHM}).
 \]
 The oracle (section~\ref{sec:score}) finds the exact optimum with the exact ring, the bus, both levels and self-heating.
 
-\hard{Both flanks give almost the same OMA: the best point on the blue side has 92--94\,\% of the best OMA. Only the
-red side ($d>0$) is stable with self-heating (sections~\ref{sec:sh} and~\ref{sec:bist}). Use $\mathrm{FWHM}/(2\sqrt3)$ as the first
-estimate and the oracle as the exact answer.}
+\hard{Both flanks give almost the same OMA. The best point on the blue side has 92--94\,\% of the best OMA. Only the
+red side ($d>0$) is stable with self-heating (sections~\ref{sec:sh} and~\ref{sec:bist}). Use $\mathrm{FWHM}/(2\sqrt3)$
+as the first estimate and the oracle as the exact answer.}
 
-\trail{\cd{oracle.py} docstring 13--22; \cd{pi_lock.py} docstring ``Which side, and why'' 8--22.}
-{Oracle optimum $d=+103$ to $+105$\,pm. $\mathrm{FWHM}/(2\sqrt3)\approx98$\,pm (my arithmetic). \texttt{pi\_lock}
-uses $f=0.7$, so $d_{set}\approx0.65w\approx110$\,pm. The settled warm start sits at $+97$ to $+121$\,pm. The 5\,pm
-lock budget is 1.5\,\% of a linewidth.}
+\trail{\cd{oracle.py} docstring 13--22; \cd{pi_lock.py} docstring ``Which side, and why'' 8--17.}
+{Oracle optimum $d=+103$ to $+105$\,pm. $\mathrm{FWHM}/(2\sqrt3)=340.5/3.46=98$\,pm (my arithmetic). \texttt{pi\_lock}
+uses $f=0.7$, so $d_{set}=w\sqrt{1/0.7-1}=0.65w=0.65\times170=111$\,pm. The settled warm start sits at $+97$ to
+$+121$\,pm. The 5\,pm lock budget is $5/340=1.5$\,\% of a linewidth.}
 {$\delta_{opt}=374/(2\sqrt3)\approx108$\,pm, from its unverified Q.}
 
 \subsection{WDM: eight rings on one bus}
 Eight lines share one bus, at $f_k=f_c+(k-\tfrac{L-1}{2})\Delta f$ and $\lambda_k=c/f_k$. Light meets ring 0 first.
 Each ring sees the averaged through power of the rings before it, times the loss of the bus segment. Lines add as
-powers, because different frequencies do not interfere:
+powers, because different frequencies do not interfere (not in the textbook):
 \[
 P_{in,k,l}=P_{chip,l}\;t^2_{seg,k}\prod_{j\ \text{before}\ k}t^2_{seg,j}\,\bar T_{j,l},\qquad
 P_{drop,k}=\sum_{l}\bar D_{k,l}\,P_{in,k,l},\qquad P_{abs,k}=\sum_l \overline{\eta\mathcal{L}}_{k,l}\,P_{in,k,l}.
@@ -404,73 +739,79 @@ Every ring absorbs and drops all 8 lines. So each monitor sees a small backgroun
 engine this bus walk runs inside the self-heating solve, ring by ring in bus order.
 
 \hard{The ring comb (one FSR, about 10.3\,nm) and the line comb (2.29\,nm) have different periods. A cold ring sits
-7.6\,nm blue of its own line, which is about 2 FWHM blue of line $n+3$. A heater ramp from cold crosses foreign lines.
+7.6\,nm blue of its own line, about 2 FWHM blue of line $n+3$. A heater ramp from cold crosses foreign lines.
 Self-heating can capture the ring on one of them. A single-ring loop cannot see the difference. A supervisor
-(\texttt{wdm\_supervisor}) assigns the lines at start-up. To see it, draw both combs and slide the ring comb red from
-7.6\,nm blue.}
+(\texttt{wdm\_supervisor}) assigns the lines at start-up. To see it, draw both combs and slide the ring comb red
+from 7.6\,nm blue.}
 
 \trail{\cd{realize.py} \cd{line_frequencies_hz} 578--592; \cd{phase.py} \cd{bus_t2_from_plant_params} 184--200;
 \cd{optics.py} docstring ``Bus'' 91--108, \cd{selfheat_commit} 1527--1557; \cd{kernel.py} wrong-line block 1348--1374.}
-{Line 0 is the lowest frequency (1318.6\,nm). Ring $k$ on line $k$. Segment transmission 0.99916, so ring 7 gets
+{Line 0 has the lowest frequency (1318.6\,nm). Ring $k$ is on line $k$. Segment transmission 0.99916, so ring 7 gets
 0.59\,\% less light than ring 0. $+4$\,dBm per line at ring 0 (10\,dBm at the laser module, less 6\,dB chip input
-loss). The next order sits 2.8--3.0 FWHM from a line. Above about 113\degC{} ambient a ring needs one more FSR of heating.}
+loss). The next order sits 2.8--3.0 FWHM from a line. Above about 113\degC{} ambient a ring needs one more FSR of
+heating.}
 {Ch07 sizes the heater for a generic 4.5\,nm blue offset. It also quotes Lightmatter's measured 7.6\,nm, which the
 model uses. 14\,dBm per line at the laser, against 10\,dBm. Both give $+4$\,dBm at the ring.}
 
 \subsection{The thermo-optic shift}\label{sec:to}
-Heat raises the silicon index, so the resonance moves red. Your master formula with $\partial n_{eff}/\partial T$ and
-the thermal expansion $\alpha_L$ gives the slope $s=d\lambda_r/dT$. The slope grows with temperature. The ring locks
-at the temperature where the integral of $s$ equals the built-in offset:
+Heat raises the silicon index, so the resonance moves red (Ch09). Your shift formula \eq{5.32} with
+$\partial n_{eff}/\partial T$ and the thermal expansion $\alpha_L$ of the ring gives the slope $s=d\lambda_r/dT$. The
+slope grows with temperature. The ring locks at the temperature where the integral of $s$ equals the built-in offset
+(not in the textbook):
 \[
 s(T)=\frac{\lambda}{n_g}\Big(\frac{\partial n_{eff}}{\partial T}+n_{eff}\,\alpha_L\Big)=s_0\big[1+\beta(T-T_0)\big],\qquad
 \int_{T_{ref}}^{T_{lock}}s(T)\,dT=\Delta\lambda_{off}\ (\mathrm{mod}\ \mathrm{FSR}_\lambda).
 \]
+Check at 25\degC{} (my arithmetic): $s_0=(1311\,\mathrm{nm}/3.94)\times(1.88\times10^{-4}+2.45\times3\times10^{-6})=332.7\,\mathrm{nm}\times1.95\times10^{-4}=65$\,pm/K.
 Each tick, the code expands the same law about the previous ring temperature (\cd{local_thermo_optic}). The
 self-heating solve then uses the exact local slope.
 
 \trail{\cd{relations.py} R1 22--24; \cd{phase.py} \cd{thermal_shift_m} 203--206, \cd{local_thermo_optic} 209--215; \cd{optics.py} \cd{_sh_prepare} 1486--1504.}
-{$s_0=65.075$\,pm/K at 25\degC, 73.89\,pm/K at the lock, $\beta=1.2377\times10^{-3}$/K. Lock at 134.38\degC{}
-(about 109\,K of heating) at 25\degC{} ambient. One world uses one $s$ law for every ring. World H86 (86\,pm/K,
-constant): \texttt{--alt uncertainty.thermo\_optic=H86}.}
+{$s_0=65.075$\,pm/K at 25\degC, $\beta=1.2377\times10^{-3}$/K, so $s=65.075\times(1+1.2377\times10^{-3}\times109.4)=73.89$\,pm/K
+at the lock. Lock at 134.38\degC{} (about 109\,K of heating) at 25\degC{} ambient. One world uses one $s$ law for
+every ring. World H86 (86\,pm/K, constant): \texttt{--alt uncertainty.thermo\_optic=H86}.}
 {86\,pm/K held constant, and $dn_{Si}/dT=1.86\times10^{-4}$/K (a C-band value). The model uses its 1310\,nm solver value.}
 
 \subsection{Self-heating: an inner feedback loop}\label{sec:sh}
-The ring loses part of the circulating light, and the fraction $\eta$ of that loss heats the ring. The absorbed power
-peaks near resonance, like the drop curve. Heat moves the resonance red, and that changes the absorbed power again.
-Treat this as an inner proportional loop around the ring temperature. The self-heating gain $G_{sh}$ converts
-absorbed power to resonance shift. $Z_0$ is the thermal resistance from the heater to its ring (K/mW). The factor $z$
-says that one milliwatt of absorbed light heats the ring $z$ times more than one milliwatt of heater power. Let $u$ be
-the detuning that the heater alone would give:
+Section~\ref{sec:newton} gave the idea. Here is the loop view (Ch10). The absorbed power peaks near resonance, like
+the drop curve. Heat moves the resonance red, and that changes the absorbed power again. Treat this as an inner
+proportional loop around the ring temperature (none of these equations is in the textbook):
+\begin{itemize}
+  \item $Z_0$ is the DC thermal resistance from the heater to its ring (K/mW).
+  \item $z$ says that one milliwatt of absorbed light heats the ring $z$ times more than one milliwatt of heater power.
+  \item The self-heating gain $G_{sh}$ converts absorbed power to resonance shift.
+  \item $u$ is the detuning that the heater alone would give.
+\end{itemize}
 \[
-G_{sh}=s(T)\,Z_{opt},\quad Z_{opt}=z\,Z_0;\qquad \text{stable iff } G_{sh}\,\frac{\partial P_{abs}}{\partial\lambda_{res}}<1;\qquad
+G_{sh}=s(T)\,Z_{opt},\quad Z_{opt}=z\,Z_0;\qquad \text{stable if and only if } G_{sh}\,\frac{\partial P_{abs}}{\partial\lambda_{res}}<1;\qquad
 \frac{dd}{du}=\frac{1}{1+G_{sh}\,|P_{abs}'|}\ \ (\text{red side}).
 \]
-On the red side ($d>0$), heat moves the resonance away from the laser, so $P_{abs}$ falls and opposes the heat. This
-is negative feedback. The relief $1+G_{sh}|P_{abs}'|$ divides the effect of the heater and of every other
-disturbance. On the blue side the feedback is positive. The code solves the loop implicitly, ring by ring in bus
-order, with Newton from the previous root:
+On the red side ($d>0$), heat moves the resonance away from the laser. So $P_{abs}$ falls and opposes the heat. This
+is negative feedback. The \emph{relief} $1+G_{sh}|P_{abs}'|$ divides the effect of the heater and of every other
+disturbance. On the blue side the feedback is positive. The code solves the loop implicitly, with the Newton solve of
+section~\ref{sec:newton}:
 \[
 F(T_k)=T_k-T_k^{other}-g_k\,P_{abs,k}(T_k)=0,\qquad g_k=\sum_j(1-a_j)\,r_j^{opt},\quad a_j=e^{-h/\tau_j}.
 \]
-An explicit update (with the previous tick's $P_{abs}$) oscillates with period 2 at 1\us{} steps, so the code does
-not use one. A start from the previous root keeps the ring on its own branch.
+An explicit update (with the previous tick's $P_{abs}$) oscillates with a period of 2 ticks at 1\us{} steps. So the
+code does not use one. A start from the previous root keeps the ring on its own branch.
 
-\hard{The plant you control is the ring with the light on. At the g26 lock its heater gain is the dark gain divided by
-3 to 7, and its response is faster. A controller tuned on the dark ring has the wrong gain.}
+\hard{The plant that you control is the ring with the light on. At the g26 lock its heater gain is the dark gain
+divided by 3 to 7, and its response is faster. A controller tuned on the dark ring has the wrong gain.}
 
 \trail{\cd{selfheat.py} docstring 1--42, \cd{solve_ring_temperature} 73--162, \cd{implicit_step_b} 174--289;
-\cd{kernel.py} \cd{_implicit_step_eng} 902--1032 (a mirror: edit both or the parity test fails).}
-{$\eta=0.848$, $z=1.76$, $G_{sh}=741.8$\,pm/mW ($=1.76\times5.704$\,K/mW$\times73.89$\,pm/K), $P_{abs,peak}\approx2.09$\,mW
-per ring. At the oracle target $G_{sh}\,\partial P_{abs}/\partial\lambda_{res}=-4.7$ to $-5.4$, so the relief is 5.7 to
-6.4 (my arithmetic). About 43\,\% of the optical heat arrives with a 0.4\us{} pole.}
-{$\eta=0.3$ and one thermal resistance for heater and light ($z=1$), so it finds only a halving of the heater gain.
+\cd{kernel.py} \cd{_implicit_step_eng} 902--1032 (a copy: edit both, or the parity test fails).}
+{$\eta=0.848$, $z=1.76$, $Z_0=5.704$\,K/mW, $G_{sh}=1.76\times5.704\,\mathrm{K/mW}\times73.89\,\mathrm{pm/K}=741.8$\,pm/mW,
+$P_{abs,peak}\approx2.09$\,mW per ring. At the oracle target $G_{sh}\,\partial P_{abs}/\partial\lambda_{res}=-4.7$ to
+$-5.4$, so the relief is $1+4.7=5.7$ to $6.4$. Of the light's heat, 43\,\% arrives with a 0.4\us{} pole.}
+{$\eta=0.3$ and one thermal resistance for heater and light ($z=1$). So it finds only a halving of the heater gain.
 The stress world: \texttt{--alt uncertainty.self\_heating.eta=stress\_0p3}.}
 
 \subsection{Bistability: two branches and a fold}\label{sec:bist}
-When the thermal pull is strong, one heater code gives three self-consistent resonance positions. The middle one is
-unstable. The outer two form a hot branch and a cold branch. A ring stays on its branch until the branch ends at a
-fold, and then it jumps to the other branch. Use the normalized detuning $y=(\lambda_r-\lambda_L)/\mathrm{HWHM}$ and
-the pull $A=G_{sh}\,P_{abs,peak}/\mathrm{HWHM}$:
+When the thermal pull is strong, one heater code gives three self-consistent resonance positions (Ch10). The middle
+one is unstable. The outer two form a hot branch and a cold branch. A ring stays on its branch until the branch ends
+at a fold. Then it jumps to the other branch. Use the normalized detuning $y=(\lambda_r-\lambda_L)/\mathrm{HWHM}$ and
+the pull $A=G_{sh}\,P_{abs,peak}/\mathrm{HWHM}$ (not in the textbook):
 \[
 r_{bist}=\frac{G_{sh}\,P_{abs,peak}}{(4\sqrt3/9)\,\mathrm{FWHM}}>1\ \Rightarrow\ \text{bistable};\qquad
 \text{folds: } (1+y^2)^2+2Ay=0.
@@ -479,165 +820,183 @@ To see it, plot the self-heating shift $A/(1+y^2)$ against $y$, and draw the hea
 one state. Three crossings give bistability. The direction of approach picks the branch.
 
 \hard{The drop peak looks like the best place to lock. In g26 the fold is only about 9\,pm blue of the drop peak. A
-small push or probe from the peak crosses the fold. The ring then jumps about 1.5\,nm blue. The peak-seeking
-controllers stop at the peak, next to the fold, at about 13\,dB OMA penalty.}
+small push from the peak crosses the fold. The ring then jumps about 1.5\,nm blue. The peak-seeking controllers stop
+at the peak, next to the fold, at about 13\,dB OMA penalty.}
 
 \trail{\cd{selfheat.py} \cd{lorentzian_folds} 463--478, \cd{bistability_ratio} 487--489; start protocols
 \texttt{branch\_low}, \texttt{branch\_high}, \texttt{laser\_ramp} in \cd{docs/ENGINE.md} section 3.}
-{$r_{bist}=5.93$--5.98 at $+4$\,dBm (\texttt{mrm params explain g26 bistability\_ratio}).}
+{$r_{bist}=741.8\times2.097/(0.770\times340.5)=5.93$ for ring 0, 5.93--5.98 over the bank at $+4$\,dBm
+(\texttt{mrm params explain g26 bistability\_ratio}).}
 {A much weaker pull ($\eta=0.3$, $z=1$).}
 
 \subsection{The heater law}
 A 16-bit voltage DAC drives each heater. So $P=V^2/R$, and the gain per code grows with the code. The resistance
 rises with the heater temperature (TCR), and that makes the gain droop at high drive. The code solves this inside
-the tick, with $T_H=t_{pre}+g_{self}P$. Here $t_{pre}$ is the heater temperature without the power of this tick, and
-$g_{self}$ (K/W) is the rise that this tick's own power gives:
+the tick, with $T_H=t_{pre}+g_{self}P$. Here $t_{pre}$ is the heater temperature without this tick's power.
+$g_{self}$ (K/W) gives the rise from this tick's own power (not in the textbook):
 \begin{gather*}
 u=\frac{\mathrm{code}}{2^{16}-1},\qquad V=u\,V_{FS},\qquad R=R_0\big[1+\alpha_{TCR}(T_H-T_0)\big],\\
 P=\frac{2V^2}{r_o+\sqrt{r_o^2+4kV^2}},\qquad r_o=R_0\big[1+\alpha_{TCR}(t_{pre}-T_0)\big],\qquad k=R_0\,\alpha_{TCR}\,g_{self}.
 \end{gather*}
 With $g_{self}=R_{th,H}$ and $t_{pre}=T_0$ this is the static law $P(1+yP)=V^2/R_0$, $y=\alpha_{TCR}R_{th,H}$. All
 heaters share one supply. Above its limit one droop factor scales every heater:
-$s=\min(1,\sqrt{P_{max}/\sum P},\,I_{max}/\sum I)$ and $P\to s^2P$ (here $s$ is the droop factor, not the
-thermo-optic slope). The tuning efficiency is $\eta_H=\mathrm{FSR}_\lambda/P_{FSR}$.
+$s=\min(1,\sqrt{P_{max}/\sum P},\,I_{max}/\sum I)$ and $P\to s^2P$. Here $s$ is the droop factor, not the
+thermo-optic slope. The tuning efficiency is $\eta_H=\mathrm{FSR}_\lambda/P_{FSR}$.
 
 \hard{A heater can only heat. Code 0 is zero heat. If a disturbance heats the ring more than the heater's share of
-the lock temperature, no controller can cancel it. This limit is ``heater authority''. For a design, linearize about
-the operating code with $dP/d\mathrm{code}\approx2P/\mathrm{code}$, and schedule the gain as
-$1/\mathrm{code}$ (the $\sigma(u)$ of \texttt{pi\_lock}).}
+the lock temperature, no controller can cancel it. This is the limit of heater authority. For a design, linearize
+about the operating code with $dP/d\mathrm{code}\approx2P/\mathrm{code}$. Schedule the gain as $1/\mathrm{code}$
+(the $\sigma(u)$ of \texttt{pi\_lock}).}
 
 \trail{\cd{electrical.py} docstring 1--43 (actuator path), \cd{dac_frac} 119--140, \cd{heater_power_row} 374--479,
 \cd{supply_limit_row} 482--509; \cd{kernel.py} 2156--2217.}
-{$V_{FS}=1.6$\,V (assumed), $R_0=45.41\,\Omega$, $\alpha_{TCR}=1.4\times10^{-3}$/K, $P_{FSR}=25.45$\,mW, so
-$\eta_H=0.4046$\,nm/mW and $Z_0=5.704$\,K/mW. $y=0.00904$/mW. Full scale about 41\,mW (about 1.6 FSR). Dark gain
-about 0.18\,pm/code at a quarter of full scale and 0.54 at three quarters. Ring 0 uses about 14\,mW at the lock
-(about 81\,K of its 109\,K). DAC latency 1\us. Supply limit 0.2\,W and 0.15\,A (assumed). It binds in about 1/3 of
-the sampled worlds.}
+{$V_{FS}=1.6$\,V (assumed), $R_0=45.41\,\Omega$, $\alpha_{TCR}=1.4\times10^{-3}$/K, $P_{FSR}=25.45$\,mW. So
+$\eta_H=10.30\,\mathrm{nm}/25.45\,\mathrm{mW}=0.4046$\,nm/mW, and $Z_0=5.704$\,K/mW. $y=0.00904$/mW. Full scale:
+$V^2/R_0=56.4$\,mW, and $P(1+yP)=56.4$ gives 41\,mW (about 1.6 FSR). Dark gain 0.18\,pm/code at a quarter of full
+scale and 0.54 at three quarters (\texttt{heater\_pm\_per\_code}). Ring 0 uses about 14\,mW at the lock. DAC latency
+1\us. Supply limit 0.2\,W and 0.15\,A (assumed). It binds in about 1/3 of the sampled worlds.}
 {TCR $10^{-3}$/K on the heater's own heat only, 4.7\,K/mW. Its 19\,500--49\,300 codes are one G26 test, not the DAC range.}
 
 \subsection{Thermal dynamics and crosstalk}
-Heat flow obeys the same equations as an RC network: power is the current, temperature rise is the voltage. The model
-writes every path from a heat source to an observer as a Foster sum of first-order poles. Each pole is one lag. The
-code advances each lag exactly over a step $h$, for a held input (ZOH, $u_0=u_1$) or a linear one (FOH):
+Heat flow obeys the same equations as an RC network. Power is the current, and temperature rise is the voltage. The
+model writes every path from a heat source to an observer (a point whose temperature it tracks) as a Foster sum of
+poles. Each pole is one RC lag. The code advances each lag exactly over a step $h$, for a held input (ZOH,
+$u_0=u_1$) or a linear one (FOH). None of this is in the textbook:
 \[
 Z(s)=\sum_k\frac{r_k}{1+s\tau_k},\qquad
 x_m\leftarrow a_mx_m+r_m\big(b_0u_0+b_1u_1\big),\quad a=e^{-h/\tau},\ b_1=1-\frac{1-a}{h/\tau},\ b_0=\frac{1-a}{h/\tau}-a.
 \]
-The heater reaches its own ring through three poles,
-$Z_{RH}(s)=Z_0\big[\frac{f_F}{1+s\tau_F}+\frac{1-f_F-f_T}{1+s\tau_S}+\frac{f_T}{1+s\tau_T}\big]$. The absorbed light
-uses $Z_{RR}$, which is $z$ times larger and has an extra fast pole. Ring-to-ring crosstalk is one pole per pair,
-$cZ_0/(1+s\tau_{xt}(d))$, and it is slower for a larger distance. PDs, the die sensor and the aggressor use the same
-distance laws.
+\begin{itemize}
+  \item The heater reaches its own ring through three poles:
+  $Z_{RH}(s)=Z_0\big[\frac{f_F}{1+s\tau_F}+\frac{1-f_F-f_T}{1+s\tau_S}+\frac{f_T}{1+s\tau_T}\big]$.
+  \item The absorbed light uses $Z_{RR}$. It is $z$ times larger and has an extra fast pole.
+  \item Ring-to-ring crosstalk is one pole per pair, $cZ_0/(1+s\tau_{xt}(d))$. It is slower for a larger distance $d$.
+  \item PDs, the die temperature sensor and the aggressor use the same distance laws.
+\end{itemize}
 
-\hard{There is no single thermal time constant. Read the step response as a sum of exponentials, and read its Bode
-phase near your crossover. The crosstalk in g26 is weak and slow, so it acts like a slow disturbance, not a fast
-coupling between loops.}
+\hard{There is no single thermal time constant. Read the step response as a sum of exponentials. Read its Bode phase
+near your crossover frequency. The crosstalk in g26 is weak and slow. So it acts like a slow disturbance, not like a
+fast coupling between the loops.}
 
 \trail{\cd{thermal.py} docstring 1--55, \cd{foh_scalar} 140--162, \cd{InterimRom} 736--820,
 \cd{crosstalk_tau_s} 823--851, \cd{site_fraction} 854--862, \cd{_interim_lags} 1122--1205.}
-{Heater to own ring: 41\,\% at 3.18\us, 54\,\% at 13.0\us, 5\,\% at 3\,ms. Light: $1.76Z_0$, 43\,\% at 0.4\us.
-Nearest neighbour 3\,\% with a 1.52\,ms pole, others 1.5\,\%. Own PD 0.38\,ms. Aggressor to ring 0: 6\,\% of $Z_0$,
-0.62\,ms. Die sensor at 1\,mm: 1.5\,\%, about 9\,ms. These are imec numbers, not G26 numbers. The G26 package is
-unknown: corner \texttt{g26\_tec\_package} gives 1.0\,\% nearest in 0.12\,ms.}
+{Heater to own ring: 41\,\% at 3.18\us, 54\,\% at 13.0\us, 5\,\% at 3\,ms. Light: $1.76Z_0=10.0$\,K/mW, 43\,\% at
+0.4\us. Nearest neighbour 3\,\% with a 1.52\,ms pole, others 1.5\,\%. Own PD 0.38\,ms. Aggressor to ring 0: 6\,\% of
+$Z_0$, 0.62\,ms. Die sensor at 1\,mm: 1.5\,\%, about 9\,ms. These are imec numbers, not G26 numbers. The G26 package
+is unknown. Corner \texttt{g26\_tec\_package} gives 1.0\,\% nearest in 0.12\,ms.}
 {10\us{} (75\,\%) + 300\us{} (25\,\%), 10\,\% and 3\,\% crosstalk at the speed of the own heater. Corner
 \texttt{g26\_textbook\_thermal} runs that network.}
 
 \subsection{The aggressor (scenario A1)}
 The aggressor is an on-die heater next to ring 0. Lightmatter drives it as the design-case disturbance. The model
-injects its power at a layout site, so ring 0, the other rings, the PDs and the die sensor each see it through their
-own thermal path. Before the run, the code solves for the non-negative power waveform that makes ring 0 follow the
-published trajectory:
+injects its power at a layout site. So ring 0, the other rings, the PDs and the die sensor each see it through their
+own heat path. Before the run, the code solves for the non-negative power waveform that makes ring 0 follow the
+published curve (not in the textbook):
 \begin{gather*}
 T_{A1}(t)=113.6-88.5\,\big|\sin(\pi t/P)\big|\ {}^{\circ}\mathrm{C},\qquad P=130.7\ \mathrm{ms},\qquad
-\max|\dot T|=\frac{\pi\,\Delta T}{P}=2127\ \mathrm{K/s},\\
+\max|\dot T|=\frac{\pi\,\Delta T}{P}=\frac{\pi\times88.5}{0.1307}=2127\ \mathrm{K/s},\\
 \Delta\lambda_{tgt}(t)=s_{ref}\big(T_p(t)-T_{base}\big),\qquad s_{ref}=15\ \mathrm{GHz/K}\cdot\frac{\lambda^2}{c}=85.86\ \mathrm{pm/K}.
 \end{gather*}
 With the default ``resonance'' referencing, the printed $^\circ$C become a resonance target. The code then applies
 the model's own $s(T)$ once, to convert that target into a ring temperature rise.
 
-\hard{The swing is about 7.6\,nm of resonance. Ring 0's heater share of its lock is about 81\,K, roughly 6\,nm. So
-at the hot cusp ring 0's heater reaches code 0 and stays there for about 15\,ms, whatever the loop does. To see it,
-compare the disturbance swing in pm with the heater range in pm. The remainder is about 1.6\,nm (my arithmetic). The ring
-does not move by all of it. It moves red, absorbs less light and cools (section~\ref{sec:sh}). So it leaves
-its point by about 0.45\,nm.}
+\hard{The swing is $88.5\,\mathrm{K}\times85.86\,\mathrm{pm/K}=7.6$\,nm of resonance. Ring 0's heater supplies about
+81\,K of its lock temperature (KNOWN\_ISSUES item 38), roughly 6\,nm. So at the hot end of A1 ring 0's heater reaches
+code 0 and stays there for about 15\,ms, whatever the loop does. To see it, compare the disturbance swing in pm with
+the heater range in pm. The ring does not move by the full remainder: it moves red, absorbs less light and cools
+(section~\ref{sec:sh}). It leaves its point by 454--473\,pm.}
 
 \trail{\cd{scenarios/library.py} \cd{a1_slide10_aggressor} 139--189; \cd{scenarios/calibrate.py} docstring 1--38,
 \cd{calibrate_aggressor_power} 517--629; \cd{experiments/examples/a1_pi_lock.yaml}.}
 {Peak rate 2127\,K/s, mean rate 1354\,K/s. Peak target rate about 183\,pm/ms at ring 0. Site 30\um{} from ring 0 and
-55\um{} from PD0 (assumed). Ring 0 leaves its point by 454--473\,pm with every controller tried (KNOWN\_ISSUES item 38). Rings 1--7 stay
-within about 15\,pm (\texttt{pi\_lock}: ring 4 14.7\,pm, ring 5 6.4\,pm, the others within 2.5\,pm).}
-{Injects the swing as a temperature at the ring node only, so nothing else on the die feels it. Rate $-2300$ to $+2200\degC$/s (read from a figure).}
+55\um{} from PD0 (assumed). Ring 0 leaves its point by 454--473\,pm with every controller tried (KNOWN\_ISSUES item
+38). Rings 1--7 stay within about 15\,pm (\texttt{pi\_lock}: ring 4 14.7\,pm, ring 5 6.4\,pm, the others within 2.5\,pm).}
+{Injects the swing as a temperature at the ring only, so nothing else on the die feels it. Rate $-2300$ to $+2200\degC$/s (read from a figure).}
 
 \subsection{The monitor and the ADC: what a code means}
 Each ring has a germanium PD on its drop port. The controller never sees the current. It sees 16-bit codes. The PD
-current, plus a dark current that grows with the PD temperature, is integrated over a window $W$. One noise sample of
-exact variance is added, and the ADC converts the mean:
+current, plus a dark current that grows with the PD temperature, is integrated over a window $W$. One noise sample
+with the exact variance is added, and the ADC converts the mean (not in the textbook):
 \[
 i_{sig}=g_s\,\mathcal{R}\,(P_{drop}+f_{bg}P_{bus}),\qquad
 \bar x=\frac{1}{W}\sum_{k\in(s-W,s]}(i_{sig}+i_d)+\sigma \xi,\qquad \sigma^2=\frac{S}{2T_W},\qquad
 \mathrm{LSB}=\frac{I_{FS}}{2^{16}-1}.
 \]
-Here $g_s$ is the monitor gain scale and $f_{bg}$ the background fraction (0 in g26). $W$ is the window in ticks
-($T_W$ in seconds) and $s$ the sample tick. $S=2q(i_{sig}+i_d)+S_{TIA}$ is the one-sided noise density, with $q$ the
-electron charge. $\xi$ is one draw from a unit normal distribution. The drop reading peaks at the resonance and is
-even in detuning. On one known flank the level gives the direction.
-On the red lock side, more heater moves the resonance further red, so the code falls ($dy/du<0$).
+\begin{itemize}
+  \item $g_s$ is the monitor gain scale. $\mathcal{R}$ is the responsivity (A/W). $f_{bg}$ is the background fraction
+  (0 in g26).
+  \item $W$ is the window in ticks ($T_W$ in seconds). $s$ is the sample tick.
+  \item $S=2q(i_{sig}+i_d)+S_{TIA}$ is the one-sided noise density. $q$ is the electron charge. $S_{TIA}$ is the noise
+  of the amplifier (TIA, transimpedance amplifier) after the PD.
+  \item $\xi$ is one draw from a unit normal distribution. The LSB is the current of one code.
+\end{itemize}
+The drop reading peaks at the resonance and is even in detuning. On one known flank the level gives the direction. On
+the red lock side, more heater moves the resonance further red, so the code falls ($dy/du<0$).
 
-\hard{Noise is not the limit. Shot noise in one 2\us{} sample is about 1\,nA, about 0.01\,pm (my arithmetic).
-Systematic errors dominate: the monitor gain (worlds scale it by 0.5--2), the dark current, and light from foreign
-lines. An extra current $\Delta i$ moves a level lock by $\Delta i$ divided by the monitor slope. So the shipped locks
-normalize to a peak that they measure.}
+\hard{Noise is not the limit. Shot noise in one 2\us{} sample is
+$\sqrt{2q\times15.5\uA/(2\times2\us)}=1.1$\,nA. The monitor slope at the lock is about $0.12\uA$/pm, so the noise is
+about 0.01\,pm (my arithmetic). Systematic errors dominate: the monitor gain (worlds scale it by 0.5--2), the dark
+current, and light from foreign lines. An extra current $\Delta i$ moves a level lock by $\Delta i$ divided by the
+monitor slope. So the shipped locks normalize to a peak that they measure.}
 
 \trail{\cd{sensing.py} docstring 1--68, \cd{dark_current_a} 194--203, \cd{adc_quantize} 222--257,
 \cd{monitor_tick_row} 291--416; \cd{pi_lock.py} \cd{block_inputs} 285--293.}
-{$\mathcal{R}=0.95$\,A/W, $I_{FS}=40\uA$, LSB $=0.610$\,nA (1556 codes per \uW{} of drop power). Window 2\us,
-one code every 4\us{} (250\,kHz), latency 2\us. Dark current 5\,nA at 25\degC{} ($\times1.6$ per 10\,K). Drop peak
-about 32\uA. The monitor current at the lock misses its target (CAL-8: 18.6 against 15.5\uA).}
+{$\mathcal{R}=0.95$\,A/W, $I_{FS}=40\uA$, LSB $=40\uA/65\,535=0.610$\,nA, so 1556 codes per \uW{} of drop power.
+Window 2\us, one code every 4\us{} (250\,kHz), latency 2\us. Dark current 5\,nA at 25\degC{} ($\times1.6$ per 10\,K).
+Drop peak about 32\uA. The monitor current at the lock misses its target (CAL-8: 18.6 against 15.5\uA).}
 {No dark current, 6.4\,pA/$\sqrt{\mathrm{Hz}}$ (model 1), 15--20\uA{} full scale, 10\us{} for window, period and delay.}
 
 \subsection{Feedback for this plant}
-Your loop works in codes. The plant chain is: heater code, heater power ($\propto\mathrm{code}^2$, with TCR droop),
-ring temperature (Foster poles), resonance shift ($s$), detuning (divided by the self-heating relief), monitor code
-(line-shape slope times monitor gain). Every disturbance is slow compared with the loop, so you need integral action.
-\texttt{pi\_lock} uses a velocity-form PI. It puts the PI zero $T_i$ on the dominant pole, and divides the error by
-the slope $s=dy/du$ that it measured at the set-point (here $s$ is in ADC codes per heater code). The open loop is
-then about an integrator with a delay $\theta$:
+Your loop works in codes. The plant chain is:
+heater code $\to$ heater power ($\propto\mathrm{code}^2$, with TCR droop) $\to$ ring temperature (Foster poles)
+$\to$ resonance shift ($s$) $\to$ detuning (divided by the self-heating relief) $\to$ monitor code (dip slope times
+monitor gain). Every disturbance is slow compared with the loop, so you need integral action. \texttt{pi\_lock} uses
+a PI controller in velocity form (it computes the change of the code, not the code). It puts the PI zero $T_i$ on the
+dominant pole. It divides the error by the slope $s=dy/du$ that it measured at the set-point (here $s$ is in ADC
+codes per heater code). The open loop is then about an integrator with a delay $\theta$ (not in the textbook):
 \begin{gather*}
 e_k=\frac{y_k-f\,M_{pk}}{|s|}\,\sigma(u_k),\qquad
 \Delta u_k=k_c\Big[(e_k-e_{k-1})+\frac{T}{T_i}e_k\Big]+v_k,\qquad k_c=2\pi f_cT_i,\\
 L(s)\approx\frac{\omega_c\,e^{-s\theta}}{s},\qquad \mathrm{PM}=90^\circ-\frac{180^\circ}{\pi}\,\omega_c\theta,\qquad
 e_{ss}=\frac{\dot r}{\omega_c}\ \ (\text{ramp}).
 \end{gather*}
-Here $f$ is the set-point fraction, $M_{pk}$ the measured peak code, $\sigma(u)\approx u_{ref}/u$ the gain schedule of
-the voltage law, $T$ the controller period, and $v_k$ an optional type-2 term (zero by default). In $L(s)$, $s$ is
-the Laplace variable. The delay, not the thermal pole, limits the crossover. The delay is the sum of the window, the
-ADC latency, the wait for the next edge, the DAC latency and the hold (\cd{timing.py}).
+\begin{itemize}
+  \item $f$ is the set-point fraction. $M_{pk}$ is the measured peak code.
+  \item $\sigma(u)\approx u_{ref}/u$ is the gain schedule of the voltage law. $T$ is the controller period.
+  \item $v_k$ is an optional type-2 term, a second integrator (zero by default). In $L(s)$, $s$ is the Laplace variable.
+  \item The delay, not the thermal pole, limits the crossover. The delay is the sum of the window, the ADC latency,
+  the wait for the next edge, the DAC latency and the hold (\cd{timing.py}).
+\end{itemize}
 
 \hard{The model plant has two main poles, a slow tail, a faster optical path, and a gain that changes with the code
-and the world. Design on the integrator-plus-delay picture, then check it on a measured step response. An open
+and the world. Design on the integrator-plus-delay picture. Then check it on a measured step response. An open
 question: a harness test holds the A1 peak rate within about 2\,pm (with a 20\,K swing, so the heater keeps its
-authority). On the engine, the A3 laser sweep (50\,nm/s) leaves a 13.9\,pm lag. Find the cause before you claim a
+authority). On the engine, the A3 test (a laser sweep at 50\,nm/s) leaves a 13.9\,pm lag. Find the cause before you claim a
 bandwidth.}
 
 \trail{\cd{pi_lock.py} docstring item 3 (47--62), \cd{design_pi_gains} 325--332, \cd{_pi_error} 367--371,
 \cd{_pi_ring_step} 456--645; \cd{core/timing.py} 1--61; \cd{control/models.py} \cd{linearize} 1143 (needs the
 \texttt{model\_nominal} token).}
-{$f_c=2.5$\,kHz and $T_i=13\us$, so $k_c=0.204$ and $T/T_i=0.77$. Loop delay about 12\us, so the phase margin is
-about $79^\circ$ before the 3.18\us{} pole (my arithmetic). Heater-to-monitor gain at the lock about 10 ADC codes
-per heater code (a harness measured $-10.0$, \cd{docs/handoff/controllers_a.md} section 4). Measure it: \texttt{pi\_lock}
-telemetry reports \texttt{slope\_per\_code}. From the warm start \texttt{pi\_lock} holds all 8 rings within 0.1\,pm rms
-at 25\degC.}
+{$f_c=2.5$\,kHz and $T_i=13\us$, so $k_c=2\pi\times2500\times13\us=0.204$ and $T/T_i=10/13=0.77$. Loop delay about
+12\us, so $\mathrm{PM}=90^\circ-360^\circ\times2500\times12\us=79^\circ$ before the 3.18\us{} pole (my arithmetic).
+Heater-to-monitor gain at the lock about 10 ADC codes per heater code (a harness measured $-10.0$,
+\cd{docs/handoff/controllers_a.md} section 4). Measure it: \texttt{pi\_lock} reports
+\texttt{slope\_per\_code} in its telemetry. From the warm start \texttt{pi\_lock} holds all 8 rings within 0.1\,pm rms at 25\degC.}
 {$K_G=86\times4.7\approx404$\,pm/mW, the same dark gain as the model. Ch13 then raises it for self-heating,
 $K_G/(1-k)$, with a slower pole. At the model's stable lock the gain falls 3 to 7 times and the response is faster.
 One pole $\tau_{th}=10\us$. Worked design: $T_d=30\us$, $T_s=20\us$, $f_c=2$\,kHz.}
 
 \subsection{Scoring: lock error, the oracle and the OMA penalty}\label{sec:score}
-The model knows the true detuning, so it scores the lock directly. The lock error is $e=d-d_{ref}$. A ring first locks
-at $|e|\le\theta_{lock}$, unlocks at $|e|>\theta_{lock}$, and relocks at $|e|\le\theta_{lock}-h_{yst}$. The default reference is the line
-($d_{ref}=0$). A side-of-fringe lock sits 0.3--0.5 FWHM from its line by design, so the example files use
-\texttt{self\_reference}: $d_{ref}$ is the median detuning over the last 5\,ms of a 20\,ms pre-run. The oracle is a
-benchmark that reads the true state. You may not run it as your controller. At each instant it finds the stable
-detuning with the best relOMA, and the OMA penalty compares your relOMA with the oracle's:
+The model knows the true detuning, so it scores the lock directly. The lock error is $e=d-d_{ref}$.
+\begin{itemize}
+  \item A ring first locks at $|e|\le\theta_{lock}$. It unlocks at $|e|>\theta_{lock}$. It relocks at
+  $|e|\le\theta_{lock}-h_{yst}$ ($h_{yst}$ is the hysteresis).
+  \item The default reference is the line ($d_{ref}=0$). A side-of-fringe lock sits 0.3--0.5 FWHM from its line by
+  design. So the example files use \texttt{self\_reference}: $d_{ref}$ is the median detuning over the last 5\,ms of a
+  20\,ms pre-run.
+  \item At each instant the oracle finds the stable detuning with the best relOMA. The OMA penalty compares your
+  relOMA with the oracle's (not in the textbook):
+\end{itemize}
 \[
 d^{*}=\arg\max_{d\,:\,G_{sh}\,\partial P_{abs}/\partial\lambda_{res}<1}\ |T_1(d)-T_0(d)|,\qquad
 \mathrm{penalty}=10\log_{10}\frac{\sum_t \mathrm{relOMA}^{*}}{\sum_t \mathrm{relOMA}}.
@@ -656,55 +1015,58 @@ will use: \texttt{max\_abs\_lock\_error\_pm}, \texttt{rms\_lock\_error\_pm}, \te
 $\delta_{ref}$, not against the best stable point now.}
 
 \subsection{Uncertainty worlds}
-Many device numbers are unknown. The preset stores ranges or competing hypotheses. A world is one draw of all of
-them, shared by every ring of the die. Variation is separate: it spreads the geometry, heater and responsivity of
-each ring inside a world. A run uses the nominal world, the 13 named corners, or many sampled worlds (Latin
-hypercube). A claim holds only if it holds in every world:
+Many device numbers are unknown. The preset stores ranges or competing hypotheses for them. A world is one draw of
+all of them, shared by every ring of the die. Variation is separate: it spreads the geometry, heater and
+responsivity of each ring inside a world. A run uses the nominal world, the 13 named corners, or many sampled worlds
+(LHS). A claim holds only if it holds in every world $b$, for every ring $n$ and every time $t$ (not in the textbook):
 \[
-\text{claim}\iff\max_{b}\ \max_n\ \max_t\,|e_{b,n}(t)|\le5\ \mathrm{pm}\ \ \wedge\ \ \mathrm{wrong\_line}_b=0\ \ \forall b.
+\text{claim}\iff\max_{b}\ \max_n\ \max_t\,|e_{b,n}(t)|\le5\ \mathrm{pm}\ \ \text{and}\ \ \mathrm{wrong\_line}_b=0\ \ \text{for all } b.
 \]
 
 \hard{No controller can hold some worlds. The heater supply limit binds in about 1/3 of the sampled worlds
-(KNOWN\_ISSUES item 40). Ring 0 has no heater left at the hot end of A1 (code 0). Read the warm-start flags (\texttt{no\_code}, \texttt{order\_hopped},
-\texttt{supply\_limited}) in the world summary before you blame the controller.}
+(KNOWN\_ISSUES item 40). Ring 0 has no heater left at the hot end of A1 (code 0). Read the warm-start flags
+(\texttt{no\_code}, \texttt{order\_hopped}, \texttt{supply\_limited}) in the world summary before you blame the
+controller.}
 
 \trail{\cd{g26.yaml} \texttt{uncertainty} 1168--1446, \texttt{variation} 1447--1481; \cd{experiment.py}
-\cd{NAMED_CORNERS} 122; \cd{experiments/examples/robust_pi_lock.yaml}.}
+\cd{NAMED_CORNERS} 122--124; \cd{experiments/examples/robust_pi_lock.yaml}.}
 {Worlds vary, among others: thermo-optic law (solver or H86), $\eta$ (0.5--0.95), $z$ (1--2), chip input loss
 (2--10\,dB), $Q_L$ (3500--4200), coupling regime, FSR, thermal family and time scales ($\times$0.5--2), crosstalk
 scale, driver mode, monitor gain (0.5--2), dark current, latency scale.}
 {Single nominal values with stated ranges.}
 
 %=====================================================================================================================
-\section{What remains, and the first things to do}
+\section{What remains, and the first things to do}\label{sec:next}
 
 \subsection*{What remains to learn before you start}
 \begin{itemize}
-\item[$\square$] Self-heating as an inner loop: why the lock is on the red side, where the fold is, and why the
-  heater gain at the lock is the dark gain divided by 3 to 7 (sections~\ref{sec:sh} and~\ref{sec:bist}).
-\item[$\square$] The plant chain in codes, with the light on. Measure it: from the settled warm start, apply a small
-  open-loop heater step and fit the gain and poles of monitor code against heater code. Compare with the dark gain
-  (0.405\,nm/mW) and with the 3.18\us{} and 13.0\us{} poles.
+\item[$\square$] Self-heating as an inner loop (sections~\ref{sec:sh} and~\ref{sec:bist}). Know why the lock is on
+  the red side and where the fold is. Know why the heater gain at the lock is the dark gain divided by 3 to 7.
+\item[$\square$] The plant chain in codes, with the light on. Measure it. From the settled warm start, apply a small
+  open-loop heater step. Fit the gain and the poles of monitor code against heater code. Compare them with the dark
+  gain (0.405\,nm/mW) and with the 3.18\us{} and 13.0\us{} poles.
 \item[$\square$] The delay budget of your loop (window, ADC latency, sample age, hold, DAC latency) and the PI design
   with dead time. Refresh from EE: Bode plots, phase margin with dead time, the discrete integrator, the zero-order
   hold, lock-in (synchronous) detection.
 \item[$\square$] Start-up: warm start against cold start (\texttt{laser\_ramp}, \texttt{branch\_low}), bistable
   capture, wrong-line capture, and the line assignment of \texttt{wdm\_supervisor} (acceptance test B5). Your lock
   law needs a hand-off: the ring on the stable branch, red of its own line.
-\item[$\square$] What your controller may know. g26 releases only \texttt{line\_grid} and \texttt{ring\_to\_line}.
-  Your controller must measure everything else. A grant of \texttt{heater\_law}, \texttt{linewidth},
-  \texttt{thermal\_dynamics} or \texttt{model\_nominal} is a factory-calibration claim, and the report must say so.
-\item[$\square$] The menu of lock techniques (Ch14): fraction-of-peak slope lock (\texttt{pi\_lock}), dither 1f/2f,
-  bias dither, bit statistics. Do not lock on the drop peak in g26.
-\item[$\square$] How to judge a controller over the worlds: separate plant-limited worlds from controller failures.
-  Every result depends on thermal numbers from imec devices, not from G26.
+\item[$\square$] What your controller may know. g26 releases only the knowledge tokens \texttt{line\_grid} and
+  \texttt{ring\_to\_line}. Your controller must measure everything else. A grant of \texttt{heater\_law},
+  \texttt{linewidth}, \texttt{thermal\_dynamics} or \texttt{model\_nominal} is a claim of factory calibration, and
+  the report must say so.
+\item[$\square$] The lock techniques of Ch14: fraction-of-peak slope lock (\texttt{pi\_lock}), dither 1f/2f (a small
+  sine on the heater, demodulated at its frequency or twice it), bias dither, bit statistics. Do not lock on the drop
+  peak in g26.
+\item[$\square$] How to judge a controller over the worlds: separate the worlds that the plant cannot hold from
+  controller failures. Every result depends on thermal numbers from imec devices, not from G26.
 \item[$\square$] The traps. Run every job through \cd{tools/memguard.py}, one at a time. The first numba compile
   takes about 2 minutes. After an edit to an \texttt{@njit} function outside \cd{kernel.py}, run
   \cd{tools/clear_numba_cache.py}. A scenario named in Python runs at 1.0\,V bias, an experiment file at 1.05\,V.
-  Keep \texttt{g26} as the default, and change numbers per run only (\texttt{--set}, \texttt{--alt}).
+  Keep \texttt{g26} as the default. Change numbers per run only (\texttt{--set}, \texttt{--alt}).
 \item[$\square$] Skip for now: Ch16 (interleavers are not modelled), most of Ch08 (keep ``what a picometre costs in
-  dB''), the calibration and validation code, \cd{mrm/waveform/}, the RL environment, and the bridge and HDL path
-  (until you target an FPGA). State space, Kalman filters and MPC can wait until your PI works.
+  dB''), the calibration and validation code, \cd{mrm/waveform/}, the reinforcement-learning environment, and the
+  bridge and HDL path (until you target an FPGA). State space, Kalman filters and MPC can wait until your PI works.
 \end{itemize}
 
 \subsection*{First things to do}
@@ -726,10 +1088,15 @@ cp examples/controllers/template_python_controller.py examples/controllers/my_lo
 # your controller over the uncertainty: nominal world, named corners, 128 sampled worlds (about 3 minutes)
 .venv/bin/python tools/memguard.py -- .venv/bin/python -m mrm.cli run experiments/examples/robust_pi_lock.yaml --set controller.name=examples.controllers.my_lock:MyIntegralLock
 \end{lstlisting}
-In \cd{my_lock.py}, rename the class and the name in \texttt{@register(...)}, and use the new class name after the
-colon. The plot script is in \cd{docs/EXPLAINED.md} lines 96--119. Under A1, ring 0 leaves its point by 445 to
-475\,pm (the template gives 445\,pm). That is heater authority, not your loop. The robust run takes about 2.5 minutes.
-It prints FAIL and exits with code 1 when one world breaks a criterion. That is a result, not a crash. The viewer:
-\texttt{cd webviz/site \&\& python3 -m http.server 8000}.
+\begin{itemize}
+  \item In \cd{my_lock.py}, rename the class and the name in \texttt{@register(...)}. Use the new class name after the
+  colon.
+  \item The plot script is in \cd{docs/EXPLAINED.md} lines 96--119.
+  \item Under A1, ring 0 leaves its point by 445 to 475\,pm (the template gives 445\,pm). That is the limit of heater
+  authority, not of your loop.
+  \item The robust run takes about 2.5 minutes. It prints FAIL and exits with code 1 when one world breaks a
+  criterion. That is a result, not a crash.
+  \item The viewer: \texttt{cd webviz/site \&\& python3 -m http.server 8000}, then open \texttt{http://localhost:8000}.
+\end{itemize}
 
 \end{document}
