@@ -122,7 +122,7 @@ examples/                  controller templates (controllers/) + tutorial notebo
 tests/{verification,closure,calibration,validation,golden,perf,hdl}/   (hdl: Icarus replay of the golden vectors)
 docs/ ARCHITECTURE.md ENGINE.md PARAMETERS.md (generated) PARAMETERS_FORMAT.md VALIDATION.md (generated, g26)
       VALIDATION_g26_calibrated.md (generated) validation/<preset>/ (report data and charts)
-      CHANGELOG.md handoff/ research/   (EXPLAINED.md not written yet)
+      CHANGELOG.md handoff/ research/ EXPLAINED.md KNOWN_ISSUES.md guide/
 tools/memguard.py          all solver runs go through it (16 GB machine); perf_*.py, clear_numba_cache.py,
                            scorecard_compare.py (docs/handoff/perf.md section 1)
 ```
