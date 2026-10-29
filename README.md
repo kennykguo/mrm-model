@@ -46,7 +46,7 @@ Documents:
 Code (the same order as the package docstrings and docs/ARCHITECTURE.md):
 
 1. `examples/controllers/template_python_controller.py` and `mrm/control/api.py`: what a controller gets and returns.
-2. `mrm/plant/optics.py`, `_airy_line`: the add-drop ring in closed form.
+2. `mrm/plant/optics.py`, `ring_rows_nb`: the add-drop ring field calculation, including backscatter.
 3. `mrm/plant/phase.py`, `ring_optics_row`: where the ring's phase, coupling and loss come from.
 4. `mrm/plant/selfheat.py`, `solve_ring_temperature`, and `mrm/plant/thermal.py`: self-heating and the heat paths.
 5. `mrm/plant/sensing.py`, `monitor_tick_row`: from drop power to a monitor ADC code.
