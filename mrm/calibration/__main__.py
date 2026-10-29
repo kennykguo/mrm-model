@@ -1,4 +1,4 @@
-"""``python -m mrm.calibration`` (same options as ``mrm calibrate``)."""
+# run `python -m mrm.calibration` with the same options as `mrm calibrate`.
 import sys
 
 from mrm.calibration.cli import main
