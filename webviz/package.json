@@ -1,0 +1,17 @@
+{
+  "name": "mrm-webviz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Viewer of the mrm plant model running (g26 preset). No dependencies: npm install is not needed.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "regen": "node scripts/run-python.mjs generate",
+    "check": "node scripts/run-python.mjs check"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
