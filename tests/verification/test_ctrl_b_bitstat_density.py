@@ -1,10 +1,14 @@
-"""Ones-density steps (Sun et al. VLSI 2015: all-0 / all-1 and balanced data; 07 P0-11) on the bit-statistics lock
-and on a plain monitor lock at the same operating point, closed loop on the g26 reference plant.
+"""Checks the bit-statistics lock and a plain monitor lock against ones-density steps, closed loop on g26.
 
-A monitor lock reads y = rho mu1 + (1 - rho) mu0, so a density step moves its lock point by (rho - 1/2) |mu1 - mu0| /
-|dy/ddelta| (04 C3, C6). The bit-statistics lock holds the EYE CENTRE with the ones-density canceller (Sun's
-self-heating canceller in this form), so only a transient remains. Reported: the plateau detuning offsets (last
-0.4 ms of each plateau against the balanced-data value before the steps) for both controllers.
+Read this first
+---------------
+The data steps between all-0, all-1 and balanced data (Sun et al. VLSI 2015). A monitor lock reads
+y = rho mu1 + (1 - rho) mu0 (rho: ones density; mu1, mu0: the monitor levels of a one and a zero). So a density step
+moves its lock point by (rho - 1/2) |mu1 - mu0| / |dy/ddelta|. The bit-statistics lock holds the EYE CENTRE with the
+ones-density canceller (Sun's self-heating canceller in this form), so only a transient remains.
+
+Reported for both controllers: the plateau detuning offsets (the last 0.4 ms of each plateau against the
+balanced-data value before the steps).
 """
 from __future__ import annotations
 
@@ -13,7 +17,7 @@ import pytest
 
 from mrm.control.baselines.bitstat_lock import BitStatLock
 from mrm.control.baselines.ramp_acquire import RampAcquire, ST_LOCK
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 
 from test_ctrl_b_plant import CtrlBPlant, load_g26, make_spec, realize, run_closed_loop
 
@@ -39,7 +43,7 @@ def setup():
     cfg = load_g26(knowledge=KNOW)
     pp = realize(cfg, 1, nominal=True)
     spec = make_spec(cfg, 1)
-    sc = lib.ones_density_steps(levels=(0.5, 1.0, 0.5, 0.0, 0.5), step_s=STEP, t0_s=T0, rings=[0])
+    sc = library.ones_density_steps(levels=(0.5, 1.0, 0.5, 0.0, 0.5), step_s=STEP, t0_s=T0, rings=[0])
     return cfg, pp, spec, sc
 
 

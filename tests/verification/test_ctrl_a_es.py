@@ -1,20 +1,27 @@
-"""Extremum seeking, perturb-and-observe and sinusoidal (mrm/control/baselines/extremum_seeking.py): convergence to
-the drop peak on a toy ring and on g26 at low laser power (no bistability); at g26 nominal power es_po falls off the
-fold and recaptures while es_sine never falls and approaches the peak slowly (CTRL_A_METRIC lines; run with -s); on
-the engine es_sine parks at the drop peak after ~150 ms (slow)."""
+"""Checks the extremum-seeking controllers (mrm/control/baselines/extremum_seeking.py).
+
+Read this first
+---------------
+es_po (perturb and observe) and es_sine (sinusoidal dither) climb to the drop peak. The tests check:
+
+- convergence to the drop peak on a toy ring, and on g26 at low laser power (no bistability);
+- at g26 nominal power: es_po falls off the self-heating fold and recaptures; es_sine never falls and approaches the
+  peak slowly (CTRL_A_METRIC lines; run with -s);
+- on the engine, es_sine parks at the drop peak after ~150 ms (slow).
+"""
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control import registry
 from mrm.control.baselines.extremum_seeking import E_FAULT, ExtremumSeekingPO, ExtremumSeekingSine
 
 LOW_DB = -14.0          # +4 -> -10 dBm at the ring: bistability ratio ~6 -> ~0.24 (no fold)
 
 
-def report(tag, m: H.LockMetrics, **extra):
+def report(tag, m: harness.LockMetrics, **extra):
     s = m.summary()
     s.update(extra)
     print("CTRL_A_METRIC", tag, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()})
@@ -23,9 +30,9 @@ def report(tag, m: H.LockMetrics, **extra):
 @pytest.mark.parametrize("cls,kw", [(ExtremumSeekingPO, {}), (ExtremumSeekingPO, {"mode": "argmax"}),
                                     (ExtremumSeekingSine, {})])
 def test_toy_converges_to_the_peak(cls, kw):
-    spec = H.toy_spec(1, 3)
+    spec = harness.toy_spec(1, 3)
     u0 = np.array([[30000, 30500, 31000]], float)
-    toy = H.ToyRings(spec, u0=u0, g=np.array([[0.3, 0.8, 1.2]]), u_init=u0[0] + 300, x0=3.0, noise=1.0)
+    toy = harness.ToyRings(spec, u0=u0, g=np.array([[0.3, 0.8, 1.2]]), u_init=u0[0] + 300, x0=3.0, noise=1.0)
     c = cls(init_codes=u0[0] + 300, **kw)
     c.reset(spec)
     toy.run(c, 3000)
@@ -35,38 +42,40 @@ def test_toy_converges_to_the_peak(cls, kw):
 
 @pytest.mark.parametrize("cls", [ExtremumSeekingPO, ExtremumSeekingSine])
 def test_g26_low_power_reaches_the_peak(cls):
-    cfg, pp, spec, plant = H.placed(delta_pm=60.0, power_delta_db=LOW_DB)
+    cfg, pp, spec, plant = harness.placed(delta_pm=60.0, power_delta_db=LOW_DB)
     c = cls()
-    loop = H.ClosedLoop(plant, spec, c)
+    loop = harness.ClosedLoop(plant, spec, c)
     rec = loop.run(8000)
     d = rec["delta_pm"].astype(float)
     final = np.median(d[-1500:], axis=0)
     assert np.all(np.abs(final) < 15.0), final
-    m = H.lock_metrics(rec, slice(-3000, -1500), slice(-1500, None), delta_ref=np.zeros_like(final))
+    m = harness.lock_metrics(rec, slice(-3000, -1500), slice(-1500, None), delta_ref=np.zeros_like(final))
     report(f"{c.name} g26 at -10 dBm per ring (peak lock)", m, centre_detuning_pm=float(np.mean(final)))
 
 
 def _g26_nominal_power(cls, **kw):
-    cfg, pp, spec, plant = H.placed(delta_pm=60.0)
+    cfg, pp, spec, plant = harness.placed(delta_pm=60.0)
     c = cls(**kw)
-    loop = H.ClosedLoop(plant, spec, c)
+    loop = harness.ClosedLoop(plant, spec, c)
     rec = loop.run(8000)                          # 8 ms
     tel = c.telemetry()
     assert np.all(tel["state"] != E_FAULT)
     d = rec["delta_pm"].astype(float)
-    m = H.lock_metrics(rec, slice(0, 500), slice(2000, None), delta_ref=np.zeros(d.shape[1:]))
+    m = harness.lock_metrics(rec, slice(0, 500), slice(2000, None), delta_ref=np.zeros(d.shape[1:]))
     report(f"{c.name}{kw or ''} g26 nominal power (peak seeking)", m, falls=float(tel["fall_count"].sum()),
            min_detuning_pm=float(d.min()))
     return d, tel
 
 
 def test_g26_nominal_power_po_falls_at_the_fold():
-    """At +4 dBm per ring the fold sits a few pm blue of the peak: a probe that reaches past it makes es_po fall off
-    and recapture (07 P0-1); it never ends in FAULT. The default +-16-code probe (~6 pm at the peak) reaches the fold
-    only marginally: on the plant of the params review (secant beta, heater_self_ratio 1.132) it does not fall in this
-    8 ms run and falls once on rings 4-7 in 0.4 s on the engine; before the review it fell once on every ring here,
-    and restoring either the tangent beta or the ratio 1.158 alone brings those falls back. So the fall path is
-    exercised with a +-24-code probe (~9 pm), and the default parameters are checked for FAULT only."""
+    """At +4 dBm per ring the self-heating fold sits a few pm blue of the peak. A probe that reaches past it makes
+    es_po fall off and recapture; it never ends in FAULT.
+
+    The default +-16-code probe (~6 pm at the peak) reaches the fold only marginally. On the current plant (secant
+    beta, heater_self_ratio 1.132) it does not fall in this 8 ms run, and it falls once on rings 4-7 in 0.4 s on the
+    engine. With the tangent beta or with the ratio 1.158 (either change alone) it falls once on every ring here. So
+    the fall path is exercised with a +-24-code probe (~9 pm), and the default parameters are checked for FAULT
+    only."""
     d, tel = _g26_nominal_power(ExtremumSeekingPO, delta_codes=24.0)
     assert tel["fall_count"].sum() > 0, tel["fall_count"]
     assert d.min() < -100.0                       # a fall: the ring dropped onto its cold branch
@@ -75,7 +84,7 @@ def test_g26_nominal_power_po_falls_at_the_fold():
 
 def test_g26_nominal_power_sine_approaches_without_a_fall():
     """es_sine's dither does not reach the fold: no fall, and the rings move toward the peak (blue, d decreasing)
-    but are still well red of it after 8 ms (a slow approach, not a lock: docs/handoff/controller_scorecard.md)."""
+    but are still well red of it after 8 ms (a slow approach, not a lock)."""
     d, tel = _g26_nominal_power(ExtremumSeekingSine)
     assert np.all(tel["fall_count"] == 0), tel["fall_count"]
     early, late = np.median(d[:500], axis=0), np.median(d[-500:], axis=0)
@@ -87,18 +96,18 @@ def test_g26_nominal_power_sine_approaches_without_a_fall():
 @pytest.mark.slow
 def test_engine_sine_parks_at_the_drop_peak():
     """On the engine (g26 nominal, settled warm start, 0.2 s): es_sine drifts toward the drop peak at ~0.8 pm/ms
-    without a fall and parks there (|d| < 3 pm), where the OMA penalty is ~13 dB (controllers review 2026-10-16)."""
+    without a fall and parks there (|d| < 3 pm), where the OMA penalty is ~13 dB."""
     import warnings
     from mrm import params
-    from mrm.scenarios import library as lib
+    from mrm.scenarios import library
     from mrm.sim import runner
     from mrm.sim.metrics import RecordSpec
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cfg = params.load("g26")
         c = ExtremumSeekingSine()
-        r = runner.run(cfg, c, lib.static(), duration_s=0.2, uncertainty="nominal", variation="off", seeds=0,
-                       heater_code="quasi_static", settle=True, reset_protocol="branch_high",
+        r = runner.run(cfg, c, library.static(), duration_s=0.2, uncertainty="nominal", variation="off", seeds=0,
+                       heater_code="locked_steady_state", settle=True, reset_protocol="branch_high",
                        record=[RecordSpec("detuning_m", 10, "mean"), RecordSpec("reloma", 10, "mean"),
                                RecordSpec("oracle_reloma", 10, "mean")])
     d = np.asarray(r.trace["detuning_m@10:mean"]["value"])[:, 0, :] * 1e12      # 10 us samples
@@ -119,4 +128,4 @@ def test_registry():
     with pytest.raises(ValueError):
         ExtremumSeekingPO(mode="nope")
     with pytest.raises(ValueError):
-        ExtremumSeekingSine(dither_hz=40e3).reset(H.toy_spec(1, 1))
+        ExtremumSeekingSine(dither_hz=40e3).reset(harness.toy_spec(1, 1))

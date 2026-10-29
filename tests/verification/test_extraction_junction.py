@@ -1,11 +1,18 @@
-"""Verification of the junction extraction (mrm/extraction/junction.py; ARCHITECTURE 5.4, schema junction/1).
+"""Checks the junction extraction (mrm.extraction.junction) and its committed artefacts (schema junction/1).
 
-Fast tests load the committed artefacts mrm/data/extracted/junction_<xsec>.json and check their identities: sha256
-against the sidecar, the contract keys and grid, physical monotonicity, the cross-checks recorded at extraction time
-(DEVSIM against the abrupt depletion approximation, first-order overlap against a direct re-solve, the index-weight
-identity, AC capacitance against dQ/dV), the convergence error estimates and the CAL-5 fill identity. They also check
-the closed-form helpers (small-signal TCMT response against docs/research/03 section 5.6, the abrupt-junction
-formulas against 02 section 11) without any solver.
+Read this first
+---------------
+The junction extraction solves the PN junction of the modulator with DEVSIM and the optical mode with femwell. It
+writes, per cross-section, a table against reverse voltage (V): dn_eff, the free-carrier loss alpha_fca (1/m), the
+capacitance (F/m) and the series resistance (ohm m). See docs/ARCHITECTURE.md, "Junction: junction_<xsec>.json".
+
+The fast tests load the committed artefacts mrm/data/extracted/junction_<xsec>.json and check their identities: the
+sha256 against the sidecar, the contract keys and grid, physical monotonicity, the cross-checks recorded at
+extraction time (DEVSIM against the abrupt depletion approximation, the first-order overlap against a direct
+re-solve, the index-weight identity, the AC capacitance against dQ/dV), the convergence error estimates and the CAL-5
+fill identity (CAL-5: the modulation efficiency target). They also check the closed-form helpers without any solver:
+the small-signal TCMT response against the table in docs/research/03_mrm_compact_models.md, and the abrupt-junction
+formulas against docs/research/02_materials.md, "Junction physics".
 
 The slow test re-runs the extraction with --quick into a temporary directory and compares it with the committed
 artefact within the coarse-mesh tolerance.
@@ -22,12 +29,14 @@ import numpy as np
 import pytest
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
+# the folder of the junction artefacts (MRM_JUNCTION_ARTEFACT_DIR overrides it)
 DATA = pathlib.Path(os.environ.get("MRM_JUNCTION_ARTEFACT_DIR", REPO / "mrm" / "data" / "extracted"))
 XSECS = ("rib160", "rib200")
 VARIANTS = ("", "_lateral")          # default topology (L-shape) and the lateral alternative
 
 
-def _load(name):
+def _load_artefact(name):
+    """(artefact dict, sidecar dict, artefact path) of junction_<name>.json; skips the test if it is not extracted."""
     p = DATA / f"junction_{name}.json"
     s = DATA / f"junction_{name}.sidecar.json"
     if not p.exists() or not s.exists():
@@ -36,18 +45,21 @@ def _load(name):
 
 
 @pytest.fixture(params=[x + v for x in XSECS for v in VARIANTS])
-def art(request):
-    return _load(request.param)
+def artefact(request):
+    """Each committed junction artefact: both cross-sections, default (L-shape) and lateral topology."""
+    return _load_artefact(request.param)
 
 
 @pytest.fixture(params=XSECS)
-def art_default(request):
-    return _load(request.param)
+def default_artefact(request):
+    """The default-topology (L-shape) artefact of each cross-section."""
+    return _load_artefact(request.param)
 
 
-# ---------------------------------------------------------------------------------------------- contract
-def test_sidecar_sha256_and_contract_keys(art):
-    a, side, p = art
+# -------------------------------------------------------------------------------- artefact contract and runtime loading
+
+def test_sidecar_sha256_and_contract_keys(artefact):
+    a, side, p = artefact
     assert side["sha256"] == hashlib.sha256(p.read_bytes()).hexdigest()
     assert a["schema"] == side["schema"] == "junction/1"
     for k in ("schema", "sha256", "inputs", "tool_versions", "mesh", "validation", "convergence", "created_utc"):
@@ -63,8 +75,8 @@ def test_sidecar_sha256_and_contract_keys(art):
     assert a["doping"]["topology"] in ("lshape", "lateral")
 
 
-def test_bias_grid_contract(art):
-    a, _, _ = art
+def test_bias_grid_contract(artefact):
+    a, _, _ = artefact
     v = np.array(a["v_reverse_v"])
     assert v[0] == pytest.approx(-0.5) and v[-1] == pytest.approx(4.0)
     assert np.all(np.diff(v) > 0)
@@ -74,9 +86,9 @@ def test_bias_grid_contract(art):
         assert np.all(np.isfinite(a[k])), k
 
 
-def test_runtime_loader_reads_the_artefact(art):
+def test_runtime_loader_reads_the_artefact(artefact):
     from mrm.plant.electrical import load_junction_table
-    a, _, p = art
+    a, _, p = artefact
     t = load_junction_table(p)
     v = np.array(a["v_reverse_v"])
     out = t.eval(np.array([[0.0, 1.0, 2.0]]), fill=1.0, length_m=40e-6)
@@ -86,22 +98,22 @@ def test_runtime_loader_reads_the_artefact(art):
     assert out["r_s_ohm"][0, 1] == pytest.approx(np.interp(1.0, v, a["r_series_ohm_m"]) / 40e-6, rel=1e-9)
 
 
-def test_runtime_realize_in_lut_mode(art_default):
+def test_runtime_realize_in_lut_mode(default_artefact):
     """The g26 preset switched to LUT mode (fidelity.junction_model: lut, ring.junction.lut_file -> this artefact,
     analytic-only keys removed) loads, verifies the sha256 through the {from:} machinery and realizes; the
     ring-level values follow the LUT: C_j = f L c', R_s = r'/(f L), eff_at_0v = f (lambda/n_g) d(dn_eff)/dV at 0 V."""
-    from mrm.params import config as C
+    from mrm.params import config
     from mrm.params.realize import realize
     from mrm.plant.electrical import junction_table_from_plant_params
-    a, _, p = art_default
-    d = C.yaml_load((REPO / "mrm" / "params" / "presets" / "g26.yaml").read_text())
+    a, _, p = default_artefact
+    d = config.yaml_load((REPO / "mrm" / "params" / "presets" / "g26.yaml").read_text())
     d["fidelity"]["junction_model"] = "lut"
     j = d["ring"]["junction"]
     for k in ("eff_at_0v_pm_per_v", "v_bi_v", "depletion_exponent", "dqi_dv_frac_per_v"):
         j.pop(k, None)
     j["lut_file"] = f"extracted/{p.name}"
     fill = a["reports"]["cal5"]["nominal_fill"]
-    cfg = C.load(d, overrides={"ring.junction.fill_fraction": fill}, data_root=DATA.parent)
+    cfg = config.load(d, overrides={"ring.junction.fill_fraction": fill}, data_root=DATA.parent)
     pp = realize(cfg, batch=1)
     assert int(pp.junction.model) == 1
     v = np.array(a["v_reverse_v"])
@@ -116,14 +128,15 @@ def test_runtime_realize_in_lut_mode(art_default):
     ng = float(np.asarray(pp.optics.n_g).ravel()[0])
     slope0 = np.interp(0.0, v, np.gradient(np.array(a["dneff"]), v))
     assert float(np.asarray(pp.junction.eff_at_0v_m_per_v).ravel()[0]) == pytest.approx(fill * lam * slope0 / ng,
-                                                                                         rel=1e-3)
+                                                                                        rel=1e-3)
 
 
-# ---------------------------------------------------------------------------------------------- physics
-def test_dneff_is_a_monotone_depletion_curve(art):
-    """Reverse bias removes carriers: dn_eff rises, with a falling slope (the depletion law, 07 P1-7 / 06 M2);
+# ----------------------------------------------------------------------------------------- physics of the stored tables
+
+def test_dneff_is_a_monotone_depletion_curve(artefact):
+    """Reverse bias removes carriers: dn_eff rises, with a falling slope (the depletion law);
     forward bias adds carriers: dn_eff < 0."""
-    a, _, _ = art
+    a, _, _ = artefact
     v = np.array(a["v_reverse_v"])
     dn = np.array(a["dneff"])
     i0 = int(np.argmin(np.abs(v)))
@@ -136,8 +149,8 @@ def test_dneff_is_a_monotone_depletion_curve(art):
     assert np.all(np.diff(slope[rev]) < 1e-9)                      # concave on the reverse branch
 
 
-def test_absorption_capacitance_resistance_signs(art):
-    a, _, _ = art
+def test_absorption_capacitance_resistance_signs(artefact):
+    a, _, _ = artefact
     v = np.array(a["v_reverse_v"])
     al = np.array(a["alpha_fca_per_m"])
     c = np.array(a["capacitance_f_per_m"])
@@ -151,28 +164,30 @@ def test_absorption_capacitance_resistance_signs(art):
     assert 0.2 < m < 0.55
 
 
-def test_loss_to_index_ratio_matches_plasma_dispersion(art):
-    """q = -lambda d(alpha)/dV / (4 pi d(dn_eff)/dV): 03 section 5.4 estimates 0.06 for both carriers at 1e18 (range
-    0.03-0.15 carried by the plant)."""
-    a, _, _ = art
+def test_loss_to_index_ratio_matches_plasma_dispersion(artefact):
+    """q = -lambda d(alpha)/dV / (4 pi d(dn_eff)/dV): the compact-model notes estimate 0.06 for both carriers at
+    1e18 cm^-3 (the plant carries the range 0.03-0.15)."""
+    a, _, _ = artefact
     v = np.array(a["v_reverse_v"])
     q = np.interp(1.0, v, a["aux"]["loss_ratio_q"])
     assert 0.03 < q < 0.15
 
 
-def test_absolute_alpha_is_inside_the_loss_budget(art):
-    """07 P0-2: the free-carrier loss at the CAL-5 fill must not exceed the intrinsic loss implied by Q_i."""
-    a, _, _ = art
+def test_absolute_alpha_is_inside_the_loss_budget(artefact):
+    """Loss budget: the free-carrier loss at the CAL-5 fill must not exceed the intrinsic loss implied by Q_i."""
+    a, _, _ = artefact
     lb = a["reports"]["loss_budget"]
     row0 = [r for r in lb["rows"] if r["v_rev"] == 0.0][0]
     assert row0["alpha_fca_ring_per_m"] <= lb["alpha_i_per_m"][0] * 1.0001
     assert 0.0 < row0["eta_fca_Qi7000"] <= 1.0
 
 
-# ---------------------------------------------------------------------------------------------- cross-checks
-def test_devsim_depletion_width_against_abrupt_formula(art):
-    """05 C7c: DEVSIM's half-density depletion edges sit 5-8 % inside the abrupt approximation (Debye tails)."""
-    a, _, _ = art
+# ----------------------------------------------------------------------------- cross-checks recorded at extraction time
+
+def test_devsim_depletion_width_against_abrupt_formula(artefact):
+    """As in the DEVSIM tool check C7c (docs/research/05_tools.md): DEVSIM's half-density depletion edges sit 5-8 %
+    inside the abrupt approximation (Debye tails)."""
+    a, _, _ = artefact
     dc = a["depletion_check"]
     rel = np.array(dc["rel_diff_vs_abrupt"], float)
     assert np.all(rel < 0.0)
@@ -180,35 +195,35 @@ def test_devsim_depletion_width_against_abrupt_formula(art):
     assert abs(dc["mean_rel_diff_vs_debye"]) < abs(dc["mean_rel_diff_vs_abrupt"])
 
 
-def test_overlap_perturbation_against_direct_resolve(art):
-    _, side, _ = art
+def test_overlap_perturbation_against_direct_resolve(artefact):
+    _, side, _ = artefact
     c = side["validation"]["perturbation_vs_direct_resolve"]
     assert np.all(np.abs(c["rel_diff"]) < 0.02)
     assert np.all(np.abs(c["alpha_rel_diff"]) < 0.02)
 
 
-def test_weight_integral_and_index_identity(art):
-    _, side, _ = art
+def test_weight_integral_and_index_identity(artefact):
+    _, side, _ = artefact
     w = side["validation"]["weight_integral"]
     assert abs(w["rel_diff_weight_vs_fd"]) < 1e-3                  # the weight density integrates to dn_eff/dn_Si
     assert abs(w["rel_diff_nodes_vs_femwell"]) < 2e-3              # and DEVSIM's node quadrature reproduces it
-    assert abs(side["validation"]["index_weight_identity"]["rel_residual"]) < 1e-4   # sum n_g,i w_i = n_g (07 P0-3)
+    assert abs(side["validation"]["index_weight_identity"]["rel_residual"]) < 1e-4   # sum n_g,i w_i = n_g
 
 
-def test_capacitance_ac_against_charge_derivative(art):
-    _, side, _ = art
+def test_capacitance_ac_against_charge_derivative(artefact):
+    _, side, _ = artefact
     c = side["validation"]["capacitance_ac_vs_dqdv"]
     assert c["max_rel_diff_reverse"] < 0.01
     assert c["electron_hole_balance_max_rel"] < 0.01
 
 
-def test_tidy3d_cross_check(art):
+def test_tidy3d_cross_check(artefact):
     """Independent mode solver against femwell (straight guide). The junction's own Tidy3D stage (uniform grids, no
     subpixel averaging) is used through its extrapolation only if a power law fits it; otherwise its finest grid must
     agree with femwell and the modes artefact's independent Tidy3D run (interface-aligned grids, fitted order) must
     agree within its own extrapolation error. The reassessment is recomputed here from the stored rows."""
     from mrm.extraction.junction import tidy3d_reassessment
-    _, side, _ = art
+    _, side, _ = artefact
     t = side["validation"].get("tidy3d_vs_femwell", {})
     if "error" in t or not t:
         pytest.skip("tidy3d cross-check not available")
@@ -246,10 +261,10 @@ def _modes_comparison(side):
     return comp
 
 
-def test_modes_artefact_consistency(art):
+def test_modes_artefact_consistency(artefact):
     """Two independent femwell set-ups (this extraction and mrm.extraction.modes) agree on the straight guide; the
     bent rows differ by the bend formulation (exact transform vs femwell's isotropic map), recorded separately."""
-    _, side, _ = art
+    _, side, _ = artefact
     comp = _modes_comparison(side)
     st = comp["straight"]
     assert abs(comp["delta_r_ref_um"]) < 1e-5
@@ -262,11 +277,11 @@ def test_modes_artefact_consistency(art):
     assert bs["modes_exact"] == pytest.approx(bs["tidy3d_finest"], rel=0.02)             # exact transform = Tidy3D
 
 
-def test_bend_formulation_bias_is_recorded_and_bounded(art):
+def test_bend_formulation_bias_is_recorded_and_bounded(artefact):
     """The isotropic map overstates the bend effect; the estimated bias of the stored overlap lies inside the hard
     bounds (straight mode, k = 0; isotropic, k = 1) and is recomputable from the stored data."""
     from mrm.extraction.junction import bend_formulation_bias
-    a, side, _ = art
+    a, side, _ = artefact
     comp = _modes_comparison(side)
     bf = side["uncertainty"]["model"]["bend_formulation"]
     k_lo, k_hi = bf["k_range"]
@@ -283,11 +298,11 @@ def test_bend_formulation_bias_is_recorded_and_bounded(art):
     assert again["bias_of_stored"]["dneff_1v6_rel"] == pytest.approx(bf["bias_of_stored"]["dneff_1v6_rel"], rel=1e-9)
 
 
-def test_mesh_code_reproduces_the_committed_devsim_mesh(art):
+def test_mesh_code_reproduces_the_committed_devsim_mesh(artefact):
     """The DEVSIM mesh generator still builds the meshes the artefact was solved on (node counts of the ladder and
     of the production mesh), so --mesh-report memory estimates refer to the same meshes."""
     from mrm.extraction.junction import XSECS, Doping, mesh_counts
-    a, side, _ = art
+    a, side, _ = artefact
     d = a["doping"]
     dop = Doping(**{k: d[k] for k in Doping.__dataclass_fields__})
     xs = XSECS[a["xsec"]["name"]]
@@ -297,9 +312,9 @@ def test_mesh_code_reproduces_the_committed_devsim_mesh(art):
     assert mesh_counts(xs, dop, side["mesh"]["devsim"]["scale"])["nodes_si"] == side["mesh"]["devsim_nodes_si"]
 
 
-def test_memory_record_and_not_done_list(art):
+def test_memory_record_and_not_done_list(artefact):
     from mrm.extraction.junction import EXPECTED_ARTEFACTS, artefact_name, estimate_peak_gb
-    _, side, _ = art
+    _, side, _ = artefact
     names = {artefact_name(x, t) + ".json" for x, t in EXPECTED_ARTEFACTS}
     for row in side["not_done"]:
         assert row["artefact"] in names and not (DATA / row["artefact"]).exists()
@@ -331,27 +346,27 @@ def test_cli_settings_override():
 
 
 def test_cli_passes_overrides_to_extract(monkeypatch, tmp_path):
-    import mrm.extraction.junction as J
+    from mrm.extraction import junction
     seen = {}
 
     def fake_extract(name, **kw):
         seen.update(kw, name=name)
         raise RuntimeError("stop")                    # no solver: main() reports the failure and returns 1
-    monkeypatch.setattr(J, "extract", fake_extract)
-    rc = J.main(["--xsec", "rib160", "--topology", "lshape", "--scale", "1.4142", "--ladder", "2.8284", "2.0",
-                 "1.4142", "--study-scale", "2.0", "--direct-mode-res-floor", "0.01", "--out", str(tmp_path)])
+    monkeypatch.setattr(junction, "extract", fake_extract)
+    rc = junction.main(["--xsec", "rib160", "--topology", "lshape", "--scale", "1.4142", "--ladder", "2.8284", "2.0",
+                        "1.4142", "--study-scale", "2.0", "--direct-mode-res-floor", "0.01", "--out", str(tmp_path)])
     assert rc == 1
     assert seen["prod"] == {"scale": 1.4142, "ladder": [2.8284, 2.0, 1.4142], "study": 2.0}
     assert seen["direct_res_floor_um"] == 0.01 and seen["light"] is False
 
 
-def test_free_order_view_and_forced_flags(art):
+def test_free_order_view_and_forced_flags(artefact):
     """The free-order views are recomputable from the stored levels, and every stored entry whose order no level
     sequence supports carries order_forced (its Richardson error is then an assumption, not evidence)."""
     import copy
 
     from mrm.extraction.junction import free_order_rows
-    _, side, _ = art
+    _, side, _ = artefact
     for blk in ("devsim_mesh", "mode_mesh"):
         b = side["convergence"][blk]
         fv = b.get("free_order_view")
@@ -384,11 +399,34 @@ def test_richardson_rejects_out_of_range_orders():
     assert r["order_forced"] is True and r["observed_order"] == 2
 
 
-def test_assumption_range_notes_and_remesh_noise_are_recomputable(art):
+def test_free_order_pattern_names_the_side_of_the_accepted_range():
+    """A monotone, shrinking sequence without an observed order is labelled by the side of [0.2, 8] that its
+    apparent order is on: above 8 (the first increment dominates) or below 0.2 (the increments shrink too slowly)."""
+    from mrm.extraction.junction import free_order_rows
+    h = list(2.8284 / 1.18921 ** np.arange(3))
+    rows = free_order_rows({"fast": {"values": [2.9848037e-4, 2.9827757e-4, 2.9823436e-4], "h": h},   # order 8.9
+                            "slow": {"values": [1.0, 0.9, 0.81], "h": [4.0, 2.0, 1.0]}})               # order 0.15
+    assert rows["fast"]["apparent_order"] > 8 and rows["fast"]["pattern"].startswith("apparent order above 8")
+    assert rows["slow"]["apparent_order"] < 0.2 and rows["slow"]["pattern"].startswith("apparent order below 0.2")
+    assert rows["fast"]["observed_order"] is None and rows["slow"]["observed_order"] is None
+
+
+def test_temperature_notes_name_the_reference_temperature():
+    """The temperature-sensitivity notes that extract() writes name T_REF_K (298.15 K): the cold DEVSIM run, the
+    table it is compared with and the optical mode are all at T_REF_K, not at 300 K."""
+    import inspect
+
+    from mrm.extraction import junction
+    src = inspect.getsource(junction.extract)
+    assert "held at 300 K" not in src and "300 K table" not in src
+    assert src.count("T_REF_K ({T_REF_K} K)") == 2
+
+
+def test_assumption_range_notes_and_remesh_noise_are_recomputable(artefact):
     """inputs.range_notes and uncertainty.jacobian_remesh_noise follow from the stored data (no solver); every
     assumed doping and geometry value lies inside the range the current code assigns to it."""
     from mrm.extraction.junction import jacobian_remesh_noise, range_notes
-    a, side, _ = art
+    a, side, _ = artefact
     rn = side["inputs"].get("range_notes")
     if rn is None:
         pytest.skip("run: python -m mrm.extraction.junction --postprocess")
@@ -409,11 +447,11 @@ def test_assumption_range_notes_and_remesh_noise_are_recomputable(art):
                 assert row.get(k, 0.0) == 0.0
 
 
-def test_report_identities_against_the_lut(art):
+def test_report_identities_against_the_lut(artefact):
     """Re-derive the reports from the LUT columns (no solver): ring C_j = f L c', R_s = r'/(f L), f_RC, the nominal
     EO bandwidths (RC x small-signal TCMT), the loss-budget rows, and C = dQ/dV against the removed charge."""
     from mrm.extraction.junction import eo_bandwidth_ghz
-    a, _, _ = art
+    a, _, _ = artefact
     v = np.array(a["v_reverse_v"])
     col = {k: np.array(a[k]) for k in ("alpha_fca_per_m", "capacitance_f_per_m", "r_series_ohm_m")}
     q = np.array(a["aux"]["loss_ratio_q"])
@@ -447,8 +485,8 @@ def test_report_identities_against_the_lut(art):
         assert qc[j] == pytest.approx(1.602176634e-19 * (e[i0] - e[j]), rel=2e-3)
 
 
-def test_convergence_error_estimates(art):
-    _, side, _ = art
+def test_convergence_error_estimates(artefact):
+    _, side, _ = artefact
     dm = side["convergence"]["devsim_mesh"]
     mm = side["convergence"]["mode_mesh"]
     assert len(dm["scales"]) >= 3 and len(mm["res_um"]) >= 3
@@ -462,11 +500,12 @@ def test_convergence_error_estimates(art):
     assert side["convergence"]["bias_grid"]["max_abs_error_rel_to_dneff_1v6"] < 1e-3
 
 
-# ---------------------------------------------------------------------------------------------- reports
-def test_cal5_fill_reproduces_the_target(art):
+# -------------------------------------------------------------------------------------------------------------- reports
+
+def test_cal5_fill_reproduces_the_target(artefact):
     """With the reported endpoint fill, (lambda/n_g) f dn_eff(1.6 V) / 1.6 V is exactly the CAL-5 52.8 pm/V; the fill
     scales with n_g across the hypotheses (dlambda = lambda/n_g f dn_eff)."""
-    a, _, _ = art
+    a, _, _ = artefact
     cal5 = a["reports"]["cal5"]
     v = np.array(a["v_reverse_v"])
     lam = cal5["lambda_nm"] * 1e-9
@@ -480,17 +519,17 @@ def test_cal5_fill_reproduces_the_target(art):
     assert cal5["hypotheses"]["H_solver"]["lsq_rms_pm"] < 10.0      # the shape fits the read-off ladder
 
 
-def test_default_topology_reaches_cal5_with_fill_below_one(art_default):
+def test_default_topology_reaches_cal5_with_fill_below_one(default_artefact):
     """The default artefact must reproduce CAL-5 with a physical fill fraction (schema bounds 0..1); the lateral
     alternative records why it cannot (fill > 1 at any doping up to 5e18, reports.doping_sweep of the lateral file)."""
-    a, _, _ = art_default
+    a, _, _ = default_artefact
     assert a["doping"]["topology"] == "lshape"
     h = a["reports"]["cal5"]["hypotheses"]["H_solver"]
     assert 0.3 < h["fill_endpoint"] <= 1.0
 
 
-def test_bandwidth_report_has_both_biases(art):
-    a, _, _ = art
+def test_bandwidth_report_has_both_biases(artefact):
+    a, _, _ = artefact
     bw = a["reports"]["eo_bandwidth"]
     v1 = [c["f3db_ghz"] for c in bw["cases"] if c["v_rev"] == 1.0]
     v2 = [c["f3db_ghz"] for c in bw["cases"] if c["v_rev"] == 2.0]
@@ -499,8 +538,8 @@ def test_bandwidth_report_has_both_biases(art):
     assert bw["junction_rc_only"]["ratio_2v_over_1v"] > 1.0       # C falls with reverse bias
 
 
-def test_jacobian_present_and_finite(art):
-    a, _, _ = art
+def test_jacobian_present_and_finite(artefact):
+    a, _, _ = artefact
     j = a["jacobian"]
     for d in ("width_nm", "film_nm", "slab_nm", "log10_na_cm3", "log10_nd_cm3", "junction_offset_nm"):
         assert d in j["d"], d
@@ -510,10 +549,12 @@ def test_jacobian_present_and_finite(art):
     assert j["of"]["alpha_fca_0v_per_m"][i] > 0                     # more doping, more absorption
 
 
-# ---------------------------------------------------------------------------------------------- helpers (no solver)
+# -------------------------------------------------------------------------------------- closed-form helpers (no solver)
+
 def test_small_signal_response_reproduces_research_table():
-    """03 section 5.6 (verified rows): Q_L 3500, critical coupling: 55.2 GHz at x = 1/sqrt(3), 75.7 GHz at 0.813,
-    38.7 GHz at 0.30; with loss modulation q = +0.13 / -0.1 at x = 1/sqrt(3): 51.3 / 58.7 GHz."""
+    """The small-signal table of the compact-model notes (verified rows), Q_L 3500, critical coupling: 55.2 GHz at
+    x = 1/sqrt(3), 75.7 GHz at 0.813, 38.7 GHz at 0.30. With loss modulation q = +0.13 / -0.1 at x = 1/sqrt(3):
+    51.3 / 58.7 GHz."""
     from mrm.extraction.junction import eo_bandwidth_ghz
     assert eo_bandwidth_ghz(0.0, q_loaded=3500, x_detune=1 / math.sqrt(3)) == pytest.approx(55.2, abs=0.1)
     assert eo_bandwidth_ghz(0.0, q_loaded=3500, x_detune=0.813) == pytest.approx(75.7, abs=0.1)
@@ -525,14 +566,16 @@ def test_small_signal_response_reproduces_research_table():
 
 
 def test_rc_pole_implied_by_cal10():
-    """03 verification log #3: 30.9 GHz measured at x = 1/sqrt(3) implies a 34.8 GHz RC pole (critical, Q 3500)."""
+    """Compact-model verification log #3: 30.9 GHz measured at x = 1/sqrt(3) implies a 34.8 GHz RC pole (critical,
+    Q 3500)."""
     from mrm.extraction.junction import eo_bandwidth_ghz
     tau = 1 / (2 * math.pi * 34.83e9)
     assert eo_bandwidth_ghz(tau, q_loaded=3500, x_detune=1 / math.sqrt(3)) == pytest.approx(30.9, abs=0.1)
 
 
 def test_abrupt_junction_formulas():
-    """02 section 11: V_bi(1e18, 1e18, 300 K) = 0.954 V; W = sqrt(2 eps (V_bi+V)/q (1/NA + 1/ND)) with eps 11.7."""
+    """Abrupt junction (docs/research/02_materials.md, "Junction physics"): V_bi(1e18, 1e18, 300 K) = 0.954 V;
+    W = sqrt(2 eps (V_bi+V)/q (1/NA + 1/ND)) with eps 11.7."""
     from mrm.extraction.junction import XSECS, Doping, analytic_depletion
     d = Doping(na_cm3=1e18, nd_cm3=1e18)
     an = analytic_depletion(XSECS["rib160"], d, np.array([0.0, 2.0]), t_k=300.0)
@@ -544,12 +587,14 @@ def test_abrupt_junction_formulas():
 
 
 def test_doping_profile_levels():
-    from mrm.extraction.junction import XSECS, DOPING_NOMINAL as D, doping_profile
+    from mrm.extraction.junction import XSECS, DOPING_NOMINAL, doping_profile
     xs = XSECS["rib160"]
-    na, nd = doping_profile(np.array([-100.0, 100.0, -(200 + 400.0), 200 + 400.0, -(200 + 900.0)]), xs, D)
-    assert na[0] == pytest.approx(D.na_cm3, rel=1e-6) and nd[1] == pytest.approx(D.nd_cm3, rel=1e-6)
-    assert na[2] == pytest.approx(D.n_plus_cm3, rel=1e-3) and nd[3] == pytest.approx(D.n_plus_cm3, rel=1e-3)
-    assert na[4] == pytest.approx(D.n_pp_cm3, rel=1e-3)
+    na, nd = doping_profile(np.array([-100.0, 100.0, -(200 + 400.0), 200 + 400.0, -(200 + 900.0)]), xs, DOPING_NOMINAL)
+    assert (na[0] == pytest.approx(DOPING_NOMINAL.na_cm3, rel=1e-6)
+            and nd[1] == pytest.approx(DOPING_NOMINAL.nd_cm3, rel=1e-6))
+    assert (na[2] == pytest.approx(DOPING_NOMINAL.n_plus_cm3, rel=1e-3)
+            and nd[3] == pytest.approx(DOPING_NOMINAL.n_plus_cm3, rel=1e-3))
+    assert na[4] == pytest.approx(DOPING_NOMINAL.n_pp_cm3, rel=1e-3)
     assert nd[0] < 1e3 and na[1] < 1e3
 
 
@@ -561,10 +606,11 @@ def test_richardson_recovers_a_known_order():
     assert r["extrapolated"] == pytest.approx(1.0, abs=1e-9)
 
 
-# ---------------------------------------------------------------------------------------------- slow: re-run
+# ------------------------------------------------------------------------------------------ slow: re-run the extraction
+
 @pytest.mark.slow
 def test_quick_rerun_matches_committed(tmp_path):
-    a, _, _ = _load("rib160_lateral")
+    a, _, _ = _load_artefact("rib160_lateral")
     cmd = [sys.executable, str(REPO / "tools" / "memguard.py"), "--limit-gb", "3", "--heavy", "--", sys.executable,
            "-m", "mrm.extraction.junction", "--quick", "--xsec", "rib160", "--topology", "lateral",
            "--out", str(tmp_path)]

@@ -1,17 +1,20 @@
-"""Equivalence of the fixed-point reference controller (07 P1-21: "float against fixed point within bounds;
-fixed point against RTL, bit-exact").
+"""Checks the fixed-point reference controller FxpPi against an exact reference, against its float twin, and for
+the classic integrator failure.
 
-- Fixed point against itself: fx_pi_update against an exact big-integer reference on random operands (every
-  rounding mode, the accumulator saturation, the integrator clamp and the output clamp); the closed loop on the
-  compiled path, on the Python path and on the Python path without JIT (test_vectors.py) is bit-identical.
+The design review (docs/research/07_design_critique.md) asks for "float against fixed point within bounds; fixed
+point against RTL, bit-exact". Here:
+
+- Fixed point against itself: fx_pi_update against an exact big-integer reference on random operands (every rounding
+  mode, the accumulator saturation, the integrator clamp and the output clamp); the closed loop on the compiled path, on
+  the Python path and on the Python path without JIT (test_vectors.py) is bit-identical.
 - Float against fixed point: the float64 twin (same structure, unquantized gains, no accumulator width) on the SAME
   observations stays within ``mrm.control.fxp.pi_float_bound_codes`` = 1 + 2^-(F+1) (sum |e| + |e_k|) codes at every
   step (derived in its docstring: the gains are the only quantized operands; docs/research states no numeric
-  float-vs-fixed rule). In closed loop the two runs see the same noise draws (counter-based RNG, 07 P1-13) and
-  differ only through the controller: measured and bounded below.
-- The failure mode 07 P1-21 cites from textbook Ch17 ("the integrator's fraction bits are the usual failure"): an
-  integrator rounded to whole codes ignores errors with |ki e| < 1/2 code and leaves a steady-state error; FxpPi's
-  integrator keeps F = 20 fraction bits.
+  float-vs-fixed rule). In closed loop the two runs see the same noise draws (counter-based RNG) and differ only through
+  the controller: measured and bounded below.
+- The failure mode that the design review cites from textbook Ch17 ("the integrator's fraction bits are the usual
+  failure"): an integrator rounded to whole codes ignores errors with |ki e| < 1/2 code and leaves a steady-state error;
+  FxpPi's integrator keeps F = 20 fraction bits.
 """
 from __future__ import annotations
 
@@ -27,22 +30,25 @@ import pytest
 from mrm import params
 from mrm.control import api, fxp
 from mrm.control.fxp import FxpPi, Overflow, QFormat, Rounding
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 from mrm.sim import runner, vectors
 from mrm.sim.metrics import RecordSpec
 
-RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="quasi_static", settle=True)
-DURATION_S = 4e-3
-REC = [RecordSpec("detuning_m", 1, "last"), RecordSpec("heater_code", 10, "last")]
+# run options: nominal world, settled warm start at the locked steady-state heater codes
+RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="locked_steady_state", settle=True)
+DURATION_S = 4e-3                                                                # s, 400 controller edges
+REC = [RecordSpec("detuning_m", 1, "last"), RecordSpec("heater_code", 10, "last")]   # recorded traces
 
 
-def scenario():
-    return lib.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
+def _aggressor_scenario():
+    """A direct square aggressor: 0.05 W at the g26 aggressor site, period 2 ms, duty 0.5, phase 1 ms."""
+    return library.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
 
 
-# ---- exact reference of fx_pi_update (Python integers, Fraction rounding) -----------------------------------------
+# ------------------------------------------------- exact reference of fx_pi_update (Python integers, Fraction rounding)
 
 def _round(q: Fraction, rnd: int) -> int:
+    """Round the exact fraction q to an integer with the Rounding mode rnd."""
     f = math.floor(q)
     d = q - f
     if rnd == Rounding.FLOOR:
@@ -60,6 +66,7 @@ def _round(q: Fraction, rnd: int) -> int:
 
 
 def ref_pi_update(e, integ, kp, ki, u0, frac, acc_bits, lo, hi, rnd):
+    """Exact reference of fxp.fx_pi_update with Python integers: (output code, new integrator)."""
     a = integ + e * ki
     a = max(-(1 << (acc_bits - 1)), min((1 << (acc_bits - 1)) - 1, a))
     a = max((lo - u0) << frac, min((hi - u0) << frac, a))
@@ -112,16 +119,17 @@ def test_fxp_pi_refuses_a_monitor_wider_than_its_error_register():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         c18 = params.load("g26", overrides=["ring.monitor.adc_bits=18"])
-    spec = bridge.spec_for(c18, scenario(), 1)
+    spec = bridge.spec_for(c18, _aggressor_scenario(), 1)
     assert spec.channels["tx.monitor.latest"].max == 2**18 - 1
     with pytest.raises(ValueError, match="17 bits"):
         FxpPi().reset(spec)
 
 
-# ---- float twin ------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------- float twin
 
 @nb.njit(cache=True)
 def float_pi_init(spec_i64, spec_f64):
+    """Init of the float twin: FxpPi's integer parameters, plus the float gains (kp, ki) from the user floats."""
     p, _pf, s, _sf = fxp.fxp_pi_init(spec_i64, spec_f64)
     n = p[0]
     pf = np.zeros(2)
@@ -160,6 +168,7 @@ def float_pi_step(p, pf, s, sf, obs, act):
 
 
 def float_pi(kp=0.0193, ki=0.0148):
+    """The float twin as a CompiledController (FxpPi's structure and channel parameters, float gains kp, ki)."""
     c = FxpPi()
     ctrl = api.CompiledController("float_pi", float_pi_init, float_pi_step, params_i64=c.params_i64,
                                   params_f64=[kp, ki])
@@ -177,7 +186,7 @@ def cfg():
 def recorded(cfg):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return vectors.run_recorded(cfg, FxpPi(), scenario(), duration_s=DURATION_S, record=REC, **RUN)
+        return vectors.run_recorded(cfg, FxpPi(), _aggressor_scenario(), duration_s=DURATION_S, record=REC, **RUN)
 
 
 def test_float_vs_fixed_on_the_same_observations_within_the_derived_bound(recorded):
@@ -223,7 +232,7 @@ def test_float_vs_fixed_closed_loop(cfg, recorded):
     loop is contractive, so a difference stays at the level of a code instead of growing)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        rf = runner.run(cfg, float_pi(), scenario(), duration_s=DURATION_S, record=REC, **RUN)
+        rf = runner.run(cfg, float_pi(), _aggressor_scenario(), duration_s=DURATION_S, record=REC, **RUN)
     hx = np.asarray(recorded.trace["heater_code@10:last"]["value"])
     hf = np.asarray(rf.trace["heater_code@10:last"]["value"])
     dx = np.asarray(recorded.trace["detuning_m@1:last"]["value"])
@@ -235,7 +244,7 @@ def test_float_vs_fixed_closed_loop(cfg, recorded):
     assert np.allclose(recorded.metrics["rms_detuning_pm"], rf.metrics["rms_detuning_pm"], atol=0.05)
 
 
-# ---- the Ch17 failure mode: integrator fraction bits ---------------------------------------------------------------
+# ---------------------------------------------------------------------- the Ch17 failure mode: integrator fraction bits
 
 def _integrate(e_seq, ki, int_frac, gain_frac=20):
     """Integrator kept with ``int_frac`` fraction bits: each ki*e (exact at gain_frac bits) is rounded to int_frac

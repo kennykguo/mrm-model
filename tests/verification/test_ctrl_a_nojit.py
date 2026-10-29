@@ -1,10 +1,11 @@
-"""The compiled controllers of controllers_a behave the same as plain Python (07 P0-9 rule: per-tick code runs under
-NUMBA_DISABLE_JIT=1 too).
+"""Checks that the compiled group-A controllers give the same codes as plain Python.
+
+Rule: the per-tick controller code must also run, with identical results, under NUMBA_DISABLE_JIT=1.
 
 - fast: the pure-Python bodies (``.py_func``) of pi_step, dither_step, bias_step and bias_fast, driven through the
   same CompiledController plumbing on the toy ring, give exactly the jitted codes;
-- slow: the toy and unit tests of the owned files run in a subprocess with NUMBA_DISABLE_JIT=1 (every helper in
-  Python too).
+- slow: the toy and unit tests of the group-A controller files run in a subprocess with NUMBA_DISABLE_JIT=1 (every
+  helper runs in Python too).
 """
 from __future__ import annotations
 
@@ -17,11 +18,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control.api import CompiledController
-from mrm.control.baselines import bias_dither as bd
-from mrm.control.baselines import dither_lockin as dl
-from mrm.control.baselines import pi_lock as pl
+from mrm.control.baselines import bias_dither, dither_lockin, pi_lock
 
 HERE = Path(__file__).resolve().parent
 
@@ -40,7 +39,7 @@ def _python_twin(ctrl: CompiledController) -> CompiledController:
 
 
 def test_pi_and_dither_python_bodies_match_the_jitted_steps():
-    spec = H.toy_spec(2, 3)
+    spec = harness.toy_spec(2, 3)
     u0 = np.array([[30000, 30500, 31000], [29800, 30200, 30900]], float)
     g = np.array([[4.0, 6.0, 0.8], [3.0, 8.0, 1.5]])
 
@@ -50,40 +49,43 @@ def test_pi_and_dither_python_bodies_match_the_jitted_steps():
         if 500 <= k < 510:
             toy.u0 += 250.0                     # past the fold: falls and recaptures
         toy.valid[:] = not (200 <= k < 203)
-    for make, init, n in ((lambda: pl.PiLockCompiled(init_codes=[31400, 31900, 31600], k2=0.002), [31400, 31900, 31600],
-                           900),
-                          (lambda: dl.DitherLockinCompiled(init_codes=[30500, 31000, 31500], dither_codes=40.0,
-                                                           phase_steps=4, blank_steps=1), [30500, 31000, 31500], 900)):
+    def make_pi():
+        return pi_lock.PiLockCompiled(init_codes=[31400, 31900, 31600], k2=0.002)
+
+    def make_dither():
+        return dither_lockin.DitherLockinCompiled(init_codes=[30500, 31000, 31500], dither_codes=40.0, phase_steps=4,
+                                                  blank_steps=1)
+    for make, init, n in ((make_pi, [31400, 31900, 31600], 900), (make_dither, [30500, 31000, 31500], 900)):
         runs = []
         for twin in (False, True):
             c = make()
             if twin:
                 _python_twin(c)
-            toy = H.ToyRings(spec, u0=u0, g=g, u_init=np.array(init), x0=3.0)
+            toy = harness.ToyRings(spec, u0=u0, g=g, u_init=np.array(init), x0=3.0)
             c.reset(spec)
             runs.append(toy.run(c, n, on_step=disturb)[0])
         assert np.array_equal(runs[0], runs[1])
 
 
 def test_bias_dither_python_bodies_match_the_jitted_kernels():
-    import test_ctrl_a_bias_dither as T
-    spec = H.toy_spec(1, 2, bias=True)
+    import test_ctrl_a_bias_dither as bias_dither_tests
+    spec = harness.toy_spec(1, 2, bias=True)
     u0 = np.array([[30000.0, 31000.0]])
     init = u0[0] + 360.0
     xs = []
     for twin in (False, True):
-        toy = H.ToyRings(spec, u0=u0, g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=init, bias_init=1191)
-        c = bd.BiasDither(dither_codes=120.0, samples_per_phase=2, hold_cycles=8, id_cycles=8, id_codes=30.0,
-                          gain=0.5, init_codes=init)
+        toy = harness.ToyRings(spec, u0=u0, g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=init, bias_init=1191)
+        c = bias_dither.BiasDither(dither_codes=120.0, samples_per_phase=2, hold_cycles=8, id_cycles=8, id_codes=30.0,
+                                   gain=0.5, init_codes=init)
         if twin:
             _python_twin(c)
         c.reset(spec)
-        saved = T.bias_fast
-        T.bias_fast = c.fast_fn                    # the toy loop calls the module-level kernel
+        saved = bias_dither_tests.bias_fast
+        bias_dither_tests.bias_fast = c.fast_fn                    # the toy loop calls the module-level kernel
         try:
-            xs.append(T.toy_fast_loop(c, spec, toy, 400))
+            xs.append(bias_dither_tests.toy_fast_loop(c, spec, toy, 400))
         finally:
-            T.bias_fast = saved
+            bias_dither_tests.bias_fast = saved
     assert np.array_equal(xs[0], xs[1])
 
 

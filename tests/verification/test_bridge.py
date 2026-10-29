@@ -1,10 +1,20 @@
-"""Binary lockstep bridge (07 P1-21; mrm.sim.bridge): frames generated from the ChannelSpecs, the handshake and its
-checks, and closed loops driven by an external controller (a thread over a socketpair, a Python process over pipes
-and over TCP) that are bit-identical to the same controller run in-process. The C reference is in
-test_bridge_c.py.
+"""Checks the binary lockstep bridge (mrm.sim.bridge) that lets an external process act as the controller.
 
-Run of the closed-loop checks: g26 nominal world, settled warm start at the quasi-static lock codes,
-mrm.control.fxp.FxpPi, a direct square aggressor (0.05 W, period 2 ms) so the heaters move by 200-2900 codes.
+Read this first
+---------------
+The bridge sends one observation frame per controller step to an external controller and reads back one action
+frame. The frame layout is generated from the ChannelSpecs. This file checks:
+
+- the frame layouts (the minimal and full profiles and custom frames) and the codec;
+- the handshake and its checks (protocol, magic, ControllerSpec, latency);
+- closed loops with an external controller: a thread over a socketpair, a Python process over pipes and over TCP.
+  Each one must be bit-identical to the same controller run in-process;
+- loud failures: a dead or silent peer, a lost lockstep tick, an actuator that the frame does not carry.
+
+The C reference endpoint is checked in test_bridge_c.py.
+
+Closed-loop runs: g26 nominal world, settled warm start at the steady-state lock codes, controller
+mrm.control.fxp.FxpPi, a direct square aggressor (0.05 W, period 2 ms). The heaters then move by 200-2900 codes.
 """
 from __future__ import annotations
 
@@ -27,11 +37,11 @@ from mrm.control import api
 from mrm.control.api import BaseController, Observation
 from mrm.core.channels import ActId
 from mrm.control.fxp import FxpPi
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 from mrm.sim import bridge, runner, vectors
 from mrm.sim.metrics import RecordSpec
 
-RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="quasi_static", settle=True)
+RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="locked_steady_state", settle=True)
 DURATION_S = 3e-3
 REC = [RecordSpec("detuning_m", 1, "last"), RecordSpec("heater_code", 10, "last"),
        RecordSpec("monitor_code", 10, "last")]
@@ -39,7 +49,7 @@ SERVE = [sys.executable, "-m", "mrm.sim.bridge", "serve", "--preset", "g26", "--
 
 
 def scenario():
-    return lib.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
+    return library.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
 
 
 SCEN_ARGS = ["--scenario", "aggressor_direct", "--scenario-params",
@@ -100,20 +110,25 @@ def run_bridged(cfg, ctrl):
         return runner.run(cfg, ctrl, scenario(), duration_s=DURATION_S, record=REC, **RUN)
 
 
-# ---- frame layout --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------- frame layout
 
-def _fields(fs):
-    return [(f.name, f.dtype, f.count) for f in fs]
+def _name_dtype_count(fields):
+    """(name, wire dtype, element count) of each frame field, in frame order."""
+    return [(f.name, f.dtype, f.count) for f in fields]
 
 
 def test_minimal_profile_is_the_07_frame(spec, cfg_bias):
-    """07 P1-21: {u64 tick, u16 adc[N], i16 temp[S], u8 flags} -> {u64 tick, u16 dac[N], u16 bias[N]}; generated:
-    adc = tx.monitor.latest, temp = temp.* (12-bit codes: u16), the latched registers of the framed actions,
-    flags[N] (u8) and dflags (u8); dac = tx.heater; bias only when bound to the controller."""
+    """The minimal profile is the frame that the design review asked for (fixed-point toolkit and HDL co-simulation):
+    {u64 tick, u16 adc[N], i16 temp[S], u8 flags} -> {u64 tick, u16 dac[N], u16 bias[N]}.
+
+    The generated frame maps it as follows. adc = tx.monitor.latest. temp = temp.* (12-bit codes, so u16). Then come
+    the latched registers of the framed actions, flags[N] (u8) and dflags (u8). dac = tx.heater. bias is in the frame
+    only when tx.bias is bound to the controller."""
     lay = bridge.FrameLayout.from_spec(spec, "minimal")
-    assert _fields(lay.obs_fields) == [("tx.monitor.latest", "<u2", 8), ("temp.die0", "<u2", 1),
-                                       ("tx.heater.applied", "<u2", 8), ("flags", "<u1", 8), ("dflags", "<u1", 1)]
-    assert _fields(lay.act_fields) == [("tx.heater", "<u2", 8)]
+    assert _name_dtype_count(lay.obs_fields) == [("tx.monitor.latest", "<u2", 8), ("temp.die0", "<u2", 1),
+                                                 ("tx.heater.applied", "<u2", 8), ("flags", "<u1", 8),
+                                                 ("dflags", "<u1", 1)]
+    assert _name_dtype_count(lay.act_fields) == [("tx.heater", "<u2", 8)]
     assert [(b.channel, b.what, b.group, b.bit) for b in lay.flag_bits] == [
         ("tx.monitor.latest", "new", "flags", 0), ("monitor_valid", "value", "flags", 1),
         ("monitor_valid", "new", "flags", 2), ("adc_overrange", "value", "flags", 3),
@@ -122,8 +137,8 @@ def test_minimal_profile_is_the_07_frame(spec, cfg_bias):
     assert lay.obs_record_bytes == 16 + 2 + 16 + 8 + 1 and lay.obs_payload_bytes == 8 + 43
     assert lay.act_payload_bytes == 16 + 16
     lb = bridge.FrameLayout.from_spec(bridge.spec_for(cfg_bias, scenario(), 1), "minimal")
-    assert _fields(lb.act_fields) == [("tx.heater", "<u2", 8), ("tx.bias", "<u2", 8)]
-    assert ("tx.bias.applied", "<u2", 8) in _fields(lb.obs_fields)
+    assert _name_dtype_count(lb.act_fields) == [("tx.heater", "<u2", 8), ("tx.bias", "<u2", 8)]
+    assert ("tx.bias.applied", "<u2", 8) in _name_dtype_count(lb.obs_fields)
 
 
 def test_full_profile_covers_the_spec(spec):
@@ -265,7 +280,7 @@ def test_hello_round_trip(spec):
     assert struct.unpack_from("<I", h.pack(), 48)[0] == 1 and struct.unpack_from("<i", h.pack(), 88)[0] == 3
 
 
-# ---- closed loops --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------------- closed loops
 
 def _thread_endpoint(ctrl, spec_ext, sock):
     out = {}
@@ -338,6 +353,8 @@ def test_custom_frame_is_bit_identical(cfg, reference):
 _HEATER_ID = int(ActId.TX_HEATER)
 
 
+# A CompiledController is two njit functions. init(spec_i64, spec_f64) returns its four arrays (int params, float
+# params, int state, float state). step(p, pf, s, sf, obs, act) updates the state and writes the commands into act.
 @nb.njit
 def _swing_init(spec_i64, spec_f64):
     p = np.zeros(2, np.int64)
@@ -414,7 +431,7 @@ def test_bias_actuator_over_the_bridge(cfg_bias):
     assert v[2] < 1.7 < 2.9 < v[-1]                 # 1000 and 3000 of 4095 codes over 1.0-3.75 V
 
 
-# ---- failures are loud ---------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------- failures are loud
 
 def test_spec_mismatch_is_refused(cfg, spec):
     with warnings.catch_warnings():

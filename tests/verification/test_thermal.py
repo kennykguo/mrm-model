@@ -1,7 +1,15 @@
-"""Verification of mrm/plant/thermal.py against analytic limits (07 section 4.2; ARCHITECTURE 5.3; 07 P1-2, P0-10).
+"""Checks the thermal model mrm/plant/thermal.py against analytic limits (code checks, not hardware checks).
 
-Code checks only (07 4.1 'verification'): exact ZOH/FOH stepping, the Foster step and ramp responses, expm, reciprocity,
-artefact integrity, scaling rules, batching, and the interim numbers of 07 P1-2.
+Read this first
+---------------
+The thermal model is a set of first-order lags (a Foster sum): every source (heater, absorbed light, junction,
+aggressor, driver) reaches every observer (ring, heater resistor, monitor PD, temperature sensor) through residues
+r_k (K/W) and time constants tau_k (s). The tests check: the exact zero-order-hold and first-order-hold stepping
+against closed forms and scipy.linalg.expm, the step and ramp responses, reciprocity of the residues, the numbers of
+the interim model, the crosstalk time-constant law, the scaling rules of the uncertainty set, batching, and the
+integrity of the ROM artefacts (docs/ARCHITECTURE.md, "5.3 Thermal ROM").
+
+"The design review" below means docs/research/07_design_critique.md.
 """
 import json
 import math
@@ -12,20 +20,25 @@ import numpy as np
 import pytest
 import scipy.linalg
 
-from mrm.plant import thermal as th
+from mrm.plant import thermal
 
-H86_Z0 = 4.7e3   # K/W, textbook R_th (derived, 04 section 2.1); any positive number works for these code checks
-
-
-def bank(n=4, pitch=30.0, **kw):
-    lay = th.LayoutSites.line(n, pitch, aggressor_xy_um=[[pitch * (n - 1) / 2.0, 25.0]], aggressor_names=("agg",),
-                              temp_sensor_xy_um=[[0.0, 0.0], [pitch * n, -40.0]], temp_sensor_ring=[0, -1],
-                              temp_sensor_names=("ts_ring0", "ts_free"),
-                              driver_xy_um=np.c_[np.arange(n) * pitch, np.full(n, -30.0)])
-    return th.assemble(th.InterimRom(**kw), lay, n)
+# K/W, textbook R_th (derived; thermal notes, docs/research/04_thermal_and_control.md, section 2.1); any positive
+# number works for these code checks
+H86_Z0 = 4.7e3
 
 
-# ------------------------------------------------------------------------------------------------ coefficients
+def _thermal_bank(n=4, pitch=30.0, **kw):
+    """An interim thermal system of n rings at pitch um, with one aggressor, two temperature sensors (one on ring 0,
+    one free) and a driver site per ring. Keywords go to InterimRom."""
+    lay = thermal.LayoutSites.line(n, pitch, aggressor_xy_um=[[pitch * (n - 1) / 2.0, 25.0]], aggressor_names=("agg",),
+                                   temp_sensor_xy_um=[[0.0, 0.0], [pitch * n, -40.0]], temp_sensor_ring=[0, -1],
+                                   temp_sensor_names=("ts_ring0", "ts_free"),
+                                   driver_xy_um=np.c_[np.arange(n) * pitch, np.full(n, -30.0)])
+    return thermal.assemble(thermal.InterimRom(**kw), lay, n)
+
+
+# --------------------------------------------------------------------------------------------------------- coefficients
+
 def _foh_reference(y):
     """b0, b1 from 25-term series (y <= 0.5) or the closed form (y > 0.5)."""
     if y <= 0.5:
@@ -41,8 +54,8 @@ def _foh_reference(y):
 def test_foh_coefficients_against_reference(y):
     tau = 1e-6
     h = y * tau
-    a, b0, b1 = th.foh_scalar(tau, h)
-    a2, c0, c1 = th.foh_coefficients(np.array([tau]), np.array([1.0]), h)
+    a, b0, b1 = thermal.foh_scalar(tau, h)
+    a2, c0, c1 = thermal.foh_coefficients(np.array([tau]), np.array([1.0]), h)
     if y == 0.0:
         assert (a, b0, b1) == (1.0, 0.0, 0.0)
         return
@@ -53,30 +66,31 @@ def test_foh_coefficients_against_reference(y):
     assert b0 + b1 == pytest.approx(-math.expm1(-y), rel=1e-12)
 
 
-# ------------------------------------------------------------------------------------------------ exact ZOH
+# ------------------------------------------------------------------------------------------------------------ exact ZOH
+
 @pytest.mark.parametrize("h", [0.37e-6, 1e-6, 13e-6, 0.25e-3, 2e-3])
 def test_zoh_step_equals_foster_sum_for_any_dt(h):
-    """ZOH step response at t = k h equals sum_k r_k (1 - exp(-t/tau_k)) for any h (07 4.2)."""
-    sys = bank()
+    """ZOH step response at t = k h equals sum_k r_k (1 - exp(-t/tau_k)) for any h."""
+    sys = _thermal_bank()
     n = 60
     u = np.zeros((n + 1, 1, sys.n_src))
     src = [sys.source_index("heater", 1), sys.aggressor_src[0], sys.source_index("waveguide_absorption", 2)]
     u[:, 0, src] = [10e-3, 50e-3, 1e-3]
-    out = th.simulate(sys, u, h, hold="zoh")
+    out = thermal.simulate(sys, u, h, hold="zoh")
     t = np.arange(n + 1) * h
-    ref = np.einsum("bost,s->tbo", th.step_response(sys, t), u[0, 0])
+    ref = np.einsum("bost,s->tbo", thermal.step_response(sys, t), u[0, 0])
     scale = np.max(np.abs(ref))
     assert np.max(np.abs(out - ref)) <= 1e-12 * scale
 
 
 def test_zoh_against_scipy_expm():
-    """Per-lag ZOH coefficients equal the exact discretization exp([[A, B], [0, 0]] h) (07 4.2)."""
-    sys = bank(n=3)
+    """Per-lag ZOH coefficients equal the exact discretization exp([[A, B], [0, 0]] h)."""
+    sys = _thermal_bank(n=3)
     obs = [sys.observer_index("ring_mode_weighted", 0), sys.observer_index("heater_resistor", 1),
            sys.observer_index("temp_sensor", name="ts_free")]
     src = [sys.source_index("heater", 0), sys.source_index("waveguide_absorption", 0), sys.aggressor_src[0]]
-    A, Bm, C, D = th.state_space(sys, 0, obs, src)
-    _, _, m, lio, lis = th._select(sys, obs, src)
+    A, Bm, C, D = thermal.state_space(sys, 0, obs, src)
+    _, _, m, lio, lis = thermal._select(sys, obs, src)
     for h in (1e-7, 1e-6, 3.3e-5, 1e-3):
         n, q = A.shape[0], Bm.shape[1]
         E = scipy.linalg.expm(np.block([[A, Bm], [np.zeros((q, n + q))]]) * h)
@@ -90,11 +104,12 @@ def test_zoh_against_scipy_expm():
 
 
 def test_foh_against_scipy_expm():
-    """FOH coefficients equal the augmented-matrix discretization of a linearly varying input (07 P0-10)."""
-    sys = bank(n=2)
+    """FOH coefficients equal the augmented-matrix discretization of a linearly varying input (the exact multi-tick
+    step of a long run)."""
+    sys = _thermal_bank(n=2)
     src = [sys.aggressor_src[0], sys.source_index("heater", 1)]
-    A, Bm, C, D = th.state_space(sys, 0, None, src)
-    _, _, m, lio, lis = th._select(sys, None, src)
+    A, Bm, C, D = thermal.state_space(sys, 0, None, src)
+    _, _, m, lio, lis = thermal._select(sys, None, src)
     n, q = A.shape[0], Bm.shape[1]
     for h in (2e-7, 5e-6, 4e-4):
         M = np.zeros((n + 2 * q, n + 2 * q))
@@ -113,25 +128,26 @@ def test_foh_against_scipy_expm():
         np.testing.assert_allclose(C0, G0 - G1 / h, rtol=1e-9, atol=tol)
 
 
-# ------------------------------------------------------------------------------------------------ exact FOH
+# ------------------------------------------------------------------------------------------------------------ exact FOH
+
 @pytest.mark.parametrize("h", [0.2e-6, 1e-6, 50e-6, 1e-3])
 def test_foh_exact_for_ramps(h):
-    """A ramp sampled at any step is reproduced exactly by the FOH: sum r [t - tau (1 - exp(-t/tau))] (07 P0-10)."""
-    sys = bank()
+    """A ramp sampled at any step is reproduced exactly by the FOH: sum r [t - tau (1 - exp(-t/tau))]."""
+    sys = _thermal_bank()
     n = 40
     t = np.arange(n + 1) * h
     slope = np.zeros(sys.n_src)
     slope[sys.aggressor_src[0]] = 120.0           # W/s
     slope[sys.source_index("heater", 0)] = -35.0
     u = t[:, None, None] * slope[None, None, :]
-    out = th.simulate(sys, u, h, hold="foh")
-    ref = np.einsum("bost,s->tbo", th.ramp_response(sys, t), slope)
+    out = thermal.simulate(sys, u, h, hold="foh")
+    ref = np.einsum("bost,s->tbo", thermal.ramp_response(sys, t), slope)
     assert np.max(np.abs(out - ref)) <= 1e-11 * np.max(np.abs(ref))
 
 
 def test_foh_piecewise_linear_triangle_matches_fine_reference():
     """A triangle (piecewise linear, corners on the grid) at a coarse FOH step equals the superposition of ramps."""
-    sys = bank(n=2)
+    sys = _thermal_bank(n=2)
     h = 7e-6
     n = 300
     t = np.arange(n + 1) * h
@@ -140,7 +156,7 @@ def test_foh_piecewise_linear_triangle_matches_fine_reference():
     tri = 0.05 * (1.0 - np.abs(((t / period) % 1.0) * 2.0 - 1.0))     # W, corners at multiples of 30 h
     u = np.zeros((n + 1, 1, sys.n_src))
     u[:, 0, s] = tri
-    out = th.simulate(sys, u, h, hold="foh")
+    out = thermal.simulate(sys, u, h, hold="foh")
     # analytic: the triangle is a sum of ramps starting at its corners
     slope = np.diff(tri) / h
     kinks = np.r_[slope[0], np.diff(slope)]
@@ -150,13 +166,14 @@ def test_foh_piecewise_linear_triangle_matches_fine_reference():
         if dk == 0.0:
             continue
         tt = np.clip(t - k0, 0.0, None)
-        ref += dk * np.moveaxis(th.ramp_response(sys, tt, src=[s])[:, :, 0, :], -1, 0)
+        ref += dk * np.moveaxis(thermal.ramp_response(sys, tt, src=[s])[:, :, 0, :], -1, 0)
     assert np.max(np.abs(out - ref)) <= 1e-9 * np.max(np.abs(ref))
 
 
-# ------------------------------------------------------------------------------------------------ kernels
+# -------------------------------------------------------------------------------------------------------------- kernels
+
 def test_njit_kernels_against_numpy():
-    sys = bank()
+    sys = _thermal_bank()
     rng = np.random.default_rng(1)
     a, c0, c1 = sys.coefficients(1e-6)
     x = rng.normal(size=(1, sys.n_lags))
@@ -164,7 +181,7 @@ def test_njit_kernels_against_numpy():
     u1 = rng.uniform(0, 1e-2, size=(1, sys.n_src))
     ss = rng.uniform(0.9, 1.1, size=(1, sys.n_src))
     ref = a * x + ss[:, sys.lag_src] * (c0 * u0[:, sys.lag_src] + c1 * u1[:, sys.lag_src])
-    th.thermal_step(x, a, c0, c1, sys.lag_src, u0, u1, ss)
+    thermal.thermal_step(x, a, c0, c1, sys.lag_src, u0, u1, ss)
     np.testing.assert_allclose(x, ref, rtol=1e-14)
     out = sys.outputs(x, 300.0)
     ref_out = 300.0 + np.bincount(sys.lag_obs, weights=x[0], minlength=sys.n_obs)
@@ -173,22 +190,22 @@ def test_njit_kernels_against_numpy():
     xf = x.copy()
     xs = x.copy()
     outf = np.zeros((1, sys.n_obs))
-    th.thermal_advance(xf, a, c0, c1, sys.lag_src, sys.obs_ptr, u0, u1, ss, np.array([290.0]), outf)
-    th.thermal_step(xs, a, c0, c1, sys.lag_src, u0, u1, ss)
+    thermal.thermal_advance(xf, a, c0, c1, sys.lag_src, sys.obs_ptr, u0, u1, ss, np.array([290.0]), outf)
+    thermal.thermal_step(xs, a, c0, c1, sys.lag_src, u0, u1, ss)
     np.testing.assert_allclose(xf, xs, rtol=1e-15)
     np.testing.assert_allclose(outf, sys.outputs(xs, 290.0), rtol=1e-14)
     # variable-step kernel equals the precomputed one
     x2 = x.copy()
     x3 = x.copy()
-    th.thermal_step_h_b(x2[0], sys.taus_s[0], sys.res_k_per_w[0], sys.lag_src, u0[0], u1[0], ss[0], 3.7e-6)
+    thermal.thermal_step_h_b(x2[0], sys.taus_s[0], sys.res_k_per_w[0], sys.lag_src, u0[0], u1[0], ss[0], 3.7e-6)
     a, c0, c1 = sys.coefficients(3.7e-6)
-    th.thermal_step_b(x3[0], a[0], c0[0], c1[0], sys.lag_src, u0[0], u1[0], ss[0])
+    thermal.thermal_step_b(x3[0], a[0], c0[0], c1[0], sys.lag_src, u0[0], u1[0], ss[0])
     np.testing.assert_allclose(x2, x3, rtol=1e-13)
 
 
 def test_observer_split_predicts_the_step():
     """pre + g u_self equals the observer after the step (the heater TCR loop interface)."""
-    sys = bank()
+    sys = _thermal_bank()
     rng = np.random.default_rng(2)
     a, c0, c1 = sys.coefficients(1e-6)
     x = rng.normal(size=sys.n_lags)
@@ -196,53 +213,57 @@ def test_observer_split_predicts_the_step():
     ss = np.ones(sys.n_src)
     o = sys.observer_index("heater_resistor", 2)
     s = sys.source_index("heater", 2)
-    pre, g = th.observer_split_b(x, a[0], c0[0], c1[0], sys.lag_src, sys.obs_ptr, o, s, u, u, ss)
-    th.thermal_step_b(x, a[0], c0[0], c1[0], sys.lag_src, u, u, ss)
+    pre, g = thermal.observer_split_b(x, a[0], c0[0], c1[0], sys.lag_src, sys.obs_ptr, o, s, u, u, ss)
+    thermal.thermal_step_b(x, a[0], c0[0], c1[0], sys.lag_src, u, u, ss)
     out = sys.outputs(x[None], 0.0)[0, o]
     assert pre + g * u[s] == pytest.approx(out, rel=1e-13)
     assert g > 0
 
 
 def test_steady_state_matches_dc_gain():
-    sys = bank()
+    sys = _thermal_bank()
     u = np.linspace(0, 1e-2, sys.n_src)[None]
     x = sys.steady_state(u)
-    np.testing.assert_allclose(sys.outputs(x)[0], th.dc_gain(sys)[0] @ u[0], rtol=1e-12)
+    np.testing.assert_allclose(sys.outputs(x)[0], thermal.dc_gain(sys)[0] @ u[0], rtol=1e-12)
     # a long ZOH run converges to it
     a, c0, c1 = sys.coefficients(1.0)
     x2 = sys.zero_state()
-    th.thermal_step(x2, a, c0, c1, sys.lag_src, u, u, np.ones((1, sys.n_src)))
+    thermal.thermal_step(x2, a, c0, c1, sys.lag_src, u, u, np.ones((1, sys.n_src)))
     np.testing.assert_allclose(x2, x, rtol=1e-12)
 
 
 def test_frequency_response_matches_state_space():
-    sys = bank(n=2)
+    sys = _thermal_bank(n=2)
     f = np.array([0.0, 10.0, 1e3, 3e4, 1e6])
-    H = th.frequency_response(sys, f)
-    A, Bm, C, D = th.state_space(sys)
+    H = thermal.frequency_response(sys, f)
+    A, Bm, C, D = thermal.state_space(sys)
     for k, fk in enumerate(f):
         ref = C @ np.linalg.solve(2j * np.pi * fk * np.eye(A.shape[0]) - A, Bm)
         np.testing.assert_allclose(H[0, :, :, k], ref, rtol=1e-9, atol=1e-9 * np.max(np.abs(ref)))
-    np.testing.assert_allclose(H[0, :, :, 0].real, th.dc_gain(sys)[0], rtol=1e-12)
+    np.testing.assert_allclose(H[0, :, :, 0].real, thermal.dc_gain(sys)[0], rtol=1e-12)
 
 
-# ------------------------------------------------------------------------------------------------ physics of the ROM
+# --------------------------------------------------------------------------------------------------- physics of the ROM
+
 def test_reciprocity_of_residues_interim():
-    """Z_ij = Z_ji for like sources and observers, including per-ring Z0 variation and an irregular layout (07 P1-2)."""
+    """Z_ij = Z_ji for like sources and observers, including per-ring Z0 variation and an irregular layout."""
     rng = np.random.default_rng(3)
     xy = np.c_[np.cumsum(rng.uniform(15, 60, 6)), rng.uniform(-5, 5, 6)]
     z0 = rng.uniform(4e3, 8e3, size=(2, 6))
-    sys = th.assemble(th.InterimRom(z_heater_ring_k_per_w=z0, z_ratio_opt_heater=[1.2, 1.9]),
-                      th.LayoutSites(xy), 6)
+    sys = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=z0, z_ratio_opt_heater=[1.2, 1.9]),
+                           thermal.LayoutSites(xy), 6)
     assert sys.batch == 2
-    assert th.reciprocity_error(sys) < 1e-13
-    corner = th.assemble(th.InterimRom.textbook_corner(), th.LayoutSites.line(5, 20.0), 5)
-    assert th.reciprocity_error(corner) < 1e-13
+    assert thermal.reciprocity_error(sys) < 1e-13
+    corner = thermal.assemble(thermal.InterimRom.textbook_corner(), thermal.LayoutSites.line(5, 20.0), 5)
+    assert thermal.reciprocity_error(corner) < 1e-13
 
 
 def test_interim_matches_07_p1_2_numbers():
-    sys = th.assemble(th.InterimRom(z_heater_ring_k_per_w=H86_Z0), th.LayoutSites.line(8, 30.0), 8)
-    G = th.dc_gain(sys)[0]
+    """The interim model has the numbers that the design review gives for it: crosstalk 3 % to the nearest
+    neighbour and a 1.5 % floor, an optical self path with a sub-us pole, the self-path shares and the
+    crosstalk time constants."""
+    sys = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=H86_Z0), thermal.LayoutSites.line(8, 30.0), 8)
+    G = thermal.dc_gain(sys)[0]
     r = [sys.observer_index("ring_mode_weighted", i) for i in range(8)]
     hsrc = [sys.source_index("heater", i) for i in range(8)]
     assert G[r[0], hsrc[0]] == pytest.approx(H86_Z0)
@@ -250,12 +271,12 @@ def test_interim_matches_07_p1_2_numbers():
     assert G[r[3], hsrc[2]] / H86_Z0 == pytest.approx(0.03)
     for j in range(2, 8):
         assert G[r[j], hsrc[0]] / H86_Z0 == pytest.approx(0.015)     # floor 1.5 %
-    # optical self path: DC = z Z0 and a sub-us pole (07 P0-1 item 3)
+    # optical self path: DC = z Z0 and a sub-us pole (the waveguide-core self-heating pole)
     wg = sys.source_index("waveguide_absorption", 0)
     assert G[r[0], wg] == pytest.approx(1.5 * H86_Z0)
     m = np.flatnonzero((sys.lag_obs == r[0]) & (sys.lag_src == wg))
     assert sys.taus_s[0, m].min() < 1e-6
-    assert th.selfheat_dc_k_per_w(sys)[0] == pytest.approx(np.full(8, 1.5 * H86_Z0))
+    assert thermal.selfheat_dc_k_per_w(sys)[0] == pytest.approx(np.full(8, 1.5 * H86_Z0))
     # self path shares: 3.2 us (40.85 %), 13 us (54.15 %), 4 ms tail (5 %)
     m = np.flatnonzero((sys.lag_obs == r[0]) & (sys.lag_src == hsrc[0]))
     np.testing.assert_allclose(sys.taus_s[0, m], [3.2e-6, 13e-6, 4e-3])
@@ -266,77 +287,79 @@ def test_interim_matches_07_p1_2_numbers():
     assert m.size == 1 and sys.taus_s[0, m[0]] == pytest.approx(4.1e-3 * ((30.0 - 2 * 7.5) / 60.0) ** 2)
     m = np.flatnonzero((sys.lag_obs == r[7]) & (sys.lag_src == hsrc[0]))
     assert 4.0e-3 <= sys.taus_s[0, m[0]] <= 9.0e-3                  # 210 um: in the 4-9 ms band
-    # 63 % point of the two-pole fit alone (04 verification log V5 prints 7.3 us; the exact value is 7.35 us)
-    two = th.assemble(th.InterimRom(z_heater_ring_k_per_w=1.0, tau_fast_s=3.18e-6, share_fast_frac=0.427,
-                                    tau_slow_s=13.01e-6, tail_share_frac=0.0), None, 1)
+    # 63 % point of the two-pole fit alone (the thermal notes' verification log, V5, prints 7.3 us; the exact value
+    # is 7.35 us)
+    two = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=1.0, tau_fast_s=3.18e-6, share_fast_frac=0.427,
+                                              tau_slow_s=13.01e-6, tail_share_frac=0.0), None, 1)
     t = np.linspace(0, 30e-6, 30001)
-    sr = th.step_response(two, t, obs=[0], src=[two.source_index("heater", 0)])[0, 0, 0]
+    sr = thermal.step_response(two, t, obs=[0], src=[two.source_index("heater", 0)])[0, 0, 0]
     assert t[np.searchsorted(sr, 1 - math.exp(-1))] == pytest.approx(7.35e-6, abs=0.01e-6)
 
 
 def test_crosstalk_tau_laws():
     d = np.array([1.0, 9.0, 15.0, 30.0, 60.0, 80.0, 100.0, 160.0, 400.0, 2000.0])
-    cap = th.crosstalk_tau_s(d)
+    cap = thermal.crosstalk_tau_s(d)
     assert np.all(np.diff(cap) >= 0)                                   # monotone
     assert cap[0] == pytest.approx(1e-4) and cap[2] == pytest.approx(4.1e-3 * 0.0625)
     assert cap[4] == pytest.approx(4.1e-3) and cap[-1] == pytest.approx(8.99e-3)
     assert np.all(cap <= 9e-3)
-    lit = th.crosstalk_tau_s(d, tau_far_s=6e-3, law="literal")
-    assert lit[6] == pytest.approx(4.1e-3 * (100 / 60) ** 2)            # 07 as written: 11.4 ms at 100 um
+    lit = thermal.crosstalk_tau_s(d, tau_far_s=6e-3, law="literal")
+    # the design review's d^2 law taken literally: 11.4 ms at 100 um
+    assert lit[6] == pytest.approx(4.1e-3 * (100 / 60) ** 2)
     assert lit[7] == pytest.approx(6e-3)
 
 
 def test_crosstalk_tau_takes_the_source_to_victim_distance():
     """physics_thermal review (2026-10-16): the X2 table and the 60 um anchor of the d^2 law are imec's
-    heat-source-to-victim distances (first neighbour 60 um from the heat source at a 100 um pitch, 04 section 2.5),
-    while the assembly passed centre distances: imec's own geometry gave 4.75 ms for the first neighbour instead of
-    the printed 4.14 ms. With the centre distance less both ring radii, rings of R = 20 um at a 100 um pitch (imec's
-    geometry, inferred) reproduce Table II for neighbours 2-7 and the 4.1 ms FE anchor for the first (Table II prints
-    4.14 ms, within 1 %); site paths subtract the radius of their ring element only."""
-    s = th.assemble(th.InterimRom(ring_radius_um=20.0), th.LayoutSites.line(8, 100.0), 8,
-                    sources=["heater"], observers=["ring_mode_weighted"])
+    heat-source-to-victim distances (first neighbour 60 um from the heat source at a 100 um pitch; thermal notes,
+    section 2.5), while the assembly passed centre distances: imec's own geometry gave 4.75 ms for the first neighbour
+    instead of the printed 4.14 ms. With the centre distance less both ring radii, rings of R = 20 um at a 100 um pitch
+    (imec's geometry, inferred) reproduce Table II for neighbours 2-7 and the 4.1 ms FE anchor for the first (Table II
+    prints 4.14 ms, within 1 %); site paths subtract the radius of their ring element only."""
+    s = thermal.assemble(thermal.InterimRom(ring_radius_um=20.0), thermal.LayoutSites.line(8, 100.0), 8,
+                         sources=["heater"], observers=["ring_mode_weighted"])
     taus = []
     for k in range(1, 8):
         m = np.flatnonzero((s.lag_obs == s.ring_obs[k]) & (s.lag_src == s.heater_src[0]))
         assert m.size == 1
         taus.append(s.taus_s[0, m[0]])
-    np.testing.assert_allclose(taus[1:], th.XT_TABLE_TAU_S[1:], rtol=1e-12)
-    assert taus[0] == pytest.approx(4.1e-3, rel=1e-12) and taus[0] == pytest.approx(th.XT_TABLE_TAU_S[0], rel=0.01)
+    np.testing.assert_allclose(taus[1:], thermal.XT_TABLE_TAU_S[1:], rtol=1e-12)
+    assert taus[0] == pytest.approx(4.1e-3, rel=1e-12) and taus[0] == pytest.approx(thermal.XT_TABLE_TAU_S[0], rel=0.01)
     # per-ring radii (B, N): each pair subtracts its own two radii; a PD site (point) only its ring's radius
     rr = np.array([[5.0, 7.0, 9.0]])
-    lay = th.LayoutSites.line(3, 50.0)
-    s3 = th.assemble(th.InterimRom(ring_radius_um=rr), lay, 3)
+    lay = thermal.LayoutSites.line(3, 50.0)
+    s3 = thermal.assemble(thermal.InterimRom(ring_radius_um=rr), lay, 3)
     for (j, i) in ((0, 1), (1, 2), (2, 0)):
         m = np.flatnonzero((s3.lag_obs == s3.ring_obs[i]) & (s3.lag_src == s3.heater_src[j]))
         d = abs(i - j) * 50.0 - rr[0, i] - rr[0, j]
-        assert s3.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(d)), rel=1e-12)
+        assert s3.taus_s[0, m[0]] == pytest.approx(float(thermal.crosstalk_tau_s(d)), rel=1e-12)
     m = np.flatnonzero((s3.lag_obs == s3.pd_obs[1]) & (s3.lag_src == s3.heater_src[1]))
-    assert s3.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(25.0 - 7.0)), rel=1e-12)
+    assert s3.taus_s[0, m[0]] == pytest.approx(float(thermal.crosstalk_tau_s(25.0 - 7.0)), rel=1e-12)
     # the site coupling (an assumed law) keeps the centre distance: DC unchanged by the radius
-    s0 = th.assemble(th.InterimRom(ring_radius_um=0.0), lay, 3)
-    np.testing.assert_allclose(th.dc_gain(s3), th.dc_gain(s0), rtol=1e-14)
+    s0 = thermal.assemble(thermal.InterimRom(ring_radius_um=0.0), lay, 3)
+    np.testing.assert_allclose(thermal.dc_gain(s3), thermal.dc_gain(s0), rtol=1e-14)
     with pytest.raises(ValueError, match="ring_radius_um"):
-        th.assemble(th.InterimRom(ring_radius_um=-1.0), lay, 3)
+        thermal.assemble(thermal.InterimRom(ring_radius_um=-1.0), lay, 3)
 
 
 def test_scaling_rules():
-    lay = th.LayoutSites.line(3, 40.0)
-    base = th.assemble(th.InterimRom(), lay, 3, th.ThermalScales(scaling_hypothesis="independent"))
-    sc = th.ThermalScales(dc_scale={"*": [1.0, 1.3], "heater->ring_mode_weighted": [2.0, 1.0]},
-                          time_scale_fast=[0.5, 1.0], time_scale_slow=[1.0, 3.0], crosstalk_scale=[2.0, 0.5],
-                          scaling_hypothesis=["resistance", "independent"])
-    s = th.assemble(th.InterimRom(), lay, 3, sc)
+    lay = thermal.LayoutSites.line(3, 40.0)
+    base = thermal.assemble(thermal.InterimRom(), lay, 3, thermal.ThermalScales(scaling_hypothesis="independent"))
+    sc = thermal.ThermalScales(dc_scale={"*": [1.0, 1.3], "heater->ring_mode_weighted": [2.0, 1.0]},
+                               time_scale_fast=[0.5, 1.0], time_scale_slow=[1.0, 3.0], crosstalk_scale=[2.0, 0.5],
+                               scaling_hypothesis=["resistance", "independent"])
+    s = thermal.assemble(thermal.InterimRom(), lay, 3, sc)
     assert s.batch == 2 and s.n_lags == base.n_lags
     np.testing.assert_array_equal(s.lag_src, base.lag_src)
     sig = s.res_k_per_w / base.res_k_per_w
-    hr = (base.src_kind[base.lag_src] == th.SRC_HEATER) & (base.obs_kind[base.lag_obs] == th.OBS_RING)
-    cross = base.lag_pair == th.PAIR_CROSS
+    hr = (base.src_kind[base.lag_src] == thermal.SRC_HEATER) & (base.obs_kind[base.lag_obs] == thermal.OBS_RING)
+    cross = base.lag_pair == thermal.PAIR_CROSS
     exp0 = np.where(hr, 2.0, 1.0) * np.where(cross, 2.0, 1.0)
     exp1 = 1.3 * np.where(cross, 0.5, 1.0)
     np.testing.assert_allclose(sig[0], exp0, rtol=1e-14)
     np.testing.assert_allclose(sig[1], exp1, rtol=1e-14)
     ts = s.taus_s / base.taus_s
-    fast = base.lag_layer == th.LAYER_FAST
+    fast = base.lag_layer == thermal.LAYER_FAST
     # resistance: tau follows the dc_scale (conductance) factor of its residue, never the crosstalk magnitude scale
     np.testing.assert_allclose(ts[0], np.where(fast, 0.5, 1.0) * np.where(hr, 2.0, 1.0), rtol=1e-14)
     np.testing.assert_allclose(ts[1], np.where(fast, 1.0, 3.0), rtol=1e-14)           # independent
@@ -344,19 +367,21 @@ def test_scaling_rules():
     assert np.all(~fast[cross])
     np.testing.assert_allclose(ts[0, cross], np.where(hr, 2.0, 1.0)[cross], rtol=1e-14)
     np.testing.assert_allclose(sig[0, cross], 2.0 * np.where(hr, 2.0, 1.0)[cross], rtol=1e-14)
-    cap = th.assemble(th.InterimRom(), lay, 3, th.ThermalScales(dc_scale=1.7, scaling_hypothesis="capacitance"))
+    cap = thermal.assemble(thermal.InterimRom(), lay, 3,
+                           thermal.ThermalScales(dc_scale=1.7, scaling_hypothesis="capacitance"))
     np.testing.assert_allclose(cap.taus_s, base.taus_s, rtol=1e-14)
     np.testing.assert_allclose(cap.res_k_per_w, 1.7 * base.res_k_per_w, rtol=1e-14)
     with pytest.raises(ValueError):
-        th.assemble(th.InterimRom(), lay, 3, th.ThermalScales(scaling_hypothesis="bogus"))
+        thermal.assemble(thermal.InterimRom(), lay, 3, thermal.ThermalScales(scaling_hypothesis="bogus"))
 
 
 def test_package_tail_preserves_dc_and_ratio():
-    lay = th.LayoutSites.line(2, 40.0)
-    base = th.assemble(th.InterimRom(), lay, 2)
-    s = th.assemble(th.InterimRom(), lay, 2, th.ThermalScales(package_tail_tau_s=[1e-3, 1e-2],
-                                                              package_tail_share_frac=[0.02, 0.10]))
-    np.testing.assert_allclose(th.dc_gain(s), np.broadcast_to(th.dc_gain(base), (2,) + th.dc_gain(base).shape[1:]),
+    lay = thermal.LayoutSites.line(2, 40.0)
+    base = thermal.assemble(thermal.InterimRom(), lay, 2)
+    s = thermal.assemble(thermal.InterimRom(), lay, 2, thermal.ThermalScales(package_tail_tau_s=[1e-3, 1e-2],
+                                                                             package_tail_share_frac=[0.02, 0.10]))
+    np.testing.assert_allclose(thermal.dc_gain(s),
+                               np.broadcast_to(thermal.dc_gain(base), (2,) + thermal.dc_gain(base).shape[1:]),
                                rtol=1e-12)
     r0, h0 = s.observer_index("ring_mode_weighted", 0), s.source_index("heater", 0)
     m = np.flatnonzero((s.lag_obs == r0) & (s.lag_src == h0))
@@ -366,42 +391,47 @@ def test_package_tail_preserves_dc_and_ratio():
 
 
 def test_batch_rows_equal_single_worlds():
-    lay = th.LayoutSites.line(3, 25.0)
+    lay = thermal.LayoutSites.line(3, 25.0)
     z = [5e3, 7e3]
     tsf = [0.7, 1.4]
-    sb = th.assemble(th.InterimRom(z_heater_ring_k_per_w=z), lay, 3, th.ThermalScales(time_scale_fast=tsf))
+    sb = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=z), lay, 3,
+                          thermal.ThermalScales(time_scale_fast=tsf))
     for b in range(2):
-        s1 = th.assemble(th.InterimRom(z_heater_ring_k_per_w=z[b]), lay, 3, th.ThermalScales(time_scale_fast=tsf[b]))
+        s1 = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=z[b]), lay, 3,
+                              thermal.ThermalScales(time_scale_fast=tsf[b]))
         np.testing.assert_array_equal(sb.taus_s[b], s1.taus_s[0])
         np.testing.assert_array_equal(sb.res_k_per_w[b], s1.res_k_per_w[0])
 
 
 def test_cross_lag_gain_assertion():
-    """07 P0-1: the lagged cross-ring optical gain per 1 us substep is far below 0.05 for the interim model."""
-    sys = th.assemble(th.InterimRom(), th.LayoutSites.line(8, 20.0), 8)
+    """The lagged cross-ring optical gain per 1 us substep is far below 0.05 for the interim model (realize asserts
+    this bound, so that the cross-ring optical heating may lag one substep)."""
+    sys = thermal.assemble(thermal.InterimRom(), thermal.LayoutSites.line(8, 20.0), 8)
     hwhm, s0 = 1310e-9 / 3800 / 2, 77e-12
     p_peak = 0.85 * 7.94e-3                                               # +9 dBm at the ring, eta 0.85
     d = 3 * math.sqrt(3) / 8 * p_peak * s0 / hwhm
-    g = th.assert_cross_lag_gain(sys, 1e-6, np.full(8, d))
+    g = thermal.assert_cross_lag_gain(sys, 1e-6, np.full(8, d))
     assert 0 < g < 0.05
-    fast = th.assemble(th.InterimRom(xt_nearest_frac=0.4, xt_floor_frac=0.4, xt_tau_min_s=1e-7, xt_tau_ref_s=1e-7),
-                       th.LayoutSites.line(8, 20.0), 8)
+    fast = thermal.assemble(thermal.InterimRom(xt_nearest_frac=0.4, xt_floor_frac=0.4, xt_tau_min_s=1e-7,
+                                               xt_tau_ref_s=1e-7),
+                            thermal.LayoutSites.line(8, 20.0), 8)
     with pytest.raises(ValueError, match="lagged cross-ring"):
-        th.assert_cross_lag_gain(fast, 1e-6, np.full(8, d))
+        thermal.assert_cross_lag_gain(fast, 1e-6, np.full(8, d))
 
 
 def test_interim_input_validation():
     with pytest.raises(ValueError):
-        th.assemble(th.InterimRom(z_ratio_opt_heater=0.8), None, 1)
+        thermal.assemble(thermal.InterimRom(z_ratio_opt_heater=0.8), None, 1)
     with pytest.raises(ValueError):
-        th.assemble(th.InterimRom(share_fast_frac=0.7, tail_share_frac=0.4), None, 1)
+        thermal.assemble(thermal.InterimRom(share_fast_frac=0.7, tail_share_frac=0.4), None, 1)
     with pytest.warns(RuntimeWarning, match="positive semidefinite"):
-        th.assemble(th.InterimRom(z_ratio_opt_heater=1.5, selfheat_share_frac=0.6), None, 1)
+        thermal.assemble(thermal.InterimRom(z_ratio_opt_heater=1.5, selfheat_share_frac=0.6), None, 1)
     with pytest.raises(ValueError):
-        th.assemble(th.InterimRom(), None, 2)
+        thermal.assemble(thermal.InterimRom(), None, 2)
 
 
-# ------------------------------------------------------------------------------------------------ ROM artefacts
+# -------------------------------------------------------------------------------------------------------- ROM artefacts
+
 def synthetic_rom(sym=True):
     """A small symmetric ROM: 5 poles from 50 ns to 6 ms, cross residues decaying with distance."""
     taus = np.array([5e-8, 8e-7, 6e-6, 4e-5, 6e-3])
@@ -417,8 +447,8 @@ def synthetic_rom(sym=True):
     for di, d in enumerate(r):
         cross[:, :, di, -1] = 150.0 * (40.0 / d) ** 0.4          # ms pole carries the crosstalk
         cross[:, :, di, 2] = 30.0 * math.exp(-d / 30.0)
-    return th.ThermalRom(taus, srcs, obss, self_res, r, cross,
-                         {"monitor_pd": (0.0, 12.0), "temp_sensor": (0.0, -12.0)}, {})
+    return thermal.ThermalRom(taus, srcs, obss, self_res, r, cross,
+                              {"monitor_pd": (0.0, 12.0), "temp_sensor": (0.0, -12.0)}, {})
 
 
 def test_rom_roundtrip_sha256_and_tamper(tmp_path):
@@ -426,59 +456,59 @@ def test_rom_roundtrip_sha256_and_tamper(tmp_path):
     side = {"family": "inring_noundercut", "film_nm": 160,
             "validation": {"step_max_rel_err": 0.01, "freq_max_db_err": 0.2, "freq_max_deg_err": 2.0,
                            "superposition_rel_err": 0.05}}
-    p = th.save_rom(tmp_path / "thermal_rom_inring_noundercut_160.npz", rom, side)
+    p = thermal.save_rom(tmp_path / "thermal_rom_inring_noundercut_160.npz", rom, side)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        r2 = th.load_rom(p)
+        r2 = thermal.load_rom(p)
     np.testing.assert_array_equal(r2.self_res, rom.self_res)
     np.testing.assert_array_equal(r2.cross_res, rom.cross_res)
     assert r2.sources == rom.sources and r2.site_offsets_um["monitor_pd"] == (0.0, 12.0)
-    assert r2.meta["sha256"] == th.sha256_file(p)
+    assert r2.meta["sha256"] == thermal.sha256_file(p)
     # tamper with the data file
     b = bytearray(p.read_bytes())
     b[-10] ^= 0xFF
     p.write_bytes(bytes(b))
-    with pytest.raises(th.RomIntegrityError, match="sha256"):
-        th.load_rom(p)
+    with pytest.raises(thermal.RomIntegrityError, match="sha256"):
+        thermal.load_rom(p)
     # missing sidecar / wrong schema
-    p2 = th.save_rom(tmp_path / "b.npz", rom, side)
+    p2 = thermal.save_rom(tmp_path / "b.npz", rom, side)
     sp = p2.with_name(p2.stem + ".sidecar.json")
     assert sp.exists()
     side2 = json.loads(sp.read_text())
     side2["schema"] = "thermal_rom/0"
     sp.write_text(json.dumps(side2))
-    with pytest.raises(th.RomIntegrityError, match="schema"):
-        th.load_rom(p2)
-    side2["schema"] = th.SCHEMA_ROM
+    with pytest.raises(thermal.RomIntegrityError, match="schema"):
+        thermal.load_rom(p2)
+    side2["schema"] = thermal.SCHEMA_ROM
     sp.unlink()
     p2.with_suffix(".json").write_text(json.dumps(side2))       # the plain <stem>.json name is accepted too
-    assert th.load_rom(p2, warn=False).taus_s.size == 5
+    assert thermal.load_rom(p2, warn=False).taus_s.size == 5
     p2.with_suffix(".json").unlink()
-    with pytest.raises(th.RomIntegrityError, match="sidecar"):
-        th.load_rom(p2)
-    assert th.load_rom(p2, verify=False, warn=False).taus_s.size == 5
+    with pytest.raises(thermal.RomIntegrityError, match="sidecar"):
+        thermal.load_rom(p2)
+    assert thermal.load_rom(p2, verify=False, warn=False).taus_s.size == 5
 
 
 def test_rom_quality_warnings(tmp_path):
     rom = synthetic_rom()
-    p = th.save_rom(tmp_path / "c.npz", rom, {"validation": {"step_max_rel_err": 0.05}})
+    p = thermal.save_rom(tmp_path / "c.npz", rom, {"validation": {"step_max_rel_err": 0.05}})
     with pytest.warns(RuntimeWarning, match="step_max_rel_err"):
-        th.load_rom(p)
-    slow = th.ThermalRom(rom.taus_s * 30, rom.sources, rom.observers, rom.self_res, rom.cross_r_um, rom.cross_res)
-    p = th.save_rom(tmp_path / "d.npz", slow, {})
+        thermal.load_rom(p)
+    slow = thermal.ThermalRom(rom.taus_s * 30, rom.sources, rom.observers, rom.self_res, rom.cross_r_um, rom.cross_res)
+    p = thermal.save_rom(tmp_path / "d.npz", slow, {})
     with pytest.warns(RuntimeWarning, match="below"):
-        th.load_rom(p)
+        thermal.load_rom(p)
 
 
 def test_rom_assembly_superposition():
     """Same-ring pairs use self_res; other pairs interpolate cross_res at the source-centre to observer-centre
-    distance (ARCH 5.3, the convention of mrm/extraction/thermal_fem.py)."""
+    distance (docs/ARCHITECTURE.md, "5.3 Thermal ROM", the convention of mrm/extraction/thermal_fem.py)."""
     rom = synthetic_rom()
     xy = np.array([[0.0, 0.0], [40.0, 0.0], [100.0, 0.0]])
-    lay = th.LayoutSites(xy, aggressor_xy_um=[[0.0, 60.0]], temp_sensor_xy_um=[[0, 0], [300.0, 0.0]],
-                         temp_sensor_ring=[1, -1])
-    sys = th.assemble(rom, lay, 3)
-    G = th.dc_gain(sys)[0]
+    lay = thermal.LayoutSites(xy, aggressor_xy_um=[[0.0, 60.0]], temp_sensor_xy_um=[[0, 0], [300.0, 0.0]],
+                              temp_sensor_ring=[1, -1])
+    sys = thermal.assemble(rom, lay, 3)
+    G = thermal.dc_gain(sys)[0]
     si = {k: i for i, k in enumerate(rom.sources)}
     oi = {k: i for i, k in enumerate(rom.observers)}
     for s in ("heater", "waveguide_absorption", "junction"):
@@ -498,11 +528,11 @@ def test_rom_assembly_superposition():
     agg = sys.aggressor_src[0]
     ref = sum(np.interp(60.0, rom.cross_r_um, rom.cross_res[3, 0, :, k]) for k in range(5))
     assert G[sys.observer_index("ring_mode_weighted", 0), agg] == pytest.approx(ref)
-    assert th.reciprocity_error(sys) < 1e-12
+    assert thermal.reciprocity_error(sys) < 1e-12
     # the fast/slow split follows tau_split_s; tail added from scales preserves DC
-    assert set(sys.lag_layer[sys.taus_s[0] < th.DEFAULT_TAU_SPLIT_S]) == {th.LAYER_FAST}
-    s2 = th.assemble(rom, lay, 3, th.ThermalScales(package_tail_share_frac=0.05, package_tail_tau_s=3e-3))
-    np.testing.assert_allclose(th.dc_gain(s2), th.dc_gain(sys), rtol=1e-12)
+    assert set(sys.lag_layer[sys.taus_s[0] < thermal.DEFAULT_TAU_SPLIT_S]) == {thermal.LAYER_FAST}
+    s2 = thermal.assemble(rom, lay, 3, thermal.ThermalScales(package_tail_share_frac=0.05, package_tail_tau_s=3e-3))
+    np.testing.assert_allclose(thermal.dc_gain(s2), thermal.dc_gain(sys), rtol=1e-12)
 
 
 def test_layout_from_sites():
@@ -511,51 +541,54 @@ def test_layout_from_sites():
              "eic": {"x_um": 20, "y_um": -500, "kind": "driver"},
              "agg": {"x_um": 17, "y_um": 15, "kind": "heater"},
              "tsA": {"x_um": 100, "y_um": 0, "kind": "temp_sensor"}}
-    lay = th.LayoutSites.from_sites(sites, 2, temp_sensors=[{"name": "die_ts", "attach": "die"},
-                                                           {"name": "r0", "attach": "ring_0"}])
+    lay = thermal.LayoutSites.from_sites(sites, 2, temp_sensors=[{"name": "die_ts", "attach": "die"},
+                                                                 {"name": "r0", "attach": "ring_0"}])
     np.testing.assert_allclose(lay.ring_xy_um, [[0, 0], [35, 0]])
     np.testing.assert_allclose(lay.pd_xy_um, [[np.nan, np.nan], [35, 20]])      # ring 0: no PD site (NaN row)
     np.testing.assert_allclose(lay.driver_xy_um, [[20, -500], [20, -500]])
     assert lay.aggressor_names == ("agg",)
     assert lay.temp_sensor_names == ("tsA", "die_ts", "r0") and list(lay.temp_sensor_ring) == [-1, -1, 0]
-    sys = th.assemble(th.InterimRom(), sites, 2, temp_sensors=[{"name": "r0", "attach": "ring_0"}])
+    sys = thermal.assemble(thermal.InterimRom(), sites, 2, temp_sensors=[{"name": "r0", "attach": "ring_0"}])
     assert sys.driver_src.min() >= 0 and sys.aggressor_src.size == 1 and sys.temp_obs.size == 2
     # ring 0's PD (no site) sits at the model's default offset (0, 25) um, not at the ring centre: site law at 25 um
-    G = th.dc_gain(sys)[0]
+    G = thermal.dc_gain(sys)[0]
     assert G[sys.observer_index("monitor_pd", 0), sys.source_index("heater", 0)] == pytest.approx(
-        th.site_fraction(25.0) * 6.1e3)
+        thermal.site_fraction(25.0) * 6.1e3)
     assert G[sys.observer_index("monitor_pd", 1), sys.source_index("heater", 1)] == pytest.approx(
-        th.site_fraction(20.0) * 6.1e3)
+        thermal.site_fraction(20.0) * 6.1e3)
     # a driver site for ring 1 only: ring 0 has no driver source
-    one = th.assemble(th.InterimRom(), {"drv1": {"x_um": 35, "y_um": -30, "kind": "driver"}}, 2, ring_pitch_um=35.0)
+    one = thermal.assemble(thermal.InterimRom(), {"drv1": {"x_um": 35, "y_um": -30, "kind": "driver"}}, 2,
+                           ring_pitch_um=35.0)
     assert one.driver_src[0] == -1 and one.driver_src[1] >= 0
-    lay2 = th.LayoutSites.from_sites({}, 4, ring_pitch_um=25.0)
+    lay2 = thermal.LayoutSites.from_sites({}, 4, ring_pitch_um=25.0)
     np.testing.assert_allclose(lay2.ring_xy_um[:, 0], [0, 25, 50, 75])
     with pytest.raises(ValueError):
-        th.LayoutSites.from_sites({}, 4)
+        thermal.LayoutSites.from_sites({}, 4)
 
 
 def test_k_temp_residue_scale():
-    s = th.k_temp_residue_scale(np.array([300.0, 378.15]))
-    assert s[0] == pytest.approx(1.0)
-    assert 0.8 < s[1] < 1.2
-    film_only = th.k_temp_residue_scale(378.15, weights=(1.0, 0.0, 0.0))
-    assert film_only > 1.0                       # thin-film k falls with T, so R rises (02 section 5.2)
+    scale = thermal.k_temp_residue_scale(np.array([300.0, 378.15]))
+    assert scale[0] == pytest.approx(1.0)
+    assert 0.8 < scale[1] < 1.2
+    film_only = thermal.k_temp_residue_scale(378.15, weights=(1.0, 0.0, 0.0))
+    assert film_only > 1.0     # thin-film k falls with T, so R rises (docs/research/02_materials.md, section 5.2)
 
 
-# ------------------------------------------------------------------------------------------------ review additions
+# ----------------------------------------------------------------------------------------------------- review additions
+
 def test_rom_loads_the_extraction_artefact_format(tmp_path):
-    """load_rom reads what mrm/extraction/thermal_fem.write_artefact writes: ``site_names`` in the .npz, the sidecar
-    ``<stem>.json`` with the nested verify() report, and site offsets that place the PD and sensor (ARCH 5.3)."""
+    """load_rom reads what mrm/extraction/thermal_fem.write_artefact writes: ``site_offset_names`` in the .npz, the
+    sidecar ``<stem>.json`` with the nested verify() report, and site offsets that place the PD and sensor
+    (docs/ARCHITECTURE.md, "5.3 Thermal ROM")."""
     from types import SimpleNamespace
-    tf = pytest.importorskip("mrm.extraction.thermal_fem")
+    thermal_fem = pytest.importorskip("mrm.extraction.thermal_fem")
     rom = synthetic_rom()
-    S, O = len(tf.SOURCES), len(tf.OBSERVERS)
+    S, O = len(thermal_fem.SOURCES), len(thermal_fem.OBSERVERS)
     K, D = rom.taus_s.size, rom.cross_r_um.size
     self_res = np.zeros((S, O, K))
     cross_res = np.zeros((S, O, D, K))
-    for i, s in enumerate(tf.SOURCES):
-        for j, o in enumerate(tf.OBSERVERS):
+    for i, s in enumerate(thermal_fem.SOURCES):
+        for j, o in enumerate(thermal_fem.OBSERVERS):
             if s in rom.sources and o in rom.observers:
                 self_res[i, j] = rom.self_res[rom.sources.index(s), rom.observers.index(o)]
                 cross_res[i, j] = rom.cross_res[rom.sources.index(s), rom.observers.index(o)]
@@ -567,81 +600,86 @@ def test_rom_loads_the_extraction_artefact_format(tmp_path):
             "nearest_neighbour": {"max_db": 0.2, "max_deg": 2.5, "max_time_err_frac_of_dc": 0.015}}
     side = {"family": cfg.family, "film_nm": 160.0, "validation": good, "inputs": {"config": {"site_offsets_um": offs}},
             "stages": {"3d": {"superposition_rel_err": 0.04}}}
-    npz, js = tf.write_artefact(cfg, fr, side, out_dir=tmp_path)
+    npz, js = thermal_fem.write_artefact(cfg, fr, side, out_dir=tmp_path)
     assert js.name == npz.stem + ".json"
+    with np.load(npz) as z:                              # the names key the load_rom docstring documents
+        assert "site_offset_names" in z.files and "site_names" not in z.files
     with warnings.catch_warnings():
         warnings.simplefilter("error")                   # good numbers in the nested report: no quality warning
-        r = th.load_rom(npz)
+        r = thermal.load_rom(npz)
     assert r.site_offsets_um["monitor_pd"] == (0.0, 25.0) and r.site_offsets_um["temp_sensor"] == (40.0, 0.0)
-    assert th.rom_validation_numbers(r.meta) == {"step_max_rel_err": 0.015, "freq_max_db_err": 0.2,
-                                                 "freq_max_deg_err": 2.5, "superposition_rel_err": 0.04}
+    assert thermal.rom_validation_numbers(r.meta) == {"step_max_rel_err": 0.015, "freq_max_db_err": 0.2,
+                                                      "freq_max_deg_err": 2.5, "superposition_rel_err": 0.04}
     # the PD of ring 1 sits at its offset: the heater-0 -> PD-1 residue uses the distance to the PD site
     xy = np.array([[0.0, 0.0], [40.0, 0.0]])
-    sys = th.assemble(r, th.LayoutSites(xy), 2, sources=("heater",), observers=("monitor_pd",))
+    sys = thermal.assemble(r, thermal.LayoutSites(xy), 2, sources=("heater",), observers=("monitor_pd",))
     d = float(np.linalg.norm(xy[0] - (xy[1] + [0.0, 25.0])))
     ref = sum(np.interp(d, r.cross_r_um, r.cross_res[0, 2, :, k]) for k in range(K))
-    assert th.dc_gain(sys)[0, sys.observer_index("monitor_pd", 1), sys.source_index("heater", 0)] == pytest.approx(ref)
+    assert thermal.dc_gain(sys)[0, sys.observer_index("monitor_pd", 1), sys.source_index("heater", 0)] == \
+        pytest.approx(ref)
     # bad numbers in the nested report do warn
     bad = json.loads(js.read_text())
     bad["validation"]["nearest_neighbour"]["max_deg"] = 7.0
     js.write_text(json.dumps(bad))
     with pytest.warns(RuntimeWarning, match="freq_max_deg_err"):
-        th.load_rom(npz)
+        thermal.load_rom(npz)
 
 
 def test_scaling_hypothesis_list_sets_the_batch():
-    s = th.assemble(th.InterimRom(), None, 1, th.ThermalScales(scaling_hypothesis=["resistance", "independent"],
-                                                                 dc_scale={"*": 1.0}))
+    s = thermal.assemble(thermal.InterimRom(), None, 1,
+                         thermal.ThermalScales(scaling_hypothesis=["resistance", "independent"], dc_scale={"*": 1.0}))
     assert s.batch == 2
     with pytest.raises(ValueError, match="inconsistent batch"):
-        th.assemble(th.InterimRom(), None, 1, th.ThermalScales(scaling_hypothesis=["resistance"] * 2,
+        thermal.assemble(thermal.InterimRom(), None, 1, thermal.ThermalScales(scaling_hypothesis=["resistance"] * 2,
                                                                 time_scale_fast=[1.0, 1.1, 1.2]))
 
 
 def test_package_tail_from_scales_is_absolute():
-    """A package tail drawn in uncertainty.thermal (07 4.8: 1-10 ms) keeps its tau under time_scale_slow and under the
-    'resistance' factor; the model's own tail (a family value) scales with time_scale_slow."""
-    sc = th.ThermalScales(time_scale_slow=2.0, dc_scale=1.5, package_tail_tau_s=6e-3, package_tail_share_frac=0.08)
-    s = th.assemble(th.InterimRom(), None, 1, sc)
+    """A package tail drawn in uncertainty.thermal (1-10 ms in the uncertainty set) keeps its tau under time_scale_slow
+    and under the 'resistance' factor; the model's own tail (a family value) scales with time_scale_slow."""
+    sc = thermal.ThermalScales(time_scale_slow=2.0, dc_scale=1.5, package_tail_tau_s=6e-3, package_tail_share_frac=0.08)
+    s = thermal.assemble(thermal.InterimRom(), None, 1, sc)
     r0, h0 = s.observer_index("ring_mode_weighted", 0), s.source_index("heater", 0)
     m = np.flatnonzero((s.lag_obs == r0) & (s.lag_src == h0))
     tail = m[s.lag_tail[m] == 1]
     assert tail.size == 1 and s.taus_s[0, tail[0]] == pytest.approx(6e-3)
     assert s.res_k_per_w[0, tail[0]] == pytest.approx(0.08 * 1.5 * 6.1e3)
-    own = th.assemble(th.InterimRom(), None, 1, th.ThermalScales(time_scale_slow=2.0, scaling_hypothesis="independent"))
+    own = thermal.assemble(thermal.InterimRom(), None, 1,
+                           thermal.ThermalScales(time_scale_slow=2.0, scaling_hypothesis="independent"))
     m = np.flatnonzero((own.lag_obs == r0) & (own.lag_src == h0) & (own.lag_tail == 1))
     assert own.taus_s[0, m[0]] == pytest.approx(2.0 * 4e-3)
 
 
 def test_transport_delay_is_passed_through():
-    s = th.assemble(th.InterimRom(), None, 1, th.ThermalScales(transport_delay_s=[0.0, 1e-6, 2e-6]))
+    s = thermal.assemble(thermal.InterimRom(), None, 1, thermal.ThermalScales(transport_delay_s=[0.0, 1e-6, 2e-6]))
     np.testing.assert_array_equal(s.transport_delay_s, [0.0, 1e-6, 2e-6])
     assert s.batch == 3
     with pytest.raises(ValueError):
-        th.assemble(th.InterimRom(), None, 1, th.ThermalScales(transport_delay_s=-1e-6))
+        thermal.assemble(thermal.InterimRom(), None, 1, thermal.ThermalScales(transport_delay_s=-1e-6))
 
 
 def test_temp_sensor_site_referenced_by_the_table_is_not_duplicated():
     sites = {"ts_site": {"x_um": 100.0, "y_um": 0.0, "kind": "temp_sensor"},
              "free": {"x_um": -50.0, "y_um": 0.0, "kind": "temp_sensor"}}
-    lay = th.LayoutSites.from_sites(sites, 2, ring_pitch_um=30.0, temp_sensors=[{"name": "T_main", "site": "ts_site"}])
+    lay = thermal.LayoutSites.from_sites(sites, 2, ring_pitch_um=30.0,
+                                         temp_sensors=[{"name": "T_main", "site": "ts_site"}])
     assert lay.temp_sensor_names == ("free", "T_main")
     np.testing.assert_allclose(lay.temp_sensor_xy_um, [[-50.0, 0.0], [100.0, 0.0]])
 
 
 def test_batched_kernels_reject_mismatched_rows():
     """numba does not bounds-check: the batched kernels must refuse row counts other than 1 or B."""
-    sys = th.assemble(th.InterimRom(z_heater_ring_k_per_w=[5e3, 6e3]), th.LayoutSites.line(2, 30.0), 2)
+    sys = thermal.assemble(thermal.InterimRom(z_heater_ring_k_per_w=[5e3, 6e3]), thermal.LayoutSites.line(2, 30.0), 2)
     a, c0, c1 = sys.coefficients(1e-6)
     x = np.zeros((3, sys.n_lags))
     u = np.zeros((1, sys.n_src))
     with pytest.raises(ValueError):
-        th.thermal_step(x, a, c0, c1, sys.lag_src, u, u, np.ones((1, sys.n_src)))      # a has 2 rows, x has 3
+        thermal.thermal_step(x, a, c0, c1, sys.lag_src, u, u, np.ones((1, sys.n_src)))      # a has 2 rows, x has 3
     with pytest.raises(ValueError):
-        th.thermal_advance(x[:2], a, c0, c1, sys.lag_src, sys.obs_ptr, u, u, np.ones((1, sys.n_src)),
-                           np.zeros(1), np.zeros((2, sys.n_obs + 1)))
+        thermal.thermal_advance(x[:2], a, c0, c1, sys.lag_src, sys.obs_ptr, u, u, np.ones((1, sys.n_src)),
+                                np.zeros(1), np.zeros((2, sys.n_obs + 1)))
     with pytest.raises(ValueError):
-        th.simulate(sys, np.zeros((3, 3, sys.n_src)), 1e-6)
+        thermal.simulate(sys, np.zeros((3, 3, sys.n_src)), 1e-6)
 
 
 def test_rom_driver_sources_and_moved_sites():
@@ -653,36 +691,37 @@ def test_rom_driver_sources_and_moved_sites():
     self_res = np.concatenate([base.self_res, base.self_res[:1] * 0.5], axis=0)
     cross = np.concatenate([base.cross_res, base.cross_res[:1] * 0.7], axis=0)
     offs = dict(base.site_offsets_um, driver=(0.0, -30.0))
-    rom = th.ThermalRom(base.taus_s, srcs, base.observers, self_res, base.cross_r_um, cross, offs, {})
-    lay = th.LayoutSites.line(2, 50.0)
-    assert np.all(th.assemble(rom, lay, 2).driver_src == -1)                 # default: no driver heat on the PIC
-    s = th.assemble(rom, lay, 2, sources=("heater", "driver"), observers=("ring_mode_weighted",))
-    G = th.dc_gain(s)[0]
+    rom = thermal.ThermalRom(base.taus_s, srcs, base.observers, self_res, base.cross_r_um, cross, offs, {})
+    lay = thermal.LayoutSites.line(2, 50.0)
+    assert np.all(thermal.assemble(rom, lay, 2).driver_src == -1)                 # default: no driver heat on the PIC
+    s = thermal.assemble(rom, lay, 2, sources=("heater", "driver"), observers=("ring_mode_weighted",))
+    G = thermal.dc_gain(s)[0]
     r0, d0 = s.observer_index("ring_mode_weighted", 0), s.source_index("driver", 0)
     assert G[r0, d0] == pytest.approx(self_res[S - 1, 0].sum())             # explicit: ROM offset, self table
     # one shared driver block 400 um away: the same-ring pair is a distance-table pair, not the 30 um self table
-    far = th.LayoutSites.line(2, 50.0, driver_xy_um=[[25.0, -400.0], [25.0, -400.0]])
+    far = thermal.LayoutSites.line(2, 50.0, driver_xy_um=[[25.0, -400.0], [25.0, -400.0]])
     with pytest.warns(RuntimeWarning, match="distance table"):
-        s2 = th.assemble(rom, far, 2, sources=("heater", "driver"), observers=("ring_mode_weighted",))
+        s2 = thermal.assemble(rom, far, 2, sources=("heater", "driver"), observers=("ring_mode_weighted",))
     d = float(np.hypot(25.0, 400.0))
     ref = sum(np.interp(d, rom.cross_r_um, cross[S - 1, 0, :, k]) for k in range(K))
-    G2 = th.dc_gain(s2)[0]
+    G2 = thermal.dc_gain(s2)[0]
     for i in range(2):
         assert G2[s2.observer_index("ring_mode_weighted", i), s2.source_index("driver", i)] == pytest.approx(ref)
     assert s2.meta["rom_sites_off_default"] == ["driver"]
 
 
-# ------------------------------------------------------------------- die-level time scales on a FEM ROM (07 D15)
-_ROM_FILES = sorted((Path(th.__file__).resolve().parents[1] / "data" / "extracted").glob("thermal_rom_*.npz"))
+# ----------------------------------------------------------------------------------- die-level time scales on a FEM ROM
+
+_ROM_FILES = sorted((Path(thermal.__file__).resolve().parents[1] / "data" / "extracted").glob("thermal_rom_*.npz"))
 _T_STEP = np.logspace(-9, 0, 4000)
 _F_RESP = np.logspace(0, 6, 300)
 
 
 def _pair_shape(sys, o, s):
     """(peak / DC, largest drop below the running maximum / DC, max |H(f)| / H(0)) of one pair."""
-    y = th.step_response(sys, _T_STEP, obs=[o], src=[s])[0, 0, 0]
-    dc = th.dc_gain(sys)[0][o, s]
-    h = np.abs(th.frequency_response(sys, _F_RESP, obs=[o], src=[s])[0, 0, 0])
+    y = thermal.step_response(sys, _T_STEP, obs=[o], src=[s])[0, 0, 0]
+    dc = thermal.dc_gain(sys)[0][o, s]
+    h = np.abs(thermal.frequency_response(sys, _F_RESP, obs=[o], src=[s])[0, 0, 0])
     return y.max() / dc, (np.maximum.accumulate(y) - y).max() / dc, h.max() / abs(dc)
 
 
@@ -690,17 +729,17 @@ def _pair_shape(sys, o, s):
 @pytest.mark.parametrize("fast, slow", [(2.0, 0.5), (0.5, 2.0), (1.83, 0.55)])
 @pytest.mark.parametrize("path", _ROM_FILES, ids=lambda p: p.stem)
 def test_rom_layer_time_scales_keep_every_pair_monotone(path, fast, slow):
-    """physics_thermal review (2026-10-16): with unequal die-level time scales (07 D15, g26 draws both in 0.5-2x)
-    a FEM ROM pair must keep the shape of its fit. Per-pole layer factors pulled the cancelling mixed-sign residues of
-    a non-collocated pair apart across tau_split: heater -> ring of metal_above_160 at x2 / x0.5 peaked at 1.21 x DC
-    and dropped by 0.22 x DC (|H| 1.27 x DC near 600 Hz), impossible for a heat-diffusion response. Now each such pair
-    is time-scaled by one blended factor: its peak, dips and |H| stay those of the unscaled fit."""
-    rom = th.load_rom(path, warn=False)
-    lay = th.LayoutSites.line(2, 50.0)
+    """physics_thermal review (2026-10-16): with unequal die-level time scales (fast and slow drawn per world; g26 draws
+    both in 0.5-2x) a FEM ROM pair must keep the shape of its fit. Per-pole layer factors pulled the cancelling
+    mixed-sign residues of a non-collocated pair apart across tau_split: heater -> ring of metal_above_160 at x2 / x0.5
+    peaked at 1.21 x DC and dropped by 0.22 x DC (|H| 1.27 x DC near 600 Hz), impossible for a heat-diffusion response.
+    Now each such pair is time-scaled by one blended factor: its peak, dips and |H| stay those of the unscaled fit."""
+    rom = thermal.load_rom(path, warn=False)
+    lay = thermal.LayoutSites.line(2, 50.0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        base = th.assemble(rom, lay, 2)
-        sysx = th.assemble(rom, lay, 2, th.ThermalScales(time_scale_fast=fast, time_scale_slow=slow))
+        base = thermal.assemble(rom, lay, 2)
+        sysx = thermal.assemble(rom, lay, 2, thermal.ThermalScales(time_scale_fast=fast, time_scale_slow=slow))
     pairs = [(base.ring_obs[0], base.heater_src[0]), (base.heater_obs[0], base.heater_src[0]),
              (base.ring_obs[0], base.wg_src[0]), (base.ring_obs[1], base.heater_src[0]),
              (base.heater_obs[1], base.heater_src[0])]
@@ -717,11 +756,11 @@ def test_rom_layer_time_scales_keep_every_pair_monotone(path, fast, slow):
     for o, s in pairs[:1]:
         m = np.flatnonzero((base.lag_obs == o) & (base.lag_src == s))
         r = base.res_k_per_w[0, m]
-        if np.any(r < 0) and np.any(base.taus_s[0, m] >= th.DEFAULT_TAU_SPLIT_S):
-            w = np.clip(np.sum(r * -np.expm1(-th.DEFAULT_TAU_SPLIT_S / base.taus_s[0, m])) / r.sum(), 0, 1)
+        if np.any(r < 0) and np.any(base.taus_s[0, m] >= thermal.DEFAULT_TAU_SPLIT_S):
+            w = np.clip(np.sum(r * -np.expm1(-thermal.DEFAULT_TAU_SPLIT_S / base.taus_s[0, m])) / r.sum(), 0, 1)
             np.testing.assert_allclose(ratio[m], fast ** w * slow ** (1 - w), rtol=1e-12)
     # equal factors: exactly the former per-layer scaling (every tau times the common factor)
-    eq = th.assemble(rom, lay, 2, th.ThermalScales(time_scale_fast=1.7, time_scale_slow=1.7))
+    eq = thermal.assemble(rom, lay, 2, thermal.ThermalScales(time_scale_fast=1.7, time_scale_slow=1.7))
     np.testing.assert_array_equal(eq.taus_s, base.taus_s * 1.7)
     np.testing.assert_array_equal(eq.res_k_per_w, base.res_k_per_w)
 
@@ -729,9 +768,10 @@ def test_rom_layer_time_scales_keep_every_pair_monotone(path, fast, slow):
 def test_interim_layer_time_scales_stay_per_pole():
     """The interim model's residues are all positive: every pole keeps its own layer factor (no whole-pair
     scaling), so the self path's package tail follows time_scale_slow while its body follows time_scale_fast."""
-    lay = th.LayoutSites.line(3, 50.0)
-    base = th.assemble(th.InterimRom(), lay, 3)
-    sysx = th.assemble(th.InterimRom(), lay, 3, th.ThermalScales(time_scale_fast=2.0, time_scale_slow=0.5))
+    lay = thermal.LayoutSites.line(3, 50.0)
+    base = thermal.assemble(thermal.InterimRom(), lay, 3)
+    sysx = thermal.assemble(thermal.InterimRom(), lay, 3,
+                            thermal.ThermalScales(time_scale_fast=2.0, time_scale_slow=0.5))
     assert sysx.meta["time_scale_whole_pairs"] == 0
-    np.testing.assert_array_equal(sysx.taus_s[0], base.taus_s[0] * np.where(base.lag_layer == th.LAYER_FAST, 2.0,
-                                                                              0.5))
+    np.testing.assert_array_equal(sysx.taus_s[0],
+                                  base.taus_s[0] * np.where(base.lag_layer == thermal.LAYER_FAST, 2.0, 0.5))

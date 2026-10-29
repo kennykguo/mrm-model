@@ -1,9 +1,11 @@
-"""HDL check of the golden vectors and the fixed-point reference (07 P1-21: "fixed point against RTL, bit-exact"),
-with Icarus Verilog only.
+"""Check the fixed-point PI controller against its Verilog twin, bit for bit, with Icarus Verilog.
 
-07 P1-21 names cocotb (with Icarus or Verilator) and a Verilator closed-loop co-simulation. Neither cocotb nor
-Verilator is installed here, and this task installs nothing, so that part is NOT built (documented stretch,
-docs/handoff/hardware.md). What runs instead, when ``iverilog`` and ``vvp`` are on the PATH (skipped otherwise):
+Read this first. mrm.control.fxp.FxpPi is the fixed-point PI controller; tests/hdl/fxp_pi_update.v is its update
+step in synthesizable Verilog. The design plan (docs/research/07_design_critique.md, "Fixed-point toolkit, golden
+vectors and HDL co-simulation") asks for fixed point against RTL, bit-exact. It also names cocotb (with Icarus or
+Verilator) and a Verilator closed-loop co-simulation. Neither cocotb nor Verilator is installed here, so
+that part is NOT built (a documented stretch goal, docs/handoff/hardware.md). What runs instead, when ``iverilog``
+and ``vvp`` are on the PATH (skipped otherwise):
 
 - tests/hdl/tb_fxp_pi_replay.v reads the golden vectors with ``$readmemh`` (the .hex files and the
   ``.layout.vh`` include that mrm.sim.vectors.record_vectors writes), sequences FxpPi per ring and world (capture,
@@ -37,6 +39,7 @@ pytestmark = pytest.mark.skipif(IVERILOG is None or VVP is None, reason="Icarus 
 
 
 def _sim(tmp: Path, top: str, sources, defines: dict, includes=()) -> str:
+    """Compile Verilog ``sources`` with top module ``top`` and the ``defines`` (-D) and run it; returns its stdout."""
     exe = tmp / f"{top}.vvp"
     cmd = [IVERILOG, "-g2012", "-Wall", "-s", top, "-o", str(exe)]
     for d in includes:
@@ -52,6 +55,7 @@ def _sim(tmp: Path, top: str, sources, defines: dict, includes=()) -> str:
 
 
 def _replay(tmp: Path, vec: vectors.VectorStream) -> tuple[int, int, str]:
+    """Write ``vec`` as $readmemh files and run the replay bench on it; returns (words checked, mismatches, stdout)."""
     paths = vectors.record_vectors(vec, tmp / "vec")
     p = vec.meta["controller_params"]
     si = vec.spec_i64
@@ -67,6 +71,7 @@ def _replay(tmp: Path, vec: vectors.VectorStream) -> tuple[int, int, str]:
 
 
 def test_golden_vectors_replay_on_icarus(tmp_path):
+    """The replay bench reproduces every recorded heater action of the golden vectors (0 mismatches)."""
     vec = vectors.load_vectors(GOLDEN_VEC)
     assert np.flatnonzero(vec.reset_before).tolist() == [0]           # the test bench resets at k = 0 only
     assert vec.meta["controller_params"]["setpoint_codes"] is None    # capture mode (what the bench sequences)
@@ -76,6 +81,7 @@ def test_golden_vectors_replay_on_icarus(tmp_path):
 
 
 def test_replay_bench_detects_one_wrong_word(tmp_path):
+    """Negative control: one edited expected action word gives exactly one mismatch."""
     vec = vectors.load_vectors(GOLDEN_VEC)
     off = vec.field("tx.heater", "act")["offset"]
     vec.act = vec.act.copy()
@@ -86,6 +92,8 @@ def test_replay_bench_detects_one_wrong_word(tmp_path):
 
 @pytest.mark.parametrize("rnd", [Rounding.FLOOR, Rounding.HALF_UP])
 def test_pi_update_random_operands_on_icarus(tmp_path, rnd):
+    """fxp_pi_update.v equals fxp.fx_pi_update on 3000 random operand sets, with the accumulator saturation and both
+    output clamps reached."""
     rng = random.Random(1234 + int(rnd))
     frac, acc, kw = 20, 30, 24                       # a 30-bit accumulator so its saturation is reached often
     stim, exp = [], []

@@ -1,5 +1,7 @@
-"""The controller templates in examples/controllers/ run on the controller API (toy ring, no plant): they import, reset,
-step, write valid codes and do what their docstrings say."""
+"""Checks the controller templates in examples/controllers/ on the controller API (toy ring, no plant).
+
+Each template must import, reset, step, write valid codes and do what its docstring says.
+"""
 from __future__ import annotations
 
 import importlib.util
@@ -7,10 +9,10 @@ from pathlib import Path
 
 import numpy as np
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control.api import ActionValidator, Controller
 
-EX = Path(__file__).resolve().parents[2] / "examples" / "controllers"
+EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples" / "controllers"
 
 
 def load(name):
@@ -19,7 +21,7 @@ def load(name):
     import sys
     key = f"ctrl_a_example_{name}"
     if key not in sys.modules:
-        spec = importlib.util.spec_from_file_location(key, EX / f"{name}.py")
+        spec = importlib.util.spec_from_file_location(key, EXAMPLES_DIR / f"{name}.py")
         mod = importlib.util.module_from_spec(spec)
         sys.modules[key] = mod
         spec.loader.exec_module(mod)
@@ -28,8 +30,8 @@ def load(name):
 
 def test_python_template_locks_the_toy():
     mod = load("template_python_controller")
-    spec = H.toy_spec(1, 2)
-    toy = H.ToyRings(spec, u0=[30000, 31000], g=0.5, M=58000.0, u_init=[30700, 31700])
+    spec = harness.toy_spec(1, 2)
+    toy = harness.ToyRings(spec, u0=[30000, 31000], g=0.5, M=58000.0, u_init=[30700, 31700])
     c = mod.MyIntegralLock(peak_codes=58000.0, k_i_codes=150.0)
     assert isinstance(c, Controller)
     c.reset(spec)
@@ -39,11 +41,11 @@ def test_python_template_locks_the_toy():
 
 def test_compiled_template_matches_its_python_twin():
     mod = load("template_compiled_controller")
-    spec = H.toy_spec(1, 2)
+    spec = harness.toy_spec(1, 2)
     runs = []
     for c in (mod.make_my_compiled_lock(k_i_codes=150.0), load("template_python_controller").MyIntegralLock(
             k_i_codes=150.0)):
-        toy = H.ToyRings(spec, u0=[30000, 31000], g=0.5, M=58000.0, u_init=[30700, 31700], noise=0.0, m=1)
+        toy = harness.ToyRings(spec, u0=[30000, 31000], g=0.5, M=58000.0, u_init=[30700, 31700], noise=0.0, m=1)
         c.reset(spec)
         h, _ = toy.run(c, 800)
         runs.append((h, toy.x.copy()))
@@ -54,8 +56,8 @@ def test_compiled_template_matches_its_python_twin():
 
 def test_per_ring_template_finds_the_peak():
     mod = load("template_per_ring")
-    spec = H.toy_spec(1, 2)
-    toy = H.ToyRings(spec, u0=[30000, 31000], g=0.3, u_init=[30200, 31200], noise=1.0)
+    spec = harness.toy_spec(1, 2)
+    toy = harness.ToyRings(spec, u0=[30000, 31000], g=0.3, u_init=[30200, 31200], noise=1.0)
     c = mod.make_po_controller(delta_codes=16)
     c.reset(spec)
     toy.run(c, 2500, validator=ActionValidator(spec))

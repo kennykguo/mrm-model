@@ -1,9 +1,16 @@
-"""Bit-statistics lock (Sun et al.) on datapath.bitstat_above with the threshold actuator, closed loop on the g26
-reference plant (tests/verification/test_ctrl_b_plant.py::CtrlBPlant wires the threshold to the sampler).
+"""Checks the bit-statistics lock (Sun et al.) on the g26 reference plant, closed loop.
 
-Scenarios here: steady lock at the eye maximum (OMA penalty against the static optimum and against the half-maximum
-monitor lock), squelch (no data: the bit statistics freeze, the lock holds). The ones-density steps are in
-test_ctrl_b_bitstat_density.py.
+Read this first
+---------------
+BitStatLock reads ``datapath.bitstat_above`` (how many samples of a window are above the threshold) and drives the
+threshold actuator ``datapath.bitstat_threshold``. Two time-multiplexed threshold trackers find the medians of the
+two data levels (the eye). The inner loop holds the eye centre at a set-point. By default (mode='ratio') the outer
+loop holds the eye ratio captured after settling, which starts at the eye maximum (alpha = 3/4). CtrlBPlant
+(test_ctrl_b_plant.py) wires the threshold to the sampler.
+
+The scenarios here: a steady lock at the eye maximum (OMA penalty against the static optimum and against the
+half-maximum monitor lock), and squelch (no data: the bit statistics freeze and the lock holds). The ones-density
+steps are in test_ctrl_b_bitstat_density.py.
 """
 from __future__ import annotations
 
@@ -14,8 +21,8 @@ from mrm.control import registry
 from mrm.control.api import ControllerSpec, validate_telemetry
 from mrm.control.baselines.bitstat_lock import BitStatLock, BitStatParams
 from mrm.control.baselines.ramp_acquire import ST_LOCK
-from mrm.plant import optics as op
-from mrm.scenarios import library as lib
+from mrm.plant import optics
+from mrm.scenarios import library
 
 from test_ctrl_b_plant import CtrlBPlant, load_g26, make_spec, realize, run_closed_loop
 
@@ -74,10 +81,17 @@ def test_threshold_trackers_find_the_level_medians(nominal):
 def _truth_levels(plant):
     """Truth: the two data levels at the monitor through the bit-statistics sampler (codes) (tests only)."""
     last = plant.last
-    mu1, mu0, _, _ = plant.mon.level_codes(last["out_r"][:, op.R_DROP_SUM1], last["out_r"][:, op.R_DROP_SUM0], 0.0,
-                                           None, None, None, tau_s=plant.dp.hw.bitstat_tau_s,
-                                           noise_a_per_rt_hz=plant.dp.hw.bitstat_noise_a_per_rt_hz,
-                                           rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1))
+    mu1, mu0, _, _ = plant.mon.level_codes(
+        last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER],
+        last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER],
+        0.0,
+        None,
+        None,
+        None,
+        tau_s=plant.dp.hw.bitstat_tau_s,
+        noise_a_per_rt_hz=plant.dp.hw.bitstat_noise_a_per_rt_hz,
+        rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1),
+    )
     return mu1, mu0
 
 
@@ -119,7 +133,7 @@ def test_squelch_freezes_and_holds(nominal):
     """Squelch (B1: swing to 0, average kept) from 2.5 ms to 4 ms: no eye, so the statistic and the eye P&O freeze;
     the inner lock holds; after the squelch the eye loop resumes."""
     cfg, pp, spec = nominal
-    sc = lib.squelch(t_on_s=2.5e-3, t_off_s=4.0e-3, rings=[0])
+    sc = library.squelch(t_on_s=2.5e-3, t_off_s=4.0e-3, rings=[0])
     plant = CtrlBPlant(pp, cfg, spec, scenario=sc)
     plant.assignment[0, 0] = LINE
     ctrl = BitStatLock(rings=[0])
@@ -152,10 +166,10 @@ def _locked_bitstat(spec, latency_ticks=0, mode="ratio"):
 
 
 def test_threshold_pairing_follows_the_controller_latency(nominal):
-    """The threshold sent at edge j latches at j + latency_ticks and is used by the window released at the first edge
-    after the latch (07 P0-6: release, then latch). With latency 0 the window of edge j + 1 used it; with a latency
-    of one period the window of edge j + 2. The tracker update must pair each window with the tracker that set
-    its threshold, else the two time-multiplexed trackers chase each other's targets."""
+    """The threshold sent at edge j latches at j + latency_ticks. The window released at the first edge after the
+    latch uses it (the event order is: release, then latch). With latency 0 the window of edge j + 1 uses it; with a
+    latency of one period the window of edge j + 2. The tracker update must pair each window with the tracker that
+    set its threshold, else the two time-multiplexed trackers chase each other's targets."""
     from test_ctrl_b_ramp import synthetic_obs
     _, _, spec = nominal
     B, N = spec.n_batch, spec.n_rings

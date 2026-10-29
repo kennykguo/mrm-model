@@ -1,5 +1,18 @@
-"""realize(): worlds vs devices, counter-RNG keying, geometry Jacobians, shapes, timing and lag rules
-(07 P0-4, P1-13, P1-16, P0-6, P0-1 item 2)."""
+"""Checks mrm.params.realize: worlds against devices, counter-RNG keying, geometry Jacobians, shapes, and the timing
+and lag rules.
+
+Read this first
+---------------
+realize(cfg, B, seeds) draws B worlds and returns a PlantParams of read-only (B, ...) arrays. Two kinds of draw stay
+apart: an uncertainty world (one draw per world, shared by every ring: a hypothesis or an interval of the uncertainty
+set) and a device (per-ring variation, with its own seed stream). Every value is derived after sampling, so the
+relations hold in every world. Element b of a batch equals a B = 1 run with seed base + b. A geometry error moves the
+resonance and the couplers through the Jacobians of the mode and coupling artefacts. Further rules: latencies are
+whole ticks, the lagged cross-ring self-heating gain per substep stays below SELFHEAT_LAG_GAIN_MAX, and nothing under
+mrm/plant imports the config loader.
+
+"The design review" below means docs/research/07_design_critique.md.
+"""
 import copy
 import os
 import subprocess
@@ -14,11 +27,12 @@ from mrm.params.realize import SELFHEAT_LAG_GAIN_MAX
 from mrm.params.config import load, yaml_load
 from mrm.params.realize import PlantParams, RealizeError, realize
 
-MINI = Path(__file__).resolve().parents[1] / "data" / "mini.yaml"
-ROOT = Path(__file__).resolve().parents[2]
+MINI = Path(__file__).resolve().parents[1] / "data" / "mini.yaml"   # the small 4-ring test config
+ROOT = Path(__file__).resolve().parents[2]                           # repository root
 
 
-def mini():
+def _mini_dict():
+    """A fresh copy of tests/data/mini.yaml as a dict (safe to modify)."""
     return copy.deepcopy(yaml_load(MINI.read_text()))
 
 
@@ -31,11 +45,11 @@ def _arrays(p: PlantParams):
     """Every batched numeric array of a PlantParams, by name."""
     out = {}
     for f in fields(p):
-        g = getattr(p, f.name)
-        if f.name == "layout" or not hasattr(g, "__dataclass_fields__"):
+        group = getattr(p, f.name)
+        if f.name == "layout" or not hasattr(group, "__dataclass_fields__"):
             continue
-        for gf in fields(g):
-            v = getattr(g, gf.name)
+        for gf in fields(group):
+            v = getattr(group, gf.name)
             if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == p.batch:
                 out[f"{f.name}.{gf.name}"] = v
     return out
@@ -44,9 +58,9 @@ def _arrays(p: PlantParams):
 def test_shapes_and_readonly(cfg):
     B, N, L = 5, cfg.n_rings, cfg.n_lines
     p = realize(cfg, B, 0, thermal_hook=None)
-    o = p.optics
-    assert o.q_loaded.shape == (B, N) and o.t_ref_k.shape == (B, 1) and p.laser.power_w.shape == (B, L)
-    assert o.order.dtype == np.int64 and p.timing.monitor_latency_ticks.dtype == np.int64
+    opt = p.optics
+    assert opt.q_loaded.shape == (B, N) and opt.t_ref_k.shape == (B, 1) and p.laser.power_w.shape == (B, L)
+    assert opt.order.dtype == np.int64 and p.timing.monitor_latency_ticks.dtype == np.int64
     assert p.heater.driver_mode.shape == (B, 1) and p.heater.dac_bit_err_z.shape == (B, N, 16)
     assert p.temp_sensors.offset_k.shape == (B, 1)
     for name, a in _arrays(p).items():
@@ -92,7 +106,7 @@ def test_uncertainty_is_per_world_variation_per_ring(cfg):
     r = p.heater.r_cold_ohm                       # per-device variation: differs ring to ring
     assert np.all(np.std(r, axis=1) > 0)
     # the Q_L anchor is a die-level epistemic draw: it is the Q_L of the nominal-geometry device of each world, equal
-    # across rings; a device of a sampled geometry has its own couplers, so its Q_L follows them (07 P1-16)
+    # across rings; a device of a sampled geometry has its own couplers, so its Q_L follows them
     n = realize(cfg, 16, 0, variation="off", thermal_hook=None)
     q = n.optics.q_loaded
     assert np.all(q == q[:, :1]) and np.unique(q[:, 0]).size == 16
@@ -152,7 +166,7 @@ def test_latency_scale_quantized(cfg):
 
 
 def test_variation_truncated_to_range():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["monitor"]["responsivity_a_per_w"]["range"] = [0.94, 0.96]
     d["variation"]["ring.monitor.responsivity_a_per_w"] = {"level": "ring", "ring_sigma": 0.05,
                                                             "provenance": "assumed", "generation": "none",
@@ -163,8 +177,8 @@ def test_variation_truncated_to_range():
 
 
 def test_geometry_jacobian_correlation():
-    """07 P1-16 test: the sampled correlation of (offset, K_d^2) matches the Jacobian prediction."""
-    d = mini()
+    """The sampled correlation of (resonance offset, K_d^2) matches the prediction from the geometry Jacobian."""
+    d = _mini_dict()
     d["variation"] = {"geometry": {"width": {"die_sigma_nm": 2.0, "ring_sigma_nm": 1.0},
                                    "gap_drop": {"ring_sigma_nm": 3.0},
                                    "jacobians": ["ring.geometry.jacobian"],
@@ -193,7 +207,7 @@ def test_geometry_jacobian_correlation():
 def test_geometry_jacobian_cannot_move_a_free_member():
     """A leaf output (n_g, s0, ...) needs a given leaf; a coupler output moves the per-pass coupling whichever R4
     member is free (test_params_review.py::test_mini_coupling_jacobian_moves_a_free_coupler)."""
-    d = mini()
+    d = _mini_dict()
     d["ring"]["geometry"]["radius_um"] = {"value": 6.6, "provenance": "assumed", "generation": "none", "source": "TEST"}
     d["ring"]["optics"]["n_g"] = {"value": None, "provenance": "derived"}
     d["ring"]["geometry"]["jacobian"]["value"]["of"]["n_g_per_nm"] = [0.001, 0.0]
@@ -202,20 +216,20 @@ def test_geometry_jacobian_cannot_move_a_free_member():
 
 
 def test_timing_rules():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["monitor"]["integration_window_s"]["value"] = 5e-6       # longer than the 4 us ADC period
     with pytest.raises(RealizeError, match="integration_window"):
         realize(load(d), 1, 0, thermal_hook=None)
 
 
 def test_selfheat_lag_bound():
-    d = mini()
-    th = d["ring"]["thermal"]
-    th["xt_tau_min_s"]["value"] = 2e-6
-    th["xt_tau_ref_s"]["value"] = 2e-6
-    th["xt_nearest_frac"]["value"] = 0.1
-    th["xt_tau_far_s"]["value"] = 2e-6
-    with pytest.raises(RealizeError, match="07 P0-1"):
+    d = _mini_dict()
+    ring_thermal = d["ring"]["thermal"]
+    ring_thermal["xt_tau_min_s"]["value"] = 2e-6
+    ring_thermal["xt_tau_ref_s"]["value"] = 2e-6
+    ring_thermal["xt_nearest_frac"]["value"] = 0.1
+    ring_thermal["xt_tau_far_s"]["value"] = 2e-6
+    with pytest.raises(RealizeError, match="per-substep gain"):
         realize(load(d), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
     d["fidelity"]["self_heating"] = "off"
     realize(load(d), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
@@ -254,7 +268,7 @@ def test_numba_disabled_parity(cfg):
 
 
 def test_plant_does_not_import_config():
-    """07 P0-4: an AST test that nothing under mrm/plant imports mrm.params.config."""
+    """Nothing under mrm/plant imports mrm.params.config (an AST scan): the plant sees only PlantParams."""
     import ast
     for path in (ROOT / "mrm" / "plant").rglob("*.py"):
         tree = ast.parse(path.read_text())
@@ -274,7 +288,8 @@ def test_alt_selection_survives_sampling():
 
 
 def test_backscatter_per_order():
-    """07 P2-2: an independent complex beta per order with E|beta|^2 = (splitting/2)^2; rb = 2 pi beta/FSR."""
+    """Backscatter per longitudinal order: an independent complex beta per order with E|beta|^2 = (splitting/2)^2,
+    and rb = 2 pi beta/FSR."""
     cfg = load(MINI, overrides={"fidelity.backscatter": "on", "ring.optics.backscatter_splitting_ghz": 4.0})
     p = realize(cfg, 500, 0, thermal_hook=None)
     rb = p.optics.backscatter_rb
@@ -286,11 +301,11 @@ def test_backscatter_per_order():
     assert not np.any(off.optics.backscatter_rb)
 
 
-# ------------------------------------------------------------------------------------------------ review additions
+# ----------------------------------------------------------------------------------------------------- review additions
 
 def test_hypothesis_weights_with_numeric_choice_names():
     """Choices are strings internally; YAML weight keys written as numbers ({160: 0.7}) must still apply."""
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["q_loaded"]["alternatives"] = {"3500": {"value": 3500, "provenance": "printed"},
                                                        "4000": {"value": 4000, "provenance": "assumed"}}
     del d["uncertainty"]["q_loaded"]
@@ -309,7 +324,7 @@ def test_pin_nominal_of_absolute_entry_keeps_the_leaf():
 
 
 def test_lognormal_dist_truncation_is_exact():
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["dark"] = {"kind": "dist", "target": "ring.monitor.dark_i0_na", "dist": "lognormal",
                                 "mean": 5.0, "sigma": 0.8, "truncate": [1.0, 30.0], "provenance": "assumed",
                                 "generation": "GF", "source": "R01"}
@@ -322,8 +337,9 @@ def test_lognormal_dist_truncation_is_exact():
 
 
 def test_lag_bound_without_hook_and_without_far_keys():
-    """The interim fallback of the 07 P0-1 lag bound works without the optional far-field keys (KeyError before)."""
-    d = mini()
+    """The interim-model fallback of the self-heating lag bound (the lagged cross-ring gain per substep) works without
+    the optional far-field keys (it raised KeyError before)."""
+    d = _mini_dict()
     for k in ("xt_far_um", "xt_tau_far_s"):
         del d["ring"]["thermal"][k]
     cfg = load(d)
@@ -335,19 +351,20 @@ def test_lag_bound_without_hook_and_without_far_keys():
 
 def test_g26_crosstalk_tau_uses_each_rings_radius():
     """physics_thermal review (2026-10-16): realize passes each ring's r_ref to the interim model, whose crosstalk
-    law takes the heat-source-to-victim distance (centre distance less the ring radii, 04 section 2.5). g26 nominal:
+    law takes the heat-source-to-victim distance (centre distance less the ring radii; thermal notes,
+    docs/research/04_thermal_and_control.md, section 2.5). g26 nominal:
     the nearest neighbour at the 50 um pitch is 1.52 ms (2.85 ms with the centre distance), the own monitor PD at
     25 um 0.38 ms."""
-    from mrm.plant import thermal as th
+    from mrm.plant import thermal
     cfg = load("g26")
     p = realize(cfg, 1, 0, uncertainty="nominal", variation="off")
-    sy = p.thermal.system
+    system = p.thermal.system
     r = p.optics.radius_m[0] * 1e6
-    m = np.flatnonzero((sy.lag_obs == sy.ring_obs[0]) & (sy.lag_src == sy.heater_src[1]))
-    assert sy.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(50.0 - r[0] - r[1])), rel=1e-12)
-    assert sy.taus_s[0, m[0]] == pytest.approx(1.521e-3, rel=2e-3)
-    m = np.flatnonzero((sy.lag_obs == sy.pd_obs[0]) & (sy.lag_src == sy.heater_src[0]))
-    assert sy.taus_s[0, m[0]] == pytest.approx(float(th.crosstalk_tau_s(25.0 - r[0])), rel=1e-12)
+    m = np.flatnonzero((system.lag_obs == system.ring_obs[0]) & (system.lag_src == system.heater_src[1]))
+    assert system.taus_s[0, m[0]] == pytest.approx(float(thermal.crosstalk_tau_s(50.0 - r[0] - r[1])), rel=1e-12)
+    assert system.taus_s[0, m[0]] == pytest.approx(1.521e-3, rel=2e-3)
+    m = np.flatnonzero((system.lag_obs == system.pd_obs[0]) & (system.lag_src == system.heater_src[0]))
+    assert system.taus_s[0, m[0]] == pytest.approx(float(thermal.crosstalk_tau_s(25.0 - r[0])), rel=1e-12)
 
 
 def test_non_finite_values_are_refused(cfg):
@@ -377,9 +394,10 @@ def test_select_cuts_nested_thermal_objects(cfg):
 
 
 def test_thermal_hypotheses_are_switches_not_scales():
-    """07 4.8 names the hypotheses thermal.family and thermal.stack; under uncertainty.thermal they must act through
-    their per-world switches, not be passed to ThermalScales (a RealizeError before)."""
-    d = mini()
+    """The uncertainty set of the design review names the hypotheses thermal.family and thermal.stack; under
+    uncertainty.thermal they must act through their per-world switches, not be passed to ThermalScales (a RealizeError
+    before)."""
+    d = _mini_dict()
     d["uncertainty"]["thermal"]["family"] = {
         "kind": "hypothesis", "nominal": "inring", "provenance": "assumed", "generation": "none", "source": "TEST",
         "choices": {"inring": {"ring.thermal.family": "inring_noundercut"},

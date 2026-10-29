@@ -1,5 +1,9 @@
-"""The calibrated preset g26_calibrated and the fit record mrm/calibration/latest_fit.json (marker
-``calibration``: reported, not CI-blocking; 07 4.1).
+"""Check the calibrated preset g26_calibrated against the fit record mrm/calibration/latest_fit.json.
+
+Read this first. ``python -m mrm.calibration`` fits the calibration targets and writes the fit record; the preset
+writer turns the record into g26_calibrated (and the G25 bench preset g25_test_vehicle_calibrated). These tests
+check that the presets, the record and the replicas agree. They carry the marker ``calibration``: their results are
+reported and do not block CI. A test that needs the record is skipped when the record is missing.
 
 What is checked:
 1. g26_calibrated loads, closes every relation and realizes nominal and sampled batches;
@@ -15,7 +19,9 @@ What is checked:
 5. the thermo-optic world H86 of g26_calibrated selects its own heater leaves and reproduces CAL-3a/3b/4;
 6. g26_calibrated runs the A1 acceptance experiment closed loop without errors;
 7. (integrator) the record's context equals its leaf decisions, and the calibrated G25 bench preset
-   g25_test_vehicle_calibrated equals the record, g26_calibrated and bench_config (also in the H86 world).
+   g25_test_vehicle_calibrated equals the record, g26_calibrated and bench_config (also in the H86 world);
+8. the LUT-mode bench mapping of the CAL-5 fill-fraction variant loads, and it is g25_test_vehicle except for the
+   junction law (no fit record needed).
 """
 from __future__ import annotations
 
@@ -27,16 +33,16 @@ import numpy as np
 import pytest
 
 from mrm import params
-from mrm.calibration import groups as G
+from mrm.calibration import groups
 from mrm.calibration import pipeline, preset
 from mrm.calibration.core import calibration_targets
-from mrm.validation import replicas as R
+from mrm.validation import replicas
 from mrm.validation.targets_io import evaluate
 
 pytestmark = pytest.mark.calibration
 
 HERE = Path(__file__).resolve().parent
-T = calibration_targets()
+TARGETS = calibration_targets()        # target id -> calibration target (calibration.yaml)
 
 
 @pytest.fixture(scope="module")
@@ -54,15 +60,16 @@ def cfg():
 
 
 def _written(record):
+    """Every leaf decision of every calibration group of the fit record."""
     for g in record["groups"].values():
         for d in g["decisions"]:
             yield d
 
 
 def test_every_fitted_residual_is_a_calibration_target(record):
-    """07 P0-5: every target id in the record (group targets, per-hypothesis residuals, leaf decisions, composed
-    worlds) is a calibration.yaml id that may be fitted (CAL-6, fit: false, never appears)."""
-    fit_ok = {tid for tid, t in T.items() if t.fit}
+    """Held-out isolation: every target id in the record (group targets, per-hypothesis residuals, leaf decisions,
+    composed worlds) is a calibration.yaml id that may be fitted (CAL-6, marked fit: false, never appears)."""
+    fit_ok = {tid for tid, t in TARGETS.items() if t.fit}
     for g, gr in record["groups"].items():
         ids = set(gr["targets"])
         for f in gr["fits"].values():
@@ -114,7 +121,8 @@ def test_no_calibrated_tag_without_tolerance_or_declared_prior(record):
                 assert idt["profile_95"][0] <= idt["conditional_profile_95"][0] + 1e-12, (w, leaf)
                 assert idt["profile_95"][1] >= idt["conditional_profile_95"][1] - 1e-12, (w, leaf)
     # every alternative written from a composed world carries that world's verdict
-    alt_world = {alt: (world, leaf) for world, _h, _held, free in pipeline.COUPLING_WORLDS for leaf, alt in free.items()}
+    alt_world = {alt: (world, leaf) for world, _h, _held, free in pipeline.COUPLING_WORLDS
+                 for leaf, alt in free.items()}
     for d in _written(record):
         for an, a in (d.get("alternatives") or {}).items():
             if an not in alt_world:
@@ -127,20 +135,20 @@ def test_no_calibrated_tag_without_tolerance_or_declared_prior(record):
                    "stale, fitted before the params review fixes; the recomputed chi2 follows the secant beta (7.77 "
                    "against the recorded 7.51) until the refit with the real device parameters")
 def test_loss_worlds_hold_the_solver_dispersion(record):
-    """The loss-mechanism hypotheses and worlds run with the coupler artefact's dispersion (07 P1-5), never with the
+    """The loss-mechanism hypotheses and worlds run with the coupler artefact's dispersion, never with the
     dispersion fitted under the dispersion mechanism: recomputing their chi2 from a fresh problem reproduces the
     record."""
     g = record["groups"]["coupling_er"]
-    disp_solver = params.load(G.BENCH).get(G.P_DISP)
+    disp_solver = params.load(groups.BENCH).get(groups.LEAF_COUPLER_DISPERSION)
     # the problems' own context (the heater leaves fitted before coupling_er) plus the dispersion fitted for the
     # nominal world (as the pipeline's context carries it after the group)
     leak = pipeline.coupling_context(record)
-    leak.device[G.P_DISP] = record["context"]["device"][G.P_DISP]
-    probs = {p.hypothesis: p for p in G.coupling_er_problems(leak, T)}
+    leak.device[groups.LEAF_COUPLER_DISPERSION] = record["context"]["device"][groups.LEAF_COUPLER_DISPERSION]
+    probs = {p.hypothesis: p for p in groups.coupling_er_problems(leak, TARGETS)}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for h in ("over/ring_t_loss/floor", "over/heater_t_loss/floor"):
-            assert g["fits"][h]["fixed"][G.P_DISP] == pytest.approx(disp_solver, rel=1e-12)
+            assert g["fits"][h]["fixed"][groups.LEAF_COUPLER_DISPERSION] == pytest.approx(disp_solver, rel=1e-12)
             assert probs[h].chi2(g["fits"][h]["theta"]) == pytest.approx(g["fits"][h]["chi2"], rel=1e-9)
         for w, h in (("er_mechanism=ring_t_loss", "over/ring_t_loss/floor"),
                      ("er_mechanism=heater_t_loss", "over/heater_t_loss/floor")):
@@ -159,7 +167,7 @@ def test_preset_equals_the_fit_record(cfg, record):
 
 def test_record_context_equals_its_decisions(record):
     """The context (read by bench_config and by every --groups rerun) is what a full serial run leaves: the written
-    leaf decisions (integrator: the merged review record had kept three pre-review values)."""
+    leaf decisions. (A merged review record once kept three values from before the review: this test catches that.)"""
     ctx = pipeline.context_from_decisions(record)
     for scope in ("device", "system"):
         assert record["context"][scope] == ctx[scope], scope
@@ -172,7 +180,7 @@ def test_bench_preset_equals_the_record_and_g26_calibrated(cfg, record):
         warnings.simplefilter("ignore")
         bench = params.load(preset.BENCH_PRESET_NAME)
         bc = preset.bench_config(record)
-        g25 = params.load(G.BENCH)
+        g25 = params.load(groups.BENCH)
         h86 = params.load(preset.BENCH_PRESET_NAME, alts={"uncertainty.thermo_optic": "H86"})
         h86_cal = params.load(preset.PRESET_NAME, alts={"uncertainty.thermo_optic": "H86"})
     for path, v in record["context"]["device"].items():
@@ -181,7 +189,7 @@ def test_bench_preset_equals_the_record_and_g26_calibrated(cfg, record):
         assert bench.get(path) == cfg.get(path), path
         assert bench.leaf(path).provenance == cfg.leaf(path).provenance, path
         assert (bench.leaf(path).alternatives or {}) == (cfg.leaf(path).alternatives or {}), path
-    for path in (G.P_PFSR, G.P_R0, G.P_RATIO):
+    for path in (groups.LEAF_P_FSR, groups.LEAF_R_COLD, groups.LEAF_HEATER_SELF_RATIO):
         assert h86.get(path) == h86_cal.get(path) != bench.get(path), path
     # the bench's own leaves are g25_test_vehicle's
     for path in ("laser.power_per_line_dbm", "optical_path.chip_input_loss_db", "ring.heater.full_scale_v",
@@ -189,14 +197,43 @@ def test_bench_preset_equals_the_record_and_g26_calibrated(cfg, record):
         assert bench.get(path) == g25.get(path), path
 
 
+def test_merged_bench_mapping_loads_to_the_bench_preset():
+    """The bench preset merged into one mapping by the loader's rules loads to the same config as its name."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        by_name = params.load(groups.BENCH)
+        by_mapping = params.load(groups._merged_preset_mapping(groups.BENCH))
+    assert by_mapping.resolved_tree() == by_name.resolved_tree()
+    assert by_mapping.hash() == by_name.hash()
+
+
+def test_lut_bench_mapping_loads_and_changes_only_the_junction_law():
+    """The CAL-5 LUT variant loads (it raised ConfigError: a null alternative and a g26 corner that
+    g25_test_vehicle removes were kept) and differs from g25_test_vehicle only in the junction law."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        bench = params.load(groups.BENCH)
+        lut = params.load(groups.bench_lut_mapping())
+    assert lut.get("fidelity.junction_model") == "lut"
+    changed_leaves = {p for p in set(bench.leaves) | set(lut.leaves)
+                      if p not in bench.leaves or p not in lut.leaves or bench.get(p) != lut.get(p)}
+    assert changed_leaves == {"ring.junction.eff_at_0v_pm_per_v", "ring.junction.v_bi_v",
+                              "ring.junction.depletion_exponent"}
+    changed_settings = {p for p in set(bench.settings) | set(lut.settings)
+                        if bench.settings.get(p) != lut.settings.get(p)}
+    assert changed_settings == {"fidelity.junction_model", "ring.junction.lut_file"}
+    assert {n: e.fields for n, e in lut.uncertainty.items()} == {n: e.fields for n, e in bench.uncertainty.items()}
+    assert {p: e.fields for p, e in lut.variation.items()} == {p: e.fields for p, e in bench.variation.items()}
+
+
 @pytest.mark.parametrize("tid", ["CAL-1", "CAL-2", "CAL-3a", "CAL-3b", "CAL-4", "CAL-5", "CAL-7", "CAL-10"])
 def test_bench_preset_and_bench_config_agree(record, tid):
     """The published bench preset (values rounded to 6 digits) gives the predictions of the fit's own bench."""
-    t = T[tid]
+    t = TARGETS[tid]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        a = R.run_target(t, preset.BENCH_PRESET_NAME)
-        b = R.run_target(t, preset.bench_config(record))
+        a = replicas.run_target(t, preset.BENCH_PRESET_NAME)
+        b = replicas.run_target(t, preset.bench_config(record))
     assert a.status == b.status == "ok", (a.notes, b.notes)
     va, vb = np.asarray(a.value, float).ravel(), np.asarray(b.value, float).ravel()
     tol = 1e-3 if tid == "CAL-2" else 1e-4           # CAL-2: notch depths near critical coupling (log of a near-zero)
@@ -208,38 +245,41 @@ def test_bench_preset_and_bench_config_agree(record, tid):
 
 @pytest.mark.parametrize("tid", ["CAL-1", "CAL-3a", "CAL-3b", "CAL-5", "CAL-7", "CAL-8", "CAL-10", "CAL-12b"])
 def test_calibrated_plant_reproduces_its_fitted_targets(record, tid):
-    t = T[tid]
+    t = TARGETS[tid]
     plant = preset.BENCH_PRESET_NAME if t.generation == "G25" else preset.PRESET_NAME
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = R.run_target(t, plant)
+        res = replicas.run_target(t, plant)
     assert res.status == "ok", res.notes
     ev = evaluate(t, res.value)
     assert ev.passed, f"{tid}: {res.value} ({ev.detail})"
 
 
 def test_cal4_is_reproduced_by_the_swept_device(record):
-    """CAL-4 is the swept G25 device (0.35 against 0.40 nm/mW, 06 E4): the calibrated median device with the swept
-    device's fitted P_FSR (and its droop transfer hypothesis) reproduces it; the median device itself does not."""
+    """CAL-4 is the swept G25 device, not the wafer median (0.35 against 0.40 nm/mW; docs/research/06_textbook_audit.md,
+    item E4). The calibrated median device with the swept device's fitted P_FSR (and its droop transfer hypothesis)
+    reproduces it; the median device itself does not."""
     g = record["groups"]["heater"]
     th = g["fits"][g["nominal"]]["theta"]
     ratio = th["heater_self_ratio"] * (th["p_fsr_swept_device_mw"] / th["p_fsr_mw"]
                                        if g["nominal"].endswith("same_rth_heater") else 1.0)
-    ctx = G.Context(device=preset.bench_overrides(record),
-                    ranges={k: list(v) for k, v in record["context"].get("ranges", {}).items()})
-    cfg = ctx.config(G.BENCH, {G.P_PFSR: th["p_fsr_swept_device_mw"], G.P_RATIO: ratio,
-                               G.P_R0: th["r_cold_ohm"] * th.get("r_cold_swept_device_rel", 1.0)})
+    ctx = groups.Context(device=preset.bench_overrides(record),
+                         ranges={k: list(v) for k, v in record["context"].get("ranges", {}).items()})
+    cfg = ctx.config(groups.BENCH, {groups.LEAF_P_FSR: th["p_fsr_swept_device_mw"],
+                                    groups.LEAF_HEATER_SELF_RATIO: ratio,
+                                    groups.LEAF_R_COLD: th["r_cold_ohm"] * th.get("r_cold_swept_device_rel", 1.0)})
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = R.resonance_vs_heater_v(cfg, T["CAL-4"])
-    ev = evaluate(T["CAL-4"], res.value)
+        res = replicas.resonance_vs_heater_v(cfg, TARGETS["CAL-4"])
+    ev = evaluate(TARGETS["CAL-4"], res.value)
     assert ev.passed, (res.value, ev.detail)
 
 
 def test_thermo_optic_worlds_reproduce_the_heater_targets(cfg, record):
-    """Review fix: every thermo-optic world the heater group fits (H86, the required robustness corner of 07 D2)
-    carries its own heater leaves, selected by uncertainty.thermo_optic in g26_calibrated, and that world reproduces
-    CAL-3a/3b (median) and CAL-4 (swept device) through the replicas; with the H_solver leaves it would not."""
+    """Every thermo-optic world that the heater group fits (H86: the required robustness corner of the thermo-optic
+    hypotheses) carries its own heater leaves, selected by uncertainty.thermo_optic in g26_calibrated. That world
+    reproduces CAL-3a/3b (median device) and CAL-4 (swept device) through the replicas; with the H_solver leaves it
+    would not."""
     g = record["groups"]["heater"]
     for prefix, entry, choice, alt in pipeline.HEATER_WORLDS:
         hyps = [h for h in g["fits"] if h.startswith(prefix + "/")]
@@ -253,37 +293,46 @@ def test_thermo_optic_worlds_reproduce_the_heater_targets(cfg, record):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             world = params.load(preset.PRESET_NAME, alts={f"uncertainty.{entry}": choice})
-            for path, name in ((G.P_PFSR, "p_fsr_mw"), (G.P_R0, "r_cold_ohm"), (G.P_RATIO, "heater_self_ratio")):
+            for path, name in ((groups.LEAF_P_FSR, "p_fsr_mw"), (groups.LEAF_R_COLD, "r_cold_ohm"),
+                               (groups.LEAF_HEATER_SELF_RATIO, "heater_self_ratio")):
                 assert world.get(path) == pytest.approx(th[name], rel=1e-5), (choice, path)
                 assert cfg.leaf(path).alternatives[alt]["value"] == pytest.approx(th[name], rel=1e-5)
             alts = {f"uncertainty.{entry}": choice}
-            dev = {**preset.bench_overrides(record), G.P_PFSR: th["p_fsr_mw"], G.P_R0: th["r_cold_ohm"],
-                   G.P_RATIO: th["heater_self_ratio"]}
-            ctx = G.Context(device=dev, ranges={k: list(v) for k, v in record["context"].get("ranges", {}).items()})
-            r3 = R.heater_power_per_fsr(ctx.config(G.BENCH, alts=alts), T["CAL-3a"])
+            dev = {**preset.bench_overrides(record), groups.LEAF_P_FSR: th["p_fsr_mw"],
+                   groups.LEAF_R_COLD: th["r_cold_ohm"], groups.LEAF_HEATER_SELF_RATIO: th["heater_self_ratio"]}
+            ctx = groups.Context(device=dev,
+                                 ranges={k: list(v) for k, v in record["context"].get("ranges", {}).items()})
+            r3 = replicas.heater_power_per_fsr(ctx.config(groups.BENCH, alts=alts), TARGETS["CAL-3a"])
             ratio = th["heater_self_ratio"] * (th["p_fsr_swept_device_mw"] / th["p_fsr_mw"]
                                                if wbest.endswith("same_rth_heater") else 1.0)
-            r4 = R.resonance_vs_heater_v(ctx.config(G.BENCH, {G.P_PFSR: th["p_fsr_swept_device_mw"], G.P_RATIO: ratio,
-                                                              G.P_R0: th["r_cold_ohm"] * th["r_cold_swept_device_rel"]},
-                                                    alts=alts), T["CAL-4"])
-        assert evaluate(T["CAL-3a"], r3.value).passed and evaluate(T["CAL-3b"], r3.variants["voltage_v"]).passed
-        assert evaluate(T["CAL-4"], r4.value).passed, (choice, r4.value)
+            r4 = replicas.resonance_vs_heater_v(ctx.config(groups.BENCH,
+                                                           {groups.LEAF_P_FSR: th["p_fsr_swept_device_mw"],
+                                                            groups.LEAF_HEATER_SELF_RATIO: ratio,
+                                                            groups.LEAF_R_COLD: th["r_cold_ohm"]
+                                                            * th["r_cold_swept_device_rel"]},
+                                                           alts=alts), TARGETS["CAL-4"])
+        assert (evaluate(TARGETS["CAL-3a"], r3.value).passed
+                and evaluate(TARGETS["CAL-3b"], r3.variants["voltage_v"]).passed)
+        assert evaluate(TARGETS["CAL-4"], r4.value).passed, (choice, r4.value)
 
 
 def test_cal2_is_reproduced_with_the_fitted_instrument_floor(record):
+    """CAL-2 (notch depth against heater voltage) is reproduced once the fitted instrument floor of the notch is
+    applied to the replica's notch depths."""
     g = record["groups"]["coupling_er"]
     # the written point is the nominal fit centred on CAL-1 (its floor, not the free fit's)
     key = next((k for k in g["fits"] if k.startswith(g["nominal"]) and "CAL-1 centre" in k), g["nominal"])
     fr = g["fits"][key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        er = R.notch_er_vs_heater_v(preset.bench_config(record), T["CAL-2"], topology=None).value
-    seen = G.notch_floor(er, fr["theta"]["notch_floor_db"])
-    ev = evaluate(T["CAL-2"], seen)
+        er = replicas.notch_er_vs_heater_v(preset.bench_config(record), TARGETS["CAL-2"], topology=None).value
+    seen = groups.notch_floor(er, fr["theta"]["notch_floor_db"])
+    ev = evaluate(TARGETS["CAL-2"], seen)
     assert ev.passed, (er, seen, ev.detail)
 
 
 def test_a1_closed_loop_runs_on_the_calibrated_preset(tmp_path):
+    """The A1 acceptance experiment (a1_g26_calibrated.yaml next to this file) runs closed loop without an error."""
     from mrm.sim import experiment
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

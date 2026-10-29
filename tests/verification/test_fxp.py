@@ -1,6 +1,13 @@
-"""Verification of mrm.control.fxp and mrm.control.lfsr (07 P1-21): Q formats, rounding modes and overflow against an
-exact big-integer reference, the 05 C12 golden PI, the fixed-point dense layer, maximal-length LFSRs, and identical
-results with NUMBA_DISABLE_JIT=1."""
+"""Checks the fixed-point toolkit mrm.control.fxp and the LFSR generator mrm.control.lfsr.
+
+Read this first
+---------------
+A controller meant for an FPGA is written in integer (Q format) arithmetic. These tests check the Q formats, the
+rounding modes and the overflow modes against an exact big-integer reference (Python ints and Fractions), a PI
+controller written with the toolkit against the golden PI that tool check C12 verified bit-exact against RTL
+(docs/research/05_tools.md), the fixed-point dense layer, the maximal-length LFSRs, and identical results with
+NUMBA_DISABLE_JIT=1.
+"""
 import json
 import math
 import os
@@ -15,12 +22,13 @@ import pytest
 from mrm.control import fxp, lfsr
 from mrm.control.fxp import Overflow, QFormat, Rounding
 
-JIT_OFF = bool(nb.config.DISABLE_JIT)
+JIT_OFF = bool(nb.config.DISABLE_JIT)   # this process runs with numba off (NUMBA_DISABLE_JIT=1)
 
 
-# ---- exact reference (Python integers and fractions) ---------------------------------------------------------------
+# ---------------------------------------------------------------------- exact reference (Python integers and fractions)
 
 def ref_round(q: Fraction, mode: Rounding) -> int:
+    """The exact integer that rounding mode ``mode`` gives for the rational q."""
     f = math.floor(q)
     d = q - f
     if mode == Rounding.FLOOR:
@@ -41,6 +49,7 @@ def ref_round(q: Fraction, mode: Rounding) -> int:
 
 
 def ref_fit(x: int, bits: int, signed: bool, ovf: Overflow):
+    """x fitted into a bits-wide (signed or unsigned) integer by overflow mode ovf; "overflow" for CHECKED."""
     lo, hi = (-(1 << (bits - 1)), (1 << (bits - 1)) - 1) if signed else (0, (1 << bits) - 1)
     if lo <= x <= hi:
         return x
@@ -56,7 +65,7 @@ ROUNDINGS = list(Rounding)
 OVERFLOWS = list(Overflow)
 
 
-# ---- formats --------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------ Q formats
 
 def test_qformat_parse_and_ranges():
     q = QFormat.parse("Q7.8")
@@ -83,7 +92,7 @@ def test_c12_reference_values():
     assert list(q.quantize([0.37512, -1000.0, 1000.0])) == [96, -32768, 32767]
 
 
-# ---- rounding and overflow against the exact reference ---------------------------------------------------------------
+# -------------------------------------------------------------------- rounding and overflow against the exact reference
 
 @pytest.mark.parametrize("mode", ROUNDINGS)
 def test_round_shift_exact(mode):
@@ -137,7 +146,8 @@ def test_from_float_matches_reference():
 def test_mul_and_cast_match_reference():
     r = np.random.default_rng(1)
     cases = [(QFormat(7, 8), QFormat(1, 14), QFormat(7, 8)), (QFormat(15, 16), QFormat(3, 12), QFormat(19, 12)),
-             (QFormat(8, 8, False), QFormat(0, 16, False), QFormat(4, 4)), (QFormat(3, 4), QFormat(3, 4), QFormat(0, 12))]
+             (QFormat(8, 8, False), QFormat(0, 16, False), QFormat(4, 4)),
+             (QFormat(3, 4), QFormat(3, 4), QFormat(0, 12))]
     for fa, fb, fo in cases:
         a = r.integers(fa.raw_min, fa.raw_max + 1, 200)
         b = r.integers(fb.raw_min, fb.raw_max + 1, 200)
@@ -186,23 +196,38 @@ def test_add_sub_neg():
         fxp.fx_neg(-32768, 16, True, int(Overflow.CHECKED))
 
 
-# ---- a controller written with the toolkit reproduces the cocotb-verified golden PI ----------------------------------
+def test_fit_add_sub_accept_non_contiguous_arrays():
+    """A transposed (column-major) input gives the same result as its row-major copy."""
+    q = QFormat.parse("Q3.4")                          # raw range [-128, 127]
+    x = np.arange(6).reshape(2, 3).T * 100             # column-major view
+    xc = np.ascontiguousarray(x)
+    assert not x.flags.c_contiguous
+    assert q.fit(xc).tolist() == [[0, 127], [100, 127], [127, 127]]
+    np.testing.assert_array_equal(q.fit(x), q.fit(xc))
+    np.testing.assert_array_equal(fxp.add(x, x, q), fxp.add(xc, xc, q))
+    np.testing.assert_array_equal(fxp.sub(-x, x, q), fxp.sub(-xc, xc, q))
 
-KP, KI, SH = 96, 5, 8          # docs/research/05_tools_smoke/t12_fixed_point/test_pi.py
+
+# ----------------------------------------------- a PI written with the toolkit reproduces the cocotb-verified golden PI
+
+# integer PI gains and the right shift of the output (bits), from
+# docs/research/05_tools_smoke/t12_fixed_point/test_pi.py
+KP, KI, OUT_SHIFT_BITS = 96, 5, 8
 
 
 def golden_pi(state, sp, me):
-    """Plain-integer golden model of t12 (verified bit-exact against Icarus and Verilator RTL, 05 C12)."""
+    """Plain-integer golden model of t12 (verified bit-exact against Icarus and Verilator RTL in tool check C12)."""
     e = sp - me
     acc = max(-2**31, min(2**31 - 1, state["acc"] + KI * e))
-    v = (KP * e + acc) >> SH
+    v = (KP * e + acc) >> OUT_SHIFT_BITS
     state["acc"] = acc
     return 0 if v < 0 else 4095 if v > 4095 else v
 
 
 @nb.njit(cache=True)
 def fxp_pi(sp, me, acc):
-    """The same PI written with declared formats: e in 13 bits, acc Q31.0 saturating, output UQ12.0 saturating."""
+    """The same PI written with declared formats: e in 13 bits, acc Q31.0 saturating, output UQ12.0 saturating.
+    The integer mode arguments: rounding 0 = FLOOR, overflow 1 = SATURATE."""
     e = fxp.fx_sub(sp, me, 14, True, 1)
     acc = fxp.fx_add(acc, fxp.fx_mul(5, 0, e, 0, 32, 0, True, 0, 1), 32, True, 1)
     v = fxp.fx_add(fxp.fx_mul(96, 0, e, 0, 40, 0, True, 0, 1), acc, 40, True, 1)
@@ -236,7 +261,7 @@ def test_matvec_dense_layer():
         assert out[o] == max(y, 0)
 
 
-# ---- LFSR --------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------- LFSR
 
 def test_every_tabulated_mask_is_maximal():
     for width, mask in lfsr.MAXIMAL_MASKS.items():
@@ -291,6 +316,7 @@ def test_dither_balance_over_one_period():
     assert list(st) == [1, 5, 77]
 
 
+# fixed-point and LFSR kernels on random inputs; the test runs it with numba on and off and compares the output
 _PARITY_SCRIPT = r"""
 import json, numpy as np
 from mrm.control import fxp, lfsr

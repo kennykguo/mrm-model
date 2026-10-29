@@ -1,29 +1,30 @@
-"""Closure tests of the shipped presets (07 section 4.1 class ``closure``; params_content task).
+"""Closure tests of the shipped presets: every preset loads, closes its relations and realizes.
 
-What is checked, for every preset in ``mrm/params/presets/*.yaml``:
+Read this first. A closure test asks whether the published numbers of a preset agree with each other once derive()
+has computed the derived ones. These tests block CI. For every preset in ``mrm/params/presets/*.yaml`` they check:
 
 1. it loads and passes the schema validation of :func:`mrm.params.load` (strict provenance, units, fidelity rules,
    uncertainty and variation entry formats);
-2. every relation of 07 P0-3 closes after :func:`mrm.params.realize` (residual <= 1e-12), for the nominal world and
-   for a sampled batch of worlds and devices, and every hypothesis choice of every uncertainty entry realizes;
-3. every corner preset (``meta.kind: corner``) is a thin ``extends:`` file that only selects alternatives (07 D3),
-   and every selection it makes actually changes the realized plant;
+2. every relation R1-R5 closes after :func:`mrm.params.realize` (residual <= 1e-12), for the nominal world and for
+   a sampled batch of worlds and devices, and every hypothesis choice of every uncertainty entry realizes;
+3. every corner preset (``meta.kind: corner``) is a thin ``extends:`` file that only selects alternatives (never a
+   copy of a preset with other numbers), and every selection it makes changes the realized plant;
 4. the completeness inventory ``meta.inventory`` of g26 covers every item of
    ``docs/research/00_prior_notes_checklist.md`` (key, excluded with a reason, or unknown with a note), and every key
    it names exists;
 5. the solver-derived leaves use the ``{from: "extracted/..."}`` form with a ``fallback`` alternative, and every
    source key exists in ``mrm/params/sources.yaml``;
-6. calibration consistency of the nominal worlds (reviewer additions): the exact G25 ring reproduces the CAL-2 0 V
-   notch in the labelled coupling regime (also in the 200 nm world), every eta choice keeps Q_i, the monitor current
-   matches CAL-8 without clipping the ADC, the laser ramp covers 10 slow thermal poles (07 P0-1 item 6), the G25
-   bench heater is voltage driven, the geometry draws reproduce the Berkeley 6 nm / 2 nm resonance spreads, and every
-   corner pins what it says in every sampled world.
+6. calibration consistency of the nominal worlds: the exact G25 ring reproduces the CAL-2 0 V notch in the labelled
+   coupling regime (also in the 200 nm world), every eta choice keeps Q_i, the monitor current matches CAL-8 without
+   clipping the ADC, the laser ramp at reset lasts at least 10 slow thermal time constants, the G25 bench heater is
+   voltage driven, the geometry draws reproduce the Berkeley 6 nm / 2 nm resonance spreads, and every corner pins
+   what it says in every sampled world.
 
-Missing extraction artefacts. The presets name artefacts (``modes_rib160.json``, ``coupling_rib160.json``) that the
-extraction agents are still producing. Until :mod:`mrm.params.config` falls back to a leaf's ``fallback`` alternative
-by itself (requested in docs/handoff/params_content.md; detected by ``config.ARTEFACT_FALLBACK_ALT``), the fixture
-:func:`fallback_loader` installs :func:`patched_make_leaf`, a copy of ``config._make_leaf`` with exactly that
-behaviour, for the duration of each test. No artefact is fabricated.
+Missing extraction artefacts. A leaf whose ``from:`` artefact file does not exist takes its ``fallback`` alternative,
+with a warning. :mod:`mrm.params.config` does this itself now (``config.ARTEFACT_FALLBACK_ALT``). The autouse fixture
+:func:`fallback_loader` installs :func:`patched_make_leaf`, a copy of ``config._make_leaf`` with that behaviour, only
+for a loader without it. With the current loader the adapter is not installed and its two tests skip. No artefact is
+fabricated.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ import pytest
 import yaml
 
 from mrm.params import config as pconfig
-from mrm.params import schema as sch
+from mrm.params import schema
 
 ROOT = Path(__file__).resolve().parents[2]
 PRESET_DIR = ROOT / "mrm" / "params" / "presets"
@@ -46,14 +47,14 @@ CHECKLIST = ROOT / "docs" / "research" / "00_prior_notes_checklist.md"
 PRESETS = sorted(p.stem for p in PRESET_DIR.glob("*.yaml"))
 CORNERS = [p for p in PRESETS if (yaml.safe_load((PRESET_DIR / f"{p}.yaml").read_text()).get("meta") or {}).get(
     "kind") == "corner"]
-FALLBACK = "fallback"          # name of the alternative a missing artefact falls back to (handoff params_content)
+FALLBACK = "fallback"          # the alternative a leaf takes when its artefact file is missing
 
-#: the corner presets 07 section 4.8 names, plus their parents
+#: the corner presets of the uncertainty set (the worlds controllers are judged on), plus their parents
 REQUIRED_PRESETS = {"g26", "g25_test_vehicle", "teaching_basic", "g26_slow_thermal", "g26_fast_thermal",
                     "g26_undercut", "g26_h86", "g26_h86_sensor", "g26_overcoupled", "g26_heater_loss",
                     "g26_hot_selfheat", "g26_low_eta", "g26_fsr_window_a", "g26_fsr_edge", "g26_textbook_thermal"}
 
-#: leaves whose value 07 / ARCHITECTURE 5 say must come from an extraction artefact
+#: leaves whose value must come from an extraction artefact (docs/ARCHITECTURE.md, "Artefact formats")
 SOLVER_LEAVES = ("ring.optics.n_eff", "ring.optics.n_g", "ring.optics.dn_g_dlambda_per_nm",
                  "ring.thermal.dlambda_dt_pm_per_k",
                  "ring.optics.loss_budget.alpha_bend_radiation_db_per_cm", "ring.geometry.jacobian",
@@ -63,7 +64,7 @@ SOLVER_LEAVES = ("ring.optics.n_eff", "ring.optics.n_g", "ring.optics.dn_g_dlamb
 SOLVER_COMPUTED_LEAVES = {"ring.thermal.dlambda_dt_beta_per_k": "tests/closure/test_params_notes.py"}
 
 
-# ------------------------------------------------------------------------------------------------ fallback adapter
+# ----------------------------------------------------------------------------------------------------- fallback adapter
 
 def _artefact_missing(err: Exception) -> bool:
     """True only for an artefact FILE that does not exist (a bad sha256, sidecar or key stays an error)."""
@@ -71,10 +72,11 @@ def _artefact_missing(err: Exception) -> bool:
 
 
 def patched_make_leaf(path: str, d: dict, origin: list[str], cfg, errs: list[str]):
-    """``mrm.params.config._make_leaf`` plus the artefact fallback of docs/handoff/params_content.md section 1:
-    when the ``from:`` artefact file does not exist and the leaf has an alternative named ``fallback`` (a mapping with
+    """``mrm.params.config._make_leaf`` plus the artefact fallback, for a loader without it.
+
+    When the ``from:`` artefact file does not exist and the leaf has an alternative named ``fallback`` (a mapping with
     a ``value``), the leaf takes that alternative's value, provenance, generation and source, ``selected_alt`` is
-    ``fallback``, and a warning names the missing artefact. Everything else is the original code."""
+    ``fallback``, and a warning names the missing artefact. Everything else is a copy of the loader's code."""
     d = dict(d)
     art = None
     val = d.get("value")
@@ -108,12 +110,12 @@ def patched_make_leaf(path: str, d: dict, origin: list[str], cfg, errs: list[str
                             f"(got {d.get('provenance')!r})")
     prov = d.get("provenance")
     if prov is None:
-        errs.append(f"{path}: leaf has no provenance (ARCHITECTURE rule 1: a number without a provenance word is a bug)")
+        errs.append(f"{path}: leaf has no provenance (a number without a provenance word is a bug)")
         prov = "assumed"
     alts = {}
     for name, a in (d.get("alternatives") or {}).items():
         if isinstance(a, dict) and ("value" in a or "from" in a):
-            bad = set(a) - pconfig._ALT_FIELDS
+            bad = set(a) - pconfig._ALTERNATIVE_FIELDS
             if bad:
                 errs.append(f"{path}: alternative {name!r} has unknown fields {sorted(bad)}")
             alts[str(name)] = dict(a)
@@ -159,11 +161,12 @@ def artefact_fallback():
 
 @pytest.fixture(autouse=True)
 def fallback_loader():
+    """Every test runs with the artefact fallback (the adapter only when the loader lacks it); yields "installed"."""
     with artefact_fallback() as installed:
         yield installed
 
 
-_CACHE: dict = {}
+_CACHE: dict = {}            # (preset name, fallback active) -> Config, for loads without keywords
 
 
 def load(name, **kw):
@@ -180,19 +183,22 @@ def load(name, **kw):
 
 
 def realize(cfg, batch=1, **kw):
+    """mrm.params.realize with the warnings silenced."""
     from mrm.params.realize import realize as _realize
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return _realize(cfg, batch, **kw)
 
 
-# ------------------------------------------------------------------------------------------------ helpers
+# -------------------------------------------------------------------------------------------------------------- helpers
 
-def _hyp_choices(entry) -> list[str]:
-    return list(pconfig._hyp_choice_map(entry))
+def _hypothesis_choices(entry) -> list[str]:
+    """The choice names of a hypothesis uncertainty entry."""
+    return list(pconfig._hypothesis_choice_map(entry))
 
 
 def _max_residual(pp) -> float:
+    """Largest |residual| of the relations R1-R5 over every world and ring of a realized PlantParams."""
     res = pp.diagnostics["relation_residuals"]
     vals = [float(np.max(np.abs(v))) if np.size(v) else 0.0 for v in res.values()] if isinstance(res, dict) else [
         float(res)]
@@ -216,15 +222,16 @@ def _checklist_items() -> dict[str, list[str]]:
 
 
 def _key_exists(key: str, cfg) -> bool:
+    """True when an inventory key names an uncertainty entry, a variation entry or a schema path of ``cfg``."""
     if key.startswith("uncertainty."):
         return key[len("uncertainty."):] in cfg.uncertainty
     if key.startswith("variation."):
         rest = key[len("variation."):]
         return (rest == "geometry" and bool(cfg.geometry)) or rest in cfg.variation
-    return sch.lookup(key) is not None
+    return schema.lookup(key) is not None
 
 
-# ------------------------------------------------------------------------------------------------ tests
+# ---------------------------------------------------------------------------------------------------------------- tests
 
 def test_required_presets_exist():
     missing = REQUIRED_PRESETS - set(PRESETS)
@@ -255,12 +262,13 @@ def test_preset_closes_every_relation(name):
 
 @pytest.mark.slow
 def test_g26_every_hypothesis_choice_realizes():
-    """Pin each choice of each hypothesis in turn (07 4.8 worlds): every world must realize and close."""
+    """Pin each choice of each hypothesis in turn (each choice is a world of the uncertainty set): every world must
+    realize and close."""
     base = load("g26")
     for ename, e in sorted(base.uncertainty.items()):
         if e.kind != "hypothesis":
             continue
-        for c in _hyp_choices(e):
+        for c in _hypothesis_choices(e):
             cfg = load("g26", alts={f"uncertainty.{ename}": c})
             pp = realize(cfg, 1, seeds=1, uncertainty="nominal", variation="sample")
             assert _max_residual(pp) <= 1e-12, (ename, c)
@@ -268,6 +276,7 @@ def test_g26_every_hypothesis_choice_realizes():
 
 @pytest.mark.slow
 def test_g26_interval_corners_realize():
+    """Pin each interval entry at its low and high end and at each named corner: every world must realize and close."""
     base = load("g26")
     for ename, e in sorted(base.uncertainty.items()):
         if e.kind == "hypothesis":
@@ -281,7 +290,7 @@ def test_g26_interval_corners_realize():
 @pytest.mark.parametrize("name", CORNERS)
 def test_corner_only_selects_alternatives(name):
     raw = yaml.safe_load((PRESET_DIR / f"{name}.yaml").read_text())
-    assert set(raw) <= {"extends", "meta", "alts"}, f"{name}: a corner may hold only extends, meta and alts (07 D3)"
+    assert set(raw) <= {"extends", "meta", "alts"}, f"{name}: a corner may hold only extends, meta and alts"
     assert raw.get("extends"), f"{name}: a corner must extend a preset"
     assert (raw.get("meta") or {}).get("kind") == "corner"
     assert raw.get("alts"), f"{name}: a corner must select at least one alternative"
@@ -300,6 +309,8 @@ def test_corner_only_selects_alternatives(name):
 
 
 def test_corners_cover_07_section_4_8():
+    """Every corner of the uncertainty set exists (docs/research/07_design_critique.md, "The uncertainty set, and how
+    controllers are judged")."""
     assert {"g26_slow_thermal", "g26_fast_thermal", "g26_undercut", "g26_h86", "g26_h86_sensor", "g26_overcoupled",
             "g26_heater_loss", "g26_hot_selfheat", "g26_low_eta", "g26_fsr_window_a", "g26_fsr_edge",
             "g26_textbook_thermal"} <= set(CORNERS)
@@ -340,7 +351,7 @@ def test_solver_leaves_use_the_from_form_with_a_fallback():
         fb = leaf["alternatives"][FALLBACK]
         assert "value" in fb and fb.get("provenance") in ("literature", "inferred", "assumed"), path
     for path, test in SOLVER_COMPUTED_LEAVES.items():
-        # a number fitted to an artefact table (the secant beta over the operating range, params review 2026-10-16):
+        # a number fitted to an artefact table (the secant beta over the operating range, CHANGELOG params-5):
         # solver provenance, a fallback, and a note naming the test that recomputes it from the artefact
         leaf = node(path)
         assert isinstance(leaf.get("value"), float) and str(leaf.get("provenance")).startswith("solver"), path
@@ -383,7 +394,7 @@ def test_every_source_key_is_declared():
     assert known is not None, "mrm/params/sources.yaml is missing"
     needed = {"BU-45CLO", "CO22-JLT", "CO22-TCPMT", "CO24-JOM", "DEC19", "GF-ECIO", "HC", "HOTI26", "LM-P", "LM-T",
               "LM26-P", "LM26-S", "OCP", "PAT-4", "PECC", "SIB", "SMTAI", "YOLE", "textbook-REF"}
-    assert needed <= known, sorted(needed - known)       # docs/handoff/validation_targets.md request 1
+    assert needed <= known, sorted(needed - known)       # the source keys that the validation targets cite
     for name in PRESETS:
         cfg = load(name)
         for n, e in cfg.uncertainty.items():
@@ -396,7 +407,8 @@ def test_every_source_key_is_declared():
 
 
 def test_textbook_disagreements_are_recorded():
-    """07 4.9 item 7: the presets carry the textbook field and the reason wherever we deliberately differ."""
+    """The presets carry the textbook field and the reason wherever the model deliberately differs from the textbook
+    (the validation report lists these disagreements from the ``disagrees:`` fields)."""
     cfg = load("g26")
     dis = {p for p, lf in cfg.leaves.items() if lf.disagrees}
     for p in ("ring.thermal.dlambda_dt_pm_per_k", "ring.thermal.tau_fast_s", "ring.thermal.xt_nearest_frac",
@@ -407,33 +419,34 @@ def test_textbook_disagreements_are_recorded():
 
 
 def test_g26_nominal_physics_sanity():
-    """Order-of-magnitude anchors of 07 (P0-1, P0-2, P0-3, D1, D16) for the nominal G26 world."""
+    """Order-of-magnitude anchors for the nominal G26 world: heat fraction, intrinsic Q, heater efficiency, lock
+    temperature and the self-heating bistability."""
     from mrm.params.derive import derive
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         d = derive(load("g26"))
     pp = d.params
     eta = float(np.mean(pp.optics.heat_fraction))
-    assert 0.8 < eta < 0.9                                              # 07 D1 nominal ~0.85
+    assert 0.8 < eta < 0.9                                              # heat fraction from the loss budget, ~0.85
     qi = float(np.mean(pp.optics.q_intrinsic))
-    assert 7000 < qi < 8400                                             # near-critical, 07 D1
+    assert 7000 < qi < 8400                                             # intrinsic Q near critical coupling
     eff = float(np.mean(pp.thermal.heater_efficiency_m_per_w)) * 1e9 / 1e3   # nm/mW
-    assert 0.38 < eff < 0.42                                            # 10.3 nm / 25.45 mW (07 D16)
+    assert 0.38 < eff < 0.42                                            # FSR / P_FSR = 10.3 nm / 25.45 mW
     tl = float(np.mean(pp.thermal.t_ring_lock_k)) - 273.15
-    assert 110 < tl < 150                                               # ~132 degC under H_solver (07 P0-3)
-    assert float(np.max(d.diagnostics["bistability_ratio"])) > 1.0      # 07 P0-1: above threshold at +4 dBm
+    assert 110 < tl < 150                                               # lock temperature, ~132 degC (H_solver)
+    assert float(np.max(d.diagnostics["bistability_ratio"])) > 1.0      # self-heating bistable at +4 dBm
 
 
-# ------------------------------------------------------------------------------------------------ calibration consistency
-# Reviewer additions: what the nominal worlds must reproduce, and what each corner must pin.
+# ---------------------------------------------------------------------------------------------- calibration consistency
+# What the nominal worlds must reproduce, and what each corner must pin.
 
-G25_NOTCH_DB = 27.9          # CAL-2: G25 notch at 0 V heater (07 section 4.3, read-off)
-CAL2_SIGMA_DB = 0.5          # CAL-2 read-off sigma (07 section 4.3)
-CAL8_UA = (15.0, 16.5)       # CAL-8: G26 drop monitor current at lock, ~15-16 uA (07 4.3; 01: 15.5 +- 0.5 read-off)
+G25_NOTCH_DB = 27.9          # CAL-2: G25 notch depth at 0 V heater, dB (read off the published plot)
+CAL2_SIGMA_DB = 0.5          # CAL-2 read-off sigma, dB
+CAL8_UA = (15.0, 16.5)       # CAL-8: G26 drop monitor current at lock, uA (read off as 15.5 +- 0.5 uA)
 
 
 def _exact_ring(pp, b: int = 0, i: int = 0) -> tuple[float, str, float]:
-    """Exact add-drop ring at its cold resonance from the realized per-pass couplings (03 section 2):
+    """Exact add-drop ring at its cold resonance from the realized per-pass power couplings K1^2, K2^2:
     through minimum T = (t1 - a t2)^2 / (1 - a t1 t2)^2 and drop peak D = K1^2 K2^2 a / (1 - a t1 t2)^2, with
     t = sqrt(1 - K^2) and a the round-trip amplitude. Returns (notch in dB, 'under' if t1 > a t2 else 'over', D)."""
     o = pp.optics
@@ -451,8 +464,8 @@ def _exact_ring(pp, b: int = 0, i: int = 0) -> tuple[float, str, float]:
     ({"uncertainty.film_thickness": "200", "uncertainty.coupling_regime": "over"}, "over", 1.0),
 ])
 def test_g25_ring_reproduces_the_cal2_notch_in_its_labelled_regime(alts, regime, tol_db):
-    """07 P1-5 / D1: at the nominal Q_L both coupling branches give the G25 27.9 dB notch at 0 V, and the 200 nm film
-    world (the rib200 artefact since the params review) keeps the measured Q_i (rib200_q_anchor) instead of turning
+    """Coupling regime: at the nominal Q_L both coupling branches (under- and over-coupled) give the G25 27.9 dB notch
+    at 0 V. The 200 nm film world (the rib200 artefact) keeps the measured Q_i (rib200_q_anchor) instead of turning
     both branches over-coupled."""
     pp = realize(load("g25_test_vehicle", alts=alts) if alts else load("g25_test_vehicle"), 1, seeds=0,
                  uncertainty="nominal", variation="off")
@@ -462,12 +475,13 @@ def test_g25_ring_reproduces_the_cal2_notch_in_its_labelled_regime(alts, regime,
 
 
 def test_eta_choices_keep_q_intrinsic_and_hit_their_label():
-    """The eta hypothesis moves only the heating share of a fixed alpha_i (07 D1, P0-2): Q_i, hence the notch and the
-    regime, is the same in every eta world, and each choice realizes its labelled heat fraction."""
+    """The eta hypothesis moves only the heating share of a fixed intrinsic loss alpha_i (the loss budget fixes
+    alpha_i). So Q_i, hence the notch and the regime, is the same in every eta world, and each choice realizes its
+    labelled heat fraction."""
     labels = {"nominal": 0.848, "low": 0.5, "mid_low": 0.65, "mid": 0.75, "high": 0.95, "stress_0p3": 0.3}
     base = realize(load("g25_test_vehicle"), 1, seeds=0, uncertainty="nominal", variation="off")
     entry = load("g26").uncertainty["self_heating.eta"]
-    assert set(_hyp_choices(entry)) == set(labels)
+    assert set(_hypothesis_choices(entry)) == set(labels)
     for c, eta in labels.items():
         pp = realize(load("g25_test_vehicle", alts={"uncertainty.self_heating.eta": c}), 1, seeds=0,
                      uncertainty="nominal", variation="off")
@@ -476,7 +490,7 @@ def test_eta_choices_keep_q_intrinsic_and_hit_their_label():
 
 
 def test_monitor_current_is_consistent_with_cal8_and_does_not_clip():
-    """07 D7 / P1-9: the nominal drop coupling reproduces the ~15.5 uA G26 monitor current at a half-maximum lock
+    """Drop coupler: the nominal drop coupling reproduces the ~15.5 uA G26 monitor current at a half-maximum lock
     (+4 dBm at the G25 ring), and the drop PEAK of every nominal g26 ring stays below the ADC full scale, so a
     peak-search acquisition (PAT-3) does not saturate in the nominal world."""
     pp = realize(load("g25_test_vehicle"), 1, seeds=0, uncertainty="nominal", variation="off")
@@ -499,7 +513,7 @@ def _reachable_choices(entry) -> list[str]:
     if entry.restrict:
         return [str(c) for c in entry.restrict]
     w = {str(k): float(v) for k, v in (entry.fields.get("weights") or {}).items()}
-    return [c for c in _hyp_choices(entry) if w.get(c, 1.0) > 0]
+    return [c for c in _hypothesis_choices(entry) if w.get(c, 1.0) > 0]
 
 
 def _interval_max(entry) -> float:
@@ -517,8 +531,8 @@ def _interval_max(entry) -> float:
 
 @pytest.mark.parametrize("name", PRESETS)
 def test_reset_ramp_covers_ten_slow_thermal_poles(name):
-    """07 P0-1 item 6: the laser_ramp reset turns the lasers on over at least 10 tau_slow, in every world the preset
-    can draw (each reachable heater family at the largest slow time scale)."""
+    """Start-up history: the laser_ramp reset turns the lasers on over at least 10 tau_slow, in every world the preset
+    can draw (each reachable heater family at the largest slow time scale), so the slow thermal pole is settled."""
     cfg = load(name)
     if cfg.get("sim.reset_protocol") != "laser_ramp":
         pytest.skip("not a laser_ramp reset")
@@ -526,7 +540,7 @@ def test_reset_ramp_covers_ten_slow_thermal_poles(name):
     ts = _interval_max(cfg.uncertainty["thermal.time_scale_slow"])
     fam = cfg.uncertainty["thermal.family"]
     leaf = cfg.leaves["ring.thermal.tau_slow_s"]
-    cmap = pconfig._hyp_choice_map(fam)
+    cmap = pconfig._hypothesis_choice_map(fam)
     for c in _reachable_choices(fam):
         sel = (cmap.get(c) or {}).get("ring.thermal.tau_slow_s")
         if fam.pinned or sel is None:
@@ -539,8 +553,8 @@ def test_reset_ramp_covers_ten_slow_thermal_poles(name):
 
 
 def test_g25_bench_heater_is_voltage_driven_in_every_world():
-    """The G25 heater data (CAL-3, CAL-4) are printed against a bench voltage, so g25_test_vehicle pins the 07 P1-11
-    driver-law hypothesis to voltage (code 0) while g26 keeps it open."""
+    """The G25 heater data (CAL-3, CAL-4) are printed against a bench voltage, so g25_test_vehicle pins the heater
+    driver-law hypothesis (voltage, current, power or DAC + PWM drive) to voltage (code 0) while g26 keeps it open."""
     pp = realize(load("g25_test_vehicle"), 32, seeds=5, uncertainty="lhs", variation="off")
     assert np.all(np.asarray(pp.heater.driver_mode) == 0)
     pp = realize(load("g26"), 32, seeds=5, uncertainty="lhs", variation="off")
@@ -548,8 +562,8 @@ def test_g25_bench_heater_is_voltage_driven_in_every_world():
 
 
 def test_geometry_variation_reproduces_the_berkeley_resonance_spreads():
-    """07 P1-16: width and film draws through the Jacobian give the 6 nm die-level and 2 nm ring-level resonance
-    spreads the preset is sized to (textbook fabOffsetGlobalNm / fabOffsetLocalNm, BER-FAB)."""
+    """Geometry variation: width and film draws through the Jacobian give the 6 nm die-level and 2 nm ring-level
+    resonance spreads the preset is sized to (textbook fabOffsetGlobalNm / fabOffsetLocalNm, BER-FAB)."""
     pp = realize(load("g26"), 512, seeds=21, uncertainty="nominal", variation="sample")
     off = np.asarray(pp.optics.resonance_offset_m) * 1e9
     n = off.shape[1]
@@ -583,7 +597,8 @@ def _corner_checks():
                             ("over-coupled", lambda pp: np.asarray(
                                 [_exact_ring(pp, b, i)[1] == "over" for b in range(pp.optics.q_loaded.shape[0])
                                  for i in range(pp.optics.q_loaded.shape[1])], float), 1.0)],
-        "g26_heater_loss": [("dln_alpha/dT_heater", lambda pp: np.asarray(pp.optics.dln_alpha_dt_heater_per_k), 1.6e-3)],
+        "g26_heater_loss": [("dln_alpha/dT_heater", lambda pp: np.asarray(pp.optics.dln_alpha_dt_heater_per_k),
+                             1.6e-3)],
         "g26_textbook_thermal": [("tau_fast [us]", lambda pp: pp.thermal.inputs.interim["tau_fast_s"] * 1e6, 10.0),
                                  ("share_fast", lambda pp: pp.thermal.inputs.interim["share_fast_frac"], 0.75),
                                  ("tau_slow [us]", lambda pp: pp.thermal.inputs.interim["tau_slow_s"] * 1e6, 300.0),
@@ -597,21 +612,23 @@ def _corner_checks():
 
 
 def test_every_corner_has_a_pin_check():
+    """_corner_checks has an entry for every corner preset."""
     assert set(_corner_checks()) == set(CORNERS)
 
 
 @pytest.mark.parametrize("name", sorted(_corner_checks()))
 def test_corner_pins_what_it_says_in_every_world(name):
-    """A corner (07 4.8) must hold its stated values in every sampled world, not only in the nominal one."""
+    """A corner must hold its stated values in every sampled world, not only in the nominal one."""
     pp = realize(load(name), 8, seeds=7, uncertainty="lhs", variation="off")
     for what, fn, want in _corner_checks()[name]:
         got = np.asarray(fn(pp), float)
         np.testing.assert_allclose(got, want, rtol=2e-3, atol=1e-12, err_msg=f"{name}: {what}")
 
 
-# ------------------------------------------------------------------------------------------------ adapter drift guard
+# -------------------------------------------------------------------------------------------------- adapter drift guard
 
 def _mini_with_n_g(spec: str) -> dict:
+    """tests/data/mini.yaml with ring.optics.n_g read from artefact ``spec`` (and a fallback alternative of 4.0)."""
     raw = pconfig._read_yaml(ROOT / "tests" / "data" / "mini.yaml")      # the loader's YAML (1.0e6 is a float)
     raw["ring"]["optics"]["n_g"] = {
         "value": {"from": spec}, "provenance": "solver(assumed-geometry)", "generation": "none", "source": "R01",
@@ -622,7 +639,7 @@ def _mini_with_n_g(spec: str) -> dict:
 
 @pytest.mark.skipif(loader_has_fallback(), reason="the loader falls back itself; no adapter is installed")
 def test_adapter_equals_the_loader_except_for_the_fallback():
-    """The test-local adapter is a copy of config._make_leaf plus the requested fallback (handoff section 1). It must
+    """The test-local adapter is a copy of config._make_leaf plus the artefact fallback. It must
     give the same Config as the real loader whenever no artefact is missing, and the fallback only for a missing
     artefact file, so the preset tests cannot pass on stale loader logic."""
     present = _mini_with_n_g("extracted/modes_strip400x200.json:n_g")
@@ -652,8 +669,8 @@ def test_adapter_equals_the_loader_except_for_the_fallback():
 @pytest.mark.skipif(loader_has_fallback(),
                     reason="the loader falls back itself: tests/verification/test_params_cli.py checks the file")
 def test_parameters_md_is_current_under_the_fallback():
-    """07 P2-12 staleness check of docs/PARAMETERS.md while the loader patch of the handoff is pending: the committed
-    file must equal `mrm params table g26` as the fallback loader renders it (so the doc is never silently stale)."""
+    """Staleness check of docs/PARAMETERS.md for a loader without the fallback: the committed file must equal
+    `mrm params table g26` as the fallback adapter renders it (so the doc is never silently stale)."""
     from mrm.params.table import table
     doc = ROOT / "docs" / "PARAMETERS.md"
     assert doc.read_text() == table(load("g26")), "regenerate: mrm params table g26 --out docs/PARAMETERS.md"
@@ -662,9 +679,10 @@ def test_parameters_md_is_current_under_the_fallback():
 @pytest.mark.slow
 @pytest.mark.parametrize("name", PRESETS)
 def test_preset_realizes_a_monte_carlo_batch(name):
-    """07 4.8 judges controllers over 256-512 Latin-hypercube worlds with device variation: every preset must realize
-    such a batch (the lag bound of 07 P0-1, the finite checks and the relations hold in every world). A 16-world
-    batch missed the textbook corner's lag gain of 0.050 with its former 20 us crosstalk pole."""
+    """Controllers are judged over 256-512 Latin-hypercube worlds with device variation, so every preset must realize
+    such a batch: the self-heating lag bound (lag gain < 0.05), the finite checks and the relations hold in every
+    world. A 16-world batch once missed the textbook corner's lag gain of 0.050 (with its former 20 us crosstalk
+    pole)."""
     pp = realize(load(name), 512, seeds=101, uncertainty="lhs", variation="sample")
     assert _max_residual(pp) <= 1e-12
     lag = pp.diagnostics.get("selfheat_lag_gain")

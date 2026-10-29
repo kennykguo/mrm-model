@@ -1,6 +1,10 @@
-"""Every registered controller closed loop on the real engine (mrm.sim.runner.run), g26 nominal world, two scenarios:
-steady lock (static, 25 degC) and A1 (the slide-10 on-die aggressor, one full period). The results go to
-docs/handoff/controller_scorecard.md (results only, with the conditions).
+"""Run every registered controller closed loop on the real engine and write the controller scorecard.
+
+Read this first. Each controller runs on mrm.sim.runner.run, g26 nominal world, in two scenarios: a steady lock
+(static, 25 degC) and A1 (the slide-10 on-die aggressor, one full period). The results go to
+docs/handoff/controller_scorecard.md and .json (results only, with the conditions; tools/scorecard_compare.py
+compares two scorecards). The asserts only check that each controller really ran closed loop; lock quality is
+recorded, not judged.
 
 Slow: 2-4 s (steady, 40 ms) and 7-33 s (A1, 130.7 ms) of wall time per controller on the shared M2 at load 3-5
 (B = 1, fixed 1 us ticks; the Python path stops the kernel at every 10 us controller edge); ~8 min for the file.
@@ -15,7 +19,7 @@ Conditions (the same for every controller; they are written into the scorecard):
   fixed, controller at the preset rate (100 kHz). Controller knowledge: every token any baseline reads
   (KNOWLEDGE below; g26 itself releases only line_grid and ring_to_line). Bias owners (bias_dither, midranging):
   ``controller_interface.bind.tx.bias=controller``. wdm_supervisor: ``bind.tx.assignment=controller``.
-- Start. ``warm``: heaters at the quasi-static oracle lock codes of each ring (mrm.sim.runner.warm_start_codes) with
+- Start. ``warm``: heaters at the steady-state oracle lock codes of each ring (mrm.sim.runner.warm_start_codes) with
   the thermal state settled (Plant.settle, reset protocol branch_high): a steady lock, not a cold-lag start.
   ``cold``: heaters at code 0, lasers on at t = 0, thermal state settled at code 0 from the cold branch (branch_low).
   Each controller runs its own start-up from there (map, capture, ramp, probe, or lock at once).
@@ -24,18 +28,19 @@ Conditions (the same for every controller; they are written into the scorecard):
   last 5 ms); a ring counts as locked when |e| <= 5 pm from some time on (time to lock = that time) AND its
   operating point is stationary: the drift (median d of the last 10 ms minus that of the 10 ms before, per ms) is
   at most DRIFT_PM_PER_MS = 0.1 pm/ms, i.e. the point moves by less than the 1 pm hysteresis over the 10 ms
-  scoring window (controllers review 2026-10-16: es_sine drifted at ~0.8 pm/ms toward the drop peak and passed as a
-  lock within 40 ms); jitter rms and max |e| over the last 10 ms. A1: d_ref = the same ring's steady lock point; scored from the bank's steady time to
-  lock + 1 ms (10 ms when the steady run never locked) to the end; excursions = exits beyond 5 pm with 1 pm
-  hysteresis (min/max envelope, so a 1-tick spike counts). OMA penalty = 10 log10(mean oracle relOMA / mean relOMA)
-  over the scored window (engine oracle: best stable relOMA point, refreshed every 1 ms; 07 P1-1). Lines: the line
-  each ring ends on (engine line_on, -1 = none) against the declared line.
+  scoring window (without this rule es_sine, drifting at ~0.8 pm/ms toward the drop peak, passed as a lock within
+  40 ms); jitter rms and max |e| over the last 10 ms. A1: d_ref = the same ring's steady lock point; scored from the
+  bank's steady time to lock + 1 ms (10 ms when the steady run never locked) to the end; excursions = exits beyond
+  5 pm with 1 pm hysteresis (min/max envelope, so a 1-tick spike counts). OMA penalty = 10 log10(mean oracle relOMA /
+  mean relOMA) over the scored window (engine oracle: the best stable relOMA point, refreshed every 1 ms; the
+  controller never sees it). Lines: the line each ring ends on (engine line_on, -1 = none) against the declared
+  line.
 - A1: mrm.scenarios.library.a1_slide10_aggressor with phase_s = P/2, so t = 0 is the rounded minimum (aggressor
   near zero power, the warm start is honest) and the hot cusp is at t = 65.35 ms; duration one period (130.7 ms).
   The aggressor power is calibrated by the engine (resonance referencing at ring 0). Two runs: ``a1``, the g26
   default site ``aggressor`` (0, -30) um, 55 um from ring 0's monitor PD; and ``a1_pd_adjacent``, the STRESS
   scenario a1_slide10_aggressor_pd_adjacent at the site ``aggressor_pd_adjacent`` (0, 30) um, 5 um from that PD
-  (the former default: the PD dark current runs away, controllers_a/b/c handoffs; not a realistic layout). Both
+  (the default until 2026-10-10: the PD dark current runs away; not a realistic layout). Both
   sites are 30 um from ring 0 and the same distance from every ring, so the calibrated power and the rings' heat
   are identical; only the monitor-PD paths differ (the die sensor sees both sites alike in the interim model).
 
@@ -59,7 +64,7 @@ runner = pytest.importorskip("mrm.sim.runner")
 
 from mrm import params                                    # noqa: E402
 from mrm.control import registry                          # noqa: E402
-from mrm.scenarios import library as lib                  # noqa: E402
+from mrm.scenarios import library                         # noqa: E402
 from mrm.sim.metrics import RecordSpec, envelope          # noqa: E402
 
 pytestmark = pytest.mark.slow
@@ -67,22 +72,24 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ.get("MRM_SCORECARD_OUT", ROOT / "docs" / "handoff" / "controller_scorecard.md"))
 JSON_OUT = OUT.with_suffix(".json")
 
+#: knowledge tokens released to every controller (each token any baseline reads)
 KNOWLEDGE = ("line_grid", "ring_to_line", "heater_nominal", "optics_nominal", "dlambda_dt_nominal", "monitor_nominal",
              "heater_law", "heater_r_nominal", "heater_efficiency", "linewidth", "thermal_dynamics",
              "bias_efficiency", "model_nominal")
-BIAS = ("controller_interface.bind.tx.bias=controller", "scenario.bias_v=null")
-ASSIGN = ("controller_interface.bind.tx.assignment=controller",)
-LOCK_PM = 5.0
-HYST_PM = 1.0
+BIAS = ("controller_interface.bind.tx.bias=controller", "scenario.bias_v=null")    # the controller owns the bias
+ASSIGN = ("controller_interface.bind.tx.assignment=controller",)                    # the controller assigns the lines
+LOCK_PM = 5.0                                # lock window: |e| <= 5 pm counts as locked
+HYST_PM = 1.0                                # hysteresis of the excursion count, pm
 DEC = 10                                     # record decimation, ticks (= the g26 controller period)
-STEADY_S = float(os.environ.get("MRM_SCORECARD_STEADY_S", 40e-3))
-A1_S = float(os.environ.get("MRM_SCORECARD_A1_S", lib.A1_PERIOD_S))
-SCORE_LAST_S = 10e-3
+STEADY_S = float(os.environ.get("MRM_SCORECARD_STEADY_S", 40e-3))           # steady run length, s
+A1_S = float(os.environ.get("MRM_SCORECARD_A1_S", library.A1_PERIOD_S))     # A1 run length, s (one period)
+SCORE_LAST_S = 10e-3                         # the steady run is scored over its last 10 ms
 DRIFT_PM_PER_MS = 0.1                        # stationary operating point: < the 1 pm hysteresis per 10 ms window
 
 # name -> (controller params, start, extra overrides, note)
 CASES: dict[str, tuple[dict, str, tuple, str]] = {
-    "pi_lock": ({}, "warm", (), "defaults: MAP from the hand-off code, PI at 0.7 of the peak (red side)"),
+    "pi_lock": ({}, "warm", (), "defaults: MAP from the hand-off code, PI at 0.7 of the peak "
+                "(tunable fraction hyperparameter, red side)"),
     "pi_lock_c": ({}, "warm", (), "compiled PiLock (in-kernel), same parameters"),
     "dither_lockin": ({}, "warm", (), "defaults: heater dither, inflection mode"),
     "dither_lockin_c": ({}, "warm", (), "compiled DitherLockin"),
@@ -102,16 +109,19 @@ CASES: dict[str, tuple[dict, str, tuple, str]] = {
     "composite": ({"children": [{"name": "pi_lock", "rate_hz": 100e3}]}, "warm", (),
                   "CompositeController with one child, pi_lock at 100 kHz (exercises the composite path)"),
 }
-_RESULTS: dict[str, dict] = {}
+_RESULTS: dict[str, dict] = {}               # controller name -> scores, filled by the runs, written last
 
 
-def _cfg(extra=()):
+def _load_g26(extra=()):
+    """g26 with the KNOWLEDGE tokens released and the override strings ``extra``."""
     ov = ["controller_interface.knowledge=[" + ",".join(KNOWLEDGE) + "]", *extra]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return params.load("g26", overrides=ov)
 
 
+#: what each run records, every DEC ticks: detuning (mean and min/max envelope), relOMA and the oracle's, the lines,
+#: the heater code, and each ring's maximum monitor-PD temperature over every 100 DEC ticks (1 ms)
 RECORD = [RecordSpec("detuning_m", DEC, "mean"), *envelope("detuning_m", DEC), RecordSpec("reloma", DEC, "mean"),
           RecordSpec("oracle_reloma", DEC, "mean"), RecordSpec("line_on", DEC, "last"),
           RecordSpec("declared_line", DEC, "last"), RecordSpec("heater_code", DEC, "last"),
@@ -119,12 +129,13 @@ RECORD = [RecordSpec("detuning_m", DEC, "mean"), *envelope("detuning_m", DEC), R
 
 
 def _run(name: str, scenario, duration_s: float, extra=()):
+    """Run controller ``name`` from its CASES start; returns (runner result, controller)."""
     prm, start, ov, _ = CASES[name]
-    cfg = _cfg((*ov, *extra))
+    cfg = _load_g26((*ov, *extra))
     ctrl = registry.create(name, prm)
     kw = dict(settle=True)
     if start == "warm":
-        kw.update(heater_code="quasi_static", reset_protocol="branch_high")
+        kw.update(heater_code="locked_steady_state", reset_protocol="branch_high")
     else:
         kw.update(reset_protocol="branch_low")
     with warnings.catch_warnings():
@@ -134,7 +145,8 @@ def _run(name: str, scenario, duration_s: float, extra=()):
     return res, ctrl
 
 
-def _tr(res, key):
+def _trace(res, key):
+    """(samples, N) values of recorded trace ``key`` for world 0."""
     return np.asarray(res.trace[key]["value"])[:, 0, :]
 
 
@@ -152,7 +164,7 @@ def _first_lock_index(e_abs: np.ndarray) -> np.ndarray:
 
 
 def _excursions(e_abs: np.ndarray) -> np.ndarray:
-    """(N,) exits beyond LOCK_PM after being within LOCK_PM - HYST_PM (07 P0-8 hysteresis), from the envelope."""
+    """(N,) exits beyond LOCK_PM after being within LOCK_PM - HYST_PM (a lock hysteresis), from the envelope."""
     S, N = e_abs.shape
     cnt = np.zeros(N, np.int64)
     for n in range(N):
@@ -167,17 +179,20 @@ def _excursions(e_abs: np.ndarray) -> np.ndarray:
 
 
 def _penalty_db(res, sl) -> np.ndarray:
-    rel = _tr(res, f"reloma@{DEC}:mean")[sl]
-    orc = _tr(res, f"oracle_reloma@{DEC}:mean")[sl]
+    """(N,) OMA penalty, dB: 10 log10(mean oracle relOMA / mean relOMA) over the samples ``sl``."""
+    rel = _trace(res, f"reloma@{DEC}:mean")[sl]
+    orc = _trace(res, f"oracle_reloma@{DEC}:mean")[sl]
     with np.errstate(divide="ignore", invalid="ignore"):
         return 10.0 * np.log10(orc.mean(axis=0) / rel.mean(axis=0))
 
 
 def _score_steady(res) -> dict:
+    """Per-ring scores of a steady run (lock point, locked, drift, time to lock, jitter, excursions, OMA penalty,
+    lines, hottest PD); the conditions are in the module docstring."""
     t = np.asarray(res.trace[f"detuning_m@{DEC}:mean"]["t_s"])
-    d = _tr(res, f"detuning_m@{DEC}:mean") * 1e12
-    lo = _tr(res, f"detuning_m@{DEC}:min") * 1e12
-    hi = _tr(res, f"detuning_m@{DEC}:max") * 1e12
+    d = _trace(res, f"detuning_m@{DEC}:mean") * 1e12
+    lo = _trace(res, f"detuning_m@{DEC}:min") * 1e12
+    hi = _trace(res, f"detuning_m@{DEC}:max") * 1e12
     last5 = t >= t[-1] - 5e-3
     ref = np.median(d[last5], axis=0)
     e_abs = np.maximum(np.abs(lo - ref), np.abs(hi - ref))
@@ -185,8 +200,8 @@ def _score_steady(res) -> dict:
     win = t >= t[-1] - SCORE_LAST_S
     e = d[win] - ref
     t_lock = np.where(i0 >= 0, t[np.maximum(i0, 0)], np.nan)
-    line = _tr(res, f"line_on@{DEC}:last")[-1].astype(int)
-    decl = _tr(res, f"declared_line@{DEC}:last")[-1].astype(int)
+    line = _trace(res, f"line_on@{DEC}:last")[-1].astype(int)
+    decl = _trace(res, f"declared_line@{DEC}:last")[-1].astype(int)
     # drift of the operating point: median of the last SCORE_LAST_S against the window before it (shorter windows
     # for a run shorter than two of them), pm per ms
     w = min(SCORE_LAST_S, 0.5 * float(t[-1] - t[0]))
@@ -198,27 +213,29 @@ def _score_steady(res) -> dict:
     return {"ref_pm": ref, "locked": within & stationary, "within_5pm": within, "stationary": stationary,
             "drift_pm_per_ms": drift, "t_lock_s": t_lock, "rms_pm": np.sqrt((e ** 2).mean(axis=0)),
             "max_pm": e_abs[win].max(axis=0), "exc": _excursions(e_abs[win]), "penalty_db": _penalty_db(res, win),
-            "line": line, "declared": decl, "t_pd_max_c": _tr(res, f"t_pd_k@{100 * DEC}:max").max(axis=0) - 273.15}
+            "line": line, "declared": decl, "t_pd_max_c": _trace(res, f"t_pd_k@{100 * DEC}:max").max(axis=0) - 273.15}
 
 
 def _score_a1(res, ref, t0) -> dict:
+    """Per-ring scores of an A1 run about the steady lock points ``ref`` (pm), scored from ``t0`` (s)."""
     t = np.asarray(res.trace[f"detuning_m@{DEC}:mean"]["t_s"])
-    lo = _tr(res, f"detuning_m@{DEC}:min") * 1e12
-    hi = _tr(res, f"detuning_m@{DEC}:max") * 1e12
-    d = _tr(res, f"detuning_m@{DEC}:mean") * 1e12
+    lo = _trace(res, f"detuning_m@{DEC}:min") * 1e12
+    hi = _trace(res, f"detuning_m@{DEC}:max") * 1e12
+    d = _trace(res, f"detuning_m@{DEC}:mean") * 1e12
     win = t >= min(t0, t[-1])                 # a run shorter than t0 (smoke runs) scores its last sample
     e_abs = np.maximum(np.abs(lo - ref), np.abs(hi - ref))[win]
     e = (d - ref)[win]
-    line = _tr(res, f"line_on@{DEC}:last")[-1].astype(int)
+    line = _trace(res, f"line_on@{DEC}:last")[-1].astype(int)
     return {"max_pm": e_abs.max(axis=0), "rms_pm": np.sqrt((e ** 2).mean(axis=0)), "exc": _excursions(e_abs),
             "locked_end": e_abs[-max(1, int(1e-3 / (DEC * 1e-6))):].max(axis=0) <= LOCK_PM,
             "penalty_db": _penalty_db(res, win), "line": line,
-            "t_pd_max_c": _tr(res, f"t_pd_k@{100 * DEC}:max").max(axis=0) - 273.15,
+            "t_pd_max_c": _trace(res, f"t_pd_k@{100 * DEC}:max").max(axis=0) - 273.15,
             "low_rail_ms": np.asarray(res.metrics["heater_low_rail_s"])[0] * 1e3,
             "full_scale_ms": np.asarray(res.metrics["heater_sat_s"])[0] * 1e3}
 
 
 def _closed_loop_checks(res, name):
+    """The run was closed loop on the engine: the heater moved, no pipeline overflow, finite metrics."""
     m = res.metrics
     rng = np.asarray(m["heater_range_used_codes"])
     assert np.any(rng > 0), f"{name}: the heater never moved (not closed loop?)"
@@ -227,6 +244,7 @@ def _closed_loop_checks(res, name):
 
 
 def _jsonable(x):
+    """``x`` with numpy values turned into JSON values (NaN and inf become None)."""
     if isinstance(x, dict):
         return {k: _jsonable(v) for k, v in x.items()}
     if isinstance(x, (np.ndarray, list, tuple)):
@@ -243,11 +261,12 @@ def _jsonable(x):
 
 @pytest.mark.parametrize("name", list(CASES))
 def test_controller_runs_closed_loop_on_the_engine(name):
+    """Run one controller in the steady scenario and both A1 scenarios and keep its scores for the scorecard."""
     assert name in registry.available(), f"{name} is not registered"
     out = {"name": name, "start": CASES[name][1], "note": CASES[name][3], "errors": []}
     try:
         t_w = time.perf_counter()
-        res, ctrl = _run(name, lib.static(), STEADY_S)
+        res, ctrl = _run(name, library.static(), STEADY_S)
         _closed_loop_checks(res, name)
         st = _score_steady(res)
         out["steady"] = st
@@ -259,8 +278,8 @@ def test_controller_runs_closed_loop_on_the_engine(name):
         lk = st["t_lock_s"][st["within_5pm"]]
         t0 = (float(np.max(lk)) + 1e-3) if st["within_5pm"].any() else 10e-3
         out["a1_t0_s"] = t0
-        for key, a1 in (("a1", lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2)),
-                        ("a1_pd_adjacent", lib.a1_slide10_aggressor_pd_adjacent(phase_s=lib.A1_PERIOD_S / 2))):
+        for key, a1 in (("a1", library.a1_slide10_aggressor(phase_s=library.A1_PERIOD_S / 2)),
+                        ("a1_pd_adjacent", library.a1_slide10_aggressor_pd_adjacent(phase_s=library.A1_PERIOD_S / 2))):
             t_w = time.perf_counter()
             r1, _ = _run(name, a1, A1_S)
             _closed_loop_checks(r1, name)
@@ -275,7 +294,8 @@ def test_controller_runs_closed_loop_on_the_engine(name):
     print(f"\n[scorecard] {name}: " + json.dumps(_jsonable({k: out[k] for k in ("steady", "a1")}))[:800])
 
 
-def _fmt(x, f="{:.1f}"):
+def _cell(x, f="{:.1f}"):
+    """Table cell text of a number ("-" for None, "nan" for a non-finite value)."""
     if x is None:
         return "-"
     try:
@@ -286,6 +306,7 @@ def _fmt(x, f="{:.1f}"):
 
 
 def _write_scorecard(results: dict) -> str:
+    """Write the scorecard Markdown (OUT) and JSON (JSON_OUT) from ``results``; returns the Markdown."""
     lines = ["# Controller scorecard: every registered controller on the engine (g26 nominal)", "",
              "Generated by `tests/validation/test_controllers_on_engine.py` (slow) on "
              f"{time.strftime('%Y-%m-%d %H:%M')}. Results only; the conditions are in that file's docstring and "
@@ -295,7 +316,7 @@ def _write_scorecard(results: dict) -> str:
              "substep policy fixed, controller edges every 10 us (100 kHz), default controller parameters.",
              "- Knowledge: every token a baseline reads (" + ", ".join(KNOWLEDGE) + "); g26 alone releases only "
              "line_grid and ring_to_line.",
-             "- Start `warm`: heaters at the quasi-static oracle lock codes (mrm.sim.runner.warm_start_codes), thermal "
+             "- Start `warm`: heaters at the steady-state oracle lock codes (mrm.sim.runner.warm_start_codes), thermal "
              "state settled (Plant.settle, branch_high). Start `cold`: heaters at code 0, lasers on at t = 0, "
              "thermal state settled at code 0 (branch_low). Each controller then runs its own start-up.",
              f"- Steady: static scenario, 25 degC, {STEADY_S * 1e3:.0f} ms. Lock point d_ref = median detuning of "
@@ -334,12 +355,12 @@ def _write_scorecard(results: dict) -> str:
         off = int(np.sum(np.asarray(s["line"]) != np.asarray(s["declared"])))
         lines.append(
             f"| {name} | {r.get('path')} | {r['start']} | {int(lk.sum())}/8 | {int(drifting.sum())} | "
-            f"{_fmt(np.max(np.abs(s['drift_pm_per_ms'])), '{:.3f}')} | "
-            f"{_fmt(np.nanmax(tl[lk]) * 1e3 if lk.any() else None, '{:.2f}')} | "
-            f"{_fmt(np.median(s['rms_pm']), '{:.2f}')} / {_fmt(np.max(s['rms_pm']), '{:.2f}')} | "
-            f"{_fmt(np.max(s['max_pm']), '{:.1f}')} | {int(np.sum(s['exc']))} | "
-            f"{_fmt(np.nanmean(s['penalty_db']), '{:.2f}')} | "
-            f"{_fmt(np.min(s['ref_pm']), '{:.0f}')} to {_fmt(np.max(s['ref_pm']), '{:.0f}')} | {off} |")
+            f"{_cell(np.max(np.abs(s['drift_pm_per_ms'])), '{:.3f}')} | "
+            f"{_cell(np.nanmax(tl[lk]) * 1e3 if lk.any() else None, '{:.2f}')} | "
+            f"{_cell(np.median(s['rms_pm']), '{:.2f}')} / {_cell(np.max(s['rms_pm']), '{:.2f}')} | "
+            f"{_cell(np.max(s['max_pm']), '{:.1f}')} | {int(np.sum(s['exc']))} | "
+            f"{_cell(np.nanmean(s['penalty_db']), '{:.2f}')} | "
+            f"{_cell(np.min(s['ref_pm']), '{:.0f}')} to {_cell(np.max(s['ref_pm']), '{:.0f}')} | {off} |")
     for key, title in (("a1", "A1 aggressor, default layout (site 55 um from ring 0's monitor PD)"),
                        ("a1_pd_adjacent", "A1 STRESS scenario a1_slide10_aggressor_pd_adjacent (site 5 um from ring "
                                           "0's monitor PD; not a realistic layout)")):
@@ -357,11 +378,11 @@ def _write_scorecard(results: dict) -> str:
             ex = np.asarray(a["exc"], int)
             le = np.asarray(a["locked_end"], bool)
             off = int(np.sum(np.asarray(a["line"]) != np.asarray(r["steady"]["declared"])))
-            lines.append(f"| {name} | {_fmt(mx[0])} | {_fmt(np.max(mx[1:]))} | {_fmt(a['rms_pm'][0], '{:.2f}')} | "
+            lines.append(f"| {name} | {_cell(mx[0])} | {_cell(np.max(mx[1:]))} | {_cell(a['rms_pm'][0], '{:.2f}')} | "
                          f"{int(ex[0])} / {int(ex[1:].sum())} | {int(le.sum())}/8 | "
-                         f"{_fmt(np.nanmean(a['penalty_db']), '{:.2f}')} | {off} | "
-                         f"{_fmt(a['t_pd_max_c'][0], '{:.0f}')} | {_fmt(a['low_rail_ms'][0])} / "
-                         f"{_fmt(a['full_scale_ms'][0])} |")
+                         f"{_cell(np.nanmean(a['penalty_db']), '{:.2f}')} | {off} | "
+                         f"{_cell(a['t_pd_max_c'][0], '{:.0f}')} | {_cell(a['low_rail_ms'][0])} / "
+                         f"{_cell(a['full_scale_ms'][0])} |")
     lines += ["", "## Reading notes (true for every run above)", "",
               f"- A steady run of {STEADY_S * 1e3:.0f} ms shows a controller's operating point, not where it ends: a "
               "ring whose point still drifts (column 'drifting') is not counted as locked, and its d_ref, jitter and "
@@ -372,8 +393,9 @@ def _write_scorecard(results: dict) -> str:
               "rings 4-7 before 40 ms (rings 0-3 never) and every ring parks at the drop peak (-0.3 to -1.4 pm, "
               "13.0-13.2 dB) by 40 ms (0.4 s run, runs/params_fix/es_long.log; before the params review of "
               "2026-10-16 it fell 2-4 times per ring and rings 4-6 parked on the cold branch). The drop peak is the "
-              "wrong point for a modulator (04 C5). A ring that locks late is also counted as drifting while its "
-              "point still settles (in the scorecard before the params review: wdm_supervisor ring 2, locked at "
+              "wrong point for a modulator (docs/research/04_thermal_and_control.md, 'Dither and lock-in'). A ring "
+              "that locks late is also counted as drifting while its point still settles (in the scorecard before the "
+              "params review: wdm_supervisor ring 2, locked at "
               "26.7 ms, -0.24 pm/ms by a least-squares fit over the last 10 ms, and bitstat_lock ring 5, locked at "
               "23.1 ms; runs/controllers_fix/drift_defs.log).",
               "- The detuning envelope includes any deliberate modulation: heater or bias dithers (dither_lockin, "

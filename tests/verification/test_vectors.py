@@ -1,8 +1,13 @@
-"""Golden vectors (07 P1-21; mrm.sim.vectors): recording is transparent, the files round-trip, and replaying the
-recorded observations through the same fixed-point controller reproduces the actions bit for bit (numba, Python
-protocol, compiled ABI, NUMBA_DISABLE_JIT=1, and the committed golden vector file).
+"""Checks the golden vectors of mrm.sim.vectors: recorded controller inputs and outputs for an HDL test bench.
 
-Run: g26 nominal world, settled warm start at the quasi-static lock codes, mrm.control.fxp.FxpPi, a direct square
+Read this first
+---------------
+A run is recorded at every controller edge (the observation words in, the action words out). The tests check that
+recording is transparent, that the files (npz, hex, Verilog header) round-trip, and that replaying the recorded
+observations through the same fixed-point controller reproduces the actions bit for bit (numba, the Python protocol,
+the compiled ABI, NUMBA_DISABLE_JIT=1, and the committed golden vector file).
+
+Run: g26 nominal world, settled warm start at the steady-state lock codes, mrm.control.fxp.FxpPi, a direct square
 aggressor (0.05 W at the g26 aggressor site, period 2 ms, phase 1 ms) for 4 ms: 400 controller edges, the heater
 codes of rings 0-7 move by 2867 ... 203 codes (the integrators work; measured 2026-10-10).
 """
@@ -24,20 +29,22 @@ from mrm.control import api, fxp
 from mrm.control.api import BaseController, CompiledController
 from mrm.control.fxp import FxpPi
 from mrm.core.channels import ActId
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 from mrm.sim import bridge, runner, vectors
 from mrm.sim.metrics import RecordSpec
 
-ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_VEC = ROOT / "tests" / "golden" / "vectors" / "fxp_pi__g26__aggressor_square.npz"
-RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="quasi_static", settle=True)
-DURATION_S = 4e-3
+ROOT = Path(__file__).resolve().parents[2]                                   # repository root
+GOLDEN_VEC = ROOT / "tests" / "golden" / "vectors" / "fxp_pi__g26__aggressor_square.npz"   # the committed recording
+# run options: nominal world, settled warm start at the locked steady-state heater codes
+RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="locked_steady_state", settle=True)
+DURATION_S = 4e-3                                                            # s, 400 controller edges
 REC = [RecordSpec("detuning_m", 10, "mean"), RecordSpec("heater_code", 10, "last"),
-       RecordSpec("monitor_code", 10, "last")]
+       RecordSpec("monitor_code", 10, "last")]                               # traces, every 10 ticks
 
 
-def scenario():
-    return lib.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
+def _aggressor_scenario():
+    """A direct square aggressor: 0.05 W at the g26 aggressor site, period 2 ms, duty 0.5, phase 1 ms."""
+    return library.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
 
 
 @pytest.fixture(scope="module")
@@ -51,19 +58,19 @@ def cfg():
 def recorded(cfg):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return vectors.run_recorded(cfg, FxpPi(), scenario(), duration_s=DURATION_S, record=REC, **RUN)
+        return vectors.run_recorded(cfg, FxpPi(), _aggressor_scenario(), duration_s=DURATION_S, record=REC, **RUN)
 
 
 @pytest.fixture(scope="module")
 def spec(cfg):
-    return bridge.spec_for(cfg, scenario(), 1)
+    return bridge.spec_for(cfg, _aggressor_scenario(), 1)
 
 
 def test_recording_is_transparent(cfg, recorded):
     """The recorder changes nothing: the recorded run equals the in-kernel compiled run bit for bit."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ref = runner.run(cfg, FxpPi(), scenario(), duration_s=DURATION_S, record=REC, **RUN)
+        ref = runner.run(cfg, FxpPi(), _aggressor_scenario(), duration_s=DURATION_S, record=REC, **RUN)
     assert ref.manifest_inputs["controller_path"] == "compiled"
     assert recorded.manifest_inputs["controller_path"] == "python"
     for k in ref.trace:
@@ -84,11 +91,12 @@ def _same_metrics(a, b, prefix=""):
             assert np.array_equal(va, vb, equal_nan=va.dtype.kind == "f"), prefix + k
 
 
-_HEATER_ID = int(ActId.TX_HEATER)
+_HEATER_ID = int(ActId.TX_HEATER)   # actuator id of the heater channel
 
 
 @nb.njit
 def _swing_init(spec_i64, spec_f64):
+    """Compiled-controller init: params p = [n_rings, offset of the heater channel in act], one step counter."""
     p = np.zeros(2, np.int64)
     p[0] = spec_i64[api.SPEC_I_N_RINGS]
     p[1] = api.act_offset(spec_i64, _HEATER_ID)
@@ -113,8 +121,8 @@ def test_recording_is_transparent_when_commands_leave_the_range(cfg, spec):
     rec = [RecordSpec("heater_code", 1, "last")]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ref = runner.run(cfg, ctrl(), scenario(), duration_s=0.3e-3, record=rec, **RUN)
-        rr = vectors.run_recorded(cfg, ctrl(), scenario(), duration_s=0.3e-3, record=rec, **RUN)
+        ref = runner.run(cfg, ctrl(), _aggressor_scenario(), duration_s=0.3e-3, record=rec, **RUN)
+        rr = vectors.run_recorded(cfg, ctrl(), _aggressor_scenario(), duration_s=0.3e-3, record=rec, **RUN)
     assert np.array_equal(ref.trace["heater_code@1:last"]["value"], rr.trace["heater_code@1:last"]["value"])
     _same_metrics(ref.metrics, rr.metrics)
     v = rr.vectors
@@ -127,11 +135,11 @@ def test_recording_is_transparent_when_commands_leave_the_range(cfg, spec):
 
 def test_stream_content(recorded, spec):
     v = recorded.vectors
-    K = int(round(DURATION_S / (spec.period_ticks * spec.tick_s)))
-    assert v.n_records == K == 400
-    assert v.obs.shape == (K, 1, spec.layout.obs_size) and v.act.shape == (K, 1, spec.layout.act_size)
+    n_edges = int(round(DURATION_S / (spec.period_ticks * spec.tick_s)))
+    assert v.n_records == n_edges == 400
+    assert v.obs.shape == (n_edges, 1, spec.layout.obs_size) and v.act.shape == (n_edges, 1, spec.layout.act_size)
     assert v.act_in.shape == v.act.shape
-    assert np.array_equal(v.ticks, np.arange(K) * spec.period_ticks)
+    assert np.array_equal(v.ticks, np.arange(n_edges) * spec.period_ticks)
     assert np.array_equal(v.obs[:, 0, 0], v.ticks)                      # obs header: tick
     assert v.reset_before[0] and not v.reset_before[1:].any()
     assert v.written.all()                                              # a CompiledController returns every channel
@@ -220,13 +228,13 @@ def test_replay_needs_the_same_interface(recorded, cfg):
         warnings.simplefilter("ignore")
         c2 = params.load("g26", overrides=["controller_interface.bind.tx.bias=controller", "scenario.bias_v=null"])
     with pytest.raises(vectors.VectorError, match="layout"):
-        vectors.replay(FxpPi(), recorded.vectors, bridge.spec_for(c2, scenario(), 1))
+        vectors.replay(FxpPi(), recorded.vectors, bridge.spec_for(c2, _aggressor_scenario(), 1))
     with pytest.raises(vectors.VectorError, match="layout"):          # B is part of the layout (dims)
-        vectors.replay(FxpPi(), recorded.vectors, bridge.spec_for(cfg, scenario(), 2), check_spec=False)
+        vectors.replay(FxpPi(), recorded.vectors, bridge.spec_for(cfg, _aggressor_scenario(), 2), check_spec=False)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         c3 = params.load("g26", overrides=["controller_interface.knowledge=[line_grid,ring_to_line,heater_law]"])
-    s3 = bridge.spec_for(c3, scenario(), 1)                            # same layout, other knowledge
+    s3 = bridge.spec_for(c3, _aggressor_scenario(), 1)                            # same layout, other knowledge
     with pytest.raises(vectors.VectorError, match="ControllerSpec"):
         vectors.replay(FxpPi(), recorded.vectors, s3)
     assert vectors.replay(FxpPi(), recorded.vectors, s3, check_spec=False).ok
@@ -267,7 +275,7 @@ class _HoldPlus(BaseController):
 def test_python_controller_vectors_and_written_mask(cfg, spec):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        rr = vectors.run_recorded(cfg, _HoldPlus(), scenario(), duration_s=0.4e-3, **RUN)
+        rr = vectors.run_recorded(cfg, _HoldPlus(), _aggressor_scenario(), duration_s=0.4e-3, **RUN)
     v = rr.vectors
     assert v.act_in is None and v.spec_i64 is None
     names = [r["name"] for r in v.act_fields]
@@ -308,7 +316,7 @@ def test_reset_marks_and_replay_resets(recorded, spec):
     assert vectors.replay_abi(fxp.fxp_pi_init, fxp.fxp_pi_step, w).ok
 
 
-# ---- the committed golden vectors ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------- the committed golden vectors
 
 def test_golden_vector_file_replays_bit_exact():
     """tests/golden/vectors/: the committed recording (regenerate only with the command in tests/golden/README.md)

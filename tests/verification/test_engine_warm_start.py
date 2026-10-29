@@ -1,10 +1,13 @@
-"""Integration features of the engine stage (integrator, 2026-10-09): the settled warm start (Plant.settle,
-``run(..., settle=True)``), the quasi-static warm-start codes (``heater_code='quasi_static'``), the factory-table hand-off
-(``run(..., factory_table=...)``) and the baseline registry.
+"""Checks the warm-start features of the engine: the settled start, the warm-start codes and the factory table.
 
-Requests resolved: controllers_a handoff 2.3 and controllers_c handoff 4.3b (a warm start from the thermal steady
-state), engine handoff 6 (a)/(b), controllers_b handoff 2 (load_factory_cal before reset), and the baselines package
-imports (controllers_a/b/c). Physics: 07 P0-1 item 6 (defined start states).
+Read this first
+---------------
+A run needs a defined start state. These tests cover the settled warm start (Plant.settle,
+``run(..., settle=True)``: the plant starts in the thermal steady state of its start codes), the locked-steady-state
+warm-start codes (``heater_code='locked_steady_state'``), the factory-table hand-off (``run(..., factory_table=...)``
+calls the controller's load_factory_cal before its reset), and the baseline registry (every baseline controller is
+found without an explicit import). The last tests check the bound of the self-heating solve (KParams.dt_max_k)
+against the steps that the settle takes.
 """
 from __future__ import annotations
 
@@ -16,9 +19,9 @@ import pytest
 from mrm import params
 from mrm.control import registry
 from mrm.control.api import ControllerSpec
-from mrm.plant.plant import DEFAULT_SH_DT_MAX_K as K_DT_MAX
+from mrm.plant.plant import DEFAULT_SH_DT_MAX_K
 from mrm.plant.plant import Plant
-from mrm.sim import kernel as K
+from mrm.sim import kernel
 from mrm.sim import runner
 from mrm.sim.metrics import RecordSpec
 
@@ -35,6 +38,7 @@ def cfg():
 
 
 def _plant(cfg, record=None, ticks=0):
+    """A Plant of one nominal world with the config's scenario, not reset. record / ticks: trace specs and length."""
     c, pp, _ = runner.load_inputs(cfg, uncertainty="nominal", variation="off")
     sc = runner._make_scenario(None, c)
     spec = ControllerSpec.from_config(c, n_batch=1, nominal=c, scenario_drives=sc.drives, scenario_offsets=sc.offsets)
@@ -50,16 +54,16 @@ def test_registry_finds_every_baseline_without_an_import():
 
 
 def test_settled_warm_start_is_a_steady_lock(cfg):
-    """quasi-static oracle codes + settle: the plant starts in its own steady state (every ring on the hot branch,
+    """steady-state oracle codes + settle: the plant starts in its own steady state (every ring on the hot branch,
     red side of its line) and stays there open loop; with cold lags the same codes drop every ring off the line
-    (measured -800 to -1250 pm after 5 ms), which is why controllers needed start_delay_s before."""
+    (measured -800 to -1250 pm after 5 ms). Without the settle, a controller would need a start_delay_s."""
     rec = [RecordSpec("detuning_m", 100, "last")]
     out = {}
     for settle in (True, False):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             r = runner.run(cfg, None, None, duration_s=3e-3, uncertainty="nominal", variation="off",
-                           heater_code="quasi_static", reset_protocol="branch_high", settle=settle, record=rec)
+                           heater_code="locked_steady_state", reset_protocol="branch_high", settle=settle, record=rec)
         out[settle] = r.trace["detuning_m@100:last"]["value"][:, 0, :] * 1e12
         if settle:
             info = r.manifest_inputs["warm_start"]["settle"]
@@ -78,13 +82,14 @@ def test_settle_equals_the_long_open_loop_limit(cfg):
     a = _plant(cfg)
     a.reset(protocol="branch_low", settle=True)
     assert a.settle_info["converged"], a.settle_info
-    t_settled = a.S.rf[:, [K.RF_T_RING, K.RF_T_HEATER, K.RF_T_PD], :].copy()
+    t_settled = a.S.ring_float[:, [kernel.RF_T_RING, kernel.RF_T_HEATER, kernel.RF_T_PD], :].copy()
     b = _plant(cfg)
     b.reset(protocol="branch_low")
-    b.run(100_000, mode=K.MODE_OPEN)
-    t_long = b.S.rf[:, [K.RF_T_RING, K.RF_T_HEATER, K.RF_T_PD], :]
+    b.run(100_000, mode=kernel.MODE_OPEN)
+    t_long = b.S.ring_float[:, [kernel.RF_T_RING, kernel.RF_T_HEATER, kernel.RF_T_PD], :]
     assert np.max(np.abs(t_settled - t_long)) < 5e-3, np.max(np.abs(t_settled - t_long))
-    assert np.max(t_settled[:, 0] - a.S.wf[:, K.WF_T_BASE0, None]) > 0.5        # data heat and absorption warm it
+    # data heat and absorption warm it
+    assert np.max(t_settled[:, 0] - a.S.world_float[:, kernel.WF_T_BASE0, None]) > 0.5
 
 
 def test_settle_needs_the_lasers_on(cfg):
@@ -127,16 +132,17 @@ def test_factory_table_is_loaded_before_the_reset(cfg):
                    variation="off", factory_table=table)
 
 
-def test_quasi_static_codes_fall_back_to_code_min_in_sampled_worlds(cfg):
-    """Sampled worlds: rings whose oracle point the heater cannot reach have no quasi-static code; they start at
+def test_locked_steady_state_codes_fall_back_to_code_min_in_sampled_worlds(cfg):
+    """Sampled worlds: rings whose oracle point the heater cannot reach have no steady-state code; they start at
     code_min with a warning (measured for g26, seeds 7, B = 8: 13 of 64 rings), and the settle still converges."""
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        r = runner.run(cfg, None, None, duration_s=50e-6, batch=8, seeds=7, heater_code="quasi_static", settle=True)
-    msg = [str(x.message) for x in w if "no quasi-static lock code" in str(x.message)]
+        r = runner.run(cfg, None, None, duration_s=50e-6, batch=8, seeds=7, heater_code="locked_steady_state",
+                       settle=True)
+    msg = [str(x.message) for x in w if "no locked-steady-state lock code" in str(x.message)]
     assert len(msg) == 1, msg
     ws = r.manifest_inputs["warm_start"]
-    # since 2026-10-10 a world whose lock powers exceed the array heater supply limit is flagged too (07 P1-12)
+    # a world whose lock powers exceed the array heater supply limit is flagged too
     sup = [str(x.message) for x in w if "supply limit" in str(x.message)]
     assert len(sup) == int(np.sum(ws["supply_limited"]) > 0), sup
     assert ws["settle"]["converged"], ws["settle"]
@@ -145,13 +151,13 @@ def test_quasi_static_codes_fall_back_to_code_min_in_sampled_worlds(cfg):
 
 
 def test_settle_reports_its_largest_step_against_the_selfheat_bound(cfg):
-    """physics_thermal review (2026-10-16): the self-heating bounds cover |T - T_ref| <= KParams.dt_max_k = 50 K for
-    every step (the comment that an auto substep scales it was wrong: nothing does). Plant.settle's first DC
-    iterations move further (~100 K from branch_low, ~240 K from branch_high at the g26 nominal), so settle() now
-    reports its largest step and the bound. Those solves are not certified by the bound alone; the settled states of
-    g26 equal those of a plant whose bound covers every step (dt_max_k 400 K), so no root was skipped."""
+    """The self-heating bounds cover |T - T_ref| <= KParams.dt_max_k = 50 K for every step (no auto substep scales
+    it). The first DC iterations of Plant.settle move further (~100 K from branch_low, ~240 K from branch_high at the
+    g26 nominal), so settle() reports its largest step and the bound. Those solves are not certified by the bound
+    alone; the settled states of g26 equal those of a plant whose bound covers every step (dt_max_k 400 K), so no
+    root was skipped."""
     pl = _plant(cfg)
-    assert float(pl.P.dt_max_k) == K_DT_MAX
+    assert float(pl.P.dt_max_k) == DEFAULT_SH_DT_MAX_K
     c = runner.load_inputs(cfg, uncertainty="nominal", variation="off")[0]
     out = {}
     for protocol in ("branch_low", "branch_high"):
@@ -163,11 +169,11 @@ def test_settle_reports_its_largest_step_against_the_selfheat_bound(cfg):
             codes = runner.warm_start_codes(pl, c)
             pl.reset(protocol=protocol, heater_code=codes, settle=True)
             info = pl.settle_info
-            assert info["converged"] and info["sh_dt_max_k"] == (dt_max or K_DT_MAX), info
-            out[protocol, dt_max] = (pl.S.rf[:, K.RF_T_RING, :].copy(), info["max_step_k"])
+            assert info["converged"] and info["sh_dt_max_k"] == (dt_max or DEFAULT_SH_DT_MAX_K), info
+            out[protocol, dt_max] = (pl.S.ring_float[:, kernel.RF_T_RING, :].copy(), info["max_step_k"])
         t50, step50 = out[protocol, None]
         t400, step400 = out[protocol, 400.0]
-        assert step50 > K_DT_MAX and step400 < 400.0, (protocol, step50, step400)
+        assert step50 > DEFAULT_SH_DT_MAX_K and step400 < 400.0, (protocol, step50, step400)
         np.testing.assert_allclose(t50, t400, atol=2e-3)       # the settle tolerance: the same root
     assert out["branch_high", None][1] > out["branch_low", None][1]
 
@@ -181,16 +187,16 @@ def test_selfheat_bound_is_one_value_for_both_substep_policies(cfg):
     spec = ControllerSpec.from_config(c, n_batch=1, nominal=c, scenario_drives=sc.drives, scenario_offsets=sc.offsets)
     for policy in ("fixed", "auto"):
         pl = Plant(pp, sc, spec, substep_policy=policy)
-        assert float(pl.P.dt_max_k) == K_DT_MAX, policy
+        assert float(pl.P.dt_max_k) == DEFAULT_SH_DT_MAX_K, policy
     pl = _plant(cfg)
     pl.reset(protocol="branch_low", heater_code=np.zeros((1, pp.n_rings), np.int64), settle=True)
-    t_prev = pl.S.rf[:, K.RF_T_RING, :].copy()
+    t_prev = pl.S.ring_float[:, kernel.RF_T_RING, :].copy()
     full = int(np.asarray(pp.heater.code_max).max())
     pl.reset(protocol="branch_low", heater_code=np.full((1, pp.n_rings), full, np.int64))
     step = 0.0
     for _ in range(200):
-        pl.run(1, mode=K.MODE_OPEN)
-        t_now = pl.S.rf[:, K.RF_T_RING, :]
+        pl.run(1, mode=kernel.MODE_OPEN)
+        t_now = pl.S.ring_float[:, kernel.RF_T_RING, :]
         step = max(step, float(np.max(np.abs(t_now - t_prev))))
         t_prev = t_now.copy()
-    assert 1.0 < step < K_DT_MAX, step
+    assert 1.0 < step < DEFAULT_SH_DT_MAX_K, step

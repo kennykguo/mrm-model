@@ -1,4 +1,9 @@
-"""07 P0-8: streaming metric accumulators and record specs (mrm.sim.metrics; owner: engine).
+"""Checks the streaming metric accumulators and the record specs of mrm.sim.metrics.
+
+Read this first
+---------------
+The engine computes its metrics online, tick by tick, in accumulators; it does not keep the full trace. Traces are
+recorded decimated (mean | min | max | last per window). The tests check:
 
 - The accumulators updated every plant tick equal the metrics computed from the full trace (a 10 ms plant run and a
   synthetic run with every lock state transition), via the independent NumPy reference metrics_from_trace.
@@ -18,15 +23,18 @@ from mrm.sim.metrics import (AI_ABOVE0, MetricsSpec, MetricsState, RecordSet, Re
                              metrics_from_trace, metrics_tick_row, record_tick_row, summarize)
 
 
-def _state(B, N, spec=None, dt=1e-6, hist=True):
+def _metrics_state(B, N, spec=None, dt=1e-6, hist=True):
+    """(spec, MetricsState) for B worlds and N rings at tick dt (s); default spec: 5 pm lock threshold, 1 pm
+    hysteresis, BER windows of 1 ms."""
     spec = spec or MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=1e-3)
     st = MetricsState.build(spec, B, N, dt, fwhm_max_m=330e-12, fsr_max_m=10.3e-9, code_lo=0, code_hi=65535,
                             histogram=hist)
     return spec, st
 
 
-def _feed(st, det, k0=0, **kw):
-    """Run metrics_tick_row over (T, B, N) traces."""
+def _feed_traces(st, det, k0=0, **kw):
+    """Run metrics_tick_row over (T, B, N) traces, starting at tick k0. det: detuning (m). Keyword arguments give the
+    other per-tick inputs (zero by default). Returns the inputs used, as keywords for metrics_from_trace."""
     T, B, N = det.shape
     z = np.zeros((T, B, N))
     order = kw.get("order", np.zeros((T, B, N), np.int64))
@@ -52,7 +60,7 @@ def _feed(st, det, k0=0, **kw):
 
 
 @njit(cache=True)
-def _drive(det, f, mpf, mpi, zi, zb, z, af, ai, hist, runhist, tv, rec_i, acc, cnt, idx, trace):
+def _drive_scalar_trace(det, f, mpf, mpi, zi, zb, z, af, ai, hist, runhist, tv, rec_i, acc, cnt, idx, trace):
     """Feed a scalar detuning trace through the accumulators and the records, one tick at a time."""
     d = np.zeros(1)
     for k in range(det.shape[0]):
@@ -62,7 +70,8 @@ def _drive(det, f, mpf, mpi, zi, zb, z, af, ai, hist, runhist, tv, rec_i, acc, c
         record_tick_row(1, tv, rec_i, acc, cnt, idx, trace)
 
 
-def _compare(acc, ref, keys):
+def _assert_metrics_equal(acc, ref, keys):
+    """Assert that the metrics ``keys`` of acc (accumulators) and ref (full-trace reference) agree."""
     for k in keys:
         a, r = acc[k], ref[k]
         if isinstance(r, dict):
@@ -73,12 +82,14 @@ def _compare(acc, ref, keys):
                                        equal_nan=True, err_msg=k)
 
 
-KEYS = ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "max_abs_lock_error_pm", "rms_lock_error_pm",
-        "time_above_s", "excursion_count",
-        "time_unlocked_s", "excursion_max_s", "first_lock_s", "time_to_lock_s", "locked_final", "fsr_hop_events",
-        "order_changes", "wrong_line_s", "wrong_line_events", "wrong_line_final", "mean_reloma", "oma_penalty_db",
-        "oma_penalty_unrestricted_db", "mean_p_abs_w", "expected_errors", "heater_energy_j", "heater_sat_s",
-        "heater_low_rail_s", "code_min_used", "code_max_used", "heater_range_used_codes", "peak_slew_codes_per_s")
+# the metrics compared between the accumulators and the full-trace reference in the synthetic tests
+COMPARED_METRICS = ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "max_abs_lock_error_pm",
+                    "rms_lock_error_pm", "time_above_s", "excursion_count", "time_unlocked_s", "excursion_max_s",
+                    "first_lock_s", "time_to_lock_s", "locked_final", "fsr_hop_events", "order_changes",
+                    "wrong_line_s", "wrong_line_events", "wrong_line_final", "mean_reloma", "oma_penalty_db",
+                    "oma_penalty_unrestricted_db", "mean_p_abs_w", "expected_errors", "heater_energy_j",
+                    "heater_sat_s", "heater_low_rail_s", "code_min_used", "code_max_used", "heater_range_used_codes",
+                    "peak_slew_codes_per_s")
 
 
 def test_accumulators_equal_trace_metrics_synthetic():
@@ -86,7 +97,7 @@ def test_accumulators_equal_trace_metrics_synthetic():
     wrong-line entries, rails, slews: the streaming accumulators equal the full-trace reference exactly."""
     rng = np.random.default_rng(3)
     T, B, N = 4000, 2, 3
-    spec, st = _state(B, N)
+    spec, st = _metrics_state(B, N)
     t = np.arange(T)[:, None, None]
     det = 1e-12 * (40.0 * np.exp(-t / 300.0) * np.cos(t / 25.0 + np.arange(N))
                    + 4.5 * np.sin(t / 97.0 + 1.3 * np.arange(B)[:, None]) + rng.normal(0.0, 1.2, (T, B, N)))
@@ -107,11 +118,11 @@ def test_accumulators_equal_trace_metrics_synthetic():
     ber = 10.0 ** rng.uniform(-14, -8, (T, B, N))
     bits = np.full((T, B, N), 50.0)
     reg0 = np.full((B, N), 1000, np.int64)
-    kw = _feed(st, det, k0=7, order=order, wrong=wrong, reloma=rel, oracle=orc, oracle_unr=oru, p_heater_w=ph,
-               p_abs_w=pa, reg=reg, popped=popped, ber=ber, bits=bits, reg0=reg0)
+    kw = _feed_traces(st, det, k0=7, order=order, wrong=wrong, reloma=rel, oracle=orc, oracle_unr=oru, p_heater_w=ph,
+                      p_abs_w=pa, reg=reg, popped=popped, ber=ber, bits=bits, reg0=reg0)
     acc = summarize(st)
     ref = metrics_from_trace(spec, 1e-6, det_m=det, code_lo=0, code_hi=65535, reg0=reg0, k0=7, **kw)
-    _compare(acc, ref, KEYS)
+    _assert_metrics_equal(acc, ref, COMPARED_METRICS)
     assert np.all(acc["excursion_count"] >= 1)
     assert acc["locked_final"][1, 2] == False         # noqa: E712
     assert np.isnan(acc["time_to_lock_s"][1, 2])
@@ -131,21 +142,21 @@ def test_lock_reference_moves_the_lock_metrics():
     ref = np.where(t < 1500, 150e-12, 140e-12) * np.ones((T, B, N))     # an operating point that moves once
     det = ref + 1e-12 * (30.0 * np.exp(-t / 200.0) + rng.normal(0.0, 1.0, (T, B, N)))
     det[2200:2210, 0, 1] += 12e-12                                      # one excursion of ring 1
-    spec_line, st_line = _state(B, N)
-    _feed(st_line, det)
+    spec_line, st_line = _metrics_state(B, N)
+    _feed_traces(st_line, det)
     m_line = summarize(st_line)
     assert not m_line["ever_locked"].any()
-    spec, st = _state(B, N, MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=1e-3,
-                                        lock_reference="target", lock_target_pm=150.0))
+    spec, st = _metrics_state(B, N, MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=1e-3,
+                                                lock_reference="target", lock_target_pm=150.0))
     assert np.allclose(st.ref, 150e-12)
-    kw = _feed(st, det, lock_ref=ref)
+    kw = _feed_traces(st, det, lock_ref=ref)
     acc = summarize(st)
     assert acc["ever_locked"].all() and acc["locked_final"].all()
     assert int(acc["excursion_count"][0, 1]) >= 1
     np.testing.assert_allclose(acc["max_abs_detuning_pm"], m_line["max_abs_detuning_pm"])
     ref_m = metrics_from_trace(spec, 1e-6, det_m=det, code_lo=0, code_hi=65535, reg0=np.zeros((B, N), np.int64),
                                lock_ref_m=ref, **kw)
-    _compare(acc, ref_m, KEYS)
+    _assert_metrics_equal(acc, ref_m, COMPARED_METRICS)
     with pytest.raises(ValueError):
         MetricsSpec(lock_reference="target")
     with pytest.raises(ValueError):
@@ -153,11 +164,11 @@ def test_lock_reference_moves_the_lock_metrics():
 
 
 def test_spike_survives_decimation():
-    """07 P0-8: a 5 us spike in a 1 s run decimated to 1 ms gives excursion_count == 1; the 1 ms mean hides it,
+    """A 5 us spike in a 1 s run decimated to 1 ms gives excursion_count == 1; the 1 ms mean hides it,
     the min/max envelope keeps it."""
     T = 1_000_000
-    spec, st = _state(1, 1, MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=2.0),
-                      hist=False)
+    spec, st = _metrics_state(1, 1, MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=2.0),
+                              hist=False)
     det = np.full(T, 1.0e-12)
     det[500_000:500_005] = 20e-12                       # 5 us at 20 pm
     z = np.zeros(1)
@@ -166,8 +177,8 @@ def test_spike_survives_decimation():
     st.reset(0, np.zeros((1, 1), np.int64))
     rs = RecordSet.build([RecordSpec("detuning_m", 1000, "mean")] + envelope("detuning_m", 1000), 1, 1, T)
     tv = np.zeros((len(TR), 1))
-    _drive(det, np.int64(TR["detuning_m"]), st.mpf, st.mpi, zi, zb, z, st.af[0], st.ai[0], st.hist[0],
-           st.runhist[0], tv, rs.rec_i, rs.acc[0], rs.cnt[0], rs.idx[0], rs.trace[0])
+    _drive_scalar_trace(det, np.int64(TR["detuning_m"]), st.mpf, st.mpi, zi, zb, z, st.af[0], st.ai[0], st.hist[0],
+                        st.runhist[0], tv, rs.rec_i, rs.acc[0], rs.cnt[0], rs.idx[0], rs.trace[0])
     m = summarize(st)
     assert int(m["excursion_count"][0, 0]) == 1
     assert m["excursion_max_s"][0, 0] == pytest.approx(5e-6, abs=1e-12)
@@ -181,7 +192,8 @@ def test_spike_survives_decimation():
 
 
 def test_record_reducers_and_multitick_steps():
-    """mean / min / max / last over windows, and a multi-tick step of h ticks counts h times (07 P0-10)."""
+    """mean / min / max / last over windows, and a multi-tick step of h ticks counts h times (exact multi-tick
+    stepping)."""
     rs = RecordSet.build([("t_ring_k", 4, "mean"), ("t_ring_k", 4, "min"), ("t_ring_k", 4, "max"),
                           ("t_ring_k", 4, "last")], 1, 2, 16)
     tv = np.zeros((len(TR), 2))
@@ -207,13 +219,13 @@ def test_record_reducers_and_multitick_steps():
 def test_ber_windows_and_time_above():
     spec = MetricsSpec(lock_threshold_pm=5.0, hysteresis_pm=1.0, ber_sample_period_s=10e-6, ber_limit=1e-9,
                        time_above_pm=(5.0, 20.0))
-    _, st = _state(1, 1, spec)
+    _, st = _metrics_state(1, 1, spec)
     T = 100
     det = np.zeros((T, 1, 1))
     det[10:15] = 30e-12
     ber = np.full((T, 1, 1), 1e-12)
     ber[40:50] = 1e-6                                   # one bad 10-tick window
-    _feed(st, det, ber=ber, bits=np.full((T, 1, 1), 50.0))
+    _feed_traces(st, det, ber=ber, bits=np.full((T, 1, 1), 50.0))
     m = summarize(st)
     assert int(m["ber_windows"][0, 0]) == 10
     assert int(m["ber_windows_over_limit"][0, 0]) == 1
@@ -244,12 +256,12 @@ def plant_run():
     from mrm import params
     from mrm.control.api import ControllerSpec
     from mrm.plant.plant import Plant
-    from mrm.scenarios import registry as scen_registry
+    from mrm.scenarios import registry as scenario_registry
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cfg = params.load("g26", overrides=["sim.reset_ramp_s=1e-3"])
         pp = params.realize(cfg, 2, seeds=11)
-    sc = scen_registry.from_config(cfg)
+    sc = scenario_registry.from_config(cfg)
     spec = ControllerSpec.from_config(cfg, n_batch=2, nominal=cfg, scenario_drives=sc.drives,
                                       scenario_offsets=sc.offsets)
     n = 10_000
@@ -265,32 +277,33 @@ def plant_run():
 
 
 def test_accumulators_equal_trace_metrics_plant(plant_run):
-    """07 P0-8 test: the accumulators of a 10 ms plant run equal the metrics computed from its full trace."""
+    """The accumulators of a 10 ms plant run equal the metrics computed from its full trace."""
     plant, n = plant_run
     tr = plant.traces()
 
-    def g(f):
+    def recorded(f):
         return tr[f"{f}@1:last"]["value"]
-    det = g("detuning_m")
+    det = recorded("detuning_m")
     assert det.shape == (n, 2, 8)
-    reg = g("heater_code").astype(np.int64)
+    reg = recorded("heater_code").astype(np.int64)
     # latches: the staircase commands latch at 1000 i (+ controller latency 0)
     popped = np.zeros_like(reg, bool)
     popped[np.arange(0, n, n // 10)] = True
     acc = plant.metrics()
     st = plant.metrics_state
     bits_zero = np.zeros_like(det)
-    ber = g("ber")
-    ref = metrics_from_trace(st.spec, plant.dt, det_m=det, order=g("order").astype(np.int64),
-                             wrong=np.zeros_like(det, bool), reloma=g("reloma"), oracle=g("oracle_reloma"),
-                             oracle_unr=g("oracle_reloma"), p_heater_w=g("p_heater_w"), p_abs_w=g("p_abs_w"),
-                             reg=reg, popped=popped, ber=ber, bits=bits_zero, code_lo=int(plant.P.he_lo),
-                             code_hi=int(plant.P.he_hi), reg0=np.zeros((2, 8), np.int64), k0=0)
-    _compare(acc, ref, ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "time_above_s",
-                        "excursion_count", "time_unlocked_s", "excursion_max_s", "first_lock_s", "time_to_lock_s",
-                        "locked_final", "fsr_hop_events", "order_changes", "mean_reloma", "oma_penalty_db",
-                        "mean_p_abs_w", "heater_energy_j", "heater_sat_s", "heater_low_rail_s", "code_min_used", "code_max_used",
-                        "peak_slew_codes_per_s"))
+    ber = recorded("ber")
+    ref = metrics_from_trace(st.spec, plant.dt, det_m=det, order=recorded("order").astype(np.int64),
+                             wrong=np.zeros_like(det, bool), reloma=recorded("reloma"),
+                             oracle=recorded("oracle_reloma"), oracle_unr=recorded("oracle_reloma"),
+                             p_heater_w=recorded("p_heater_w"), p_abs_w=recorded("p_abs_w"), reg=reg, popped=popped,
+                             ber=ber, bits=bits_zero, code_lo=int(plant.P.he_lo), code_hi=int(plant.P.he_hi),
+                             reg0=np.zeros((2, 8), np.int64), k0=0)
+    _assert_metrics_equal(acc, ref, ("max_abs_detuning_pm", "mean_detuning_pm", "rms_detuning_pm", "time_above_s",
+                                     "excursion_count", "time_unlocked_s", "excursion_max_s", "first_lock_s",
+                                     "time_to_lock_s", "locked_final", "fsr_hop_events", "order_changes", "mean_reloma",
+                                     "oma_penalty_db", "mean_p_abs_w", "heater_energy_j", "heater_sat_s",
+                                     "heater_low_rail_s", "code_min_used", "code_max_used", "peak_slew_codes_per_s"))
     assert np.all(acc["code_max_used"] == 18000)
     assert np.all(acc["peak_slew_codes_per_s"] == pytest.approx(2000 / (1000 * plant.dt)))
     assert np.all(acc["heater_energy_j"] > 0)

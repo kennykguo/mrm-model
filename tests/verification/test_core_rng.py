@@ -1,5 +1,15 @@
-"""Verification of mrm.core.rng (07 P1-13): Philox known answers, batch and thread-count invariance, stream ids,
-purity (no hidden state), distribution checks, and identical bits with NUMBA_DISABLE_JIT=1."""
+"""Checks the counter-based random numbers of mrm.core.rng.
+
+Read this first
+---------------
+Every random draw is a pure function of (seed, stream id, ring, tick, slot), computed with the Philox4x32-10
+counter-based generator. There is no hidden state. So element b of a batch with base seed s equals the single run
+with seed s + b, the thread count does not matter, and switching one noise source on or off leaves the other streams
+unchanged.
+
+The tests check the Philox known answers, batch and thread-count invariance, the stream ids, purity, the
+distributions (uniform, normal, Poisson, binomial), edge cases, and identical bits with NUMBA_DISABLE_JIT=1.
+"""
 import json
 import os
 import subprocess
@@ -55,8 +65,20 @@ def test_batch_seeds():
         rng.batch_seeds(-1, 2)
 
 
+def test_batch_seeds_reaches_the_largest_int64_seed():
+    """The last seed base + B - 1 may be 2**63 - 1 (it fits an int64); one more is refused."""
+    B = 4
+    seeds = rng.batch_seeds(2**63 - B, B)
+    assert seeds.dtype == np.int64 and int(seeds[-1]) == 2**63 - 1
+    assert int(rng.batch_seeds(2**63 - 1, 1)[0]) == 2**63 - 1
+    with pytest.raises(ValueError):
+        rng.batch_seeds(2**63 - B + 1, B)
+    with pytest.raises(ValueError):
+        rng.batch_seeds(2**63, 0)
+
+
 def test_element_b_equals_b1_run_with_seed_b():
-    """07 P1-13: element b of a B = 64 run equals the B = 1 run with seed b."""
+    """Element b of a B = 64 run (base seed 1000) equals the B = 1 run with seed 1000 + b."""
     base, B, K = 1000, 64, 8
     sid = rng.stream_id("adc_tx.monitor")
     seeds = rng.batch_seeds(base, B)
@@ -98,8 +120,8 @@ def test_thread_count_invariance():
 
 
 def test_draws_are_pure_functions_of_the_counter():
-    """No hidden state: drawing from another stream in between changes nothing (07 P1-13: toggling shot noise leaves
-    the ADC-noise draws unchanged; two controllers on one seed see the same noise)."""
+    """No hidden state: drawing from another stream in between changes nothing. So toggling shot noise leaves the
+    ADC-noise draws unchanged, and two controllers on one seed see the same noise."""
     k_adc = rng.stream_key(5, rng.stream_id("adc_tx.monitor"))
     k_shot = rng.stream_key(5, rng.stream_id("shot_noise"))
     first = [rng.normal(k_adc, r, t, 0) for r in range(4) for t in range(50)]
@@ -219,15 +241,15 @@ def test_identical_bits_without_jit():
     assert json.loads(here.stdout) == json.loads(other.stdout)
 
 
-# ---- review additions -----------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------- numeric edge cases
 
 def test_uniform_interval_is_open_at_both_ends():
     """All-ones words used to give exactly 1.0 (x + 0.5 with x = 2**53 - 1 rounds to 2**53), which would make
     us = 0 and divide by zero in PTRS / BTRS."""
-    top = rng._u53(np.uint64(0xFFFFFFFF), np.uint64(0xFFFFFFFF))
+    top = rng._uniform53(np.uint64(0xFFFFFFFF), np.uint64(0xFFFFFFFF))
     assert top < 1.0 and top == 1.0 - 2.0**-53
-    assert rng._u53(np.uint64(0), np.uint64(0)) == 0.5 * 2.0**-53
-    assert rng._u53(np.uint64(0xFFFFFFFF), np.uint64(0xFFFFFFBF)) < 1.0      # the next value below the top
+    assert rng._uniform53(np.uint64(0), np.uint64(0)) == 0.5 * 2.0**-53
+    assert rng._uniform53(np.uint64(0xFFFFFFFF), np.uint64(0xFFFFFFBF)) < 1.0      # the next value below the top
 
 
 def test_binomial_small_p_large_n_is_accurate():

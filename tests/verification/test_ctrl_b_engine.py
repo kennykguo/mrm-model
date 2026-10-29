@@ -1,10 +1,13 @@
-"""Controllers B on the compiled engine (mrm.sim.runner.run, Python controller path), through this small adapter:
-Truth comes from the engine's records (lam_res_m, detuning_m) and its final Truth; the controllers are the same
-objects the reference-plant tests use. Skipped when the engine is not importable (it is being written alongside).
+"""Checks the group-B controllers on the compiled engine (mrm.sim.runner.run, Python controller path).
 
-Cross-checks against the reference bench (tests/verification/test_ctrl_b_plant.py, same g26 nominal world): the
-ramp acquisition must end at the same red-side detuning; the WDM supervisor must end with every ring on its declared
-line (engine metric wrong_line_final). The aggressor runs on the engine are in test_ctrl_b_ramp_aggressor.py (slow).
+Read this first
+---------------
+A small adapter runs the same controller objects that the reference-plant tests use. Truth comes from the engine's
+records (lam_res_m, detuning_m) and its final Truth. The file is skipped when the engine is not importable.
+
+Cross-checks against the reference bench (test_ctrl_b_plant.py, same g26 nominal world): the ramp acquisition must
+end at the same red-side detuning, and the WDM supervisor must end with every ring on its declared line (engine
+metric wrong_line_final). The aggressor runs on the engine are in test_ctrl_b_ramp_aggressor.py (slow).
 """
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ runner = pytest.importorskip("mrm.sim.runner")
 from mrm.control.baselines.bitstat_lock import BitStatLock
 from mrm.control.baselines.ramp_acquire import RampAcquire, ST_LOCK
 from mrm.control.baselines.wdm_supervisor import PH_TRACK, WdmSupervisor
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 from mrm.units import C0
 
 from test_ctrl_b_plant import load_g26
@@ -62,7 +65,7 @@ def run_engine(ctrl, duration_s, scenario=None, record=(("detuning_m", 10, "mean
     cfg = load_g26(knowledge=KNOW) if cfg is None else cfg
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return runner.run(cfg, controller=ctrl, scenario=lib.static() if scenario is None else scenario,
+        return runner.run(cfg, controller=ctrl, scenario=library.static() if scenario is None else scenario,
                           duration_s=duration_s, batch=1, uncertainty="nominal", variation="off",
                           record=list(record), reset_protocol="branch_low", **kw)
 
@@ -115,11 +118,12 @@ def test_bitstat_lock_on_the_engine():
 @pytest.mark.slow
 def test_bitstat_lock_recovers_from_a_laser_power_step():
     """+10 % laser power at 4 ms. The monitor lock's set-point is an absolute code from the old peak, so it is
-    pushed red by (dP/P) y / |dy/ddelta| (04 C3) and stays there; the bit-statistics lock holds the eye ratio
+    pushed red by (dP/P) y / |dy/ddelta| and stays there; the bit-statistics lock holds the eye ratio
     D / (c - y_bg), which does not depend on the optical power, and returns towards its detuning."""
     import math
-    from mrm.scenarios import generators as g
-    step = g.Scenario(name="pstep", components=(g.step("laser.power_delta_db", 4e-3, 10 * math.log10(1.1)),))
+    from mrm.scenarios import generators
+    power_step = generators.step("laser.power_delta_db", 4e-3, 10 * math.log10(1.1))       # +10 % at 4 ms
+    step = generators.Scenario(name="pstep", components=(power_step,))
     out = {}
     for name, ctrl in (("bitstat", BitStatLock(rings=[0])), ("monitor", RampAcquire(rings=[0], alpha=0.75))):
         res = run_engine(ctrl, 14e-3, scenario=step, assignment=[7, 1, 2, 3, 4, 5, 6, 7])
@@ -136,10 +140,10 @@ def test_ramp_lock_recovers_from_a_line_failover_gap():
     """[B2] laser failover with a 1 ms dark gap on ring 0's line (line 7) at 3 ms, then the spare laser at +10 GHz and
     -1 dB (mrm.scenarios.library.laser_failover). In the dark the lock is lost and the self-heating goes away (the
     resonance moves ~1 nm blue); the re-search covers only this resonance, in a window moved by the drift the loop
-    had tracked, and FAIL re-arms after fail_rearm_s. Ring 0 must end locked on the red side of line 7 again. Before
-    the review the re-search ran in the full window: a search still climbing when the light came back took the next
+    had tracked, and FAIL re-arms after fail_rearm_s. Ring 0 must end locked on the red side of line 7 again. Before a
+    fix the re-search ran in the full window: a search still climbing when the light came back took the next
     resonance up (a foreign line), and a FAIL was final."""
-    sc = lib.laser_failover(line=7, t_fail_s=3e-3, gap_s=1e-3)
+    sc = library.laser_failover(line=7, t_fail_s=3e-3, gap_s=1e-3)
     ctrl = RampAcquire(rings=[0])
     res = run_engine(ctrl, 14e-3, scenario=sc, assignment=[7, 1, 2, 3, 4, 5, 6, 7])
     f = ctrl.fsm

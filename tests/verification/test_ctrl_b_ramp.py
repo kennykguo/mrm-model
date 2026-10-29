@@ -1,9 +1,18 @@
-"""Ramp-and-maximize acquisition (PAT-3) with the red-side lock hand-off, closed loop on the g26 reference plant
-(tests/verification/test_ctrl_b_plant.py::CtrlBPlant). Truth is read here only, never by the controller.
+"""Checks the ramp-and-maximize acquisition (Lightmatter patent PAT-3) with its red-side lock hand-off, closed loop on
+the g26 reference plant (test_ctrl_b_plant.py::CtrlBPlant). Only the test reads Truth, never the controller.
 
-Scenarios: steady lock after a cold acquisition (lasers on at t = 0, heaters at code 0), the self-heating jump of a
-heater-up sweep (07 P0-1), a +10 % laser power step, the standalone all-ring cold start (the wrong-line / duplicate
-hazard that the WDM supervisor exists for). The aggressor runs (A1, A2) are in test_ctrl_b_ramp_aggressor.py (slow).
+Read this first
+---------------
+RampAcquire ramps the heater up until it passes a drop peak, scans back down to measure the peak, and then locks the
+monitor at a fraction alpha of the peak on the red side. The scenarios here:
+
+- a steady lock after a cold acquisition (lasers on at t = 0, heaters at code 0);
+- the self-heating jump of a heater-up sweep;
+- a +10 % laser power step;
+- the standalone cold start of all rings at once (the wrong-line and duplicate-line hazard that the WDM supervisor
+  exists for).
+
+The aggressor runs (A1, A2) are in test_ctrl_b_ramp_aggressor.py (slow).
 
 Reported numbers (printed; pytest -s): lock error (jitter rms and max about the steady detuning, pm), offset from the
 static OMA optimum (pm and OMA penalty dB), lock-excursion count (5 pm threshold, 1 pm hysteresis about the steady
@@ -18,9 +27,9 @@ import pytest
 
 from mrm.control import registry
 from mrm.control.api import Controller, ControllerSpec, validate_telemetry
-from mrm.control.baselines import ramp_acquire as ra
+from mrm.control.baselines import ramp_acquire
 from mrm.control.baselines.ramp_acquire import RampAcquire, ST_LOCK, ST_DOWN, ST_UP
-from mrm.scenarios import generators as g
+from mrm.scenarios import generators
 
 from test_ctrl_b_plant import CtrlBPlant, load_g26, make_spec, realize, run_closed_loop, excursions
 
@@ -70,7 +79,7 @@ def test_registered_and_protocol(nominal):
     validate_telemetry(ctrl.telemetry(), spec)
     with pytest.raises(TypeError):
         registry.create("ramp_acquire", {"no_such": 1})
-    # tuning from the nominal linewidth when the knowledge allows, documented defaults otherwise (07 P1-1)
+    # tuning from the nominal linewidth when the knowledge grants it, documented defaults otherwise
     assert ctrl.fsm.dw_up0 == pytest.approx(ctrl.fsm.design.fwhm_w / 3.5)
     assert ctrl.fsm.dw_up.shape == (spec.n_batch, spec.n_rings) and np.all(ctrl.fsm.dw_up == ctrl.fsm.dw_up0)
     bare = ControllerSpec.from_config(load_g26(), n_batch=1, nominal=None)
@@ -80,7 +89,7 @@ def test_registered_and_protocol(nominal):
 
 
 def test_upsweep_jumps_over_the_peak(ring0_run):
-    """07 P0-1: a heater-up sweep approaches on the positive-feedback side and JUMPS. Shown on Truth (the detuning
+    """Self-heating: a heater-up sweep approaches on the positive-feedback side and JUMPS. Shown on Truth (the detuning
     goes from blue to red of the line within one controller period, never resting near zero) and handled: the peak
     used for the set-point is the one measured on the DOWN scan, well above the up-sweep's landing level."""
     plant, ctrl, rec, _ = ring0_run
@@ -151,10 +160,11 @@ def test_alpha_near_max_slope_lowers_the_oma_penalty(nominal):
 
 def test_laser_power_step(nominal):
     """+10 % laser power (0.41 dB) at 2 ms: the set-point was a fraction of the OLD peak, so the lock point moves
-    (04 C3 failure mode, a known limit of a fraction-of-peak lock without re-normalization); the loop must hold
-    lock (no re-acquisition, no excursion beyond the moved point after it settles)."""
+    (a known limit of a fraction-of-peak lock without re-normalization). The loop must hold lock (no re-acquisition,
+    no excursion beyond the moved point after it settles)."""
     cfg, pp, spec = nominal
-    step = g.Scenario(name="pstep", components=(g.step("laser.power_delta_db", 2e-3, 10 * math.log10(1.1)),))
+    power_step = generators.step("laser.power_delta_db", 2e-3, 10 * math.log10(1.1))       # +10 % at 2 ms
+    step = generators.Scenario(name="pstep", components=(power_step,))
     plant = CtrlBPlant(pp, cfg, spec, scenario=step)
     plant.assignment[0, 0] = RING0_FIRST_LINE
     ctrl = RampAcquire(rings=[0])
@@ -167,7 +177,7 @@ def test_laser_power_step(nominal):
     after = float(np.mean(d[rec.ticks > 3500]))
     m = steady_metrics(d[rec.ticks > 2000], rec.ticks[rec.ticks > 2000], t_from=3000)
     # y scales with the power, so the loop holds the same code further from the line: the ring moves red (heater
-    # up), by about (dP/P) y / |dy/ddelta| (04 C3)
+    # up), by about (dP/P) y / |dy/ddelta|
     assert after > before, (before, after)
     assert after - before < 60.0, (before, after)
     assert m["excursions"] == 0 and m["rms_pm"] < 1.0, m
@@ -176,7 +186,7 @@ def test_laser_power_step(nominal):
 
 
 def test_standalone_cold_start_takes_foreign_lines(nominal):
-    """The g26 cold-ring hazard (docs/handoff/integrator.md section 4): with every ring acquiring its first
+    """The g26 cold-ring hazard: with every ring acquiring its first
     resonance from blue at once, rings lock on lines other than the declared map, and some share a line (the
     downstream one starved). This is why the WDM supervisor exists; the ramp controller reports it honestly."""
     cfg, pp, spec = nominal
@@ -200,7 +210,7 @@ def test_partial_peak_below_zero_drive_is_locked():
     monitor: the DOWN scan's y keeps rising until w reaches 0."""
     cfg = load_g26(knowledge=KNOW)
     spec = make_spec(cfg, 1)
-    f = ra.RampFSM(spec, ra.RampParams())
+    f = ramp_acquire.RampFSM(spec, ramp_acquire.RampParams())
     m = np.ones((1, spec.n_rings), bool)
     f.start(m, w_from=0.0)
     ys = [5000, 5000, 5100, 5000, 30000, 26000]           # floor, then a jump and a fall (event)
@@ -218,8 +228,9 @@ def test_partial_peak_below_zero_drive_is_locked():
 
 
 def test_composition_with_the_pi_lock(nominal):
-    """AcquireThenLock: the PAT-3 acquisition hands ring 0 (on the stable red branch of its line) to the drop-port PI
-    lock of controllers A (mrm.control.baselines.pi_lock, fraction 0.7), whose hand-off contract is exactly that."""
+    """AcquireThenLock: the PAT-3 acquisition hands ring 0 (on the stable red branch of its line) to the group-A
+    drop-port PI lock (mrm.control.baselines.pi_lock, tunable fraction hyperparameter 0.7), whose hand-off contract
+    is exactly that."""
     pi_lock = pytest.importorskip("mrm.control.baselines.pi_lock")
     cfg, pp, spec = nominal
     plant = CtrlBPlant(pp, cfg, spec)
@@ -272,7 +283,7 @@ def test_start_delay_counts_from_the_first_step_after_reset(nominal):
         assert not ctrl.started                          # 0, 10, 20, 30 us after the reset
     for j in range(4, 7):
         ctrl.step(synthetic_obs(spec, t0 + j * per, applied=1234))
-    assert ctrl.started and ctrl.fsm.state[0, 0] != ra.ST_IDLE
+    assert ctrl.started and ctrl.fsm.state[0, 0] != ramp_acquire.ST_IDLE
     out = ctrl.step(synthetic_obs(spec, t0 + 7 * per, applied=1234))
     assert np.all(out["tx.heater"][0, 1:] == 1234)        # rings outside params.rings keep their register
 
@@ -284,4 +295,4 @@ def test_acquire_then_lock_exposes_the_lock_latency_before_reset():
     c = registry.create("acquire_then_lock", {"lock": {"name": "mrm.control.baselines.pi_lock:PiLock",
                                                        "params": {"latency_ticks": 3}}})
     assert c.latency_ticks == 3 and type(c.lock_ctrl).__name__ == "PiLock"
-    assert ra.AcquireThenLock().latency_ticks == 0                  # default lock: controllers A's PI lock
+    assert ramp_acquire.AcquireThenLock().latency_ticks == 0        # default lock: the group-A PI lock

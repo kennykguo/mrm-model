@@ -1,25 +1,38 @@
-"""Closed-loop harness for the model-based baselines (controllers_c) and its own checks.
+"""Closed-loop harness for the model-based baseline controllers (group C), and the checks of the harness itself.
 
-The plant is tests/verification/test_plant_wiring.py::ReferencePlant (imported, not copied): the Python plant tick
+Read this first
+---------------
+The group-C controller tests import the helpers here. The usual pattern is::
+
+    cfg = load_cfg()                                  # g26 with the model_nominal knowledge
+    rig = build_rig(cfg)                              # plant + spec, every world warm-started at its oracle point
+    hold(rig, 30)                                     # open loop for 30 ticks
+    tr = run_loop(rig, KalmanLQG(), 2000)             # closed loop; per-tick Truth in tr
+    m = lock_metrics(tr.detuning_m, rig.targets_m)
+
+The plant is tests/verification/test_plant_wiring.py::ReferencePlant (imported, not copied): a Python plant tick
 built only from PlantParams and the leaf adapters. This module adds what a closed-loop test needs and the
 ReferencePlant does not provide:
 
 - ``warm_start``: put every world at a steady state of the TRUE plant (``mrm.control.models.static_point`` with the
-  true PlantParams) by writing the thermal lag states, the self-heating branch, the heater DAC registers and the
+  true PlantParams). It writes the thermal lag states, the self-heating branch, the heater DAC registers and the
   previous-tick powers. This is how a test starts "locked" without simulating an acquisition.
-- ``Loop``: the event order of a controller edge (mrm.core.timing): release the sensor banks at the edge, build a
+- ``run_loop``: the event order of a controller edge (mrm.core.timing). Release the sensor banks at the edge, build a
   strict Observation of the declared channels only, step the controller, validate the actions (ActionValidator:
   clip, count, cast) and latch the heater command ``latency_ticks`` later.
-- Truth readouts inside the TEST only: detuning delta = lambda_res - lambda_line of every ring each tick
-  (``models.resonance_detuning_m`` on the plant's own temperatures, lines and junction levels) and the OMA of each
+- Truth readouts, inside the TEST only: the detuning delta = lambda_res - lambda_line of every ring at each tick
+  (``models.resonance_detuning_m`` on the plant's own temperatures, lines and junction levels), and the OMA of each
   ring at its line (|P_out1 - P_out0| from the plant's optics).
-- ``lock_metrics``: lock error (pm), lock-excursion count with hysteresis (07 P0-8), time to lock, OMA penalty
-  against the oracle (10 log10 OMA_oracle / OMA).
+- ``lock_metrics``: lock error (pm), lock-excursion count with hysteresis (as the engine's online metric counts it),
+  time to lock, and the OMA penalty against the oracle (10 log10 OMA_oracle / OMA).
 
-The tests here check the harness itself: a warm start is a fixed point of the plant, the plant runs at the
-conditions of the controller's nominal model (scenario bias and ambient from the config), the array-supply limits
-(power and current) decide which sampled worlds can be warm-started at all, and the loop delay the linear model
-assumes is the one the plant produces (07 P0-6 ``test_loop_delay_impulse`` in miniature).
+The tests here check the harness itself:
+
+- a warm start is a fixed point of the plant;
+- the plant runs at the conditions of the controller's nominal model (scenario bias and ambient from the config);
+- the array-supply limits (power and current) decide which sampled worlds can be warm-started at all;
+- the loop delay that the linear model assumes is the one the plant produces (the loop-delay impulse test in
+  miniature).
 """
 from __future__ import annotations
 
@@ -31,16 +44,16 @@ import numpy as np
 import pytest
 
 from mrm import params
-from mrm.control import models as M
+from mrm.control import models
 from mrm.control.api import ActionValidator, ControllerSpec, Observation
 from mrm.core import timing
-from mrm.plant import electrical as el
+from mrm.plant import electrical
 from mrm.scenarios.generators import Scenario, const
 
 from test_plant_wiring import ReferencePlant
 
-KNOWLEDGE = ["line_grid", "ring_to_line", M.KNOWLEDGE_TOKEN]
-LOCK_THRESHOLD_PM = 5.0          # g26 metrics.lock_threshold_pm (textbook 5 pm budget)
+KNOWLEDGE = ["line_grid", "ring_to_line", models.KNOWLEDGE_TOKEN]
+LOCK_THRESHOLD_PM = 5.0          # g26 metrics.lock_threshold_pm (the textbook 5 pm budget)
 HYSTERESIS_PM = 1.0              # g26 metrics.hysteresis_pm
 
 
@@ -77,8 +90,8 @@ def with_config_defaults(sc: Scenario, cfg) -> Scenario:
     tx.bias_v undriven, the bias DAC stays at code 0 (ring.bias_dac.v_min_v = 1.0 V in g26) instead of
     scenario.bias_v = 1.05 V, and the plant runs at another bias than the controller's nominal model (a 0.2 pm
     target shift and ~110 monitor codes, which a set-point lock reads as a 0.6 pm offset)."""
-    from mrm.scenarios import registry as _sreg
-    base = _sreg.from_config(cfg).defaults
+    from mrm.scenarios import registry as scenario_registry
+    base = scenario_registry.from_config(cfg).defaults
     d = dict(sc.defaults)
     for s in _CFG_DEFAULT_SIGNALS:
         if s in base:
@@ -87,7 +100,7 @@ def with_config_defaults(sc: Scenario, cfg) -> Scenario:
 
 
 def calibrate(sc, pp):
-    """Aggressor calibration of a library scenario on the plant's thermal system (ENGINE_BRIEF section 1)."""
+    """Aggressor calibration of a library scenario on the plant's own thermal system, as the engine does."""
     from mrm.scenarios import calibrate_scenario, foster_from_system
     if not sc.aggressors:
         return sc
@@ -125,21 +138,22 @@ class Rig:
     def N(self):
         return self.pp.n_rings
 
-    def conditions(self, b: int) -> M.Conditions:
+    def conditions(self, b: int) -> models.Conditions:
         """Truth conditions of world b at the last plant tick (lines, chip power, junction levels, data)."""
         last = self.plant.last
         ev = self.plant.arr.evaluate(int(self.k), self.plant.cache)
-        return M.Conditions(lam_m=np.ascontiguousarray(last["lam"][b]), p_chip_w=np.ascontiguousarray(last["p_chip"][b]),
-                            t_base_k=float(ev["thermal.t_base_k"][b, 0] + ev["thermal.xpu_rise_k"][b, 0]),
-                            v_lo=np.ascontiguousarray(last["v_lo"][b]), v_hi=np.ascontiguousarray(last["v_hi"][b]),
-                            rho=np.ascontiguousarray(last["rho"][b]),
-                            transition_density=np.ascontiguousarray(ev["data.transition_density"][b]),
-                            aggressor_w=(np.asarray(ev["thermal.aggressor_w"][b]) if self.plant.sys.aggressor_src.size
-                                         else None))
+        aggressor_w = np.asarray(ev["thermal.aggressor_w"][b]) if self.plant.sys.aggressor_src.size else None
+        return models.Conditions(lam_m=np.ascontiguousarray(last["lam"][b]),
+                                 p_chip_w=np.ascontiguousarray(last["p_chip"][b]),
+                                 t_base_k=float(ev["thermal.t_base_k"][b, 0] + ev["thermal.xpu_rise_k"][b, 0]),
+                                 v_lo=np.ascontiguousarray(last["v_lo"][b]), v_hi=np.ascontiguousarray(last["v_hi"][b]),
+                                 rho=np.ascontiguousarray(last["rho"][b]),
+                                 transition_density=np.ascontiguousarray(ev["data.transition_density"][b]),
+                                 aggressor_w=aggressor_w)
 
     def detuning_m(self) -> np.ndarray:
         """TRUTH: (B, N) detuning of every ring at the current plant state."""
-        return np.stack([M.resonance_detuning_m(self.pp, b, self.plant.t_ring[b], self.conditions(b))
+        return np.stack([models.resonance_detuning_m(self.pp, b, self.plant.t_ring[b], self.conditions(b))
                          for b in range(self.B)])
 
     def oma_w(self) -> np.ndarray:
@@ -148,9 +162,8 @@ class Rig:
     def feasible_worlds(self) -> np.ndarray:
         """TRUTH: (B,) True where every ring's warm-start point is reachable (mrm.validation.oracle.reachable: positive
         heater power, codes inside the DAC range with heater authority, and the bank within the array supply's power
-        AND current limits, 07 P1-12; above either the supply droops every heater, so the injected steady state is
-        not one and the rings fold before any controller acts). The current limit (150 mA in g26) was missing here
-        before the review: two "reachable" LHS worlds of the mismatch report were in supply droop."""
+        AND current limits). Above either limit the supply droops every heater, so the injected steady state is not
+        one and the rings fold before any controller acts. The current limit is 150 mA in g26."""
         from mrm.validation.oracle import reachable
         return np.array([bool(np.all(reachable(self.pp, sp))) for sp in self.static])
 
@@ -162,7 +175,7 @@ class Rig:
                           heater_applied=np.array(self.plant.heater.applied_codes))
 
     def dark_codes(self) -> np.ndarray:
-        """TRUTH: (B, N) monitor code of the PD dark current at the current PD temperature (Arrhenius, 07 P1-9)."""
+        """TRUTH: (B, N) monitor code of the PD dark current at the current PD temperature (Arrhenius law)."""
         hw = self.plant.mon.hw
         t_pd = self.plant.t_obs[:, self.plant.sys.pd_obs]
         _, i_d = hw.photocurrent_a(np.zeros((self.B, self.N)), 0.0, t_pd)
@@ -174,7 +187,7 @@ class Rig:
 
     def reference_detuning_m(self) -> np.ndarray:
         """TRUTH: the detuning where a monitor set-point lock holds its code when the PD dark current differs from
-        its quiet value (aggressor heating of the PD, 07 P1-9): target + offset / |dy/d delta| (the monitor cannot
+        its quiet value (aggressor heating of the PD): target + offset / |dy/d delta| (the monitor cannot
         tell the two apart). Equal to the target when the PD is at its quiet-lock temperature."""
         if self.targets_m is None:                    # no warm start: no reference
             return np.full((self.B, self.N), np.nan)
@@ -247,19 +260,19 @@ def warm_start(rig: Rig, detuning_m="oracle", aggressor_presettle_ticks: int = 0
     t_pd_quiet = np.zeros((B, N))
     for b in range(B):
         cond = rig.conditions(b)
-        quiet = M.Conditions(**{**cond.__dict__, "aggressor_w": None, "t_extra_obs_k": None})
+        quiet = models.Conditions(**{**cond.__dict__, "aggressor_w": None, "t_extra_obs_k": None})
         if agg is not None:
             xa = np.zeros(sysm.n_lags)
             xa[agg[1]] = agg[0][b]
             extra = sysm.outputs(xa[None], 0.0)[0]
-            cond = M.Conditions(**{**cond.__dict__, "aggressor_w": None, "t_extra_obs_k": extra})
-        d_opt, oma_opt, _, _ = M.oma_optimal_detuning(pp, b, cond=cond)
+            cond = models.Conditions(**{**cond.__dict__, "aggressor_w": None, "t_extra_obs_k": extra})
+        d_opt, oma_opt, _, _ = models.oma_optimal_detuning(pp, b, cond=cond)
         rig.oracle_oma_w[b] = oma_opt
         rig.oracle_detuning_m[b] = d_opt
         tgt = d_opt if isinstance(detuning_m, str) else np.broadcast_to(np.asarray(detuning_m, float), (B, N))[b]
-        sp = M.static_point(pp, b, tgt, cond=cond)
+        sp = models.static_point(pp, b, tgt, cond=cond)
         rig.static.append(sp)
-        t_pd_quiet[b] = M.static_point(pp, b, tgt, cond=quiet, with_slopes=False).t_pd_k
+        t_pd_quiet[b] = models.static_point(pp, b, tgt, cond=quiet, with_slopes=False).t_pd_k
         targets[b] = sp.detuning_m
         u[b, sysm.heater_src] = sp.heater_power_w
         u[b, sysm.wg_src] = sp.p_abs_w
@@ -280,7 +293,7 @@ def warm_start(rig: Rig, detuning_m="oracle", aggressor_presettle_ticks: int = 0
     plant.t_branch[:] = plant.t_ring
     plant.p_prev[:] = u[:, sysm.wg_src]
     plant.u_heater[:] = u[:, sysm.heater_src]
-    plant.heater = el.HeaterBank(plant.heater_p, initial_code=codes)
+    plant.heater = electrical.HeaterBank(plant.heater_p, initial_code=codes)
     rig.targets_m = targets
     hw = plant.mon.hw
     _, i_d = hw.photocurrent_a(np.zeros((B, N)), 0.0, t_pd_quiet)
@@ -372,12 +385,17 @@ def run_loop(rig: Rig, ctrl, n_ticks: int, *, reset: bool = True, record_every: 
 
 def lock_metrics(det_m, ref_m, *, threshold_pm=LOCK_THRESHOLD_PM, hysteresis_pm=HYSTERESIS_PM, dt_s=1e-6,
                  oma_w=None, oracle_oma_w=None, settle_ticks=0) -> dict:
-    """Lock metrics from TRUTH (07 P0-8, 4.8): error e = delta - ref (pm) over the scored window (after settle_ticks):
-    rms_pm, max_pm (max |e|), mean_pm; excursions = number of times |e| rises above threshold after having been below
-    threshold - hysteresis (counted per ring, summed, in the scored window); time_to_lock_s = first time |e| <
-    threshold and stays below for the rest of the run (per ring, max over rings; inf if never; measured from the
-    start of the run, settle_ticks ignored); oma_penalty_db = mean over the scored window of
-    10 log10(OMA_oracle / OMA) (per ring, max over rings)."""
+    """Lock metrics from TRUTH, with the definitions of the engine's online metrics and the controller scorecard.
+
+    The error is e = delta - ref (pm) over the scored window (after settle_ticks). Returns:
+
+    - rms_pm, max_pm (max |e|), mean_pm;
+    - excursions: the number of times |e| rises above threshold after having been below threshold - hysteresis
+      (counted per ring, summed, in the scored window);
+    - time_to_lock_s: the first time |e| < threshold and stays below for the rest of the run (per ring, max over
+      rings; inf if never; measured from the start of the run, settle_ticks ignored);
+    - oma_penalty_db: the mean over the scored window of 10 log10(OMA_oracle / OMA) (per ring, max over rings).
+    """
     r = np.asarray(ref_m)
     e = (np.asarray(det_m) - (r if r.ndim == 3 else r[None])) * 1e12
     es = e[settle_ticks:]
@@ -408,7 +426,7 @@ def lock_metrics(det_m, ref_m, *, threshold_pm=LOCK_THRESHOLD_PM, hysteresis_pm=
     return out
 
 
-# ------------------------------------------------------------------------------------------------ harness checks
+# ------------------------------------------------------------------------------------------------------- harness checks
 @pytest.fixture(scope="module")
 def nominal_rig():
     cfg = load_cfg()
@@ -435,21 +453,21 @@ def test_plant_runs_at_the_controllers_nominal_conditions(nominal_rig):
     DAC latency. (Before this was fixed the plant sat at the bias DAC's v_min = 1.0 V: the warm-start target moved by
     0.2 pm and the monitor code by ~110 codes, which every set-point lock read as a 0.6 pm offset.)"""
     rig = nominal_rig
-    pp_nom = M.nominal_plant_params(rig.cfg)
-    nom = M.conditions_from_config(pp_nom, 0, cfg=rig.cfg)
+    pp_nom = models.nominal_plant_params(rig.cfg)
+    nom = models.conditions_from_config(pp_nom, 0, cfg=rig.cfg)
     tru = rig.conditions(0)
     np.testing.assert_allclose(tru.v_lo, nom.v_lo, atol=2e-3)          # bias DAC quantization + noise only
     np.testing.assert_allclose(tru.v_hi, nom.v_hi, atol=2e-3)
     assert tru.t_base_k == pytest.approx(nom.t_base_k)
     np.testing.assert_allclose(tru.lam_m, nom.lam_m, rtol=1e-12)
     np.testing.assert_allclose(tru.p_chip_w, nom.p_chip_w, rtol=1e-3)  # RIN
-    lm = M.linearize_bank(rig.cfg, M.OperatingPoint(), latency_ticks=1)[0]
+    lm = models.linearize_bank(rig.cfg, models.OperatingPoint(), latency_ticks=1)[0]
     np.testing.assert_allclose(rig.static[0].y_code, lm.op.y_code, atol=10.0)       # codes (~0.05 pm)
     np.testing.assert_allclose(rig.targets_m[0], lm.op.detuning_m, atol=0.02e-12)
 
 
 def test_loop_delay_of_the_model_matches_the_plant():
-    """07 P0-6 in miniature: a heater step commanded at an edge is first seen by the controller at
+    """The loop-delay impulse test in miniature: a heater step commanded at an edge is first seen by the controller at
     timing.first_response_tick, and the linear model's delay tau = tau_u + tau_m is consistent with it (tau_u is the
     tick the code reaches the heater; the first sample that sees it has sample tick >= k_act + 1)."""
     cfg = load_cfg()
@@ -460,7 +478,7 @@ def test_loop_delay_of_the_model_matches_the_plant():
     k_edge = rig.k
     assert k_edge % spec.period_ticks == 0
     lat_c = 1
-    lm = M.linearize(cfg, M.OperatingPoint(ring=0), latency_ticks=lat_c)
+    lm = models.linearize(cfg, models.OperatingPoint(ring=0), latency_ticks=lat_c)
     pending = {k_edge + lat_c: np.array(rig.plant.heater.applied_codes) + 400}
     seen = None
     for i in range(80):
@@ -483,12 +501,12 @@ def test_loop_delay_of_the_model_matches_the_plant():
 
 
 def test_supply_limits_decide_reachability():
-    """07 P1-12: the array heater supply limits total power (200 mW) AND total current (150 mA) in g26. A world whose
+    """The array heater supply limits total power (200 mW) AND total current (150 mA) in g26. A world whose
     oracle point needs more is not reachable: the plant droops every heater by the same factor
     (electrical.supply_limit_row), so a warm start there is not a steady state. models.static_point predicts the
     plant's droop factor (StaticPoint.supply_scale), and mrm.validation.oracle.reachable (which Rig.feasible_worlds
-    uses) rejects such worlds. In this LHS draw two worlds are within the power limit but over the current limit (the
-    controllers_c builder's mismatch report counted them as reachable and their folds as controller failures)."""
+    uses) rejects such worlds. In this LHS draw two worlds are within the power limit but over the current limit (an
+    earlier mismatch report counted them as reachable and their folds as controller failures)."""
     from mrm.validation.oracle import reachable
     cfg = load_cfg()
     pp = realize(cfg, 6, uncertainty="lhs", variation="sample", seeds=11)

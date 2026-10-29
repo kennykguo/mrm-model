@@ -1,6 +1,12 @@
-"""Every experiment kind on the engine, short and small (mrm.sim.experiment; 07 P1-17, P0-10, 4.8): the run
-directory contents, ``rerun`` bit for bit, the scoring start, the self reference, the compression gate, compare,
-sweep, Monte Carlo chunking and the quasi-static survey. ~40 s with a warm numba cache."""
+"""Runs every experiment kind of mrm.sim.experiment on the engine, short and small.
+
+Read this first
+---------------
+The tests check the run directory contents, that ``rerun`` reproduces a run bit for bit (also without the original
+files and without numba), the scoring start, the self reference, the gate on compressed scenario time (a
+convergence certificate), compare, sweep, Monte Carlo chunking and the steady-state survey. ~40 s with a warm numba
+cache.
+"""
 from __future__ import annotations
 
 import json
@@ -12,19 +18,21 @@ import numpy as np
 import pytest
 import yaml
 
-from mrm.sim import experiment as E
-from mrm.sim import manifest as mf
+from mrm.sim import experiment
+from mrm.sim import manifest
 
-QUIET = {"log": lambda s: None}
+QUIET = {"log": lambda s: None}   # keyword arguments that silence experiment.run / rerun
 
 
 def _write(tmp_path: Path, name: str, text: str) -> Path:
+    """Write the dedented text to tmp_path / name and return the path."""
     p = tmp_path / name
     p.write_text(textwrap.dedent(text))
     return p
 
 
-RUN = """\
+# a 4 ms warm-started run of pi_lock_c on two sampled g26 worlds, scored from 1 ms
+RUN_YAML = """\
     extends: g26
     meta: {name: t_run, kind: experiment}
     controller: {name: pi_lock_c}
@@ -42,8 +50,8 @@ RUN = """\
 
 
 def test_run_writes_a_complete_run_directory_and_reruns_bit_for_bit(tmp_path):
-    p = _write(tmp_path, "run.yaml", RUN)
-    res = E.run(p, runs_dir=tmp_path / "runs", argv=["mrm", "run", str(p)], **QUIET)
+    p = _write(tmp_path, "run.yaml", RUN_YAML)
+    res = experiment.run(p, runs_dir=tmp_path / "runs", argv=["mrm", "run", str(p)], **QUIET)
     d = res.run_dir
     assert d.name.endswith("_" + res.experiment_hash[:8]) and d.parent == tmp_path / "runs"
     names = {x.name for x in d.iterdir()}
@@ -55,7 +63,7 @@ def test_run_writes_a_complete_run_directory_and_reruns_bit_for_bit(tmp_path):
     assert tree["experiment"]["start"] == "warm" and tree["experiment"]["histogram"] is False
     assert str(p) in tree["_source"]["files"]
     man = json.loads((d / "manifest.json").read_text())
-    assert man["schema"] == mf.MANIFEST_SCHEMA and man["kind"] == "run"
+    assert man["schema"] == manifest.MANIFEST_SCHEMA and man["kind"] == "run"
     assert man["experiment_hash"] == res.experiment_hash
     assert man["seeds"] == {"device": 3, "uncertainty": 4, "noise": 5, "scenario": 6}
     assert man["argv"] == ["mrm", "run", str(p)]
@@ -67,12 +75,12 @@ def test_run_writes_a_complete_run_directory_and_reruns_bit_for_bit(tmp_path):
     assert man["cases"]["main"]["manifest_inputs"]["score_from_tick"] == 1000
     met = json.loads((d / "metrics.json").read_text())
     assert np.asarray(met["cases"]["main"]["max_abs_detuning_pm"]).shape == (2, 8)
-    tr = mf.read_trace_h5(d / "trace.h5")
+    tr = manifest.read_trace_h5(d / "trace.h5")
     assert tr["trace"]["main"]["detuning_m@10:min"]["value"].shape == (400, 2, 8)       # default records
     assert tr["truth_final"]["main"]["detuning_m"].shape == (2, 8)
-    assert res.report.splitlines()[0] == E.Q1_CAVEAT
+    assert res.report.splitlines()[0] == experiment.Q1_CAVEAT
     # rerun from the directory: a new directory, every array of trace.h5 identical
-    res2, cmp = E.rerun(d, runs_dir=tmp_path / "runs", **QUIET)
+    res2, cmp = experiment.rerun(d, runs_dir=tmp_path / "runs", **QUIET)
     assert res2.run_dir != d and cmp["identical"], cmp["differing"][:5]
     assert cmp["n_compared"] >= 90
     man2 = json.loads((res2.run_dir / "manifest.json").read_text())
@@ -80,8 +88,8 @@ def test_run_writes_a_complete_run_directory_and_reruns_bit_for_bit(tmp_path):
     # a changed input is caught before running
     txt = (d / "inputs" / "run.yaml").read_text().replace("duration_s: 0.004", "duration_s: 0.005")
     (d / "inputs" / "run.yaml").write_text(txt)
-    with pytest.raises(E.ExperimentError, match="experiment hash"):
-        E.rerun(d, runs_dir=tmp_path / "runs", **QUIET)
+    with pytest.raises(experiment.ExperimentError, match="experiment hash"):
+        experiment.rerun(d, runs_dir=tmp_path / "runs", **QUIET)
 
 
 def test_mrm_run_on_a_loaded_config(tmp_path):
@@ -97,8 +105,8 @@ def test_mrm_run_on_a_loaded_config(tmp_path):
         cfg = params.load(p)
     res = mrm.run(cfg, runs_dir=tmp_path / "runs", **QUIET)
     assert res.status == "ok" and res.metrics["max_abs_detuning_pm"].shape == (1, 8)
-    assert res.report.splitlines()[0] != E.Q1_CAVEAT          # open loop: not a controller report
-    res2, cmp = E.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
+    assert res.report.splitlines()[0] != experiment.Q1_CAVEAT          # open loop: not a controller report
+    res2, cmp = experiment.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
     assert cmp["identical"]
 
 
@@ -115,7 +123,8 @@ def test_score_from_leaves_the_plant_and_records_untouched(tmp_path):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 out.append(runner.run("g26", ctrl, "static", duration_s=4e-3, uncertainty="nominal",
-                                      variation="off", heater_code="quasi_static", settle=True, record=rec, **kw))
+                                      variation="off", heater_code="locked_steady_state", settle=True, record=rec,
+                                      **kw))
         a, b, c = out
         for k in a.trace:
             assert a.trace[k]["value"].tobytes() == b.trace[k]["value"].tobytes() == c.trace[k]["value"].tobytes()
@@ -136,13 +145,13 @@ def test_score_from_leaves_the_plant_and_records_untouched(tmp_path):
 def test_scored_metrics_equal_the_scored_ticks_of_a_full_trace_and_keep_the_oracle_reference():
     """runner score_from_s: the restarted accumulators equal the same metrics taken over the scored ticks of a
     per-tick record of the run; with lock_reference 'oracle' the oracle's current operating point is kept across the
-    split (MetricsState.reset sets the reference to 0, the line, until the next oracle evaluation up to
-    oracle_period_ticks = 1000 ticks later: before the fix the scored lock error of pi_lock_c was ~125 pm, the
-    distance to its line, larger than the unsplit run's)."""
+    split. (MetricsState.reset sets the reference to 0, the line, until the next oracle evaluation up to
+    oracle_period_ticks = 1000 ticks later. Without the kept reference, the scored lock error of pi_lock_c would be
+    ~125 pm, the distance to its line, larger than that of the unsplit run.)"""
     from mrm.sim import runner
     from mrm.sim.metrics import RecordSpec
     rec = [RecordSpec("detuning_m", 1, "mean")]
-    kw = dict(duration_s=6e-3, uncertainty="nominal", variation="off", heater_code="quasi_static", settle=True)
+    kw = dict(duration_s=6e-3, uncertainty="nominal", variation="off", heater_code="locked_steady_state", settle=True)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         tgt = {"lock_reference": "target", "lock_target_pm": 100.0}
@@ -164,10 +173,10 @@ def test_scored_metrics_equal_the_scored_ticks_of_a_full_trace_and_keep_the_orac
 
 def test_scored_peak_slew_does_not_depend_on_where_the_split_falls():
     """The previous controller latch is plant history: a split that falls between two latches must not shorten the
-    first latch interval it sees (before the fix, pi_lock_c under A1 scored 6e5 to 6e6 codes/s depending on the
+    first latch interval it sees (otherwise pi_lock_c under A1 would score 6e5 to 6e6 codes/s, depending on the
     split's offset in the 10-tick controller period)."""
     from mrm.sim import runner
-    kw = dict(duration_s=8e-3, uncertainty="nominal", variation="off", heater_code="quasi_static", settle=True)
+    kw = dict(duration_s=8e-3, uncertainty="nominal", variation="off", heater_code="locked_steady_state", settle=True)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         slews = [runner.run("g26", "pi_lock_c", "a1", score_from_s=k * 1e-6, **kw).metrics["peak_slew_codes_per_s"]
@@ -176,13 +185,13 @@ def test_scored_peak_slew_does_not_depend_on_where_the_split_falls():
 
 
 def test_self_reference_judges_the_lock_about_its_own_point(tmp_path):
-    p = _write(tmp_path, "sr.yaml", RUN.replace("batch: 2", "batch: 1").replace(
+    p = _write(tmp_path, "sr.yaml", RUN_YAML.replace("batch: 2", "batch: 1").replace(
         "start: warm", "start: warm\n      self_reference: {duration_s: 0.006, window_s: 0.002}\n"
         "      acceptance: [{id: lock, metric: max_abs_lock_error_pm, op: '<=', value: 5.0}]").replace(
         "uncertainty: sample", "uncertainty: nominal").replace("variation: sample", "variation: \"off\"").replace(
-        "duration_s: 0.004", "duration_s: 0.0083").replace("score_from_s: 0.001", "score_from_s: 0.004\n"
-                                                             "      record: ['i_monitor_a@1:mean']"))
-    res = E.run(p, write=False, **QUIET)                     # scored after pi_lock's ~3 ms peak map
+        "duration_s: 0.004", "duration_s: 0.0083").replace(
+        "score_from_s: 0.001", "score_from_s: 0.004\n      record: ['i_monitor_a@1:mean']"))
+    res = experiment.run(p, write=False, **QUIET)            # scored after pi_lock's ~3 ms peak map
     m = res.metrics
     case = res.cases["main"]
     ref = case.reference["d_ref_pm"]
@@ -202,13 +211,14 @@ def test_self_reference_judges_the_lock_about_its_own_point(tmp_path):
 
 
 def test_self_reference_refuses_a_driven_base_temperature(tmp_path):
-    p = _write(tmp_path, "sr.yaml", RUN.replace("scenario: {name: static}", "scenario: {name: soak}").replace(
+    p = _write(tmp_path, "sr.yaml", RUN_YAML.replace("scenario: {name: static}", "scenario: {name: soak}").replace(
         "start: warm", "start: warm\n      self_reference: {duration_s: 0.002, window_s: 0.001}"))
-    with pytest.raises(E.ExperimentError, match="drives the base temperature"):
-        E.run(p, write=False, **QUIET)
+    with pytest.raises(experiment.ExperimentError, match="drives the base temperature"):
+        experiment.run(p, write=False, **QUIET)
 
 
-MINI_SOAK = """\
+# a 0.2 s soak (two 0.5 K cycles) at time compression 2, with the convergence cases at compression 1 and 2
+MINI_SOAK_YAML = """\
     extends: g26
     meta: {name: t_soak, kind: experiment}
     controller: {name: pi_lock_c}
@@ -226,8 +236,8 @@ MINI_SOAK = """\
 
 
 def test_compressed_run_needs_and_reuses_a_convergence_certificate(tmp_path):
-    p = _write(tmp_path, "soak.yaml", MINI_SOAK)
-    res = E.run(p, runs_dir=tmp_path / "runs", **QUIET)
+    p = _write(tmp_path, "soak.yaml", MINI_SOAK_YAML)
+    res = experiment.run(p, runs_dir=tmp_path / "runs", **QUIET)
     assert res.status == "ok"
     assert [k for k in res.cases] == ["convergence_c1", "convergence_c2", "main"]
     assert res.cases["convergence_c1"].manifest_inputs["n_ticks"] == 200_000          # one 0.2 s cycle
@@ -235,23 +245,24 @@ def test_compressed_run_needs_and_reuses_a_convergence_certificate(tmp_path):
     conv = json.loads((res.run_dir / "convergence.json").read_text())
     assert conv["passed"] and conv["max_validated_factor"] == 2.0 and conv["certificate"]
     # the whole compressed run (convergence cases included) reruns bit for bit
-    res_r, cmp = E.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
+    res_r, cmp = experiment.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
     assert cmp["identical"], cmp["differing"][:5]
-    assert "convergence_c1" in mf.read_trace_h5(res_r.run_dir / "trace.h5")["metrics"]
+    assert "convergence_c1" in manifest.read_trace_h5(res_r.run_dir / "trace.h5")["metrics"]
     # the certificate of that run validates the same plant, controller and scenario in another experiment
-    res2 = E.run(p, overrides=[f"experiment.convergence_certificate={res.run_dir}", "experiment.duration_s=0.05"],
-                 write=False, **QUIET)
+    res2 = experiment.run(p, overrides=[f"experiment.convergence_certificate={res.run_dir}",
+                                        "experiment.duration_s=0.05"], write=False, **QUIET)
     assert res2.status == "ok" and list(res2.cases) == ["main"]
     # ... but not another plant, nor other worlds
     for ov in ("ring.optics.q_loaded=4000", "experiment.seeds.noise=9"):
-        res3 = E.run(p, overrides=[f"experiment.convergence_certificate={res.run_dir}", ov],
-                     runs_dir=tmp_path / "runs", **QUIET)
+        res3 = experiment.run(p, overrides=[f"experiment.convergence_certificate={res.run_dir}", ov],
+                              runs_dir=tmp_path / "runs", **QUIET)
         assert res3.status == "refused" and "different plant" in res3.report
         assert not res3.cases
-    # the 07 P0-10 load-time rule (compressed ramp <= 1 % of the fast transient) holds before anything runs
+    # the load-time rule of time compression (compressed ramp <= 1 % of the fast transient) holds before anything
+    # runs
     from mrm.scenarios import CompressionError
     with pytest.raises(CompressionError, match="time_compression rule"):
-        E.run(p, overrides=["scenario.time_compression=5"], write=False, **QUIET)
+        experiment.run(p, overrides=["scenario.time_compression=5"], write=False, **QUIET)
 
 
 def test_compare_reports_corners_quantiles_and_rank_stability(tmp_path):
@@ -272,9 +283,9 @@ def test_compare_reports_corners_quantiles_and_rank_stability(tmp_path):
           corners: [g26_h86, g26_slow_thermal]
           controllers: [pi_lock_c, kalman_lqg_c]
         """)
-    res = E.run(p, runs_dir=tmp_path / "runs", **QUIET)
+    res = experiment.run(p, runs_dir=tmp_path / "runs", **QUIET)
     lines = res.report.splitlines()
-    assert lines[0] == E.Q1_CAVEAT
+    assert lines[0] == experiment.Q1_CAVEAT
     s = res.summary
     assert set(s["controllers"]) == {"pi_lock_c", "kalman_lqg_c"}
     for d in s["controllers"].values():
@@ -284,10 +295,10 @@ def test_compare_reports_corners_quantiles_and_rank_stability(tmp_path):
     rs = s["rank_stability"]["oma_penalty_db_worst"]
     assert rs["n_worlds"] == 5 and set(rs["nominal_order"]) == {"pi_lock_c", "kalman_lqg_c"}
     assert "Ranking stability" in res.report
-    # metrics only for the worlds (07 P0-8): no traces recorded
-    tr = mf.read_trace_h5(res.run_dir / "trace.h5")
+    # metrics only for the worlds: no traces recorded
+    tr = manifest.read_trace_h5(res.run_dir / "trace.h5")
     assert "pi_lock_c|worlds" in tr["metrics"] and not tr.get("trace")
-    res2, cmp = E.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
+    res2, cmp = experiment.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
     assert cmp["identical"]
 
 
@@ -309,7 +320,7 @@ def test_sweep_points_and_criteria(tmp_path):
             "alt:uncertainty.thermo_optic": [H_solver, H86]
           acceptance: [{id: line, metric: wrong_line_rings, op: "==", value: 0}]
         """)
-    res = E.run(p, write=False, **QUIET)
+    res = experiment.run(p, write=False, **QUIET)
     pts = res.summary["points"]
     assert len(pts) == 4 and pts[1]["assignment"] == {"controller.params.fraction": 0.6,
                                                       "alt:uncertainty.thermo_optic": "H86"}
@@ -324,7 +335,8 @@ def test_sweep_points_and_criteria(tmp_path):
 
 
 def test_mc_chunks_reproduce_one_plant(tmp_path):
-    """Sample-mode Monte Carlo in chunks with advanced seed bases gives the worlds of one B = n plant (07 P1-13)."""
+    """Sample-mode Monte Carlo in chunks with advanced seed bases gives the worlds of one B = n plant (the batch rule
+    of the random streams)."""
     p = _write(tmp_path, "mc.yaml", """\
         extends: g26
         meta: {name: t_mc, kind: experiment}
@@ -336,8 +348,8 @@ def test_mc_chunks_reproduce_one_plant(tmp_path):
           variation: sample
           seeds: {device: 11, uncertainty: 12, noise: 13, scenario: 14}
         """)
-    one = E.run(p, write=False, **QUIET)
-    chunked = E.run(p, overrides=["experiment.max_worlds_per_plant=2"], write=False, **QUIET)
+    one = experiment.run(p, write=False, **QUIET)
+    chunked = experiment.run(p, overrides=["experiment.max_worlds_per_plant=2"], write=False, **QUIET)
     assert list(one.cases) == ["worlds"] and list(chunked.cases) == ["worlds_00", "worlds_01"]
     a = one.cases["worlds"].metrics["max_abs_detuning_pm"]
     b = np.concatenate([chunked.cases["worlds_00"].metrics["max_abs_detuning_pm"],
@@ -347,34 +359,34 @@ def test_mc_chunks_reproduce_one_plant(tmp_path):
     assert q["n"] == 3
 
 
-def test_quasi_static_survey_with_a_corner(tmp_path):
+def test_locked_steady_state_survey_with_a_corner(tmp_path):
     p = _write(tmp_path, "qs.yaml", """\
         extends: g26
         meta: {name: t_qs, kind: experiment}
         experiment:
-          kind: quasi_static
+          kind: locked_steady_state
           uncertainty: nominal
           variation: "off"
           grid: {ambient_c: [0.0, 105.0], bias_v: [1.0, 3.75]}
           corners: [g26_heater_loss]
-          acceptance: [{id: cov, metric: code_range_coverage, op: ">=", value: 1.0, cases: [quasi_static]}]
+          acceptance: [{id: cov, metric: code_range_coverage, op: ">=", value: 1.0, cases: [locked_steady_state]}]
         """)
-    res = E.run(p, runs_dir=tmp_path / "runs", **QUIET)
+    res = experiment.run(p, runs_dir=tmp_path / "runs", **QUIET)
     s = res.summary
     assert s["code_range_coverage"] == [1.0] and s["fsr_hop_risk_points"] == 0
-    assert set(s["cases"]) == {"quasi_static", "quasi_static/corner/g26_heater_loss"}
-    # only a heater-temperature loss mechanism moves the oracle relOMA over ambient (07 4.5, BND-4)
-    assert s["cases"]["quasi_static"]["bnd4_max_db"] < 1e-6
-    assert s["cases"]["quasi_static/corner/g26_heater_loss"]["bnd4_max_db"] > 1e-3
+    assert set(s["cases"]) == {"locked_steady_state", "locked_steady_state/corner/g26_heater_loss"}
+    # only a heater-temperature loss mechanism moves the oracle relOMA over ambient (the BND-4 bound)
+    assert s["cases"]["locked_steady_state"]["bnd4_max_db"] < 1e-6
+    assert s["cases"]["locked_steady_state/corner/g26_heater_loss"]["bnd4_max_db"] > 1e-3
     assert res.passed is True
-    tr = mf.read_trace_h5(res.run_dir / "trace.h5")
-    assert tr["quasi_static"]["quasi_static"]["heater_code"].shape == (2, 2, 1, 8)
-    # the same trace.h5 layout without corners (/quasi_static/<case>/<array>)
-    res1 = E.run(p, overrides=["experiment.corners=[]"], runs_dir=tmp_path / "runs", **QUIET)
-    tr1 = mf.read_trace_h5(res1.run_dir / "trace.h5")
-    assert set(k for k in tr1["quasi_static"] if not k.startswith("@")) == {"quasi_static"}
-    assert tr1["quasi_static"]["quasi_static"]["heater_code"].tobytes() == \
-        tr["quasi_static"]["quasi_static"]["heater_code"].tobytes()
+    tr = manifest.read_trace_h5(res.run_dir / "trace.h5")
+    assert tr["locked_steady_state"]["locked_steady_state"]["heater_code"].shape == (2, 2, 1, 8)
+    # the same trace.h5 layout without corners (/locked_steady_state/<case>/<array>)
+    res1 = experiment.run(p, overrides=["experiment.corners=[]"], runs_dir=tmp_path / "runs", **QUIET)
+    tr1 = manifest.read_trace_h5(res1.run_dir / "trace.h5")
+    assert set(k for k in tr1["locked_steady_state"] if not k.startswith("@")) == {"locked_steady_state"}
+    assert tr1["locked_steady_state"]["locked_steady_state"]["heater_code"].tobytes() == \
+        tr["locked_steady_state"]["locked_steady_state"]["heater_code"].tobytes()
 
 
 def test_open_loop_acceptance_is_not_a_controller_report(tmp_path):
@@ -387,29 +399,29 @@ def test_open_loop_acceptance_is_not_a_controller_report(tmp_path):
           record: []
           acceptance: [{id: line, metric: wrong_line_rings, op: "==", value: 0}]
         """)
-    res = E.run(p, write=False, **QUIET)
-    assert res.report.splitlines()[0] == "RESULT: PASS" and E.Q1_CAVEAT not in res.report
+    res = experiment.run(p, write=False, **QUIET)
+    assert res.report.splitlines()[0] == "RESULT: PASS" and experiment.Q1_CAVEAT not in res.report
 
 
 def test_a_run_directory_reruns_without_the_original_files(tmp_path):
-    """inputs/ carries the experiment file and every non-preset parent (07 P1-17): a rerun after the original parent
+    """inputs/ carries the experiment file and every non-preset parent: a rerun after the original parent
     changed (or was sent elsewhere) reproduces the run bit for bit from the copies."""
     lib = tmp_path / "lib"
     lib.mkdir()
-    parent = _write(lib, "parent.yaml", RUN.replace("meta: {name: t_run, kind: experiment}",
-                                                    "meta: {name: t_parent, kind: experiment}"))
+    parent = _write(lib, "parent.yaml", RUN_YAML.replace("meta: {name: t_run, kind: experiment}",
+                                                         "meta: {name: t_parent, kind: experiment}"))
     child = _write(tmp_path, "child.yaml", """\
         extends: lib/parent.yaml
         meta: {name: t_child, kind: experiment}
         experiment: {duration_s: 0.003, batch: 1, record: []}
         """)
-    res = E.run(child, runs_dir=tmp_path / "runs", **QUIET)
+    res = experiment.run(child, runs_dir=tmp_path / "runs", **QUIET)
     names = sorted(x.name for x in (res.run_dir / "inputs").iterdir())
     assert names == ["_extends_1_parent.yaml", "child.yaml"]
     man = json.loads((res.run_dir / "manifest.json").read_text())
     assert [i["file"] for i in man["source"]["inputs"]] == ["inputs/child.yaml", "inputs/_extends_1_parent.yaml"]
     parent.write_text(parent.read_text().replace("pi_lock_c", "mpc_c"))    # the original changes afterwards
-    res2, cmp = E.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
+    res2, cmp = experiment.rerun(res.run_dir, runs_dir=tmp_path / "runs", **QUIET)
     assert cmp["identical"], cmp["differing"][:5]
 
 
@@ -440,7 +452,7 @@ def test_experiment_without_jit_is_bit_identical(tmp_path):
                             "--quiet"], cwd=root, env=env, capture_output=True, text=True, timeout=300)
         assert r.returncode == 0, r.stderr[-2000:]
     a, b = sorted((tmp_path / "runs").iterdir())
-    cmp = mf.compare_runs(a, b)
+    cmp = manifest.compare_runs(a, b)
     assert cmp["identical"], cmp["differing"][:5]
     assert json.loads((a / "manifest.json").read_text())["environment"]["numba_disable_jit"] == "1"
 
@@ -450,11 +462,11 @@ def test_manifest_records_the_code_that_ran(tmp_path, monkeypatch):
     not change what the manifest records."""
     calls = iter([{"available": True, "commit": "at-start", "diff_sha256": "a"},
                   {"available": True, "commit": "at-write", "diff_sha256": "b"}])
-    monkeypatch.setattr(mf, "git_state", lambda root=None: next(calls))
+    monkeypatch.setattr(manifest, "git_state", lambda root=None: next(calls))
     p = _write(tmp_path, "g.yaml", """\
         extends: g26
         meta: {name: t_git, kind: experiment}
         experiment: {kind: run, duration_s: 0.001, uncertainty: nominal, variation: "off", record: []}
         """)
-    res = E.run(p, runs_dir=tmp_path / "runs", **QUIET)
+    res = experiment.run(p, runs_dir=tmp_path / "runs", **QUIET)
     assert json.loads((res.run_dir / "manifest.json").read_text())["git"]["commit"] == "at-start"
