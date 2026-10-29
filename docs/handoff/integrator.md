@@ -147,7 +147,7 @@ New: `docs/ENGINE.md` (how the engine works and how to use it), `tests/validatio
 (slow; writes `docs/handoff/controller_scorecard.md` and `.json`), `tests/verification/test_engine_warm_start.py`.
 
 Changed: `mrm/plant/plant.py` (`reset(..., settle=)`, `settle()`, `_reset`), `mrm/sim/runner.py` (`settle`,
-`heater_code='quasi_static'`, `warm_start_codes`, `factory_table`, `manifest_inputs["warm_start"]`),
+`heater_code='locked_steady_state'`, `warm_start_codes`, `factory_table`, `manifest_inputs["warm_start"]`),
 `mrm/sim/metrics.py` (`from_config` reads `metrics.lock_target_pm`), `mrm/params/schema.py` (`metrics.lock_reference`,
 `metrics.lock_target_pm`), `mrm/control/baselines/__init__.py` (imports every baseline), `mrm/params/presets/g26.yaml`
 (loss budget, 6.2 item 2), `pyproject.toml` (`perf` marker), `docs/PARAMETERS.md` and the PARAMETERS_FORMAT.md key
@@ -162,7 +162,7 @@ critical coupling).
 ### 6.2 Decisions
 
 1. **Settled warm start = the kernel with DC lag coefficients.** Not a separate static model (controllers_c's
-   harness uses `models.static_point`; quasi_static simplifies the bus): the kernel's own implicit solve, heater TCR,
+   harness uses `models.static_point`; solve_locked_steady_state simplifies the bus): the kernel's own implicit solve, heater TCR,
    bias, data heat and scenario inputs at t = 0 (held there since 2026-10-16; before, iteration i read the scenario of
    tick i), iterated tick by tick with a = 0, c0 = 0, c1 = r, then everything
    but the thermal state is reset. Tolerance 2 mK, set by the per-tick noise draws (~0.5 mK). Checked against a
@@ -192,7 +192,7 @@ critical coupling).
 - controllers_a (2.1), controllers_b (2), controllers_c (4.1), replicas (6, controllers): baselines package imports;
   all 17 baselines resolve by name (`test_registry_finds_every_baseline_without_an_import`).
 - controllers_a (2.3), controllers_c (4.3b), engine (6a): settled warm start (`settle=True`), and
-  `heater_code='quasi_static'` for the oracle lock codes. The compiled lock-only controllers (kalman_lqg_c, mpc_c)
+  `heater_code='locked_steady_state'` for the oracle lock codes. The compiled lock-only controllers (kalman_lqg_c, mpc_c)
   now run on the engine (scorecard).
 - controllers_b (2), engine (6b): `run(..., factory_table=)` -> `load_factory_cal` before `reset`.
 - engine (3.21): schema keys `metrics.lock_reference`, `metrics.lock_target_pm`.
@@ -206,7 +206,7 @@ critical coupling).
 - **plant/config owner**: the PD / aggressor layout (6.2 item 4; resolved 2026-10-10, section 7); the monitor ADC
   full scale (clips in some sampled worlds, controllers_a 6, controllers_b 6.5); the bias physics check (FCA heat
   cancels most of the electro-optic shift, controllers_a 5).
-- **engine owner**: `quasi_static` own-line heat and no upstream bus filtering (replicas 6b; the settled engine
+- **engine owner**: `solve_locked_steady_state` own-line heat and no upstream bus filtering (replicas 6b; the settled engine
   lock sits 3-16 pm from the quasi-static target in g26); `run_lock_request(LockRunRequest)` for the replicas (the
   warm-state part is now `settle`; a monitor-current set-point controller `drop_setpoint_pi` is also missing, so
   BND-3a/b stay blocked); experiments, manifests, CLI, gym, bridge, P1-20 metrics, compression runs; the 07 P0-9
@@ -452,11 +452,11 @@ RL stage integration". Nothing was committed.
   regenerated key appendix).
 - `mrm/sim/experiment.py`: `config_hash_without_options` (the experiment hash), `_options_from_cfg` (dotted
   overrides of a map option merge into the file's map; integer floats), strict checks of extension overrides in both
-  states, `start: warm` -> `heater_code="quasi_static_reachable"`, warm-start flags in the metrics and world summaries
-  (`warm_start_supply_limited`, `warm_start_order_hopped`), supply-limit columns in the quasi_static kind, docstrings.
-- `mrm/sim/runner.py`: `quasi_static` checks the array heater supply limit (`supply_scale`, `supply_limited`;
+  states, `start: warm` -> `heater_code="locked_steady_state_reachable"`, warm-start flags in the metrics and world summaries
+  (`warm_start_supply_limited`, `warm_start_order_hopped`), supply-limit columns in the locked_steady_state kind, docstrings.
+- `mrm/sim/runner.py`: `solve_locked_steady_state` checks the array heater supply limit (`supply_scale`, `supply_limited`;
   `_heater_drive`) and takes `order="heater_up" | "reachable"` (`order_hopped`); `WARM_START_MODES`,
-  `heater_code="quasi_static_reachable"`; `warm_start_codes(..., return_no_code=)`; `_warm_start_codes` returns
+  `heater_code="locked_steady_state_reachable"`; `warm_start_codes(..., return_no_code=)`; `_warm_start_codes` returns
   (codes, no_code, supply_limited, order_hopped) and warns about supply-limited worlds; `manifest_inputs["warm_start"]`
   gains `supply_limited`, `mode`, `order_hopped`; the scoring split calls `MetricsState.restart`; `_run_python`
   clips a CompiledController's new held command after a scenario controller reset (hardware review finding).
@@ -487,14 +487,14 @@ RL stage integration". Nothing was committed.
    the driver law at its own Truth heater temperature, while in side_by_side the two agree to 6e-8; the kernel and the
    NumPy reference agree bit for bit in that world (400 ticks); the plant's `supply_limit_row` (07 P1-12) scales every
    heater because the lock currents (~155 mA at 25 degC) exceed the assumed 150 mA (`array.heater_supply_current_max_a`,
-   assumed, source D07). quasi_static now checks the same limit; at a supply-limited point no ring counts as
+   assumed, source D07). solve_locked_steady_state now checks the same limit; at a supply-limited point no ring counts as
    reachable (coverage drops), the codes are kept, and the warm start warns. Not changed: the limit itself (assumed;
    content owner) and the plant.
 3. **Reachable order (request 10.4b) is an opt-in runner mode.** Moving no-code rings one order bluer changes the
    warm start of sampled worlds, and the regression scenario mc8_pi (sampled worlds, seeds 1000) has 10 such rings,
-   so a default change would break the bit-identity rule. `heater_code="quasi_static"` is unchanged (bit for bit);
-   `"quasi_static_reachable"` is new, and the experiments' `start: warm` uses it (identical in the nominal world).
-   The gym env keeps 'quasi_static' (rl owner's choice, rl.md section 10).
+   so a default change would break the bit-identity rule. `heater_code="locked_steady_state"` is unchanged (bit for bit);
+   `"locked_steady_state_reachable"` is new, and the experiments' `start: warm` uses it (identical in the nominal world).
+   The gym env keeps 'locked_steady_state' (rl owner's choice, rl.md section 10).
 4. **Compressed-soak golden = the certified case only** (pi_lock_c, the c = 100 convergence case of A4). The open
    loop and fxp_pi are left out: no convergence experiment covers them (07 P0-10). Its scenario is built from the
    config (`CONFIG_SCENARIO`), because a registry name loses the config's signal defaults (finding 8.4.4).
@@ -504,7 +504,7 @@ RL stage integration". Nothing was committed.
 
 ### 8.3 Requests: resolved and still open
 
-Resolved here: experiments 10.1 (schema), 10.2 (h5py), 10.3 (docs), 10.4a (diagnosed: supply limit; quasi_static
+Resolved here: experiments 10.1 (schema), 10.2 (h5py), 10.3 (docs), 10.4a (diagnosed: supply limit; solve_locked_steady_state
 checks it), 10.4b (opt-in reachable order, used by experiments), 10.8 (`--set` enum words in mrm.params), 10.10
 (`MetricsState.restart`); hardware 7.1-7.6 except the scorecard entry of FxpPi and the lock file; rl 7.4 and the
 public part of 7.2.
@@ -516,7 +516,7 @@ Still open (owner):
   supply-limited. It dominates every LHS quantile; it needs a source or a range (and a hypothesis if it stays
   uncertain). Also experiments 10.9 (more corner presets).
 - **engine / perf**: rl 7.1 (Python-path per-call cost), 7.3 (per-world reset); runner: rl 7.2 (vectorized
-  quasi_static). (rl 7.5, the per-world settle stop, was done on 2026-10-16 by the engine review fixes; the regression
+  solve_locked_steady_state). (rl 7.5, the per-world settle stop, was done on 2026-10-16 by the engine review fixes; the regression
   scenario mc8_pi moved, docs/CHANGELOG.md.)
 - **controllers owners**: experiments 10.5; the sampled-world losses of 8.4.3 (worlds without any warm-start flag);
   FxpPi in the scorecard.
@@ -554,7 +554,7 @@ Still open (owner):
   thermal-artefact targets, extraction owner; unchanged since section 6.5).
 - Slow: tests/golden `-m slow` (the compressed-soak golden): 1 passed (217 s under load).
 - Engine bit-identity (no njit code changed; the kernel cache stayed valid): tools/perf_scenarios.py and
-  perf_scenarios_adv.py against runs/perf_r2/final3 and final3_adv, after the quasi_static / warm-start changes and
+  perf_scenarios_adv.py against runs/perf_r2/final3 and final3_adv, after the solve_locked_steady_state / warm-start changes and
   again after the runner fix: 0 of 476 + 1132 signals differ in 6 + 11 scenarios (runs/integrator_exp/reg2*).
 - tools/perf_bench.py (7 x 3000 ticks, load 5.2, AC): b1 9.41 us (min 9.09), b1lock 9.47 us, b64 2.37 us per
   world-tick (min 1.99); Newton iterations 1.704 / 1.817 per ring and tick, as in perf.md 8.5 (b1 9.12, b1lock

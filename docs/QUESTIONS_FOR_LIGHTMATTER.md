@@ -27,7 +27,7 @@ PDK ring.
 *Why it matters:* the heater and crosstalk time constants and the heat-transport delay set the fastest stable lock
 loop; mine are mostly borrowed from imec literature and span about a factor of 10 in achievable loop bandwidth.
 
-> **Goes in** (Kenny only; 07 Q1): fit the trace to the interim thermal leaves `ring.thermal.tau_fast_s`,
+> **Goes in** (Kenny only): fit the trace to the interim thermal leaves `ring.thermal.tau_fast_s`,
 > `ring.thermal.tau_slow_s`, `ring.thermal.share_fast_frac`, `ring.thermal.heater_node_tau_s`; the tail is set in
 > every world by `uncertainty.thermal.package_tail_tau_s` and `uncertainty.thermal.package_tail_share_frac` (over
 > `ring.thermal.tail_tau_s` / `ring.thermal.tail_share_frac`), so restate those two; the delay goes in
@@ -52,7 +52,7 @@ plus 10 °C.
 the monitor gain, the curvature of the heater drive law, the optical self-heating (from the up/down asymmetry and how
 it grows with power) and the heater codes per kelvin.
 
-> **Goes in** (Kenny only; 07 Q2): linewidth in codes -> `ring.optics.q_loaded` (through the heater law); FSR in
+> **Goes in** (Kenny only): linewidth in codes -> `ring.optics.q_loaded` (through the heater law); FSR in
 > codes -> the heater law `ring.heater.full_scale_v` (or `ring.heater.full_scale_a`, `ring.heater.full_scale_w`) with
 > `uncertainty.heater.driver_mode` and `ring.heater.p_fsr_mw`; peak monitor code -> `ring.monitor.gain_scale` (pin
 > `uncertainty.monitor.gain_scale`), off-resonance floor -> `ring.monitor.dark_i0_na` and
@@ -76,7 +76,7 @@ changes it.
 of spread in simulated lock performance and the crosstalk size among the next largest, and the assumed aggressor
 position is a prime suspect for why the model cannot reproduce the per-lane heater codes of your slide 10.
 
-> **Goes in** (Kenny only; 07 Q8): `layout.ring_pitch_um` (or ring records in `layout.sites`),
+> **Goes in** (Kenny only): `layout.ring_pitch_um` (or ring records in `layout.sites`),
 > `ring.thermal.pd_offset_um`, `ring.thermal.driver_offset_um`, `ring.thermal.temp_sensor_offset_um`, the `aggressor`
 > record of `layout.sites` (A1/A2 recalibrate the aggressor power to the printed trajectory), `temp_sensors` (site,
 > attach); stacking and package -> pin `uncertainty.thermal.stack` (`side_by_side`, `stacked_eic`,
@@ -99,7 +99,7 @@ floor (the deepest notch the setup could resolve) of the published notch-depth-a
 wrong-channel locks in my model), and the coupling side decides how the extinction and the monitor signal drift while
 the loop holds lock; the published data fit both coupling sides about equally well.
 
-> **Goes in** (Kenny only; 07 Q6): film -> pin `uncertainty.film_thickness` (`"160"` or `"200"`, the rib200
+> **Goes in** (Kenny only): film -> pin `uncertainty.film_thickness` (`"160"` or `"200"`, the rib200
 > artefact); strip/rib, slab, width -> `ring.geometry.width_nm`, `ring.geometry.slab_nm`, `ring.geometry.xsec` (a
 > label: a new cross-section needs its own modes and coupling artefacts in mrm/data/extracted/ and the leaves that
 > read them); FSR -> `ring.optics.fsr_thz` and pin `uncertainty.fsr: default`; radius -> `ring.geometry.radius_um`
@@ -135,10 +135,10 @@ Please state:
 handle (under a voltage or current law the heater gain varies about 2.5 times across the 19,500 to 49,300 code range
 of your slide 10), and which controller types the hardware allows.
 
-> **Goes in** (Kenny only; 07 Q3): `controller_interface.update_rate_hz` (whole ticks); `ring.monitor.afe_type`
+> **Goes in** (Kenny only): `controller_interface.update_rate_hz` (whole ticks); `ring.monitor.afe_type`
 > (`rc` | `integrate_dump`), `ring.monitor.integration_window_s`, `ring.monitor.adc_rate_hz`,
 > `ring.monitor.adc_mux.channels_per_adc`, `ring.monitor.adc_mux.order`, `ring.monitor.adc_bits`; LSB =
-> `ring.monitor.adc_full_scale_ua` / 2^bits, and the 15 µA code also moves `ring.monitor.gain_scale` (CAL-8);
+> `ring.monitor.adc_full_scale_ua` / (2^bits - 1), and the 15 µA code also moves `ring.monitor.gain_scale` (CAL-8);
 > `ring.monitor.baseline_ua`, `ring.monitor.pga_gains`; drive law -> pin `uncertainty.heater.driver_mode`
 > (`ring.heater.driver_mode`), `ring.heater.full_scale_v` / `ring.heater.full_scale_a` / `ring.heater.full_scale_w`,
 > `ring.heater.dac_bits`, `ring.heater.pwm_bits`, `ring.heater.pwm_period_s`, `ring.heater.code_min`,
@@ -166,7 +166,7 @@ the ring when its resonance shift against reverse bias was measured.
 -2.1 to -3.0 dB, so the reference plane or the drive must differ; and the optical power at the ring sets the
 self-heating, one of the largest causes of lost and wrong-channel locks in my model.
 
-> **Goes in** (Kenny only; 07 Q4): reference plane -> the CAL-14 definition (`metrics.reloma_definition` has one
+> **Goes in** (Kenny only): reference plane -> the CAL-14 definition (`metrics.reloma_definition` has one
 > value, `oma_over_pin`; the OMA-in-dBm reading exists only as the reported, unfitted `_reloma_dbm_reading` in
 > mrm/calibration/pipeline.py); power at the MRM -> `optical_path.chip_input_loss_db` (with
 > `laser.power_per_line_dbm`), pin `uncertainty.chip_input_loss: nominal`; swing -> `driver.swing_pp_v`; topology ->
@@ -187,7 +187,7 @@ test and the > 2000 °C/s test of the deck's slide 10 use the same on-die heater
 mode solves give for this ring between 25 and 105 °C, so the thermometer behind it changes the size (1.2 to 1.3 times)
 and the slope (up to 2 times) of the temperature disturbance a controller must reject.
 
-> **Goes in** (Kenny only; 07 Q5): thermometer -> `ring.thermal.reference_rise_frac` (its `sensor` alternative, the
+> **Goes in** (Kenny only): thermometer -> `ring.thermal.reference_rise_frac` (its `sensor` alternative, the
 > `H86_sensor` choice) and `uncertainty.aggressor.referencing` (`resonance` | `temperature`); the sensitivity itself ->
 > pin `uncertainty.thermo_optic` or write `ring.thermal.dlambda_dt_pm_per_k` with
 > `ring.thermal.dlambda_dt_ref_ring_temp_c` and `ring.thermal.dlambda_dt_beta_per_k` (CAL-6 is never fitted); the
@@ -203,7 +203,7 @@ Please share the raw samples (5 °C steps × bias points) behind the loop-closed
 *Why it matters:* it is the only data set that tests the thermal tuning, the linewidth and the modulation depth
 together; I would keep it out of every fit and use it only as an independent check.
 
-> **Goes in** (Kenny only; 07 Q7): held-out data for VAL-4a/b/c and VAL-5 in mrm/validation/targets/validation.yaml,
+> **Goes in** (Kenny only): held-out data for VAL-4a/b/c and VAL-5 in mrm/validation/targets/validation.yaml,
 > which is frozen by sha256 (new data are a re-freeze or a private held-out file, never a calibration target); the
 > loop-open code replaces the `align_peak_c` alignment in VAL-5's `replica_args` (also a re-freeze).
 
@@ -222,7 +222,7 @@ together; I would keep it out of every fit and use it only as an independent che
 *Why it matters:* laser power steps and data activity move each ring's temperature by up to about 2 K in my model,
 and the turn-on sequence decides whether a cold ring heats itself onto a wrong channel.
 
-> **Goes in** (Kenny only; 07 Q9): drift together -> the `common` argument of `laser_drift` in
+> **Goes in** (Kenny only): drift together -> the `common` argument of `laser_drift` in
 > mrm/scenarios/library.py and the die/line split of the `variation` entry `laser.line_offset_ghz`; RIN ->
 > `laser.rin_db_per_hz`; squelch -> the `squelch` scenario (`residual_swing`); turn-on -> `sim.reset_protocol`,
 > `sim.reset_ramp_s`; polarization -> the `pol` field of `channel_plan.lines`; traffic -> the `traffic_start_stop`,
@@ -239,7 +239,7 @@ die.
 *Why it matters:* these set the ring-to-ring variation that a controller and its start-up search must cover, and which
 lane runs out of heater range first at the hot end.
 
-> **Goes in** (Kenny only; 07 Q10): the `variation` entries `ring.heater.r_cold_ohm` and `ring.heater.p_fsr_mw`
+> **Goes in** (Kenny only): the `variation` entries `ring.heater.r_cold_ohm` and `ring.heater.p_fsr_mw`
 > (`die_sigma`, `ring_sigma`) and `variation.geometry` (width, thickness, gaps); a designed stagger -> a per-ring list
 > in `ring.optics.resonance_offset_nm`; the lock-code spread checks CAL-9b (lane offsets) and BND-2 (worst lane) and
 > would need its own calibration target.
@@ -253,7 +253,7 @@ and 105 °C; and how a lock on a wrong channel is detected?
 *Why it matters:* with self-heating the ring is bistable, so the sweep direction decides where each ring lands, and a
 lock on a wrong channel at power-up is a failure my model shows.
 
-> **Goes in** (Kenny only; 07 Q11): sweep direction -> `sim.reset_protocol` (`laser_ramp` | `branch_low` |
+> **Goes in** (Kenny only): sweep direction -> `sim.reset_protocol` (`laser_ramp` | `branch_low` |
 > `branch_high`) and the parameters of the acquisition controllers (mrm/control/baselines/ramp_acquire.py,
 > mrm/control/baselines/wdm_supervisor.py); stored calibration -> `experiment.start` (`cold` | `cold_settled` |
 > `warm`) and the factory table (mrm/control/calibration.py); hops and remap -> `metrics.allowed_assignments`
@@ -292,21 +292,25 @@ lock on a wrong channel at power-up is a failure my model shows.
    is given, and it always writes its data and charts to docs/validation/<name>/, which git does not ignore. The
    calibration refit and the report regeneration of docs/KNOWN_ISSUES.md items 1-2 are due when the answers arrive.
 
-### Ranking changes against 07 section 5
+### Ranking changes against the design review
 
-- 07 Q8 (layout, package, crosstalk) moved from 8 to 3: in the last sensitivity study (docs/VALIDATION.md section 4,
+The eleven questions follow the question list of the design review (docs/research/07_design_critique.md, section
+5, "Questions for Lightmatter"), in a new order. Question n here was review question 1, 2, 8, 6, 3, 4, 5, 7, 9, 10,
+11 for n = 1 to 11.
+
+- Question 3 (layout, package, crosstalk) moved up from 8 to 3: in the last sensitivity study (docs/VALIDATION.md section 4,
   pi_lock_c under A1; computed before the 2026-10-17 fixes and marked stale, so recheck it after regeneration) the
   package/stack hypothesis has the largest total Sobol index for five of the six closed-loop metrics and the crosstalk
   scale is in the top 8, and CAL-9a/b/c fail under every hypothesis with the assumed aggressor site as first suspect
   (calibration.md 4.6, 8).
-- 07 Q6 (the ring itself) moved from 6 to 4: the FSR, eta and extinction-mechanism hypotheses it pins are all in that
+- Question 4 (the ring itself) moved up from 6 to 4: the FSR, eta and extinction-mechanism hypotheses it pins are all in that
   study's top 8 (the FSR first or second for unlocked and wrong-line rings), and CAL-1/CAL-2 fit both coupling
   branches about equally (calibration.md 4.2).
-- Not moved: Q1 stays first although the fast-pole scale and the transport delay barely moved pi_lock_c in that
-  study, because 07 ranks it by the loop bandwidth a controller can reach, which a fixed-gain study cannot show. The
-  others keep 07's relative order (here 5 to 11 = 07 Q3, Q4, Q5, Q7, Q9, Q10, Q11).
+- Not moved: question 1 stays first although the fast-pole scale and the transport delay barely moved pi_lock_c in
+  that study, because the review ranks it by the loop bandwidth a controller can reach, which a fixed-gain study
+  cannot show. Questions 5 to 11 keep the review's relative order.
 
-### Added to 07's questions, from the model's results
+### Added to the review's questions, from the model's results
 
 - Question 5: the heater-array supply limit (`array.heater_supply_current_max_a` 0.15 A and
   `array.heater_total_power_max_w` 0.2 W, both assumed; it binds in about a third of the sampled g26 worlds:
@@ -319,4 +323,4 @@ lock on a wrong channel at power-up is a failure my model shows.
 - Question 9: the driver dissipation (`driver.static_power_mw` 2 mW and `driver.energy_per_transition_fj` 100 fJ, no
   source: integrator.md 4).
 - Question 1: an external photodiode is allowed, because the monitor ADC rate is 250 kHz in g26 (inferred from
-  US11409045B2: `ring.monitor.adc_rate_hz`), slower than the 1 µs that 07 asks for.
+  US11409045B2: `ring.monitor.adc_rate_hz`), slower than the 1 µs that the review asks for.

@@ -25,7 +25,7 @@ stale marking, the experiments/docs fixes, the report banners); the code and tes
 ## 2. Fixed (one line each; the tests are named in docs/CHANGELOG.md, 2026-10-16 entries)
 
 physics_optics
-- -2: the engine never applied the bus segment loss (bus_t2); Plant, quasi_static and mrm.control.models now use one law (ring 7 gets 0.59 % less light).
+- -2: the engine never applied the bus segment loss (bus_t2); Plant, solve_locked_steady_state and mrm.control.models now use one law (ring 7 gets 0.59 % less light).
 - -3: the next-order distance (BND-1 diagnostic) comes from the plant's phase model and TCMT linewidths, not an ideal comb (g26 2.79-3.01 FWHM, was 3.33-3.37).
 
 physics_thermal

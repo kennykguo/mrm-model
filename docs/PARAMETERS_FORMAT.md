@@ -1,11 +1,12 @@
 # Parameter format and the `mrm.params` machinery
 
-This document is the contract for everyone who writes a preset (the content agent, students, Lightmatter) and for
-everyone who consumes a realized plant (`PlantParams`, the engine agent). It implements 07 P0-3, P0-4, P1-14, P1-15,
-P1-16 and the params part of P2-12. The authoritative key list is `mrm/params/schema.py`; the appendix at the end is
-generated from it (`mrm params keys`).
+This document describes how a preset is written and how a realized plant (`PlantParams`) is read. It covers the
+relations that tie the preset numbers together, realization after sampling, provenance, the unit-suffix grammar,
+variation and the `mrm params` commands. The authoritative key list is `mrm/params/schema.py`; the appendix at the
+end is generated from it (`mrm params keys`).
 
-Code: `mrm/params/{units,schema,config,relations,realize,derive,table}.py`, CLI in `mrm/cli.py`.
+Code: `mrm/params/{units,schema,config,relations,realize,derive,symbols,table}.py`. The `mrm params` commands are
+in `mrm/params/table.py`, registered through `mrm/cli.py` (section 12).
 
 ```python
 from mrm import params
@@ -17,7 +18,7 @@ print(params.explain(cfg, "ring.heater.efficiency_nm_per_mw"))
 
 Contents: 1 files and sections, 2 leaves and provenance, 3 units, 4 artefacts, 5 alternatives, alts and overrides,
 6 uncertainty entries, 7 variation entries, 8 relations, 9 realize, 10 PlantParams reference, 11 derive,
-12 CLI, 13 deviations from 07, appendix: key list.
+12 CLI, 13 deviations from the design review, appendix: key list.
 
 ---
 
@@ -45,7 +46,7 @@ Top level:
 | kind | rule |
 |---|---|
 | `preset` (default) | every physical number is a leaf mapping (section 2). Bare physical numbers are an error. |
-| `corner` | may contain only `extends`, `meta` and `alts` (07 D3: corner presets are thin files that select alternatives). |
+| `corner` | may contain only `extends`, `meta` and `alts` (corner presets are thin files that select alternatives). |
 | `private` | like `preset`; the only kind (with files under `presets/private/`) that may use provenance `private`. |
 | `test` | like `preset`; when `mrm/params/sources.yaml` is missing, source keys are checked against `meta.sources`. |
 | `experiment` | bare physical numbers are allowed and are tagged provenance `override`. Settings are bare. |
@@ -61,13 +62,14 @@ Physical keys need a leaf mapping in every strict kind.
 `experiment.self_reference`, `experiment.acceptance` (validated by `mrm.sim.experiment`, which also checks every
 other `experiment.*` key again; docs/handoff/experiments.md section 3).
 
-**Unknown keys are errors** everywhere else, with a did-you-mean suggestion; keys deleted by 07 give the reason
-(for example `ring.optics.absorbed_fraction` -> "deleted by 07 P0-2"). An override typo such as
-`ring.heater.r_cold_ohms=50` therefore fails instead of silently running the nominal model (07 P1-15).
+**Unknown keys are errors** everywhere else, with a did-you-mean suggestion; keys deleted from the
+first design give the reason (for example `ring.optics.absorbed_fraction` -> "deleted: the heat fraction now comes
+from ring.optics.loss_budget"). An override typo such as `ring.heater.r_cold_ohms=50` therefore fails instead of
+silently running the nominal model.
 
 **YAML note.** The loader reads `1e6` and `1.0e6` as numbers (plain YAML 1.1 reads them as strings).
 
-## 2. Leaves and provenance (07 P1-14)
+## 2. Leaves and provenance
 
 ```yaml
 ring:
@@ -83,7 +85,7 @@ ring:
       note: "read from the measured -3 dB width"
       textbook: REF.Q             # optional: the textbook field this leaf corresponds to
       disagrees: "..."            # optional: why we differ from the textbook (generates the disagreement table)
-      targets: [CAL-1]            # required when provenance is calibrated (07 P0-5)
+      targets: [CAL-1]            # required when provenance is calibrated
       residual: 0.02              # optional, calibrated leaves
       identifiable: true          # optional, calibrated leaves
 ```
@@ -102,8 +104,8 @@ the others are ARCHITECTURE section 1. A qualifier is allowed: `solver(assumed-g
 
 **Generation** (closed set): `G25 G26 EVK100 L20 M1000 Guide OCP OCI GF PAT none`.
 
-**Source**: a key of `mrm/params/sources.yaml` (owned by the content agent; it mirrors the textbook's tags plus
-literature, GF and patents). A file may declare extra keys in `meta.sources` (private and test presets). While
+**Source**: a key of `mrm/params/sources.yaml` (it mirrors the textbook's tags plus literature, GF and
+patents). A file may declare extra keys in `meta.sources` (private and test presets). While
 `sources.yaml` does not exist the loader warns and skips the check (except for `kind: test`).
 
 **Enforcement**
@@ -112,12 +114,12 @@ literature, GF and patents). A file may declare extra keys in `meta.sources` (pr
   mapping. Other fields (source, range, note, ...) are inherited field by field. Alternatives merge by name.
 - `calibrated` needs `targets`. `private` is allowed only in private presets.
 - A key marked `derived only` in the schema (for example `ring.optics.dn_eff_dt_per_k`,
-  `ring.heater.efficiency_nm_per_mw`) may not be set; a relation computes it (07 P0-3).
+  `ring.heater.efficiency_nm_per_mw`) may not be set; a relation computes it.
 - A relation member that a preset wants computed is written `{value: null, provenance: derived}` or left out.
   `derived` on a key that no relation computes is an error.
 - Values must lie inside their own `range` and inside the schema's hard physical bounds.
 - Every hardware period and latency (schema rule "whole ticks") must be a whole number of `sim.dt_plant_s` ticks;
-  the error names the key (07 P0-6). For a rate key the period 1/rate must be whole ticks.
+  the error names the key. For a rate key the period 1/rate must be whole ticks.
 
 **Levels and lists.** Each key has a level: `die` (one value per die, realized as (B, 1)), `ring` ((B, N)),
 `line` ((B, L)) or `global` (not batched). A ring-level leaf may be a scalar (same for every ring) or a list of N
@@ -144,7 +146,7 @@ layout:
     source: TEST
 ```
 
-## 3. Units: the suffix grammar (07 P1-15)
+## 3. Units: the suffix grammar
 
 A key is `<name>[_<qualifier>]_<unit>`. The unit is the longest run of trailing tokens that forms a unit
 expression: factors multiply, `per` starts a denominator, `rt` is a square root of the next token, a trailing digit
@@ -209,18 +211,18 @@ ring:
   convention for ROM `.npz` files).
 - Provenance must be `solver` (it is set to `solver` when absent). If the sidecar's `inputs` record a provenance
   (`inputs: {geometry: {provenance: assumed, ...}}`), the leaf becomes `solver(assumed-geometry)`, which ranks as
-  `assumed` (07 P1-14: "solver outputs carry their inputs").
+  `assumed` (solver outputs carry the provenance of their inputs).
 - An alternative may also be a `from:` value; it is resolved when it is selected or drawn.
 
 ## 5. Alternatives, `alts` and overrides
 
-**Alternatives on a leaf** (07 D3, P1-14) hold disputed values without forking presets. Each alternative is
+**Alternatives on a leaf** hold disputed values without forking presets. Each alternative is
 `{value | from, provenance, generation?, source?, note?}`; missing generation and source are inherited from the
 leaf. In strict presets an alternative must be a mapping, not a bare number. An alternative's value is checked like
 the leaf's (type, list length, the schema's hard bounds) and, in strict presets, against the leaf's `range`: a
 selected alternative is range-checked like any value, so one outside the range could never be selected (params
-review 2026-10-16; params_content handoff 5.7: the range spans every selectable value, stress alternatives included,
-and the note states the plausible span). A child preset removes an inherited alternative whose meaning it changed
+review 2026-10-16: the range spans every selectable value, stress alternatives included, and the note states the
+plausible span). A child preset removes an inherited alternative whose meaning it changed
 with `name: null` (g25_test_vehicle restates `laser.power_per_line_dbm` at the ring and drops g26's
 `guide_16_lines`, a laser-module output); `null` naming no inherited alternative is an error. Every leaf with
 alternatives also gets an implicit alternative `default` (its own value), so a world can switch back. Alternatives
@@ -251,7 +253,7 @@ are part of the resolved config and of `Config.hash()`.
 Order inside `load`: extends merge -> `alts` of the files -> `alts` argument -> overrides -> label entries (a pinned
 label entry pins or restricts its leader, section 6.1) -> validation.
 
-## 6. Uncertainty entries (07 P0-4, section 4.8)
+## 6. Uncertainty entries
 
 `uncertainty:` holds epistemic entries: each is drawn **once per world** (shape (B,)) and is shared by every ring.
 An entry is any mapping with a `kind`; entries may be nested for grouping (`uncertainty.thermal.time_scale_fast`).
@@ -261,7 +263,7 @@ Every entry carries `provenance`, `generation` and `source` (in strict presets),
 
 ```yaml
 uncertainty:
-  thermo_optic:                      # 07 D2: H_solver (default), H86, H86_sensor
+  thermo_optic:                      # H_solver (default), H86, H86_sensor
     kind: hypothesis
     choices:
       H_solver: {ring.thermal.dlambda_dt_pm_per_k: default, ring.thermal.dlambda_dt_beta_per_k: default}
@@ -370,11 +372,11 @@ The draw is stored in `PlantParams.world[name]` and passed to its consumer:
 - `uncertainty.thermal.<field>` (interval or dist) -> `ThermalInputs.scales[<field>]` and the thermal hook's
   `ThermalScales`; allowed fields are the ThermalScales fields of `mrm.plant.thermal`: `dc_scale`,
   `time_scale_fast`, `time_scale_slow`, `crosstalk_scale`, `package_tail_tau_s`, `package_tail_share_frac`,
-  `transport_delay_s` (07 D15, P1-2, 4.8). The scaling hypothesis is the per-world switch
-  `ring.thermal.scaling_hypothesis`. A hypothesis under `uncertainty.thermal` (07 4.8 names `thermal.family` and
+  `transport_delay_s`. The scaling hypothesis is the per-world switch
+  `ring.thermal.scaling_hypothesis`. A hypothesis under `uncertainty.thermal` (for example `thermal.family` or
   `thermal.stack`) acts through the switches and leaves it sets, never as a scale.
-- `uncertainty.timing.latency_scale` multiplies every I/O latency before it is quantized to ticks (07 4.8 "loop
-  latency 0.5 to 2 times the declared total").
+- `uncertainty.timing.latency_scale` multiplies every I/O latency before it is quantized to ticks (the loop
+  latency spans 0.5 to 2 times the declared total).
 - any other untargeted entry is passed through unchanged in `PlantParams.world`.
 
 ### 6.4 How worlds are drawn
@@ -384,7 +386,7 @@ or `lhs` (a Latin hypercube over the batch, `scipy.stats.qmc`, one column per en
 entry is constant in every mode. Hypothesis indices are stored as int64 in `world[name]` with the names in
 `world_choices[name]`.
 
-## 7. Variation entries (07 P1-16)
+## 7. Variation entries
 
 `variation:` holds per-device entries keyed by **config path** (the YAML key is the dotted path), drawn from a
 stream separate from the worlds.
@@ -457,9 +459,9 @@ artefact's derivatives are at fixed edge-to-edge gaps: a lithographic width bias
 d/dw - d/dgap). The radiation loss is exponential in the geometry (extract_modes handoff), so its secant is applied
 as a log-slope and stays positive. A leaf output whose leaf is a free relation member is an error: the preset must
 give that leaf as an input for the geometry to move it. Unknown inputs or outputs are errors. The direct path-keyed
-sigmas remain available as overrides (07 P1-16).
+sigmas remain available as overrides.
 
-**Sampled geometry and the relation anchors** (07 P1-16: one geometry error moves the resonance, the FSR and the
+**Sampled geometry and the relation anchors** (one geometry error moves the resonance, the FSR and the
 coupling together). With `variation: sample` and a `variation.geometry`, realize solves the relations twice: once
 for the nominal-geometry device of every world (the arrays after the uncertainty draw and the grid, before any device
 draw, with the device's own draws of the R4 coupling members q_loaded, q_through, q_drop, kappa_d_over_kappa), then
@@ -476,10 +478,10 @@ for the devices. The nominal solve gives
   change when a device's loss or n_g does, and its Q_L does. The coupling outputs move a coupler whichever R4 member
   is free. `PlantParams.values` holds `derived.geometry.dln_kappa2_{through,drop}` and
   `derived.geometry.nominal_kappa2_{through,drop}`, the diagnostics `geometry_dlambda_res_nm`.
-With `variation: off` (derive, nominal runs) none of this applies and the anchors hold for every ring. 07 wrote the sigma names as `width_nm_sigma`; that breaks the
-suffix grammar, so they are `die_sigma_nm` / `ring_sigma_nm` per dimension here.
+With `variation: off` (derive, nominal runs) none of this applies and the anchors hold for every ring. The design review wrote the sigma names as
+`width_nm_sigma`; that breaks the suffix grammar, so they are `die_sigma_nm` / `ring_sigma_nm` per dimension here.
 
-## 8. Relations (07 P0-3)
+## 8. Relations
 
 Each relation group needs exactly one free member per equation. A member is free when it is absent, `null`, or
 tagged `derived`. All members given: the residual is computed and `OverdeterminedError` is raised, unless
@@ -492,10 +494,10 @@ provenance** is recomputed and `PlantParams.diagnostics["relation_notes"]` says 
 |---|---|---|
 | `R3_geometry` | `ring.geometry.radius_um`, `ring.optics.n_g`, `ring.optics.fsr_thz` or `fsr_nm`; `n_eff`, `resonance_offset_nm` -> `order` | FSR = c/(n_g 2 pi R). One of R, n_g, FSR free. m = round(n_eff L/lambda_res), lambda_res = lambda_line - offset; then n_eff_phase = m lambda_res/L (the order rounding moves into n_eff, \|correction\| <= lambda/(2L)), so the cold resonance sits exactly at the offset and the FSR keeps its hypothesis. `fsr_nm` is the wavelength FSR at the assigned line. With sampled geometry the radius and the order are the nominal-geometry device's and the FSR follows each device's n_g (section 7.1). |
 | `R1_thermo_optic` | `ring.thermal.dlambda_dt_pm_per_k` (s0), `dlambda_dt_ref_ring_temp_c` (T0), `dlambda_dt_beta_per_k` (beta), `ring.optics.n_g`; -> `ring.optics.dn_eff_dt_per_k` | s(T) = (lambda/n_g)(dn_eff/dT(T) + n_eff alpha_L(T)) = s0 (1 + beta (T - T0)). dn_eff/dT(T0) = s0 n_g/lambda - n_eff alpha_L(T0); d2n_eff/dT2 = s0 beta n_g/lambda - n_eff dalpha_L/dT. beta = 0 when `fidelity.thermo_optic_order` = 1. s0 is the single anchor; setting dn_eff_dt is a load error. |
-| `R2_heater_efficiency` | `ring.heater.p_fsr_mw` (anchor, 07 D16), optional `ring.heater.p_fsr_ref_wavelength_nm` -> `ring.heater.efficiency_nm_per_mw` | efficiency = FSR_lambda/P_FSR, FSR_lambda = lambda_ref^2 FSR/c at the line the P_FSR measurement was made on (`derived.heater.p_fsr_span_m`), so the efficiency and Z are the same on every line; without the key FSR_lambda is at each ring's assigned line (Z then follows lambda_line^2). The efficiency in pm/mW inherits the FSR hypothesis (07 D16). |
-| `R2_heater_z` | -> `ring.thermal.z_heater_ring_k_per_mw`, `ring.thermal.t_ring_lock_c` | T_lock solves int_{T_ref}^{T_lock} s dT = resonance_offset mod FSR_lambda (`derived.optics.lock_offset_m`: the heater only red-shifts, so a sampled ring with a negative offset, or one above an FSR, locks the nearest order blue of its line; equal to the offset for 0 <= offset < FSR). `fidelity.heater_anchor: fsr_integral` (default since the integration): Z = dT_FSR/P_FSR with int_{T_meas}^{T_meas+dT_FSR} s dT = FSR_lambda of R2_heater_efficiency (needs `ring.heater.p_fsr_ref_temp_c`). `lock_slope` (07 as written): Z = efficiency/s(T_lock). See section 13 item 1. |
-| `R4_loss_budget` | `ring.optics.loss_budget.{alpha_fca, alpha_other_abs, alpha_scatter, alpha_bend_radiation}_db_per_cm`, `q_intrinsic`, `heat_fraction` | all four components: alpha_i = sum, Q_i = 2 pi n_g/(lambda_res alpha_i), eta = (fca + other)/alpha_i (07 P0-2). Or no component and `heat_fraction` given: alpha_heat = eta alpha_i with alpha_i from Q_i. A partial budget is an error; neither is an error. |
-| `R4_q` | `q_loaded`, `q_intrinsic`, `q_through`, `q_drop`, optional `kappa_d_over_kappa` | 1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d (with kappa_d_over_kappa = x: Q_d = Q_L/x). Derived per-pass couplings use the exact energy decay per round trip: K^2 = 1 - exp(-omega T_rt/Q), a = exp(-omega T_rt/(2 Q_i)), T_rt = n_g L/c, so one parameter set serves the exact ring and TCMT (07 P2-4). With sampled geometry the anchors hold for the nominal-geometry device and each device's couplers move with its geometry (section 7.1). |
+| `R2_heater_efficiency` | `ring.heater.p_fsr_mw` (anchor), optional `ring.heater.p_fsr_ref_wavelength_nm` -> `ring.heater.efficiency_nm_per_mw` | efficiency = FSR_lambda/P_FSR, FSR_lambda = lambda_ref^2 FSR/c at the line the P_FSR measurement was made on (`derived.heater.p_fsr_span_m`), so the efficiency and Z are the same on every line; without the key FSR_lambda is at each ring's assigned line (Z then follows lambda_line^2). The efficiency in pm/mW inherits the FSR hypothesis. |
+| `R2_heater_z` | -> `ring.thermal.z_heater_ring_k_per_mw`, `ring.thermal.t_ring_lock_c` | T_lock solves int_{T_ref}^{T_lock} s dT = resonance_offset mod FSR_lambda (`derived.optics.lock_offset_m`: the heater only red-shifts, so a sampled ring with a negative offset, or one above an FSR, locks the nearest order blue of its line; equal to the offset for 0 <= offset < FSR). `fidelity.heater_anchor: fsr_integral` (default since the integration): Z = dT_FSR/P_FSR with int_{T_meas}^{T_meas+dT_FSR} s dT = FSR_lambda of R2_heater_efficiency (needs `ring.heater.p_fsr_ref_temp_c`). `lock_slope` (the design review's form): Z = efficiency/s(T_lock). See section 13 item 1. |
+| `R4_loss_budget` | `ring.optics.loss_budget.{alpha_fca, alpha_other_abs, alpha_scatter, alpha_bend_radiation}_db_per_cm`, `q_intrinsic`, `heat_fraction` | all four components: alpha_i = sum, Q_i = 2 pi n_g/(lambda_res alpha_i), eta = (fca + other)/alpha_i. Or no component and `heat_fraction` given (relation `R4_heat_fraction`, after R4_q): alpha_heat = eta alpha_i with alpha_i from Q_i. A partial budget is an error; neither is an error. |
+| `R4_q` | `q_loaded`, `q_intrinsic`, `q_through`, `q_drop`, optional `kappa_d_over_kappa` | 1/Q_L = 1/Q_i + 1/Q_t + 1/Q_d (with kappa_d_over_kappa = x: Q_d = Q_L/x; when `q_drop` is given too, Q_L/Q_d must equal x). Derived per-pass couplings use the exact energy decay per round trip: K^2 = 1 - exp(-omega T_rt/Q), a = exp(-omega T_rt/(2 Q_i)), T_rt = n_g L/c, so one parameter set serves the exact ring and TCMT. With sampled geometry the anchors hold for the nominal-geometry device and each device's couplers move with its geometry (section 7.1). |
 | `R5_latency` | one owner per I/O channel: `ring.monitor.adc_latency_s` (tx.monitor), `ring.heater.latency_s` (tx.heater), `ring.bias_dac.latency_s` (tx.bias), `ring.heater.readback.latency_s`, `datapath.error_count_latency_s`; sensors in `temp_sensors[].latency_s`; the controller declares `Controller.latency_ticks` in code | ticks = round(latency_s x latency_scale/dt). The deleted `controller_interface.*_latency_samples` keys are load errors. |
 
 Overdetermined example (radius printed, n_g solver, FSR printed): give `relations: {R3_geometry: {tolerance_rel:
@@ -503,7 +505,7 @@ Overdetermined example (radius printed, n_g solver, FSR printed): give `relation
 
 ## 9. `realize(cfg, batch, seeds, grid=None, *, uncertainty=None, variation=None, thermal_hook="auto")`
 
-Order of work (07 P0-4):
+Order of work:
 1. base arrays from the leaves (config units), per-world switch codes;
 2. uncertainty: one draw per world (section 6);
 3. `grid` `{path: (B,) values}` (a sweep), in config units;
@@ -515,14 +517,14 @@ Order of work (07 P0-4):
 7. thermal: `ThermalInputs` is always built; with `thermal_hook="auto"` and `mrm.plant.thermal` importable,
    `assemble(InterimRom(...) | load_rom(path), layout.sites, N, ThermalScales(...), temp_sensors=...,
    ring_pitch_um=...)` builds `PlantParams.thermal.system`. For the ROM model a per-world `dc_scale` =
-   mean_i Z_heater->ring,i / Z_FEM(heater->ring) is applied (07 P1-2 `rom_dc_scale`, warned outside [0.5, 2]) and
+   mean_i Z_heater->ring,i / Z_FEM(heater->ring) is applied (`rom_dc_scale`, warned outside [0.5, 2]) and
    Z_opt comes from the ROM;
 8. timing: periods and latencies to ticks; assertions (ADC period >= 1 tick, integrate-and-dump window >= 1 tick and
    <= one ADC period, controller period >= the heater DAC's minimum update period, bias DAC period >= 1 tick);
 9. no silent nan: every optics, thermal, laser and junction array the plant always uses must be finite, and every
    world's heater driver law must have its full scale (`RealizeError` names the fields); every relation residual
    must be <= 1e-12 (nan fails);
-10. the self-heating lag bound of 07 P0-1 item 2: the per-substep gain of the lagged cross-ring optical heating,
+10. the self-heating lag bound: the per-substep gain of the lagged cross-ring optical heating,
    g = sum_j (1 - exp(-dt/tau_ij)) x_ij G_sh max|dP_abs/dlambda|, must be below 0.05 (computed by
    `mrm.plant.thermal.cross_optical_lag_gain` when the system exists, otherwise from the interim numbers with the
    plant's own crosstalk-pole law `mrm.plant.thermal.crosstalk_tau_s`: nearest neighbour `xt_nearest_frac`, second
@@ -580,15 +582,15 @@ uncertainty_mode, variation_mode}; `thermal_inputs`.
 | `alpha_i_per_m` | 1/m | B,N | intrinsic power attenuation = 2 pi n_g/(lambda Q_i) |
 | `alpha_heat_per_m` | 1/m | B,N | heat-producing part of alpha_i |
 | `alpha_fca_per_m` | 1/m | B,N | junction FCA loss at the reference bias (nan without a loss budget) |
-| `heat_fraction` | 1 | B,N | eta = alpha_heat/alpha_i (07 P0-2) |
+| `heat_fraction` | 1 | B,N | eta = alpha_heat/alpha_i |
 | `dln_kappa2_through_dlambda_per_m`, `dln_kappa2_drop_dlambda_per_m` | 1/m | B,N | coupler dispersion, evaluate at each line (absent -> 0) |
-| `dln_alpha_dt_ring_per_k`, `dln_alpha_dt_heater_per_k` | 1/K | B,N | loss vs ring / heater temperature (07 P1-5; absent -> 0) |
+| `dln_alpha_dt_ring_per_k`, `dln_alpha_dt_heater_per_k` | 1/K | B,N | loss vs ring / heater temperature (absent -> 0) |
 | `dn_eff_dt_per_k` | 1/K | B,N | dn_eff/dT at T0 (R1, inverted at lambda_line) |
 | `d2n_eff_dt2_per_k2` | 1/K^2 | B,N | (R1) |
 | `alpha_l_per_k`, `alpha_l_slope_per_k2` | 1/K, 1/K^2 | B,1 | length expansion at T0 and its slope (slope 0 for order 1) |
 | `backscatter_splitting_hz` | Hz | B,N | CW/CCW mode splitting 2\|beta\|/2pi (0 unless `fidelity.backscatter: on`) |
 | `backscatter_rb` | 1 (complex128) | B,N,M_b | rb_n = 2 pi beta_n/FSR per longitudinal order (applied as order n mod M_b, M_b = `ring.optics.backscatter_orders`); beta_n complex Gaussian with E\|beta_n\|^2 = (splitting/2)^2, uniform phase, per device; beta_n = splitting/2 with variation off; zeros when off |
-| `tcmt_orders` | int | | orders summed by the TCMT model (`ring.optics.tcmt_orders`) |
+| `tcmt_orders` | int | | reserved legacy count, unused by exact optics (`ring.optics.tcmt_orders`) |
 | `fwhm_hz` | Hz | B,N | c/(lambda_res Q_L) |
 
 Temperature model (R1): the resonance at ring temperature T (heater off, reference bias) is
@@ -642,7 +644,7 @@ evaluating it at the cold resonance instead of the line scales it by lambda_res_
 | `driver_mode` | int64 | B,1 | 0 voltage, 1 current, 2 power, 3 dac_pwm (per world) |
 | `full_scale_v`, `full_scale_a`, `full_scale_w` | V, A, W | B,1 | nan when not given |
 | `dac_bits`, `code_min`, `code_max` | int | | code range (absent -> 0 and 2^bits - 1) |
-| `slew_codes_per_s` | 1/s | B,1 | absent -> inf (07 P1-11) |
+| `slew_codes_per_s` | 1/s | B,1 | absent -> inf |
 | `settle_tau_s` | s | B,1 | absent -> 0 |
 | `dac_inl_lsb`, `dac_dnl_lsb` | LSB | B,1 | absent -> 0 |
 | `compliance_v` | V | B,1 | absent -> inf |
@@ -682,11 +684,11 @@ absent -> inf), `settle_tau_s` (s, B,1, absent -> 0), `noise_rms_codes` (B,1, ab
 | `baseline_a` | A | B,1 | analog baseline subtracted before the ADC (PAT-2; absent -> 0) |
 | `stuck_flagged` | bool | | a stuck converter clears `monitor_valid` |
 | `flicker_band_min_hz` | Hz | float | lowest 1/f pole of the flicker synthesis |
-| `ref_tap_present`, `ref_tap_coupling_frac`, `ref_tap_responsivity_a_per_w`, `ref_tap_dark_i0_a` | -, 1, A/W, A | -, B,1 | reference-tap PD (07 P1-9; nan = absent or the drop PD's value). Carried only: `MonitorHw.from_plant_params` (so the engine) refuses `ref_tap_present` (no channels yet) |
+| `ref_tap_present`, `ref_tap_coupling_frac`, `ref_tap_responsivity_a_per_w`, `ref_tap_dark_i0_a` | -, 1, A/W, A | -, B,1 | reference-tap PD (nan = absent or the drop PD's value). Carried only: `MonitorHw.from_plant_params` (so the engine) refuses `ref_tap_present` (no channels yet) |
 | `adc_ref_site` | str | | `ring.monitor.adc_ref_site`: package_base (the ADC reference at thermal.t_base_k + thermal.xpu_rise_k) \| monitor_pd (at each ring's PD observer; needs channels_per_adc 1) |
 
 Absent `dark_activation_ev` gives 0.37 eV (`mrm.materials.ge_pd_dark_ea_ev`, inferred), not 0, so the dark current
-keeps the Arrhenius law of 07 P1-9.
+keeps its Arrhenius law.
 
 ### temp_sensors (`TempSensorParams`)
 
@@ -730,7 +732,7 @@ the `sim.*` settings the kernel needs: `reset_protocol` (0 laser_ramp, 1 branch_
 
 Ints `self_heating, thermo_optic_order, thermal_model, junction_model, optics_model, backscatter, shot_noise,
 pattern_noise, data_modulation, heater_anchor, heater_pwm_ripple`; `as_array()` gives the int32 array in
-`FidelityFlags.ORDER` (07 P0-9).
+`FidelityFlags.ORDER`.
 
 ## 11. `derive(cfg)` (nominal view and diagnostics)
 
@@ -739,16 +741,16 @@ inputs, provenance, warnings)`. Diagnostics (per ring unless stated; display uni
 
 | name | meaning |
 |---|---|
-| `implied_index_weight`, `index_weight_ceiling`, `index_weight_ratio` | dn_eff/dn_Si that s0 needs (oxide term from `ring.optics.index_weight_oxide` when given), the ceiling n_g/n_g,Si, and their ratio (> 1: above the materials ceiling, 07 D2) |
+| `implied_index_weight`, `index_weight_ceiling`, `index_weight_ratio` | dn_eff/dn_Si that s0 needs (oxide term from `ring.optics.index_weight_oxide` when given), the ceiling n_g/n_g,Si, and their ratio (> 1: above the materials ceiling) |
 | `self_heating_gain_pm_per_mw` | s(T_lock) Z_opt (= efficiency x z_ratio under lock_slope) |
 | `p_in_ring_dbm`, `p_abs_peak_mw` | power at the ring and absorbed power on resonance |
-| `bistability_ratio` | G_sh P_abs,peak/(0.77 FWHM); a warning above 1 (07 P0-1) |
+| `bistability_ratio` | G_sh P_abs,peak/(0.77 FWHM); a warning above 1 |
 | `t_ring_lock_c`, `t_amb_order_hop_c` | lock temperature; ambient at which the heater reaches zero (peak lock, BND-2) |
 | `next_order_distance_ghz`, `next_order_distance_fwhm` | other orders of a ring locked on its own line to any other TX line, from the plant's phase model (the lock-shifted cold comb with dispersion; each order's TCMT FWHM): the BND-1 replica's distance (`derive.next_order_distances`; warning below 2 FWHM) |
-| `monitor_codes_per_uw_at_drop`, `heater_pm_per_code` (on `heater_code_grid`), `fwhm_pm`, `disturbance_pm_per_k`, `selfheat_pm_per_mw_in` | the identifiable block of 07 P1-9 |
+| `monitor_codes_per_uw_at_drop`, `heater_pm_per_code` (on `heater_code_grid`), `fwhm_pm`, `disturbance_pm_per_k`, `selfheat_pm_per_mw_in` | the block of monitor quantities that the measurements can identify |
 | `heater_efficiency_nm_per_mw`, `z_heater_ring_k_per_mw`, `fsr_thz`, `fsr_nm`, `radius_um`, `rom_dc_scale` | anchors in display units |
 
-Each diagnostic's provenance is the weakest of its inputs (07 P1-14).
+Each diagnostic's provenance is the weakest of its inputs.
 
 ## 12. CLI
 
@@ -769,32 +771,32 @@ Each diagnostic's provenance is the weakest of its inputs (07 P1-14).
 provider module listed in `mrm.cli.PROVIDERS` (`mrm.sim.cli`, `mrm.validation.cli`, ... are pre-listed and skipped
 while they do not exist).
 
-## 13. Deviations from 07 and doubts
+## 13. Deviations from the design review, and doubts
 
-1. **R2 form.** 07 writes Z_heater->ring(0) = efficiency/dlambda/dT(T_lock). With the g26 beta (1.24e-3 /K, the
+1. **R2 form.** The design review writes Z_heater->ring(0) = efficiency/dlambda/dT(T_lock). With the g26 beta (1.24e-3 /K, the
    secant of the solver curve) and the 7.6 nm offset, T_lock ~ 134 degC, so this Z is 4.0 % lower (5.475 against
    5.704 K/mW) than the Z that makes the integral of s(T) over the P_FSR measurement equal one FSR; with per-ring
-   offset variation it also makes a thermal resistance depend on the ring's offset. The integrator made
-   `fidelity.heater_anchor: fsr_integral` the default (schema and g26): Z depends only on FSR, P_FSR and s(T), the
-   exact inversion of the anchor measurement (07 D16), taken at the P_FSR measurement line
-   (`ring.heater.p_fsr_ref_wavelength_nm`), so Z is the same on every line. `lock_slope` (07 as written) stays
+   offset variation it also makes a thermal resistance depend on the ring's offset. The default is
+   therefore `fidelity.heater_anchor: fsr_integral` (schema and g26): Z depends only on FSR, P_FSR and s(T), the
+   exact inversion of the anchor measurement, taken at the P_FSR measurement line
+   (`ring.heater.p_fsr_ref_wavelength_nm`), so Z is the same on every line. `lock_slope` (the review's form) stays
    selectable. The two agree when beta = 0 (docs/handoff/integrator.md).
-2. `ring.optics.fsr_thz` was added next to 07's `fsr_nm`, because the 07 P1-6 FSR windows are stated in THz.
-3. Geometry sigmas are `die_sigma_nm` / `ring_sigma_nm` per dimension (07's `width_nm_sigma` breaks the grammar).
-4. Provenance ranks of `private` and `override` are not in 07; see section 2.
+2. `ring.optics.fsr_thz` was added next to the review's `fsr_nm`, because the review states its FSR windows in THz.
+3. Geometry sigmas are `die_sigma_nm` / `ring_sigma_nm` per dimension (the review's `width_nm_sigma` breaks the grammar).
+4. Provenance ranks of `private` and `override` are not in the review; see section 2.
 5. The order rounding of R3 is absorbed by n_eff (section 8), not by L, so the FSR hypothesis is kept exactly.
 6. dB values convert to a natural-log power ratio (section 3), so a `_db` key never becomes a linear factor
    silently; consumers apply `exp(-x)` for a loss.
-7. 07 4.8 states the `uncertainty` entries informally; this document fixes the format (section 6).
-8. R2 locks each ring on the order reachable by heating: T_lock uses resonance_offset mod FSR_lambda. 07 writes
-   the offset; the two agree for the designed 0 <= offset < FSR, and the wrap keeps sampled rings with a negative
+7. The review states the `uncertainty` entries informally; this document fixes the format (section 6).
+8. R2 locks each ring on the order reachable by heating: T_lock uses resonance_offset mod FSR_lambda. The review
+   writes the offset; the two agree for the designed 0 <= offset < FSR, and the wrap keeps sampled rings with a negative
    offset (about 11 % of rings for a 7.6 nm mean with the Berkeley 6 nm/2 nm spreads) from getting a lock
    temperature below ambient (and, under lock_slope, a Z from it).
 9. An FSR given by a hypothesis is the FSR: `derived.optics.fsr_hz`, `fsr_m`, the round-trip time and the heater
-   efficiency inherit the FSR leaf's provenance (07 D16), not that of n_g, which R3 solved the radius from (with a
+   efficiency inherit the FSR leaf's provenance, not that of n_g, which R3 solved the radius from (with a
    sampled geometry a device's FSR also inherits its n_g's). A quantity taken at a ring's line (`fsr_m`, Q_i,
    K^2, dn_eff/dT) also inherits the channel plan's provenance (center, spacing, line count or the lines table,
-   recorded as the derivation of `derived.optics.lambda_line_m`; 07 P1-14). `channel_plan.ring_to_line` is not an
+   recorded as the derivation of `derived.optics.lambda_line_m`). `channel_plan.ring_to_line` is not an
    input: it is the design convention per-ring values are stated against (each ring is designed relative to its
    own line) and only permutes the plan's wavelengths.
 
@@ -812,95 +814,95 @@ is current.
 | `meta.kind` | enum |  |  | setting; enum: preset, experiment, corner, private, test; default preset | preset: strict (no bare physical numbers); experiment: bare physical numbers become overrides; corner: an extends: file that only selects alternatives; private: NDA data (provenance private); test: unit-test preset |
 | `meta.description` | str |  |  | setting | free text |
 | `meta.sources` | map |  |  | setting | extra source keys declared by this file {key: citation} (private and test presets) |
-| `meta.generation_mix` | str |  |  | setting | free text: which generation each block comes from (07 4.9 item 6) |
+| `meta.generation_mix` | str |  |  | setting | free text: which hardware generation each block comes from |
 | `meta.inventory` | map |  |  | setting | completeness inventory of docs/research/00_prior_notes_checklist.md: {section: {item: {status: key \| excluded \| unknown, keys: [...], reason: ...}}} (validated by tests/closure/test_presets.py) |
-| `fidelity.self_heating` | enum |  |  | setting; enum: on, off; default on | optical self-heating (07 P0-1) |
-| `fidelity.thermo_optic_order` | enum |  |  | setting; enum: 1, 2; default 2 | 1: constant dlambda/dT; 2: s0*(1+beta*(T-T0)) (07 P0-3) |
-| `fidelity.thermal_model` | enum |  |  | setting; enum: interim, rom; default interim | interim three-pole model (07 P1-2) or a FEM ROM artefact |
-| `fidelity.junction_model` | enum |  |  | setting; enum: analytic, lut; default analytic | analytic depletion law or junction LUT artefact (07 P1-7) |
-| `fidelity.optics_model` | enum |  |  | setting; enum: exact, tcmt; default exact | exact add-drop ring or TCMT (07 P2-4) |
-| `fidelity.backscatter` | enum |  |  | setting; enum: off, on; default off | CW/CCW coupling (07 P2-2) |
+| `fidelity.self_heating` | enum |  |  | setting; enum: on, off; default on | optical self-heating: the absorbed light heats its own ring |
+| `fidelity.thermo_optic_order` | enum |  |  | setting; enum: 1, 2; default 2 | 1: constant dlambda/dT; 2: s0*(1+beta*(T-T0)) |
+| `fidelity.thermal_model` | enum |  |  | setting; enum: interim, rom; default interim | interim three-pole model with preset numbers (used until the FEM ROM of the heater family exists), or a FEM reduced-order model (ROM) artefact |
+| `fidelity.junction_model` | enum |  |  | setting; enum: analytic, lut; default analytic | analytic depletion law or junction LUT artefact |
+| `fidelity.optics_model` | enum |  |  | setting; enum: exact; default exact | exact two-direction add-drop ring - the steady-state TCMT comparison is archived |
+| `fidelity.backscatter` | enum |  |  | setting; enum: off, on; default off | CW/CCW coupling by backscatter |
 | `fidelity.shot_noise` | enum |  |  | setting; enum: on, off; default on | photodiode shot noise |
-| `fidelity.pattern_noise` | enum |  |  | setting; enum: off, binomial, prbs7, prbs9, prbs15, prbs23, prbs31; default off | ones-density noise (07 P0-11) |
-| `fidelity.data_modulation` | enum |  |  | setting; enum: mean, lut; default mean | mark-density mean or LUT correction (07 P2-6) |
-| `fidelity.nonlinear_optics` | enum |  |  | setting; enum: off; default off | TPA/FCA/Kerr excluded with a bound (07 P2-1) |
-| `fidelity.heater_anchor` | enum |  |  | setting; enum: lock_slope, fsr_integral; default fsr_integral | R2 form: fsr_integral (default, integrator decision: Z = dT_FSR/P_FSR with the integral of s(T) over the P_FSR sweep equal to one FSR, the exact inversion of the anchor measurement, 07 D16) or lock_slope (07 P0-3 as written: Z = efficiency/s(T_lock); 4 % low at the g26 nominal, and it makes Z depend on each ring's sampled offset; docs/handoff/integrator.md) |
-| `fidelity.heater_pwm_ripple` | enum |  |  | setting; enum: off, on; default off | dac_pwm ripple term (07 P1-11) |
-| `fidelity.plasma_dispersion` | enum |  |  | setting; enum: nedeljkovic2011, soref_bennett1987; default nedeljkovic2011 | free-carrier model (07 P1-7) |
-| `sim.dt_plant_s` | float |  | s | setting; required | plant tick (07 P0-6) |
-| `sim.substep_policy` | enum |  |  | setting; enum: fixed, auto; default fixed | 07 P0-10 |
-| `sim.min_samples_per_dither_period` | int |  |  | setting; default 8 | 07 P0-10 |
-| `sim.max_detuning_step_pm` | float |  | pm | setting; default 0.2 | 07 P0-10 |
-| `sim.reset_protocol` | enum |  |  | setting; enum: laser_ramp, branch_low, branch_high; default laser_ramp | 07 P0-1 item 6 |
+| `fidelity.pattern_noise` | enum |  |  | setting; enum: off, binomial, prbs7, prbs9, prbs15, prbs23, prbs31; default off | ones-density noise of the data pattern |
+| `fidelity.data_modulation` | enum |  |  | setting; enum: mean, lut; default mean | mark-density mean or LUT correction |
+| `fidelity.nonlinear_optics` | enum |  |  | setting; enum: off; default off | TPA/FCA/Kerr: excluded with a computed bound |
+| `fidelity.heater_anchor` | enum |  |  | setting; enum: lock_slope, fsr_integral; default fsr_integral | how relation R2 turns the measured P_FSR into Z_heater->ring. fsr_integral (default): Z = dT_FSR/P_FSR, with the integral of s(T) over the P_FSR sweep equal to one FSR; this is the exact inversion of the anchor measurement. lock_slope (the first design form): Z = efficiency/s(T_lock); it is 4 % low at the g26 nominal, and it makes Z depend on each ring's sampled offset |
+| `fidelity.heater_pwm_ripple` | enum |  |  | setting; enum: off, on; default off | ripple term of the dac_pwm driver law |
+| `fidelity.plasma_dispersion` | enum |  |  | setting; enum: nedeljkovic2011, soref_bennett1987; default nedeljkovic2011 | free-carrier plasma-dispersion model of the junction |
+| `sim.dt_plant_s` | float |  | s | setting; required | plant tick; every hardware period and latency is a whole number of ticks |
+| `sim.substep_policy` | enum |  |  | setting; enum: fixed, auto; default fixed | fixed: one substep per tick; auto: exact multi-tick thermal steps, with optics substeps only where needed |
+| `sim.min_samples_per_dither_period` | int |  |  | setting; default 8 | auto substeps: least number of samples per dither period while a dither is active (a rule of the auto-substep design; realize() keeps it in TimingParams, but the current kernel does not read it) |
+| `sim.max_detuning_step_pm` | float |  | pm | setting; default 0.2 | auto substeps: the largest resonance move in one substep |
+| `sim.reset_protocol` | enum |  |  | setting; enum: laser_ramp, branch_low, branch_high; default laser_ramp | start-up history of Plant.reset(): laser_ramp (the lasers turn on over sim.reset_ramp_s with every heater at code_min), branch_low (lasers on at once, cold branch) or branch_high (lasers on at once, hot self-locked branch) |
 | `sim.reset_ramp_s` | float |  | s | setting | laser turn-on ramp of laser_ramp (>= 10 tau_slow) |
 | `channel_plan.center_thz` | float | global | thz |  | centre of the per-direction grid |
 | `channel_plan.spacing_ghz` | float | global | ghz |  | line spacing seen by one ring bank |
 | `channel_plan.n_lines` | int | global |  |  | lines per bank |
 | `channel_plan.lines` | table (list: freq_thz, direction, source_laser, pol) | global |  |  | explicit line table (overrides centre/spacing) |
 | `channel_plan.ring_to_line` | list_int | global |  |  | assigned line of each ring (default: identity) |
-| `laser.power_per_line_dbm` | float | line | dbm | required | power per line at the laser-module output (07 P0-1 item 4) |
+| `laser.power_per_line_dbm` | float | line | dbm | required | power per line at the laser-module output |
 | `laser.line_offset_ghz` | float | line | ghz |  | static frequency error of each line from the grid |
 | `laser.rin_db_per_hz` | float | die | db_per_hz |  | relative intensity noise |
 | `laser.linewidth_mhz` | float | die | mhz |  | laser linewidth |
-| `laser.tune.present` | bool |  |  | setting; default False | optional laser.tune actuator (07 P0-7, P2-8) |
+| `laser.tune.present` | bool |  |  | setting; default False | optional laser.tune actuator |
 | `laser.tune.bits` | int | die |  | required if laser.tune.present=True | laser tuning DAC bits |
 | `laser.tune.lsb_hz` | float | die | hz | required if laser.tune.present=True | laser tuning step per code |
 | `optical_path.chip_input_loss_db` | float | die | db | required | laser output to the first ring (fibre, coupler, splitters) |
 | `optical_path.bus_loss_db_per_mm` | float | die | db_per_mm |  | bus waveguide loss between rings |
 | `optical_path.ring_spacing_on_bus_um` | float | die | um |  | bus length between adjacent rings |
-| `ring.geometry.radius_um` | float | ring | um |  | ring radius = the phase reference radius r_ref of n_eff_bent (07 P1-6); R3 |
+| `ring.geometry.radius_um` | float | ring | um |  | ring radius = the phase reference radius r_ref of n_eff_bent; R3 |
 | `ring.geometry.width_nm` | float | die | nm |  | rib/strip width (informational; sets the artefact) |
-| `ring.geometry.film_nm` | float | die | nm |  | silicon film thickness (D21: 160 or 200) |
+| `ring.geometry.film_nm` | float | die | nm |  | silicon film thickness (the cross-section hypotheses use 160 or 200) |
 | `ring.geometry.slab_nm` | float | die | nm |  | rib slab thickness (0 for a strip) |
 | `ring.geometry.xsec` | str |  |  | setting | cross-section hypothesis name (rib160, rib200, strip400x200, ...) |
-| `ring.geometry.jacobian` | table | global |  |  | geometry Jacobian {d: [names], of: {output: [per d]}} (07 P1-16) |
+| `ring.geometry.jacobian` | table | global |  |  | geometry Jacobian {d: [input names], of: {output: [one coefficient per input]}}: how each output moves per nm of each geometry error |
 | `ring.geometry.jacobian_coupling` | table | global |  |  | second Jacobian block (coupling artefact) |
-| `ring.optics.resonance_offset_nm` | float | ring | nm | required | cold-cavity blue offset: assigned line minus resonance, at the reference temperature and bias, heater off, P_in -> 0 (07 P1-6); R3 |
+| `ring.optics.resonance_offset_nm` | float | ring | nm | required | cold-cavity blue offset: assigned line minus resonance, at the reference temperature and bias, heater off, P_in -> 0; R3 |
 | `ring.optics.resonance_offset_ref_temp_c` | float | die | c | required | temperature at which resonance_offset_nm is defined |
 | `ring.optics.resonance_offset_ref_bias_v` | float | die | v |  | reverse bias at which resonance_offset_nm is defined |
-| `ring.optics.n_eff` | float | ring |  | required | effective index of the bent mode at the resonance, T_ref (07 P1-6); R3 |
+| `ring.optics.n_eff` | float | ring |  | required | effective index of the bent mode at the resonance, T_ref; R3 |
 | `ring.optics.n_g` | float | ring |  |  | group index of the bent mode; R1, R3 |
 | `ring.optics.dn_g_dlambda_per_nm` | float | ring | per_nm |  | group-index dispersion |
 | `ring.optics.fsr_nm` | float | ring | nm |  | FSR in wavelength at the assigned line wavelength, i.e. at the locked resonance (optional R3 member; FSR_lambda = lambda_line^2 FSR/c) |
-| `ring.optics.fsr_thz` | float | ring | thz |  | FSR in frequency (optional R3 member; the 07 P1-6 windows are in THz) |
+| `ring.optics.fsr_thz` | float | ring | thz |  | FSR in frequency (optional R3 member; the FSR hypothesis windows of uncertainty.fsr are in THz) |
 | `ring.optics.order` | int | ring |  | derived only | longitudinal order m = round(n_eff*L/lambda_res) (R3) |
 | `ring.optics.q_loaded` | float | ring |  |  | loaded Q at reference conditions; R4 |
 | `ring.optics.q_intrinsic` | float | ring |  |  | intrinsic Q; R4 (derived from the loss budget when it is given) |
 | `ring.optics.q_through` | float | ring |  |  | through-coupler Q; R4 |
 | `ring.optics.q_drop` | float | ring |  |  | drop-coupler Q; R4 |
 | `ring.optics.kappa_d_over_kappa` | float | ring |  |  | drop decay rate over total decay rate (sets q_drop = q_loaded/x) |
-| `ring.optics.dln_kappa2_through_dlambda_per_nm` | float | ring | per_nm |  | through-coupler dispersion d ln K^2/d lambda (07 P1-5); evaluated at each line |
+| `ring.optics.dln_kappa2_through_dlambda_per_nm` | float | ring | per_nm |  | through-coupler dispersion d ln K^2/d lambda, evaluated at each line |
 | `ring.optics.dln_kappa2_drop_dlambda_per_nm` | float | ring | per_nm |  | drop-coupler dispersion |
-| `ring.optics.dln_alpha_dt_ring_per_k` | float | ring | per_k |  | loss change with the mode-weighted ring temperature (07 P1-5) |
-| `ring.optics.dln_alpha_dt_heater_per_k` | float | ring | per_k |  | loss change with the ROM heater temperature (07 P1-5) |
-| `ring.optics.loss_budget.alpha_fca_db_per_cm` | float | ring | db_per_cm |  | free-carrier absorption of the junction at the reference bias (07 P0-2) |
+| `ring.optics.dln_alpha_dt_ring_per_k` | float | ring | per_k |  | loss change with the mode-weighted ring temperature |
+| `ring.optics.dln_alpha_dt_heater_per_k` | float | ring | per_k |  | loss change with the ROM heater temperature |
+| `ring.optics.loss_budget.alpha_fca_db_per_cm` | float | ring | db_per_cm |  | free-carrier absorption of the junction at the reference bias |
 | `ring.optics.loss_budget.alpha_other_abs_db_per_cm` | float | ring | db_per_cm |  | other heat-producing absorption (heater doping, silicide, metal, surface states) |
 | `ring.optics.loss_budget.alpha_scatter_db_per_cm` | float | ring | db_per_cm |  | sidewall scattering (no heat) |
 | `ring.optics.loss_budget.alpha_bend_radiation_db_per_cm` | float | ring | db_per_cm |  | bend and slab radiation (no heat) |
 | `ring.optics.heat_fraction` | float | ring |  |  | eta = heat-producing loss / intrinsic loss (derived from the budget, or given with q_intrinsic when no component is given) |
 | `ring.optics.index_weight_oxide` | float | ring |  |  | dn_eff/dn_SiO2 of the bent mode (solver; used only by the implied_index_weight diagnostic) |
 | `ring.optics.dn_eff_dt_per_k` | float | ring | per_k | derived only | thermo-optic coefficient of the bent mode at T0 (R1); never set it |
-| `ring.optics.alpha_l_per_k` | float | die | per_k |  | ring length expansion at T0, substrate-clamped (07 P0-3) |
+| `ring.optics.alpha_l_per_k` | float | die | per_k |  | ring length expansion at T0, substrate-clamped |
 | `ring.optics.alpha_l_slope_per_k2` | float | die | per_k2 | required if fidelity.thermo_optic_order=2 | d alpha_L / dT |
 | `ring.optics.backscatter_splitting_ghz` | float | ring | ghz | required if fidelity.backscatter=on | CW/CCW mode splitting 2\|beta\|/2pi (not the coupling rate) |
-| `ring.optics.backscatter_orders` | int |  |  | setting; default 5 | M_b: independent complex beta per longitudinal order, applied periodically in the order (07 P2-2; plant_optics handoff: >= 5) |
-| `ring.optics.tcmt_orders` | int |  |  | setting; default 3 | orders summed by the TCMT model (07 P2-4); use an odd number (symmetric about every resonance, plant_optics handoff) |
-| `ring.thermal.dlambda_dt_pm_per_k` | float | ring | pm_per_k | required | s0 = dlambda/dT at the ring temperature T0 (single thermo-optic anchor, 07 P0-3 R1) |
+| `ring.optics.backscatter_orders` | int |  |  | setting; default 5 | M_b: number of independent complex beta values, one per longitudinal order, repeated periodically over the orders (use 5 or more) |
+| `ring.optics.tcmt_orders` | int |  |  | setting; default 3 | reserved legacy setting - unused by exact ring optics |
+| `ring.thermal.dlambda_dt_pm_per_k` | float | ring | pm_per_k | required | s0 = dlambda/dT at the ring temperature T0: the single thermo-optic anchor (R1) |
 | `ring.thermal.dlambda_dt_ref_ring_temp_c` | float | die | c | required | T0 of s0 |
 | `ring.thermal.dlambda_dt_beta_per_k` | float | die | per_k | required if fidelity.thermo_optic_order=2 | beta of s(T) = s0*(1+beta*(T-T0)) |
 | `ring.thermal.z_heater_ring_k_per_mw` | float | ring | k_per_mw | derived only | Z_heater->ring(0) (R2) |
 | `ring.thermal.t_ring_lock_c` | float | ring | c | derived only | ring temperature at lock when the ambient is the offset reference temperature (diagnostic) |
-| `ring.thermal.z_ratio_opt_heater` | float | die |  | required | Z_opt->ring(0)/Z_heater->ring(0) (>= 1 for an external heater, 07 P0-1 item 5) |
-| `ring.thermal.reference_rise_frac` | float | die | frac |  | fraction of the ring's mode-weighted temperature rise registered by the thermometer behind Lightmatter's printed degC values (07 D2 H86_sensor: 0.77-0.86; 1 = the ring itself). Not used by the plant; replicas and degC scenario targets read it from PlantParams.values |
-| `ring.thermal.family` | enum |  |  | setting; per-world switch; enum: inring_noundercut, silicide_undercut, metal_above; default inring_noundercut | heater family (07 P1-3) |
-| `ring.thermal.stack` | enum |  |  | setting; per-world switch; enum: side_by_side, stacked_eic; default side_by_side | stack hypothesis (07 P1-3) |
+| `ring.thermal.z_ratio_opt_heater` | float | die |  | required | Z_opt->ring(0)/Z_heater->ring(0) (>= 1 for an external heater, by reciprocity) |
+| `ring.thermal.reference_rise_frac` | float | die | frac |  | fraction of the ring's mode-weighted temperature rise registered by the thermometer behind Lightmatter's printed degC values (hypothesis H86_sensor: 0.77-0.86; 1 = the ring itself). Not used by the plant; replicas and degC scenario targets read it from PlantParams.values |
+| `ring.thermal.family` | enum |  |  | setting; per-world switch; enum: inring_noundercut, silicide_undercut, metal_above; default inring_noundercut | heater family hypothesis |
+| `ring.thermal.stack` | enum |  |  | setting; per-world switch; enum: side_by_side, stacked_eic; default side_by_side | die-stack hypothesis |
 | `ring.thermal.rom_file` | str |  |  | setting; required if fidelity.thermal_model=rom; forbidden if fidelity.thermal_model=interim | extracted/thermal_rom_<family>_<film>.npz |
-| `ring.thermal.tau_fast_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim self path, fast pole (07 P1-2) |
-| `ring.thermal.share_fast_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim self path, DC share of the fast pole |
-| `ring.thermal.tau_slow_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim self path, slow pole |
-| `ring.thermal.tail_tau_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim die/package tail pole |
-| `ring.thermal.tail_share_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | DC share of the tail (slow share = 1 - fast - tail) |
-| `ring.thermal.selfheat_tau_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | sub-us waveguide-core pole of the optical self-heating path (07 P0-1) |
+| `ring.thermal.tau_fast_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim model, heater-to-own-ring path: fast pole |
+| `ring.thermal.share_fast_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim model, heater-to-own-ring path: DC share of the fast pole |
+| `ring.thermal.tau_slow_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim model, heater-to-own-ring path: slow pole |
+| `ring.thermal.tail_tau_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim model, heater-to-own-ring path: die/package tail pole |
+| `ring.thermal.tail_share_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim model, heater-to-own-ring path: DC share of the tail (slow share = 1 - fast - tail) |
+| `ring.thermal.selfheat_tau_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | sub-us waveguide-core pole of the optical self-heating path |
 | `ring.thermal.selfheat_share_frac` | float | die | frac | forbidden if fidelity.thermal_model=rom | DC share of Z_opt in the sub-us pole (rest follows the heater poles); absent: (z - 1)/z, the largest passive share (mrm.plant.thermal.InterimRom) |
 | `ring.thermal.heater_self_ratio` | float | die |  | forbidden if fidelity.thermal_model=rom | R_th,H / Z_heater->ring(0): heater resistor observing its own heater |
 | `ring.thermal.heater_node_tau_s` | float | die | s | forbidden if fidelity.thermal_model=rom | extra pole of the heater-resistor observer |
@@ -911,41 +913,41 @@ is current.
 | `ring.thermal.pd_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | monitor PD offset from the ring centre (x, y) |
 | `ring.thermal.temp_sensor_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | ring-attached sensor offset (x, y) |
 | `ring.thermal.driver_offset_um` | list_float | global | um | forbidden if fidelity.thermal_model=rom | driver offset from the ring centre (x, y) |
-| `ring.thermal.xt_tau_law` | enum |  |  | setting; enum: capped, literal; default capped | capped (monotone) or literal (07 P1-2 as written) |
+| `ring.thermal.xt_tau_law` | enum |  |  | setting; enum: capped, literal; default capped | crosstalk time-constant law: capped (monotone in distance) or literal (the interim law as first specified; not monotone) |
 | `ring.thermal.crosstalk_dynamics` | enum |  |  | setting; enum: imec, self; default imec | imec first-order crosstalk, or the self shape (textbook corner) |
-| `ring.thermal.scaling_hypothesis` | enum |  |  | setting; per-world switch; enum: resistance, capacitance, independent; default resistance | how tau scales with the residue (07 P1-2) |
+| `ring.thermal.scaling_hypothesis` | enum |  |  | setting; per-world switch; enum: resistance, capacitance, independent; default resistance | how tau scales with the residue |
 | `ring.thermal.xt_nearest_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim crosstalk to the nearest neighbour, fraction of the self DC |
 | `ring.thermal.xt_floor_frac` | float | die | frac | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | interim crosstalk floor to every other ring |
-| `ring.thermal.xt_tau_ref_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2) (07 P1-2), d the heat-source-to-victim distance (centre distance less the ring radii) |
+| `ring.thermal.xt_tau_ref_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | tau_xt = max(xt_tau_min_s, xt_tau_ref_s*(d/xt_dist_ref_um)^2), d the heat-source-to-victim distance (centre distance less the ring radii) |
 | `ring.thermal.xt_dist_ref_um` | float | die | um | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | reference heat-source-to-victim distance of xt_tau_ref_s (imec: 60 um at a 100 um pitch) |
 | `ring.thermal.xt_tau_min_s` | float | die | s | required if fidelity.thermal_model=interim; forbidden if fidelity.thermal_model=rom | floor of the crosstalk time constant |
-| `ring.thermal.xt_tau_far_s` | float | die | s | forbidden if fidelity.thermal_model=rom | crosstalk time constant beyond xt_far_um (absent: the printed X2 table of 04 section 2.4) |
+| `ring.thermal.xt_tau_far_s` | float | die | s | forbidden if fidelity.thermal_model=rom | crosstalk time constant beyond xt_far_um (absent: the printed X2 table, see mrm.plant.thermal.crosstalk_tau_s) |
 | `ring.thermal.xt_far_um` | float | die | um | forbidden if fidelity.thermal_model=rom | distance beyond which xt_tau_far_s applies |
 | `ring.thermal.transport_delay_s` | float | die | s |  | optional per-pair transport delay |
-| `ring.heater.p_fsr_mw` | float | ring | mw | required | heater power per FSR (the heater anchor, 07 D16, R2) |
+| `ring.heater.p_fsr_mw` | float | ring | mw | required | heater power per FSR: the heater anchor (R2) |
 | `ring.heater.p_fsr_ref_temp_c` | float | die | c | required if fidelity.heater_anchor=fsr_integral | stage temperature of the P_FSR measurement (fsr_integral form) |
 | `ring.heater.p_fsr_ref_wavelength_nm` | float | die | nm |  | wavelength of the line the P_FSR measurement was made on: R2 takes FSR_lambda there, so the efficiency and Z_heater->ring are the same on every line (absent: each ring's line) |
 | `ring.heater.efficiency_nm_per_mw` | float | ring | nm_per_mw | derived only | FSR/P_FSR (R2; derived) |
 | `ring.heater.r_cold_ohm` | float | ring | ohm | required | heater resistance at r_ref_temp_c |
 | `ring.heater.r_ref_temp_c` | float | die | c | required | temperature of r_cold_ohm |
-| `ring.heater.tcr_per_k` | float | die | per_k | required | R = R0*(1 + tcr*(T_heater - T_ref)) (07 P1-2, P1-11) |
-| `ring.heater.driver_mode` | enum |  |  | setting; per-world switch; enum: voltage, current, power, dac_pwm; default voltage | driver law hypothesis (07 P1-11) |
+| `ring.heater.tcr_per_k` | float | die | per_k | required | R = R0*(1 + tcr*(T_heater - T_ref)) |
+| `ring.heater.driver_mode` | enum |  |  | setting; per-world switch; enum: voltage, current, power, dac_pwm; default voltage | heater driver law hypothesis: the quantity the DAC code sets |
 | `ring.heater.full_scale_v` | float | die | v | required if ring.heater.driver_mode=voltage|dac_pwm | DAC full scale in voltage drive |
 | `ring.heater.full_scale_a` | float | die | a | required if ring.heater.driver_mode=current | DAC full scale in current drive |
 | `ring.heater.full_scale_w` | float | die | w | required if ring.heater.driver_mode=power | DAC full scale in power drive |
 | `ring.heater.dac_bits` | int | die |  | required | heater DAC resolution |
-| `ring.heater.code_min` | int | die |  |  | lowest code (07 P1-11: hardware, not measured demand) |
+| `ring.heater.code_min` | int | die |  |  | lowest code (a hardware limit, not the measured demand) |
 | `ring.heater.code_max` | int | die |  |  | highest code |
 | `ring.heater.slew_codes_per_s` | float | die | codes_per_s |  | hardware slew limit (absent: unlimited) |
 | `ring.heater.settle_tau_s` | float | die | s |  | analog settle filter |
-| `ring.heater.latency_s` | float | die | s | required; whole ticks (period) | DAC latency (one owner, 07 P0-6) |
+| `ring.heater.latency_s` | float | die | s | required; whole ticks (period) | DAC latency (the only place this delay is stated) |
 | `ring.heater.dac_inl_lsb` | float | die | lsb |  | DAC INL |
 | `ring.heater.dac_dnl_lsb` | float | die | lsb |  | DAC DNL |
 | `ring.heater.dac_max_update_hz` | float | die | hz |  | max DAC update rate |
 | `ring.heater.driver_compliance_v` | float | die | v |  | current-drive headroom |
 | `ring.heater.pwm_period_s` | float | die | s | required if ring.heater.driver_mode=dac_pwm | dac_pwm period (PAT-2: 2.56 us) |
 | `ring.heater.pwm_bits` | int | die |  |  | PWM bits of dac_pwm (PAT-2: 8) |
-| `ring.heater.readback.present` | bool |  |  | setting; default False | heater V/I readback (07 P1-10) |
+| `ring.heater.readback.present` | bool |  |  | setting; default False | heater V/I readback |
 | `ring.heater.readback.adc_bits` | int | die |  | required if ring.heater.readback.present=True | readback ADC bits |
 | `ring.heater.readback.v_full_scale_v` | float | die | v |  | readback voltage full scale |
 | `ring.heater.readback.i_full_scale_a` | float | die | a |  | readback current full scale |
@@ -953,26 +955,26 @@ is current.
 | `ring.heater.readback.latency_s` | float | die | s | whole ticks (period) | readback latency |
 | `ring.heater.readback.noise_rms_codes` | float | die | codes |  | readback ADC noise per sample (absent -> 0) |
 | `ring.heater.readback.average` | bool |  |  | setting; default False | readback ADC averages V and I over its sample period (boxcar) instead of a track-and-hold of the last tick (mrm.plant.sensing.ReadbackHw) |
-| `ring.junction.fill_fraction` | float | ring |  | required | fraction of the circumference with the junction (07 P1-7, CAL-5) |
+| `ring.junction.fill_fraction` | float | ring |  | required | fraction of the circumference with the junction (CAL-5, the resonance shift against reverse bias, constrains it only in LUT mode; in the analytic law it cancels) |
 | `ring.junction.lut_file` | str |  |  | setting; required if fidelity.junction_model=lut; forbidden if fidelity.junction_model=analytic | extracted/junction_<xsec>.json |
 | `ring.junction.eff_at_0v_pm_per_v` | float | ring | pm_per_v | required if fidelity.junction_model=analytic; forbidden if fidelity.junction_model=lut | dlambda/dV at 0 V for the analytic law (derived in LUT mode) |
 | `ring.junction.v_bi_v` | float | die | v | required if fidelity.junction_model=analytic | built-in voltage |
-| `ring.junction.depletion_exponent` | float | die |  | required if fidelity.junction_model=analytic | m of dlambda = A*((V+Vbi)^m - Vbi^m): 1/2 (abrupt) to 2/3 (linearly graded) by charge control, dlambda ~ removed charge (03 section 5.3, plant_electrical note 1); 07 P1-7 wrote 1/3..1/2 (the depletion-width exponents); bounds [1/3, 2/3], the span mrm.plant.electrical.analytic_junction_table accepts |
+| `ring.junction.depletion_exponent` | float | die |  | required if fidelity.junction_model=analytic | m of dlambda = A*((V+Vbi)^m - Vbi^m). Charge control (dlambda ~ removed charge) gives 1/2 for an abrupt junction and 2/3 for a linearly graded one (docs/research/03_mrm_compact_models.md, 'Efficiency against bias: the charge-control form'). An earlier design note used 1/3..1/2, the depletion-width exponents. The bounds [1/3, 2/3] cover both: the span mrm.plant.electrical.analytic_junction_table accepts |
 | `ring.junction.dqi_dv_frac_per_v` | float | ring | frac_per_v | forbidden if fidelity.junction_model=lut | relative Q_i change per volt (derived in LUT mode) |
-| `ring.junction.loss_ratio_q` | float | die |  |  | q = lambda*d_alpha/(4 pi d_n) of the plasma effect (03 section 5.4) |
+| `ring.junction.loss_ratio_q` | float | die |  |  | q = lambda*d_alpha/(4 pi d_n) of the plasma effect |
 | `ring.junction.capacitance_at_0v_ff` | float | ring | ff |  | junction capacitance |
 | `ring.junction.series_resistance_ohm` | float | ring | ohm |  | junction series resistance |
 | `ring.monitor.responsivity_a_per_w` | float | ring | a_per_w | required | drop PD responsivity |
-| `ring.monitor.gain_scale` | float | die |  |  | lumped monitor-gain nuisance factor (07 P1-9) |
-| `ring.monitor.dark_i0_na` | float | die | na |  | dark current at dark_t0_c (07 D20) |
+| `ring.monitor.gain_scale` | float | die |  |  | lumped monitor-gain nuisance factor |
+| `ring.monitor.dark_i0_na` | float | die | na |  | dark current at dark_t0_c |
 | `ring.monitor.dark_t0_c` | float | die | c |  | reference temperature of dark_i0_na |
-| `ring.monitor.dark_activation_ev` | float | die | ev |  | Arrhenius activation energy (07 P1-9) |
-| `ring.monitor.background_fraction` | float | ring |  |  | stray light at the PD, as a fraction of the total bus power at the ring (all lines, not one line; i += gain_scale R f P_bus, 07 P1-9) |
-| `ring.monitor.afe_type` | enum |  |  | setting; enum: rc, integrate_dump; default integrate_dump | 07 P0-7 |
-| `ring.monitor.integration_window_s` | float | die | s | required if ring.monitor.afe_type=integrate_dump; whole ticks (period) | integrate-and-dump boxcar (07 P0-7) |
+| `ring.monitor.dark_activation_ev` | float | die | ev |  | Arrhenius activation energy of the dark current |
+| `ring.monitor.background_fraction` | float | ring |  |  | stray light at the PD, as a fraction of the total bus power at the ring (all lines, not one line; i += gain_scale R f P_bus) |
+| `ring.monitor.afe_type` | enum |  |  | setting; enum: rc, integrate_dump; default integrate_dump | monitor analog front end: rc (first-order filter) or integrate_dump (boxcar integrator, dumped at each ADC sample) |
+| `ring.monitor.integration_window_s` | float | die | s | required if ring.monitor.afe_type=integrate_dump; whole ticks (period) | integrate-and-dump boxcar length |
 | `ring.monitor.afe_tau_s` | float | die | s | required if ring.monitor.afe_type=rc | RC front-end time constant |
 | `ring.monitor.adc_rate_hz` | float | die | hz | required; whole ticks (rate) | monitor ADC sample rate |
-| `ring.monitor.adc_latency_s` | float | die | s | required; whole ticks (period) | conversion latency (one owner, 07 P0-6) |
+| `ring.monitor.adc_latency_s` | float | die | s | required; whole ticks (period) | conversion latency (the only place this delay is stated) |
 | `ring.monitor.adc_bits` | int | die |  | required | monitor ADC bits |
 | `ring.monitor.adc_full_scale_ua` | float | die | ua | required | PD current at ADC full scale |
 | `ring.monitor.adc_offset_codes` | float | ring | codes |  | ADC offset |
@@ -982,70 +984,70 @@ is current.
 | `ring.monitor.input_noise_pa_per_rt_hz` | float | die | pa_per_rt_hz |  | input-referred current noise density |
 | `ring.monitor.flicker_corner_hz` | float | die | hz |  | 1/f corner |
 | `ring.monitor.adc_ref_tempco_ppm_per_k` | float | die | ppm_per_k |  | tempco of the ADC reference about 25 degC, at the temperature of ring.monitor.adc_ref_site |
-| `ring.monitor.adc_ref_site` | enum |  |  | setting; enum: package_base, monitor_pd; default package_base | where the monitor ADC reference sits, i.e. the temperature its tempco sees: package_base = thermal.t_base_k + thermal.xpu_rise_k (a converter on its own die beside the PIC, 07 P1-3; its own dissipation not modelled); monitor_pd = each ring's PD observer (one converter per ring, next to its PD) |
-| `ring.monitor.pga_gains` | list_float | global |  |  | PGA gain steps (07 P1-10) |
-| `ring.monitor.adc_mux.channels_per_adc` | int | die |  |  | rings per converter (07 P0-7): ring n on converter n // C; they share its DNL and INL; round_robin needs C x integration window <= the ADC period |
+| `ring.monitor.adc_ref_site` | enum |  |  | setting; enum: package_base, monitor_pd; default package_base | where the monitor ADC reference sits, i.e. the temperature its tempco sees: package_base = thermal.t_base_k + thermal.xpu_rise_k (a converter on its own die beside the PIC; its own dissipation is not modelled); monitor_pd = each ring's PD observer (one converter per ring, next to its PD) |
+| `ring.monitor.pga_gains` | list_float | global |  |  | PGA gain steps |
+| `ring.monitor.adc_mux.channels_per_adc` | int | die |  |  | rings per converter: ring n on converter n // C; they share its DNL and INL; round_robin needs C x integration window <= the ADC period |
 | `ring.monitor.adc_mux.order` | enum |  |  | setting; enum: round_robin, bank; default round_robin | mux order |
-| `ring.monitor.baseline_ua` | float | die | ua |  | analog baseline current subtracted before the PGA and ADC (PAT-2 i_os,det, 07 P1-9); absent -> 0 |
-| `ring.monitor.stuck_flagged` | bool |  |  | setting; default True | a stuck converter clears monitor_valid (07 P1-10); false = silent |
+| `ring.monitor.baseline_ua` | float | die | ua |  | analog baseline current subtracted before the PGA and ADC (PAT-2 i_os,det); absent -> 0 |
+| `ring.monitor.stuck_flagged` | bool |  |  | setting; default True | a stuck converter clears monitor_valid; false = silent |
 | `ring.monitor.flicker_band_min_hz` | float |  | hz | setting; default 0.001 | lowest pole of the 1/f noise synthesis (mrm.plant.sensing) |
-| `ring.monitor.reference_tap.present` | bool |  |  | setting; default False | reference-tap PD on the bus before the bank (07 P1-9, 06 S8); not built in the engine yet: true is refused when the plant is built (docs/ENGINE.md section 10) |
+| `ring.monitor.reference_tap.present` | bool |  |  | setting; default False | reference-tap PD on the bus before the bank; not built in the engine yet: true is refused when the plant is built (docs/ENGINE.md, 'Physics to expect, and open items for the next stage') |
 | `ring.monitor.reference_tap.coupling_frac` | float | die | frac | required if ring.monitor.reference_tap.present=True | bus power fraction tapped to the reference PD |
 | `ring.monitor.reference_tap.responsivity_a_per_w` | float | die | a_per_w |  | reference PD responsivity (absent: the drop PD's) |
 | `ring.monitor.reference_tap.dark_i0_na` | float | die | na |  | reference PD dark current (absent: the drop PD's) |
-| `ring.bias_dac.bits` | int | die |  | required | bias DAC bits (07 P0-7) |
+| `ring.bias_dac.bits` | int | die |  | required | bias DAC bits |
 | `ring.bias_dac.v_min_v` | float | die | v | required | bias range low end (printed G26 axis) |
 | `ring.bias_dac.v_max_v` | float | die | v | required | bias range high end |
 | `ring.bias_dac.update_rate_hz` | float | die | hz | whole ticks (rate) | bias DAC update rate |
-| `ring.bias_dac.latency_s` | float | die | s | required; whole ticks (period) | bias DAC latency (one owner) |
+| `ring.bias_dac.latency_s` | float | die | s | required; whole ticks (period) | bias DAC latency (the only place this delay is stated) |
 | `ring.bias_dac.slew_v_per_s` | float | die | v_per_s |  | bias slew limit |
 | `ring.bias_dac.settle_tau_s` | float | die | s |  | bias settle filter |
 | `ring.bias_dac.noise_rms_codes` | float | die | codes |  | bias DAC output noise |
-| `driver.output_resistance_ohm` | float | die | ohm |  | driver output resistance (07 P1-8) |
+| `driver.output_resistance_ohm` | float | die | ohm |  | driver output resistance |
 | `driver.static_power_mw` | float | die | mw |  | driver static power |
 | `driver.energy_per_transition_fj` | float | die | fj |  | driver energy per transition |
 | `driver.swing_pp_v` | float | ring | v |  | junction peak-to-peak swing |
-| `driver.site` | str |  |  | setting | layout site of the driver (07 P1-8) |
-| `driver.level_convention` | enum |  |  | setting; per-world switch; enum: centered, one_sided; default centered | NRZ levels: centered (bias +- Vpp/2, 07 P1-7) or one_sided (bias - Vpp and bias) |
-| `temp_sensors` | table (list: name, site, attach, type, sample_rate_hz, latency_s, noise_rms_k, flicker_corner_hz, resolution_k, offset_sigma_k, gain_error_sigma_frac, self_heating_k, adc_bits, code_zero_c) | global |  |  | temperature sensors (07 P1-10) |
+| `driver.site` | str |  |  | setting | layout site of the driver |
+| `driver.level_convention` | enum |  |  | setting; per-world switch; enum: centered, one_sided; default centered | NRZ levels: centered (bias +- Vpp/2) or one_sided (bias - Vpp and bias) |
+| `temp_sensors` | table (list: name, site, attach, type, sample_rate_hz, latency_s, noise_rms_k, flicker_corner_hz, resolution_k, offset_sigma_k, gain_error_sigma_frac, self_heating_k, adc_bits, code_zero_c) | global |  |  | temperature sensors |
 | `layout.ring_pitch_um` | float | global | um |  | ring pitch of the default straight bank |
-| `layout.sites` | table (map: x_um, y_um, kind, note) | global |  |  | named sites {name: {x_um, y_um, kind}} (07 P1-2); rings default to ring<i> on a line at ring_pitch_um |
+| `layout.sites` | table (map: x_um, y_um, kind, note) | global |  |  | named sites {name: {x_um, y_um, kind}}; rings default to ring<i> on a line at ring_pitch_um |
 | `array.n_rings` | int | global |  | required | rings per bank |
 | `array.bus_order` | list_int | global |  |  | order of the rings along the bus (default: identity) |
-| `array.heater_total_power_max_w` | float | die | w |  | die heater power limit (07 P1-12) |
+| `array.heater_total_power_max_w` | float | die | w |  | die heater power limit |
 | `array.heater_supply_current_max_a` | float | die | a |  | die heater supply current limit |
 | `controller_interface.update_rate_hz` | float |  | hz | setting; whole ticks (rate) | controller rate (a whole number of ticks) |
-| `controller_interface.bind.tx.heater` | enum |  |  | setting; enum: controller; default controller | 07 P0-7 |
-| `controller_interface.bind.tx.bias` | enum |  |  | setting; enum: scenario, controller; default scenario | 07 P0-7 |
-| `controller_interface.bind.laser.tune` | enum |  |  | setting; enum: scenario, controller; default scenario | 07 P0-7 |
-| `controller_interface.bind.tx.assignment` | enum |  |  | setting; enum: scenario, controller; default scenario | 07 P1-12 |
-| `controller_interface.bind.datapath.bitstat_threshold` | enum |  |  | setting; enum: controller, scenario; default controller | 07 P0-11 |
-| `controller_interface.bind.monitor.pga_select` | enum |  |  | setting; enum: controller, scenario; default controller | 07 P1-10 |
+| `controller_interface.bind.tx.heater` | enum |  |  | setting; enum: controller; default controller | who drives tx.heater |
+| `controller_interface.bind.tx.bias` | enum |  |  | setting; enum: scenario, controller; default scenario | who drives tx.bias |
+| `controller_interface.bind.laser.tune` | enum |  |  | setting; enum: scenario, controller; default scenario | who drives laser.tune |
+| `controller_interface.bind.tx.assignment` | enum |  |  | setting; enum: scenario, controller; default scenario | who drives tx.assignment (the line of each ring) |
+| `controller_interface.bind.datapath.bitstat_threshold` | enum |  |  | setting; enum: controller, scenario; default controller | who drives datapath.bitstat_threshold |
+| `controller_interface.bind.monitor.pga_select` | enum |  |  | setting; enum: controller, scenario; default controller | who drives monitor.pga_select |
 | `controller_interface.expose` | list_str |  |  | setting | sensor channels the controller may read (default: all bound) |
-| `controller_interface.knowledge` | list_str |  |  | setting | what the controller may know (07 P1-1) |
-| `controller_interface.schedule` | enum |  |  | setting; enum: simultaneous, round_robin; default simultaneous | 07 P2-7 |
-| `controller_interface.on_out_of_range` | enum |  |  | setting; enum: clip, error; default clip | 07 P1-19 |
-| `controller_interface.tick_jitter_s` | float |  | s | setting | 07 P2-7 |
+| `controller_interface.knowledge` | list_str |  |  | setting | knowledge tokens: what the controller may know (for example model_nominal) |
+| `controller_interface.schedule` | enum |  |  | setting; enum: simultaneous, round_robin; default simultaneous | simultaneous: each controller edge updates every ring; round_robin: edge j updates ring j % N |
+| `controller_interface.on_out_of_range` | enum |  |  | setting; enum: clip, error; default clip | an out-of-range controller command is clipped, or raises an error |
+| `controller_interface.tick_jitter_s` | float |  | s | setting | largest delay of a controller edge from its nominal tick |
 | `controller.name` | str |  |  | setting | registry name or module:Class |
 | `controller.params` | map |  |  | setting | controller parameters (validated by the controller) |
 | `scenario.name` | str |  |  | setting | registry name |
 | `scenario.stack` | list_str |  |  | setting | scenario stack |
 | `scenario.params` | map |  |  | setting | scenario parameters (validated by the scenario registry) |
-| `scenario.time_compression` | float |  |  | setting; default 1.0 | 07 P0-10 |
+| `scenario.time_compression` | float |  |  | setting; default 1.0 | speed-up of the slow exogenous signals (ramps, drift) only; never of the plant time constants or the controller rate |
 | `scenario.ambient_c` | float |  | c | setting | constant ambient when no scenario sets it |
 | `scenario.bias_v` | float |  | v | setting; forbidden if controller_interface.bind.tx.bias=controller | absolute bias when the scenario owns tx.bias |
 | `scenario.bias_offset_v` | float |  | v | setting | additive bias offset (always allowed) |
-| `scenario.aggressor` | map |  |  | setting | 07 P1-4 |
-| `scenario.target` | map |  |  | setting | 07 P1-4 |
-| `scenario.external_reflection` | map |  |  | setting | 07 P2-2 |
-| `metrics.reloma_definition` | enum |  |  | setting; enum: oma_over_pin; default oma_over_pin | 07 D9 |
+| `scenario.aggressor` | map |  |  | setting | aggressor heat source (power into the thermal model) |
+| `scenario.target` | map |  |  | setting | aggressor target at the victim ring {units: resonance \| temperature, trajectory, ...}; the aggressor power waveform is calibrated to meet it |
+| `scenario.external_reflection` | map |  |  | setting | external reflection at the bus output {r_db, phase_drift_rad_per_s}; not built: the engine does not read it |
+| `metrics.reloma_definition` | enum |  |  | setting; enum: oma_over_pin; default oma_over_pin | relOMA definition: oma_over_pin (relOMA = OMA / P_in) |
 | `metrics.ber_sample_period_s` | float |  | s | setting; default 2.0 | G26 instrument interval |
 | `metrics.lock_threshold_pm` | float |  | pm | setting | lock excursion threshold |
 | `metrics.hysteresis_pm` | float |  | pm | setting | excursion hysteresis |
-| `metrics.allowed_assignments` | enum |  |  | setting; enum: fixed, cyclic, any; default fixed | 07 P1-12 |
-| `metrics.lock_reference` | enum |  |  | setting; enum: line, oracle, target; default line | reference of the lock error: the line (07 literal), the oracle operating point, or metrics.lock_target_pm (mrm.sim.metrics; engine handoff 3 item 21) |
+| `metrics.allowed_assignments` | enum |  |  | setting; enum: fixed, cyclic, any; default fixed | which ring-to-line assignments count as correct |
+| `metrics.lock_reference` | enum |  |  | setting; enum: line, oracle, target; default line | reference of the lock error: the line, the oracle operating point, or metrics.lock_target_pm (mrm.sim.metrics) |
 | `metrics.lock_target_pm` | float |  | pm | setting | lock-error reference detuning (pm) when metrics.lock_reference is target |
-| `experiment.kind` | enum |  |  | setting; enum: run, sweep, mc, compare, robust, acceptance, quasi_static; default run | 07 P1-17 |
+| `experiment.kind` | enum |  |  | setting; enum: run, sweep, mc, compare, robust, acceptance, locked_steady_state; default run | experiment type |
 | `experiment.duration_s` | float |  | s | setting | simulated duration |
 | `experiment.batch` | int |  |  | setting | batch size B |
 | `experiment.n_mc` | int |  |  | setting | Monte Carlo worlds |
@@ -1057,25 +1059,25 @@ is current.
 | `experiment.variation` | enum |  |  | setting; enum: off, sample; default sample | per-device variation on or off |
 | `experiment.grid` | map |  |  | setting | sweep grid {path: [values]} |
 | `experiment.controllers` | list_str |  |  | setting | controllers of a compare experiment |
-| `experiment.start` | enum |  |  | setting; enum: cold, cold_settled, warm | start state: cold (code_min, reset protocol, cold lags), cold_settled (code_min, settled, branch_low), warm (quasi-static lock codes, settled, branch_high); default: the scenario's ResetSpec |
+| `experiment.start` | enum |  |  | setting; enum: cold, cold_settled, warm | start state: cold (code_min, reset protocol, cold lags), cold_settled (code_min, settled, branch_low), warm (steady-state lock codes, settled, branch_high); default: the scenario's ResetSpec |
 | `experiment.n_threads` | int |  |  | setting | kernel worker threads (default os.cpu_count()) |
 | `experiment.score_from_s` | float |  | s | setting | the metrics accumulate from this time (runner score_from_s) |
-| `experiment.convergence_certificate` | str |  |  | setting | run directory whose 07 P0-10 convergence certificate covers this compressed scenario and plant |
-| `experiment.compression_factors` | list_float |  |  | setting; default (1.0, 10.0, 100.0) | time-compression factors of the 07 P0-10 convergence experiment |
-| `experiment.histogram` | bool |  |  | setting; default False | detuning histogram accumulators (07 P0-8) |
+| `experiment.convergence_certificate` | str |  |  | setting | run directory whose time-compression convergence certificate covers this compressed scenario and plant |
+| `experiment.compression_factors` | list_float |  |  | setting; default (1.0, 10.0, 100.0) | time-compression factors of the convergence experiment |
+| `experiment.histogram` | bool |  |  | setting; default False | detuning histogram accumulators |
 | `experiment.oracle` | bool |  |  | setting; default True | in-kernel oracle (OMA penalty, lock_reference oracle) |
-| `experiment.p_in_w` | float |  | w | setting | quasi_static: power per line at the chip (default the plant's own) |
+| `experiment.p_in_w` | float |  | w | setting | locked_steady_state: power per line at the chip (default the plant's own) |
 | `experiment.max_worlds_per_plant` | int |  |  | setting; default 512 | largest B in one Plant (Monte Carlo chunk) |
 | `experiment.rank_metrics` | list_str |  |  | setting | compare: world metrics to rank by (lower is better; mrm.sim.experiment.RANKABLE) |
 | `datapath.bitrate_gbps` | float | die | gbps |  | line rate (G26: 50 Gb/s NRZ) |
-| `datapath.bitstat_window_bits` | int | die |  |  | bit-statistics window (07 P0-11) |
+| `datapath.bitstat_window_bits` | int | die |  |  | bit-statistics window |
 | `datapath.error_count_period_s` | float | die | s | whole ticks (period) | error-counter period (G26: 2.0 s) |
-| `datapath.error_count_latency_s` | float | die | s | whole ticks (period) | error-counter latency (one owner) |
+| `datapath.error_count_latency_s` | float | die | s | whole ticks (period) | error-counter latency (the only place this delay is stated) |
 | `datapath.transition_density` | float | die |  |  | mean transition density of the traffic |
 | `datapath.rx_sensitivity_oma_dbm` | float | ring | dbm |  | receiver OMA sensitivity at datapath.ber_ref, per lane |
 | `datapath.ber_ref` | float | die |  |  | BER at which rx_sensitivity_oma_dbm is quoted |
 | `datapath.link_loss_db` | float | die | db |  | loss from the TX bus output to the RX PD (the OMA reference planes) |
 | `datapath.ber_floor` | float | die |  |  | BER floor of the error counter |
-| `datapath.bitstat_bw_ghz` | float | die | ghz |  | bandwidth of the bit-rate sampler of the bit statistics (07 P0-11) |
+| `datapath.bitstat_bw_ghz` | float | die | ghz |  | bandwidth of the bit-rate sampler of the bit statistics |
 | `datapath.bitstat_noise_pa_per_rt_hz` | float | die | pa_per_rt_hz |  | input noise density of the bit-rate sampler (absent: the monitor TIA density) |
 <!-- keys:end -->

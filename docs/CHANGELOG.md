@@ -3,6 +3,57 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+- 2026-10-28 - consolidate optical heating on one general two-direction field calculation; retire Airy selection, polynomial rotation, and far-line hold. Physical parameters and core field equations are unchanged.
+- golden: tests/golden/g26__a1_slide10_aggressor.npz updated (data sha256 d64aa451446a): consolidate all rings on the general two-direction field solver; equivalent zero-backscatter algebra changes floating-point rounding
+- golden: tests/golden/g26__static.npz updated (data sha256 b05d86be891d): consolidate all rings on the general two-direction field solver; equivalent zero-backscatter algebra changes floating-point rounding
+- 2026-10-23: readability pass over the whole code base (comments, docstrings, names, file layout, the living docs, a new README.md): planning codes replaced by the rules they stand for, cryptic names renamed (old -> new in docs/RENAMES.md), named constants for index positions. No YAML key, CLI command, trace, metric or golden key changed; the golden traces are unchanged and the engine is bit-identical (tools/perf_compare.py: zero difference on every signal of tools/perf_scenarios.py).
+- 2026-10-23: test fix: `test_runs_identically_with_jit_disabled` (tests/verification/test_optics.py) checks the exit code of the JIT subprocess, as it does for the no-JIT one; a crash of the JIT run failed with IndexError on the empty output and its error text was lost. Engine results unchanged.
+- 2026-10-23: test fix: `test_extension_schema_is_strict` (tests/verification/test_experiment.py) expects an ExperimentError only; it also accepted any Exception, so a loader crash whose text matched the pattern (for example KeyError('op')) passed. Engine results unchanged.
+- 2026-10-23: test fix: `test_reward_can_leave_out_rings_without_a_warm_start_code` (tests/verification/test_gym_env.py) closes its two envs before it skips; the skip came first, so on that path the envs stayed open. Engine results unchanged.
+- 2026-10-23: test fix: `test_laser_power_step` (tests/verification/test_ctrl_c_kalman_lqg.py) finds the record index of the step from the tick where the loop starts (37 in g26: the warm start runs 7 ticks before the 30 held ticks); it assumed tick 30, so the 'before' window held 7 samples after the step and the printed lock-point shift was 22 pm, not 25 pm. Engine results unchanged.
+- 2026-10-23: bug fix: `tools/perf_compare.py` prints a scenario file or a signal that is in only one of the two runs as MISSING, counts it as a difference and then exits with code 1; it skipped them silently, so a crashed scenario or a dropped trace passed the bit-identity check. Engine results unchanged.
+- 2026-10-23: bug fix: `tools/perf_summarize.py` prints the largest relative difference of each signal over all rows; a later row with a larger absolute but smaller relative difference replaced it.
+- 2026-10-23: bug fix: `tools/scorecard_compare.py` reads a null of the scorecard JSON (NaN or inf) as NaN, so a number that becomes null is an infinite change; null values were skipped, so a ring that stopped locking showed as unchanged.
+- 2026-10-23: bug fix: the heavy lock of `tools/memguard.py` (`take_heavy_lock`) appears together with its owner file (written into `<lock>.<pid>`, then renamed), and a waiter that finds no owner file waits; a waiter could read the lock between mkdir and the owner write, remove it as stale, and two heavy jobs ran at once.
+- 2026-10-23: bug fix: the implicit self-heating row of `tools/perf_profile.py` prints its Newton iterations per ring per tick (the count that `p_implicit` returns); the count was computed and then dropped.
+- 2026-10-23: bug fix: `tools/gen_variable_map.py` takes the longest unit suffix of a name (`_m_per_k` is m/K, not the 1/K of `_per_k`). docs/variables/data.json regenerated: 8 PlantParams fields get their right unit (for example `s_lock_m_per_k` m/K, `z_heater_ring_k_per_w` K/W, `responsivity_a_per_w` A/W). Engine results unchanged.
+- 2026-10-23: bug fix: the a1_aggressor paragraph of the webviz site (`webviz/derived.py`, `describe`) quotes the rail time, the first rail time and the lock error of the ring it names (the ring nearest the aggressor), and "the other rings" are all the others; it always quoted ring 0 and rings 1 to N-1. In g26 the nearest ring is ring 0, so the site text is unchanged.
+- 2026-10-23: bug fix: `mrm.extraction.junction.free_order_rows` labels a monotone, shrinking sequence whose apparent order is below 0.2 "apparent order below 0.2"; it was labelled "apparent order above 8". The committed sidecars have no such row, so they are unchanged.
+- 2026-10-23: bug fix: `mrm.extraction.coupling.cmt_overlap` returns the grid-integrated ring power P_rr at the plane nearest z = 0 as `ring_self_power_z0_grid` (a check of the assumed P_rr = 1); it was always None. The unused bus self-power integral is removed. No artefact stores this key, so artefacts are unchanged.
+- 2026-10-23: text fix: the junction temperature-sensitivity notes say the table and the optical mode are at T_REF_K (298.15 K); they said 300 K. The committed junction_rib160.json keeps the old text until its next extraction.
+- 2026-10-23: bug fix: the thermal fit ladder (`mrm.extraction.thermal_fem.fit_ladder`, moved out of `extract`) keeps the first rung that passes the accuracy rule; a failed rung before it with a lower score (the score leaves out the nearest-neighbour time error) was kept instead. The committed artefacts already keep their first passing rung, so they are unchanged.
+- 2026-10-23: bug fix: `thermal_fem.analytic_disagreements` gives fem_mesh_change None for a one-mesh-level analytic stage (`--quick`); `--stage propagate` raised KeyError on such a sidecar. Full sidecars unchanged.
+- 2026-10-23: bug fix: the 3-D bank of `--quick` (3 rings) drives ring 0 once (`thermal_fem.bank_driven_rings`); it drove ring 0 twice (duplicate columns and pair records). The full run (rings 0 and 3 of 8) and its bank cache key are unchanged.
+- 2026-10-23: text fix: the `mrm.plant.thermal.load_rom` docstring and comment say that `thermal_fem.write_artefact` writes `site_offset_names` (they said `site_names`). No code change.
+- 2026-10-22: bug fix: the LUT-mode bench mapping of the CAL-5 fill-fraction variant (`mrm.calibration.groups.bench_lut_mapping`) merges g25_test_vehicle over g26 with the loader's own rules (`_merged_preset_mapping`); its own merge kept a null alternative and a g26 corner that g25_test_vehicle removes, so `params.load` raised ConfigError and the junction group (`mrm calibrate`, `--groups junction`) stopped at its `lut/*` problems. The stored latest_fit.json predates this fix. Engine results unchanged.
+- 2026-10-22: bug fix: `mrm.calibration.core.Problem.predictions` returns the new prediction when the cache passes `_CACHE_MAX_ENTRIES` (20000) entries and is cleared; it raised KeyError at the 20001st distinct evaluation. Results below the limit unchanged.
+- 2026-10-22: bug fix: the section-4 sensitivity of the validation report offsets the seeds of each chunk of worlds by the chunk's first row (`mrm.validation.report.evaluate_worlds`, the rule of the experiment's mc split), so every row has its own noise seed. Each chunk restarted at seed 300, so AB_1, AB_3, AB_5 and AB_7 shared the noise seeds of their A rows and their total indices had no noise floor, against the report text. The cached sensitivity parts of both (already STALE) reports predate this fix; it applies at their next regeneration. Engine results unchanged.
+- 2026-10-22: bug fix: a tornado entry whose metric is NaN at every point keeps lo = hi = swing = NaN (`mrm.validation.sensitivity.tornado_table`), and the report lists it as not defined; it got swing 0 and was listed under "No change".
+- 2026-10-22: bug fix: the held-out isolation scan (`targets_io.held_out_reference_violations`) also follows an import alias of `load_targets` from the package `mrm.validation` (`from mrm.validation import load_targets as lt`); it saw aliases from `mrm.validation.targets_io` only.
+- 2026-10-22: bug fix: the rel-tolerance fallback scale of a curve target in the report Jacobian (`report._residual_scales`) takes the largest |y|, not the largest number of the whole value (x included). No current target uses it, so results are unchanged.
+- 2026-10-22: bug fix: `mrm report --recompute "predictions, "` ignores an empty part after a comma (it raised "unknown parts ['']").
+- 2026-10-22: bug fix: the Truth-fed `Oracle` uses a rate of d of 0 on the edge of a retarget (`mrm.validation.oracle`), as on the first edge; the jump of d from the new reference went into the rate term and kicked the heater (about 190 codes at a +0.5 dB laser power step). Engine results unchanged.
+- 2026-10-22: bug fix: the CAL-7 variant `at_preset_power_red_sweep` of `cold_resonance_offset` uses the same `bias_v` as the primary read-out; it always used 0 V. CAL-7 sets no bias, so its results are unchanged.
+- 2026-10-22: bug fix: `aggressor_feasibility` (BND-3a/b) with no `controllers` listed is `blocked`; it raised TypeError (an `error` result) when a run function was given.
+- 2026-10-22: bug fix: `mrm.core.rng.batch_seeds` accepts base seeds up to 2**63 - B, so the last seed can be 2**63 - 1 (the largest int64); it refused base 2**63 - B. Engine results unchanged.
+- 2026-10-22: bug fix: `CalibratedWaveform.mean_power_w` of a one-shot waveform is its time mean over [0, horizon] (the power starts from 0 W at t = 0); it was the knot mean, high by p_n / (2 n). Periodic waveforms unchanged. Only the calibration record changes; engine results unchanged.
+- 2026-10-22: bug fix: the `traffic_start_stop` description names a stop at t_stop_s = 0.0 s (it was left out). Only the description text changes.
+- 2026-10-22: bug fix: the WDM supervisor's warm start takes a factory table with a ring that recorded no resonance (`WdmSupervisor._ring_events` raised IndexError); that ring gets no target.
+- 2026-10-22: bug fix: WDM supervisor policy `any` with more rings than lines gives a ring left without a line no target resonance (it got the resonance of line 0, a line another ring holds).
+- 2026-10-22: bug fix: `ramp_acquire`, `acquire_then_lock`, `bitstat_lock` and `wdm_supervisor` refuse `controller_interface.schedule: round_robin` at reset (`ramp_acquire.require_simultaneous`); they accepted it and ran their sweeps and lock loops on heater commands the engine did not apply. Engine results unchanged.
+- 2026-10-22: bug fix: `QFormat.fit` (and so `mrm.control.fxp.add` / `sub`) takes a non-row-major array, for example a transposed one; it returned uninitialized memory. Engine results unchanged.
+- 2026-10-22: bug fix: R4_q checks a given `kappa_d_over_kappa` against Q_L/Q_d when `q_drop` is also given and `q_loaded` is free (`mrm.params.relations`); a disagreement raises OverdeterminedError (it was ignored).
+- 2026-10-22: bug fix: the derive diagnostic `monitor_codes_per_uw_at_drop` uses the plant's ADC LSB, full scale / (2^bits - 1) (`mrm.params.derive`); it was high by 2^bits / (2^bits - 1). g26: 1556.48 -> 1556.46 codes/uW (docs/PARAMETERS.md regenerated). Engine results unchanged.
+- 2026-10-22: bug fix: the heat-fraction solver records its alpha_heat / alpha_nonheat derivations and its error under `R4_heat_fraction` (it used `R4_loss_budget`). Only labels change.
+- 2026-10-22: bug fix: a NaN self-heating gain is a failed solve (new status `STATUS_NAN_GAIN` = 3 in `mrm.plant.selfheat.solve_ring_temperature` and the engine copy `mrm.sim.kernel._solve_ring_eng`; counted in `n_fail`); it was reported as converged.
+- 2026-10-22: bug fix: a NaN metric no longer passes a `!=` criterion (`mrm.sim.experiment._holds`); NaN now fails every op, as `evaluate_criteria` documents.
+- 2026-10-22: bug fix: `mrm run --dry-run` (`experiment.estimate`) takes each case's own ring count for the record memory, not the experiment config's.
+- 2026-10-22: bug fix: `solve_locked_steady_state` notes name the worlds whose heat balance is in the given `data_state` (the note always described the traffic-on state).
+- 2026-10-22: bug fix: `mrm.sim.manifest.to_jsonable` takes a 0-d float or complex array (it raised "iteration over a 0-d array").
+- 2026-10-22: bug fix: `mrm.params.load` of a mapping with `meta: null` no longer raises AttributeError.
+- 2026-10-22: bug fix: a relative `.yaml` path in `extends:` is tried beside the extending file first, then in the working directory (a same-named file in the working directory was loaded instead).
+- 2026-10-21: renamed `mrm.sim.runner.quasi_static` -> `solve_locked_steady_state` (it finds the locked steady state of every ring without simulating time) and `QuasiStaticResult` -> `LockedSteadyStateResult`; the experiment kind `quasi_static` -> `locked_steady_state` (case labels and the trace.h5 group too) and the warm-start modes `heater_code="quasi_static"` / `"quasi_static_reachable"` -> `"locked_steady_state"` / `"locked_steady_state_reachable"`. The old strings stay accepted as aliases (`mrm.params.schema.ENUM_ALIASES`, `runner.WARM_START_ALIASES`, old case labels in `cases`, and `mrm rerun` of an old run directory through `Experiment.legacy_hashes` and the renamed trace.h5 paths); the Python function has no alias. Engine results unchanged; experiment hashes of the renamed kind change.
+
 ## 2026-10-17: final check of the review (stale reports, the WDM label rule, the A2 headroom test, known issues)
 
 The final check after the eight review fixers (docs/handoff/final_review.md). No calibration refit, solver
@@ -858,10 +909,10 @@ fixed-tick budget (<= 10 us per tick) is met**; B = 64 3.6 -> 2.1 us per world-t
   `_heater_split_fill`; `_implicit_step_eng` takes per-lag coefficient tables (new `_th_tables`, `_th_coef`,
   `_uu_fill`, `_th_dead_init`, `_th_live`, `_th_wake`); `eng_commit(t, k, args_f, args_i, full)` takes a `full`
   flag.
-- **Self-heating adapter** (`mrm.plant.optics`): `sh_fast_outputs` / `sh_pass_on` take `full=True` (False: only the
+- **Self-heating adapter** (`mrm.plant.optics`): `cache_write_optical_outputs` / `sh_pass_on` take `full=True` (False: only the
   outputs a tick reads; the engine passes False at every substep but the last of a block); `bus_finalize_nb` =
   `_bus_pout_nb` + `_bus_refl_nb`; the far-line hold's evaluation moved to `_sh_fast_pabs_hold`. Cache layouts:
-  N_FK 6 -> 8 (new FK_K11, FK_A2), N_FC 16 -> 13 (FC_K11, FC_A2, FC_SE removed), so `pack_selfheat_args` rows are
+  COUPLER_CACHE_FIELD_COUNT 6 -> 8 (new COUPLER_CACHE_FIELD_THROUGH_FIELD_CROSS_COUPLING_SQUARED, COUPLER_CACHE_FIELD_THROUGH_FIELD_SELF_COUPLING_SQUARED), AIRY_CACHE_FIELD_COUNT 16 -> 13 (FC_K11, FC_A2, FC_SE removed), so `pack_selfheat_args` rows are
   shorter. New `selfheat_pabs_general`, `selfheat_commit_general`, `selfheat_bounds_general` (the general path, an
   independent implementation).
 - **Reference**: `ReferenceEngine(plant, *, oracle=True, airy=True)`; `airy=False` runs the general optics path, so
@@ -921,11 +972,11 @@ Details, measurements and error bounds: docs/handoff/perf.md (owner: engine).
   that takes the KParams/KState tuples costs a reference-count update of every one of their ~270 arrays. No result
   changed (bit-identical, kernel/reference parity and the regression scenarios).
 - **Self-heating adapter**: the exact ring without backscatter (g26) evaluates from substep caches (cos/sin of the
-  reference phase, rotated; the Airy constants) in `mrm.plant.optics` (`sh_fast_precompute`, `sh_fast_pabs`,
-  `sh_fast_outputs`, `sh_bounds`), used by both the engine and `optics.selfheat_pabs` / `selfheat_commit` /
+  reference phase, rotated; the Airy constants) in `mrm.plant.optics` (`cache_refresh_selfheating_optics`, `sh_fast_pabs`,
+  `cache_write_optical_outputs`, `sh_bounds`), used by both the engine and `optics.selfheat_pabs` / `selfheat_commit` /
   `selfheat_bounds`. Equal to `_airy_line` up to floating-point rounding (P_abs 2e-13 relative); the optics adapter
-  now also fills the slope outputs (RL_DABS_DPHI, R_DABS_DLAM) for these rings. `pack_selfheat_args` layout: new
-  blocks SH_O_FK, SH_O_FC, SH_O_FF, SH_O_LE, SH_O_FH and the flag SH_FARHOLD (SH_HDR 18 -> 24); new keyword
+  now also fills the slope outputs (RING_LINE_OUTPUT_ROW_ABSORBED_POWER_ROUND_TRIP_PHASE_DERIVATIVE, RING_OUTPUT_ROW_ABSORBED_POWER_RESONANCE_WAVELENGTH_DERIVATIVE) for these rings. `pack_selfheat_args` layout: new
+  blocks SELF_HEATING_HEADER_INDEX_COUPLER_CACHE_OFFSET, SELF_HEATING_HEADER_INDEX_AIRY_CACHE_OFFSET, SELF_HEATING_HEADER_INDEX_NO_BACKSCATTER_FLAGS_OFFSET, SELF_HEATING_HEADER_INDEX_LAST_EVALUATION_CACHE_OFFSET, SELF_HEATING_HEADER_INDEX_FAR_LINE_CACHE_OFFSET and the flag SELF_HEATING_HEADER_INDEX_FAR_LINE_HOLD_ENABLED_FLAG (SELF_HEATING_HEADER_FIXED_FIELD_COUNT 18 -> 24); new keyword
   `far_hold`.
 - **Phase model** (`mrm.plant.phase`): `ring_optics_row` = `ring_optics_levels_row` + `coupling_row`; the engine
   recomputes K^2 at the lines only when the line wavelengths change (exact).
