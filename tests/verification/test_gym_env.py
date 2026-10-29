@@ -1,10 +1,15 @@
-"""Verification of the batched RL environment mrm.sim.gym_env (07 P1-22).
+"""Checks the batched reinforcement-learning environment mrm.sim.gym_env (MRMEnv, a Gymnasium vector env).
 
-Spaces from the ChannelSpecs, frame skip = controller period, bounded delta actions (and the bias when the controller
-owns it), the observation = the released sensor channels only (no Truth), the reward from the kernel's accumulators
-equal to the same reward computed from per-tick Truth records, domain randomization per reset, determinism, NEXT_STEP
-autoreset, Gymnasium's env checker, the vector API with Gymnasium wrappers, and step-for-step equality with the
-engine's own Python-controller path (mrm.sim.runner.run)."""
+Read this first
+---------------
+One env step is one controller period (frame skip). The action is a bounded change of the heater codes (and of the
+bias codes when the controller owns the bias). The observation is the released sensor channels only, never Truth.
+The tests check: the spaces built from the ChannelSpecs; the frame skip and the command clipping; that the
+observation is the sensor view; that the reward from the kernel's accumulators equals the same reward computed from
+per-tick Truth records; domain randomization at each reset, determinism and the NEXT_STEP autoreset; that an episode
+replays from its seeds, also one world alone; Gymnasium's env checker and the vector API with Gymnasium wrappers; and
+step-for-step equality with the engine's own Python-controller path (mrm.sim.runner.run).
+"""
 from __future__ import annotations
 
 import warnings
@@ -18,17 +23,20 @@ from mrm.sim import runner
 from mrm.sim.gym_env import (ENV_ID, MRMEnv, MRMSingleEnv, RewardSpec, code_codec)
 from mrm.sim.metrics import RecordSpec
 
-BIAS_OV = ["controller_interface.bind.tx.bias=controller", "scenario.bias_v=null"]
+# config overrides that give the bias DAC to the controller (the scenario no longer drives the bias)
+BIAS_BY_CONTROLLER = ["controller_interface.bind.tx.bias=controller", "scenario.bias_v=null"]
 
 
 @pytest.fixture(scope="module")
-def env2():
+def two_world_env():
+    """An MRMEnv on g26 with two worlds and 6-step episodes, shared by the tests of this module."""
     e = MRMEnv("g26", num_envs=2, max_episode_steps=6)
     yield e
     e.close()
 
 
-# ---------------------------------------------------------------------------------------------------- spaces
+# --------------------------------------------------------------------------------------------------------------- spaces
+
 def test_code_codec_is_a_power_of_two_normalization():
     for lo, hi in [(0, 65535), (0, 4095), (0, 1), (-1, 7), (100, 1123), (0, 0), (-32768, 32767)]:
         c0, s = code_codec(lo, hi)
@@ -40,10 +48,10 @@ def test_code_codec_is_a_power_of_two_normalization():
         assert np.array_equal(back, codes)                       # exact in float32
 
 
-def test_spaces_are_generated_from_the_channel_specs(env2):
-    spec = env2.ctrl_spec
-    N, M, K = spec.n_rings, spec.samples_per_step, env2.history_blocks
-    lay = env2.obs_layout
+def test_spaces_are_generated_from_the_channel_specs(two_world_env):
+    spec = two_world_env.ctrl_spec
+    N, M, K = spec.n_rings, spec.samples_per_step, two_world_env.history_blocks
+    lay = two_world_env.obs_layout
     names = [c.name for c in lay.channels]
     assert names == ["tx.monitor.samples", "tx.heater.applied", "tx.bias.applied", "temp.die0"]
     assert lay.size == N * K * M + 2 * N + len(spec.temp_sensors)
@@ -53,18 +61,18 @@ def test_spaces_are_generated_from_the_channel_specs(env2):
         c0, s = code_codec(int(ch.min), int(ch.max))
         assert (c.code_offset, c.shift) == (c0, s)
         assert c.lo == (int(ch.min) - c0) / 2 ** s and c.hi == (int(ch.max) - c0) / 2 ** s
-    sp = env2.single_observation_space
+    sp = two_world_env.single_observation_space
     assert sp.shape == (lay.size,) and sp.dtype == np.float32
-    assert env2.observation_space.shape == (2, lay.size)
+    assert two_world_env.observation_space.shape == (2, lay.size)
     # g26: the scenario owns the bias, so the action is the heater only
-    assert env2.action_codec.names() == ("tx.heater",)
-    assert env2.single_action_space.shape == (N,) and env2.action_space.shape == (2, N)
-    assert np.all(env2.single_action_space.low == -1) and np.all(env2.single_action_space.high == 1)
-    assert env2.frame_skip_ticks == spec.period_ticks == 10
+    assert two_world_env.action_codec.names() == ("tx.heater",)
+    assert two_world_env.single_action_space.shape == (N,) and two_world_env.action_space.shape == (2, N)
+    assert np.all(two_world_env.single_action_space.low == -1) and np.all(two_world_env.single_action_space.high == 1)
+    assert two_world_env.frame_skip_ticks == spec.period_ticks == 10
 
 
 def test_bias_joins_the_action_when_the_controller_owns_it():
-    e = MRMEnv("g26", num_envs=1, overrides=BIAS_OV, max_episode_steps=5, max_delta_bias_codes=32)
+    e = MRMEnv("g26", num_envs=1, overrides=BIAS_BY_CONTROLLER, max_episode_steps=5, max_delta_bias_codes=32)
     assert e.action_codec.names() == ("tx.heater", "tx.bias")
     N = e.ctrl_spec.n_rings
     assert e.single_action_space.shape == (2 * N,)
@@ -81,46 +89,48 @@ def test_bias_joins_the_action_when_the_controller_owns_it():
     e.close()
 
 
-# ---------------------------------------------------------------------------------------------------- stepping
-def test_frame_skip_actions_and_clipping(env2):
-    obs, info = env2.reset(seed=11)
-    N = env2.ctrl_spec.n_rings
-    k0 = int(env2.plant.tick)
-    h0 = env2.obs_layout.to_codes(obs)["tx.heater.applied"].copy()
+# ---------------------------------------------------------------------------------------- stepping and command clipping
+
+def test_frame_skip_actions_and_clipping(two_world_env):
+    obs, info = two_world_env.reset(seed=11)
+    N = two_world_env.ctrl_spec.n_rings
+    k0 = int(two_world_env.plant.tick)
+    h0 = two_world_env.obs_layout.to_codes(obs)["tx.heater.applied"].copy()
     a = np.zeros((2, N), np.float32)
     a[0, 0] = 1.0                 # +256
     a[0, 1] = -0.25               # -64
     a[1, 2] = 0.5 / 256           # rint(0.5) = 0 (half to even)
     a[1, 3] = 1.5 / 256           # rint(1.5) = 2
-    obs, r, term, trunc, info = env2.step(a)
-    assert int(env2.plant.tick) == k0 + env2.frame_skip_ticks
-    assert np.all(info["tick"] == k0 + env2.frame_skip_ticks)
-    h1 = env2.obs_layout.to_codes(obs)["tx.heater.applied"]
+    obs, r, term, trunc, info = two_world_env.step(a)
+    assert int(two_world_env.plant.tick) == k0 + two_world_env.frame_skip_ticks
+    assert np.all(info["tick"] == k0 + two_world_env.frame_skip_ticks)
+    h1 = two_world_env.obs_layout.to_codes(obs)["tx.heater.applied"]
     d = h1 - h0
     assert d[0, 0] == 256 and d[0, 1] == -64 and d[1, 2] == 0 and d[1, 3] == 2
     assert np.count_nonzero(d) == 3
     assert not term.any() and not trunc.any() and np.all(info["clipped"] == 0)
 
 
-def test_commands_are_clipped_by_the_kernel_and_counted(env2):
+def test_commands_are_clipped_by_the_kernel_and_counted(two_world_env):
     """Ring 5 of world 0 starts 300 codes below the top rail: +256 twice reaches it; the kernel clips the command
-    (07 P1-19), counts the clipped element in info['clipped'], and the clipped value is the next held command (so
+    to the DAC range, counts the clipped element in info['clipped'], and the clipped value is the next held command (so
     -1 then moves it down from the rail, not from the unclipped sum)."""
-    N = env2.ctrl_spec.n_rings
+    N = two_world_env.ctrl_spec.n_rings
     codes = np.full((2, N), 30000, np.int64)
     codes[0, 5] = 65535 - 300
-    env2.reset(seed=12, options={"heater_code": codes})
+    two_world_env.reset(seed=12, options={"heater_code": codes})
     a = np.zeros((2, N), np.float32)
     a[0, 5] = 1.0
     got = []
     for _ in range(3):
-        obs, r, term, trunc, info = env2.step(a)
-        got.append((int(env2.obs_layout.to_codes(obs)["tx.heater.applied"][0, 5]), int(info["clipped"][0]),
+        obs, r, term, trunc, info = two_world_env.step(a)
+        got.append((int(two_world_env.obs_layout.to_codes(obs)["tx.heater.applied"][0, 5]), int(info["clipped"][0]),
                     int(info["clipped"][1])))
     assert got == [(65535 - 44, 0, 0), (65535, 1, 0), (65535, 1, 0)]
     a[0, 5] = -1.0
-    obs, r, term, trunc, info = env2.step(a)
-    assert int(env2.obs_layout.to_codes(obs)["tx.heater.applied"][0, 5]) == 65535 - 256 and info["clipped"][0] == 0
+    obs, r, term, trunc, info = two_world_env.step(a)
+    assert (int(two_world_env.obs_layout.to_codes(obs)["tx.heater.applied"][0, 5]) == 65535 - 256
+            and info["clipped"][0] == 0)
 
 
 def test_discrete_actions():
@@ -139,44 +149,45 @@ def test_discrete_actions():
     e.close()
 
 
-def test_observation_is_the_released_sensor_channels(env2):
+def test_observation_is_the_released_sensor_channels(two_world_env):
     """The observation is rebuilt here from the controller's own view (Plant.sample_sensors: the channels released
     at the edge) with an independent history: no Truth and no plant state reach it."""
-    obs, _ = env2.reset(seed=5)
-    lay, spec = env2.obs_layout, env2.ctrl_spec
-    N, M, K = spec.n_rings, spec.samples_per_step, env2.history_blocks
+    obs, _ = two_world_env.reset(seed=5)
+    lay, spec = two_world_env.obs_layout, two_world_env.ctrl_spec
+    N, M, K = spec.n_rings, spec.samples_per_step, two_world_env.history_blocks
     rng = np.random.default_rng(0)
     hist = None
     for step in range(K + 3):
-        sensors, _ = env2.plant.sample_sensors()
+        sensors, _ = two_world_env.plant.sample_sensors()
         cnt = np.asarray(sensors["tx.monitor.count"], np.int64)
         lat = np.asarray(sensors["tx.monitor.latest"], np.int64)
         smp = np.asarray(sensors["tx.monitor.samples"], np.int64)
         blk = np.where(np.arange(M) < cnt[..., None], smp, lat[..., None])
-        hist = np.repeat(blk[:, :, None], K, axis=2) if hist is None else np.concatenate([hist[:, :, 1:],
-                                                                                           blk[:, :, None]], axis=2)
+        hist = (np.repeat(blk[:, :, None], K, axis=2) if hist is None
+                else np.concatenate([hist[:, :, 1:], blk[:, :, None]], axis=2))
         exp = np.concatenate([hist.reshape(2, -1), np.asarray(sensors["tx.heater.applied"], np.int64),
                               np.asarray(sensors["tx.bias.applied"], np.int64),
                               np.asarray(sensors["temp.die0"], np.int64).reshape(2, 1)], axis=1)
         x = (exp - lay.code_offsets()) / 2.0 ** lay.shifts()
         assert np.array_equal(x.astype(np.float32), obs)
-        assert env2.observation_space.contains(obs)
-        obs, *_ = env2.step(rng.uniform(-0.1, 0.1, (2, N)).astype(np.float32))
+        assert two_world_env.observation_space.contains(obs)
+        obs, *_ = two_world_env.step(rng.uniform(-0.1, 0.1, (2, N)).astype(np.float32))
 
 
-def test_truth_only_in_info(env2):
-    obs, info = env2.reset(seed=8)
+def test_truth_only_in_info(two_world_env):
+    obs, info = two_world_env.reset(seed=8)
     assert set(info) == {"tick", "seed", "truth"} and set(info["truth"]) == {"warm_start_no_code"}
-    obs, r, term, trunc, info = env2.step(np.zeros((2, env2.ctrl_spec.n_rings), np.float32))
+    obs, r, term, trunc, info = two_world_env.step(np.zeros((2, two_world_env.ctrl_spec.n_rings), np.float32))
     assert set(info) == {"tick", "clipped", "controller_reset", "truth"}
     t = info["truth"]
     for k in ("detuning_m", "lock_reference_m", "lock_error_m", "reward_per_ring", "step_rms_lock_error_m"):
-        assert t[k].shape == (2, env2.ctrl_spec.n_rings)
+        assert t[k].shape == (2, two_world_env.ctrl_spec.n_rings)
     assert np.allclose(t["lock_error_m"], t["detuning_m"] - t["lock_reference_m"], rtol=0, atol=0)
     assert np.allclose(r, t["reward_per_ring"].mean(axis=1), rtol=0, atol=0)
 
 
-# ---------------------------------------------------------------------------------------------------- reward
+# --------------------------------------------------------------------------------------------------------------- reward
+
 @pytest.mark.parametrize("shape", ["log", "quadratic"])
 def test_reward_equals_the_reward_of_the_truth_trace(shape):
     """The env reward (kernel accumulator differences) against the same formula on per-tick Truth records."""
@@ -198,16 +209,17 @@ def test_reward_equals_the_reward_of_the_truth_trace(shape):
     det = det.reshape(12, P, 2, -1)
     rel = tr["reloma@1:mean"]["value"].reshape(12, P, 2, -1)
     orc = tr["oracle_reloma@1:mean"]["value"].reshape(12, P, 2, -1)
-    ph = tr["p_heater_w@1:mean"]["value"].reshape(12, P, 2, -1)
+    p_heater_w = tr["p_heater_w@1:mean"]["value"].reshape(12, P, 2, -1)
     u = ((det - 110e-12) ** 2).mean(axis=1) / (2e-12) ** 2
     lock = -np.log1p(u) if shape == "log" else -np.minimum(u, 3.0)
     oma = np.where(orc.sum(axis=1) > 0, rel.sum(axis=1) / orc.sum(axis=1), 0.0)
-    exp = lock + 0.3 * oma - 50.0 * ph.mean(axis=1)
+    exp = lock + 0.3 * oma - 50.0 * p_heater_w.mean(axis=1)
     np.testing.assert_allclose(np.asarray(got), exp, rtol=1e-9, atol=1e-12)
     e.close()
 
 
-# ---------------------------------------------------------------------------------------------------- resets
+# ------------------------------------------------------------------------------ resets, determinism and reproducibility
+
 def test_each_reset_draws_new_worlds_and_seeds_reproduce():
     e = MRMEnv("g26", num_envs=2, max_episode_steps=3)
     o1, i1 = e.reset(seed=21)
@@ -264,12 +276,12 @@ def test_determinism_and_next_step_autoreset():
 
 
 def test_an_episode_replays_from_its_seeds_and_a_world_alone():
-    """Reproducibility (07 P1-13): an episode replays bit for bit from env.seeds (options={'seeds': ...}); world b of
-    a batch replays alone at B = 1 with the seeds base + b from a cold start (plant draws and noise are per world),
-    and its warm-start codes with their jitter are per world too. Since the engine review of 2026-10-16 a SETTLED
-    start (warm, cold_settled) replays alone too: Plant.settle stops each world at its own iteration (here 9 / 15 /
-    11 for warm, 4 / 6 / 6 for cold_settled). Before, the batch iterated until its slowest world converged, so a
-    world's settled state depended on its batch companions (~1 mK; docs/handoff/rl.md section 6 item 10)."""
+    """Reproducibility: an episode replays bit for bit from env.seeds (options={'seeds': ...}); world b of a batch
+    replays alone at B = 1 with the seeds base + b from a cold start (plant draws and noise are per world), and its
+    warm-start codes with their jitter are per world too. A SETTLED start (warm, cold_settled) replays alone too:
+    Plant.settle stops each world at its own iteration (here 9 / 15 / 11 for warm, 4 / 6 / 6 for cold_settled). If
+    the batch iterated until its slowest world converged, a world's settled state would depend on its batch
+    companions (~1 mK)."""
     B, n = 3, 8
     rng = np.random.default_rng(0)
     acts = rng.uniform(-0.2, 0.2, (n, B, 8)).astype(np.float32)
@@ -323,7 +335,8 @@ def test_start_jitter_is_per_world_and_clipped_to_the_dac_range():
     b.close()
 
 
-# ---------------------------------------------------------------------------------------------------- gymnasium
+# ------------------------------------------------------------------------------------- Gymnasium checker and vector API
+
 def test_gymnasium_env_checker_passes():
     from gymnasium.utils.env_checker import check_env
     with warnings.catch_warnings(record=True) as w:
@@ -371,7 +384,8 @@ def test_vector_api_and_gymnasium_wrappers():
     venv.close()
 
 
-# ---------------------------------------------------------------------------------------------------- engine parity
+# -------------------------------------------------------------------------- parity with the engine and scenario options
+
 class _Schedule(BaseController):
     """A Python controller that applies the same code deltas as the env test below (held + delta, clipped)."""
     name = "sched"
@@ -408,7 +422,7 @@ def test_env_steps_equal_the_engine_python_controller_path(latency):
     for k in range(n):
         e.step((deltas[k] / 256.0).astype(np.float32))
     r = runner.run("g26", _Schedule(deltas, latency), None, duration_s=n * e.step_s, batch=B, seeds=seeds,
-                   uncertainty="sample", variation="sample", heater_code="quasi_static", settle=True,
+                   uncertainty="sample", variation="sample", heater_code="locked_steady_state", settle=True,
                    metrics={"lock_reference": "oracle"}, histogram=False)
     assert r.manifest_inputs["n_ticks"] == e.plant.tick
     m_env = e.plant.metrics()
@@ -424,13 +438,13 @@ def test_env_steps_equal_the_engine_python_controller_path(latency):
 def test_starts_and_randomized_scenarios():
     """'cold' (the config's reset protocol, heaters at code_min), 'cold_settled', and a scenario callable that draws
     the A1 aggressor phase per reset from the world seed."""
-    from mrm.scenarios import library as lib
+    from mrm.scenarios import library
     phases = []
 
     def scen(rng):
-        ph = float(rng.uniform(0.0, lib.A1_PERIOD_S))
-        phases.append(ph)
-        return lib.a1_slide10_aggressor(phase_s=ph)
+        phase_s = float(rng.uniform(0.0, library.A1_PERIOD_S))
+        phases.append(phase_s)
+        return library.a1_slide10_aggressor(phase_s=phase_s)
     e = MRMEnv("g26", num_envs=2, start="cold", scenario=scen, max_episode_steps=3)
     obs, _ = e.reset(seed=1)
     assert np.all(e.obs_layout.to_codes(obs)["tx.heater.applied"] == 0)
@@ -461,7 +475,7 @@ def test_reward_can_leave_out_rings_without_a_warm_start_code():
     np.testing.assert_allclose(ra, rr.mean(axis=1), rtol=1e-14)
     exp = np.array([rr[i][~nc[i]].mean() if (~nc[i]).any() else 0.0 for i in range(4)])
     np.testing.assert_allclose(rb, exp, rtol=1e-14)
-    if not nc.any():
-        pytest.skip("no unreachable ring in these worlds (the exclusion is then the plain mean)")
     a.close()
     b.close()
+    if not nc.any():
+        pytest.skip("no unreachable ring in these worlds (the exclusion is then the plain mean)")

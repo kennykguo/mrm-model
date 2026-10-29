@@ -1,5 +1,7 @@
-"""The tutorial notebook examples/tutorial.ipynb runs end to end (07 P1-19 tutorial, P1-22 environment section).
+"""Checks that the tutorial notebook examples/tutorial.ipynb runs end to end (also its RL environment section).
 
+Read this first
+---------------
 nbconvert / nbclient are not installed in this environment, so this file carries a minimal executor: every code cell
 runs in order in one namespace of a fresh interpreter (a subprocess, as a notebook kernel), its stdout and stderr are
 captured as stream outputs, and nothing else (no rich outputs; the notebook prints text only). Run it as a script to
@@ -7,9 +9,9 @@ refresh the stored outputs::
 
     .venv/bin/python tools/memguard.py -- .venv/bin/python tests/verification/test_gym_env_tutorial.py --write
 
-The test checks that the notebook runs without an error in under 5 min (07 P1-19 / task brief: "runs end to end in
-under ~5 min"), that its stored outputs are small, and that the stored outputs come from an execution (every code
-cell has an execution count). About 10 s with a warm numba cache (the first run in a fresh environment compiles the
+The test checks that the notebook runs without an error in under 5 min (the requirement: "runs end to end in under
+~5 min"), that its stored outputs are small, and that the stored outputs come from an execution (every code cell has
+an execution count). About 10 s with a warm numba cache (the first run in a fresh environment compiles the
 plant kernel: minutes).
 """
 from __future__ import annotations
@@ -28,8 +30,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 NOTEBOOK = ROOT / "examples" / "tutorial.ipynb"
-MAX_OUTPUT_BYTES = 24_000
-TIME_LIMIT_S = 300.0
+MAX_OUTPUT_BYTES = 24_000   # bytes, upper limit of the stored text outputs of all cells
+TIME_LIMIT_S = 300.0        # s, the notebook must run in less time than this
 
 
 def execute(path: Path, write: bool = False) -> dict:

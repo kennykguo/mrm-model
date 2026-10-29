@@ -1,9 +1,12 @@
-"""The g26 sensing keys say what the code does (physics_sensing review, 2026-10-16).
+"""Check that the g26 sensing keys, their schema docs and their preset comments say what the code does.
 
-- physics_sensing-4: ring.monitor.background_fraction multiplies the TOTAL bus power at the ring (all lines), not one
-  line's power; its g26 range must keep every nominal drop peak plus the background below the ADC full scale.
-- physics_sensing-7: the g26 junction_model comment named the junction LUT as missing while
-  mrm/data/extracted/junction_rib160.json exists.
+Read this first. Two review findings are guarded here:
+
+- ring.monitor.background_fraction multiplies the TOTAL bus power at the ring (all lines), not one line's power
+  (CHANGELOG physics_sensing-4). Its g26 range must keep every nominal drop peak plus the background below the ADC
+  full scale.
+- The g26 comment on fidelity.junction_model called the junction LUT missing while
+  mrm/data/extracted/junction_rib160.json exists (CHANGELOG physics_sensing-7).
 """
 from __future__ import annotations
 
@@ -15,13 +18,14 @@ from pathlib import Path
 import numpy as np
 
 from mrm.params import load, realize
-from mrm.params import schema as sch
+from mrm.params import schema
 
 ROOT = Path(__file__).resolve().parents[2]
 G26 = ROOT / "mrm" / "params" / "presets" / "g26.yaml"
 
 
 def _nominal():
+    """(g26 Config, its nominal realized PlantParams with one world)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         cfg = load("g26")
@@ -31,7 +35,7 @@ def _nominal():
 def test_background_fraction_doc_names_the_total_bus_power():
     """The schema doc (and the generated key appendix) said 'fraction of the line power'; the kernel applies the
     fraction to the sum of every line's bus power at the ring (3-8 x one line in g26)."""
-    doc = sch.lookup("ring.monitor.background_fraction").doc
+    doc = schema.lookup("ring.monitor.background_fraction").doc
     assert "line power" not in doc
     assert "total bus power" in doc and "all lines" in doc
     cfg, _ = _nominal()
@@ -52,7 +56,7 @@ def test_background_fraction_range_keeps_the_monitor_in_range():
         k1, k2 = float(o.kappa2_through[0, i]), float(o.kappa2_drop[0, i])
         a = float(o.round_trip_amplitude[0, i])
         t1, t2 = math.sqrt(1.0 - k1), math.sqrt(1.0 - k2)
-        drop = k1 * k2 * a / (1.0 - a * t1 * t2) ** 2
+        drop = k1 * k2 * a / (1.0 - a * t1 * t2) ** 2     # exact add-drop peak: K1^2 K2^2 a / (1 - a t1 t2)^2
         line = int(pp.layout.ring_to_line[i])
         p_in = float(pp.laser.power_w[0, line] * pp.laser.input_transmission[0, 0])
         r = float(m.responsivity_a_per_w[0, i])

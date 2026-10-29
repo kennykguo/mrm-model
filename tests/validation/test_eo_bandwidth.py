@@ -1,18 +1,23 @@
 """EO bandwidth of the waveform mode against CAL-10 (calibration) and VAL-3a/VAL-3b (held out).
 
+Read this first. The electro-optic (EO) bandwidth is the modulation frequency where the small-signal optical
+response falls by 3 dB. The tests fit R_s C to the calibration target CAL-10 (the bandwidth at 1 V reverse bias)
+and then predict the held-out VAL-3a (the bandwidth at 2 V) and VAL-3b (the 2 V / 1 V ratio) without more tuning.
+
 Replica ``eo_bandwidth_at_bias`` (mrm/validation/targets/README.md): the small-signal EO response of the G25 test
 vehicle (preset g25_test_vehicle, nominal world) through the driver output resistance, the junction R_s and C_j(V)
 (mrm.waveform.driver) and the exact TCMT linearization (mrm.waveform.tcmt_time; Sacher & Poon 2008 poles at
--kappa/2 +- i Delta, zero at -(kappa_i + kappa_d)); 3 dB point |H(f)/H(0)|^2 = 1/2 (docs/research/03 section 5.6).
+-kappa/2 +- i Delta, zero at -(kappa_i + kappa_d)); 3 dB point |H(f)/H(0)|^2 = 1/2 (docs/research/
+03_mrm_compact_models.md, section 5.6).
 
 The measurement detuning is not printed (CAL-10/VAL-3 ``detuning: hypothesis``). Hypotheses, chosen before any
-comparison from 03 section 5.6 (which states the CAL-10 inversion at both): the laser at the maximum static slope
+comparison from that section (which states the CAL-10 inversion at both): the laser at the maximum static slope
 x = 2 Delta/kappa = 1/sqrt(3) (PRIMARY: the usual small-signal bias point) or at x = 0.813 (the -4 dB through point);
 and at 2 V either re-centred to the same x (PRIMARY: the laser re-tuned at each bias) or held at the -1 V wavelength
 (the resonance then moves by the junction shift). R_s C is fitted to CAL-10 only (calibration rule: R_s scaled, C_j(V)
 and R_drv as in the preset; only the product is identified); VAL-3 is then predicted, not tuned. The scored
-assertions use the primary hypotheses; every hypothesis is printed (pytest -s) and in the handoff. Validation tests
-report outcomes and do not block CI (07 section 4.1).
+assertions use the primary hypotheses; every hypothesis is printed (pytest -s). Validation tests report outcomes
+and do not block CI.
 """
 from __future__ import annotations
 
@@ -26,12 +31,14 @@ from scipy.optimize import brentq
 from mrm.validation.targets_io import evaluate, load_targets
 from mrm.waveform import DriverJunction, RingTCMT, eo_bandwidth
 
-X_PRIMARY = 1.0 / math.sqrt(3.0)
-X_HYPOTHESES = (X_PRIMARY, 0.813)
+# laser detuning x = 2 Delta / kappa (Delta: laser-to-resonance detuning, kappa: loaded energy decay rate)
+X_PRIMARY = 1.0 / math.sqrt(3.0)        # the maximum static slope of the Lorentzian (usual small-signal bias point)
+X_HYPOTHESES = (X_PRIMARY, 0.813)       # 0.813: the -4 dB point of the through port
 
 
 @pytest.fixture(scope="module")
 def pp():
+    """Nominal realized PlantParams of the G25 test vehicle (one world)."""
     from mrm import params
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")      # artefact fallbacks warn until the extraction lands
@@ -41,12 +48,15 @@ def pp():
 
 @pytest.fixture(scope="module")
 def targets():
+    """(CAL-10, VAL-3a, VAL-3b)."""
     cal = {t.id: t for t in load_targets("calibration")}
     val = {t.id: t for t in load_targets("validation")}
     return cal["CAL-10"], val["VAL-3a"], val["VAL-3b"]
 
 
 def _f3db(pp, v_bias, x_bias=None, t_ring_k=None, r_s_scale=1.0):
+    """EO response of ring 0 at reverse bias ``v_bias`` (V): (eo_bandwidth result, RingTCMT, DriverJunction). The
+    laser sits at detuning ``x_bias`` or, with ``t_ring_k``, at the wavelength of that ring temperature (K)."""
     ring = RingTCMT.from_plant_params(pp, 0, 0, v_bias=v_bias, x_bias=x_bias, t_ring_k=t_ring_k)
     dj = DriverJunction.from_plant_params(pp, 0, 0, rise_time_s=0.0, r_s_scale=r_s_scale)
     r = eo_bandwidth(ring, dj, v_bias)

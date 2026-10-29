@@ -1,7 +1,16 @@
-"""Heater-dither lock-in (mrm/control/baselines/dither_lockin.py): closed loop on the ReferencePlant (through
-test_ctrl_a_harness), parity of the compiled port, peak and inflection modes on a toy bistable ring.
+"""Checks the heater-dither lock-in controller (mrm/control/baselines/dither_lockin.py).
 
-Truth is read by the TEST only. CTRL_A_METRIC lines are the reported numbers (run with -s).
+Read this first
+---------------
+DitherLockin dithers the heater code and demodulates the monitor signal. In inflection mode it locks where the 2f
+term is zero (red of the drop peak); in peak mode where the 1f term is zero (on the peak). The tests check:
+
+- the closed loop on the ReferencePlant (through test_ctrl_a_harness) settles on the red side;
+- the compiled port (DitherLockinCompiled) gives bit-identical heater codes;
+- the peak and inflection lock points on a toy bistable ring;
+- the recapture after a fall ends red of the peak.
+
+Only the test reads Truth. The CTRL_A_METRIC lines are the reported numbers (run with -s).
 """
 from __future__ import annotations
 
@@ -10,14 +19,14 @@ import math
 import numpy as np
 import pytest
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control import registry
 from mrm.control.api import Observation
-from mrm.control.baselines import dither_lockin as dl
+from mrm.control.baselines import dither_lockin
 from mrm.control.baselines.dither_lockin import DitherLockin, DitherLockinCompiled
 
 
-def report(tag, m: H.LockMetrics, **extra):
+def report(tag, m: harness.LockMetrics, **extra):
     s = m.summary()
     s.update(extra)
     print("CTRL_A_METRIC", tag, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()})
@@ -31,9 +40,9 @@ def cycle_mean(x, period_ticks: int):
 
 @pytest.fixture(scope="module")
 def inflection():
-    cfg, pp, spec, plant = H.placed()
+    cfg, pp, spec, plant = harness.placed()
     ctrl = DitherLockin()
-    loop = H.ClosedLoop(plant, spec, ctrl)
+    loop = harness.ClosedLoop(plant, spec, ctrl)
     seen = []
     orig = ctrl.step
 
@@ -52,7 +61,7 @@ def inflection():
 def test_inflection_lock_converges_on_the_red_side(inflection):
     rec, ctrl, spec = inflection["rec"], inflection["ctrl"], inflection["spec"]
     tel = ctrl.telemetry()
-    assert np.all(tel["state"] == dl.D_LOCK)
+    assert np.all(tel["state"] == dither_lockin.D_LOCK)
     p = ctrl.params
     cyc = 4 * p.phase_steps * spec.period_ticks                        # ticks per dither cycle (240)
     d = rec["delta_pm"].astype(float)
@@ -64,10 +73,10 @@ def test_inflection_lock_converges_on_the_red_side(inflection):
     assert np.all(np.abs(tel["eps"]) < 0.3), tel["eps"]
     assert np.all(tel["s1"] < 0.0)
     swing = (d[-cyc * 4:].max(axis=0) - d[-cyc * 4:].min(axis=0)) / 2.0
-    m = H.lock_metrics(rec, slice(-3000, -1500), slice(-1500, None))
+    m = harness.lock_metrics(rec, slice(-3000, -1500), slice(-1500, None))
     report("dither_lockin inflection steady g26 nominal", m, lock_delta_pm=float(final.mean()),
            dither_swing_pm=float(swing.mean()), cycle_mean_drift_pm=float(np.abs(dc[-8:] - final).max()),
-           time_to_lock_us=float(np.nanmax(H.time_to_lock_us({"delta_pm": dc}, dt_us=cyc))))
+           time_to_lock_us=float(np.nanmax(harness.time_to_lock_us({"delta_pm": dc}, dt_us=cyc))))
 
 
 def test_compiled_replay_is_bit_identical(inflection):
@@ -83,7 +92,7 @@ def test_compiled_replay_is_bit_identical(inflection):
 def test_toy_parity_and_lock_points(mode):
     """Python and compiled agree code for code on a toy bistable ring (with a fold-crossing kick); the 1f zero is
     the peak (x = 0) and the 2f zero the inflection x = 1/sqrt(3) on the red side."""
-    spec = H.toy_spec(2, 3)
+    spec = harness.toy_spec(2, 3)
     u0 = np.array([[30000, 30500, 31000], [29800, 30200, 30900]], float)
     g = np.array([[1.0, 2.0, 0.5], [3.0, 0.8, 1.5]]) if mode == "inflection" else \
         np.array([[0.5, 0.8, 1.0], [0.3, 0.6, 1.2]])
@@ -97,14 +106,14 @@ def test_toy_parity_and_lock_points(mode):
             toy.u0 += 60.0
     runs = []
     for ctrl in (DitherLockin(**kw), DitherLockinCompiled(**kw)):
-        toy = H.ToyRings(spec, u0=u0, g=g, u_init=init[0], x0=3.0, noise=1.0)
+        toy = harness.ToyRings(spec, u0=u0, g=g, u_init=init[0], x0=3.0, noise=1.0)
         ctrl.reset(spec)
         h, _ = toy.run(ctrl, 2000, on_step=disturb)
         runs.append((h, ctrl.telemetry(), toy.x.copy()))
     (ha, ta, xa), (hb, tb, xb) = runs
     assert np.array_equal(ha, hb)
     np.testing.assert_array_equal(ta["state"], tb["state"])
-    assert np.all(ta["state"] == dl.D_LOCK), ta["state"]
+    assert np.all(ta["state"] == dither_lockin.D_LOCK), ta["state"]
     # x at the end of a cycle's centre phase is the centre detuning (the dither returns to the centre)
     want = 0.0 if mode == "peak" else 1.0 / math.sqrt(3.0)
     tol = 0.08 if mode == "peak" else 0.08
@@ -112,14 +121,15 @@ def test_toy_parity_and_lock_points(mode):
 
 
 def test_peak_mode_on_g26_sits_next_to_the_fold():
-    """Peak lock (1f -> 0) on g26 nominal: the fold is ~9 pm blue of the peak (bistability ratio ~6). Measured: how
-    close the lock gets, and how often the ring falls off and is recaptured (07 P0-1, 04 C5)."""
-    cfg, pp, spec, plant = H.placed(delta_pm=60.0, n_ticks=2500)
+    """Peak lock (1f -> 0) on g26 nominal. Self-heating makes the ring bistable: the fold is ~9 pm blue of the peak
+    (bistability ratio ~6). Measured: how close the lock gets, and how often the ring falls off and is recaptured
+    (see docs/research/04_thermal_and_control.md, "C5. Dither and lock-in")."""
+    cfg, pp, spec, plant = harness.placed(delta_pm=60.0, n_ticks=2500)
     ctrl = DitherLockin(mode="peak", dither_codes=16.0, max_step_codes=48.0)
-    loop = H.ClosedLoop(plant, spec, ctrl)
+    loop = harness.ClosedLoop(plant, spec, ctrl)
     rec = loop.run(6000)
     tel = ctrl.telemetry()
-    assert np.all(tel["state"] != dl.D_FAULT)
+    assert np.all(tel["state"] != dither_lockin.D_FAULT)
     d = rec["delta_pm"].astype(float)
     cyc = 4 * ctrl.params.phase_steps * spec.period_ticks
     dc = cycle_mean(d, cyc)
@@ -127,7 +137,7 @@ def test_peak_mode_on_g26_sits_next_to_the_fold():
     near = np.abs(dc[-5:].mean(axis=0))
     # every ring either sits within 25 pm of the peak or has fallen off and been recaptured
     assert np.all((near < 25.0) | (falls > 0)), (near, falls)
-    m = H.lock_metrics(rec, slice(-2400, -1200), slice(-1200, None))
+    m = harness.lock_metrics(rec, slice(-2400, -1200), slice(-1200, None))
     report("dither_lockin peak g26 nominal", m, centre_abs_detuning_pm=float(near.mean()),
            min_detuning_pm=float(d.min()), falls=float(falls.sum()))
 
@@ -146,7 +156,7 @@ def test_recapture_after_an_early_fall_waits_for_the_red_side():
     recapture_level x 0 then, so any 2 % dip of a noisy monitor past the guard ended the recapture on the COLD branch
     (measured with 200-code noise: LOCK at x = -3.8). The reference is now the pre-fall level: the recapture ends red of
     the peak. Python and compiled identical."""
-    spec = H.toy_spec(1, 1)
+    spec = harness.toy_spec(1, 1)
     u0 = np.array([[30000.0]])
     init = u0[0] + 500
     kw = dict(mode="inflection", dither_codes=40.0, phase_steps=4, blank_steps=1, max_step_codes=60.0,
@@ -154,15 +164,15 @@ def test_recapture_after_an_early_fall_waits_for_the_red_side():
     runs = []
     for cls in (DitherLockin, DitherLockinCompiled):
         c = cls(**kw)
-        toy = H.ToyRings(spec, u0=u0, g=3.0, u_init=init, x0=3.0, noise=200.0)
+        toy = harness.ToyRings(spec, u0=u0, g=3.0, u_init=init, x0=3.0, noise=200.0)
         c.reset(spec)
-        trans, prev = [], [dl.D_LOCK]
+        trans, prev = [], [dither_lockin.D_LOCK]
 
         def hook(t, k, c=c, trans=trans, prev=prev):
             if k == 2:
                 t.u0 += 3000.0                         # far past the fold: the ring falls to the cold branch
             st = int(c.telemetry()["state"][0, 0])
-            if prev[0] == dl.D_RECAPTURE and st == dl.D_LOCK:
+            if prev[0] == dither_lockin.D_RECAPTURE and st == dither_lockin.D_LOCK:
                 trans.append(float(t.x[0, 0]))
             prev[0] = st
         h, _ = toy.run(c, 1500, on_step=hook)
@@ -171,4 +181,4 @@ def test_recapture_after_an_early_fall_waits_for_the_red_side():
     assert np.array_equal(ha, hb)
     assert tela["fall_count"][0, 0] >= 1 and len(ta) >= 1
     assert all(x > 0.0 for x in ta), ta                   # every recapture ended red of the peak
-    assert tela["state"][0, 0] == dl.D_LOCK
+    assert tela["state"][0, 0] == dither_lockin.D_LOCK

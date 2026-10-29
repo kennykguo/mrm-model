@@ -1,10 +1,17 @@
-"""The g26 aggressor sites (docs/handoff/integrator.md section 7).
+"""Checks the two aggressor sites of the g26 layout: only the monitor-PD paths differ between them.
 
-The default site ``aggressor`` (0, -30) um is the mirror image of the former default (0, 30) um, which is kept as the
-stress site ``aggressor_pd_adjacent``: both are 30 um from ring 0 and the same distance from every ring, so the
-aggressor -> ring and -> heater-resistor paths, the A1/A2 power calibration and the rings' trajectories are the same,
-bit for bit. Only the monitor-PD paths differ (PD0 55 um from the default site, 5 um from the stress site); the die
-temperature sensor (~1 mm away) sees both sites alike.
+Read this first
+---------------
+The default site ``aggressor`` is at (0, -30) um. The stress site ``aggressor_pd_adjacent`` is its mirror image at
+(0, 30) um. Both sites are 30 um from ring 0 and at the same distance from every ring. So these quantities are the
+same on both sites, bit for bit:
+
+- the thermal paths aggressor -> ring and aggressor -> heater resistor;
+- the power calibration of the A1 and A2 aggressor scenarios;
+- the ring trajectories in a closed-loop run.
+
+Only the paths to the monitor photodiodes (PDs) differ. PD0 is 55 um from the default site and 5 um from the stress
+site. The die temperature sensor is about 1 mm away, so it sees both sites alike.
 """
 from __future__ import annotations
 
@@ -14,7 +21,7 @@ import numpy as np
 import pytest
 
 from mrm import params
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +33,8 @@ def g26():
     return cfg, pp
 
 
-def _lags(sysm, src, obs):
+def _lag_terms(sysm, src, obs):
+    """Time constants (s) and residues (K/W) of the thermal-ROM lag terms from source ``src`` to observer ``obs``."""
     m = np.flatnonzero((sysm.lag_src == src) & (sysm.lag_obs == obs))
     return sysm.taus_s[:, m], sysm.res_k_per_w[:, m]
 
@@ -35,8 +43,8 @@ def test_g26_sites_and_provenance(g26):
     cfg, _ = g26
     sites = cfg.get("layout.sites")
     assert (sites["aggressor"]["x_um"], sites["aggressor"]["y_um"], sites["aggressor"]["kind"]) == (0.0, -30.0,
-                                                                                                   "aggressor")
-    st = sites[lib.AGGRESSOR_PD_ADJACENT_SITE]
+                                                                                                    "aggressor")
+    st = sites[library.AGGRESSOR_PD_ADJACENT_SITE]
     assert (st["x_um"], st["y_um"], st["kind"]) == (0.0, 30.0, "aggressor") and "stress" in st["note"]
     leaf = cfg.leaves["layout.sites"]
     assert leaf.provenance == "assumed"
@@ -49,32 +57,34 @@ def test_ring_and_sensor_paths_are_identical_only_the_pd_paths_differ(g26):
     _, pp = g26
     sysm = pp.thermal.system
     names = [sysm.src_names[i] for i in sysm.aggressor_src]
-    assert names == [lib.AGGRESSOR_SITE, lib.AGGRESSOR_PD_ADJACENT_SITE]
+    assert names == [library.AGGRESSOR_SITE, library.AGGRESSOR_PD_ADJACENT_SITE]
     a_def, a_pdj = (int(i) for i in sysm.aggressor_src)
     same = [*sysm.ring_obs, *sysm.heater_obs, *sysm.temp_obs]
     assert len(sysm.temp_obs) >= 1                                       # the die sensor (feedforward_pi reads it)
     for o in same:
-        t1, r1 = _lags(sysm, a_def, int(o))
-        t2, r2 = _lags(sysm, a_pdj, int(o))
+        t1, r1 = _lag_terms(sysm, a_def, int(o))
+        t2, r2 = _lag_terms(sysm, a_pdj, int(o))
         assert r1.size and np.array_equal(t1, t2) and np.array_equal(r1, r2), sysm.obs_names[int(o)]
-    dc = [[float(_lags(sysm, a, int(o))[1].sum()) for a in (a_def, a_pdj)] for o in sysm.pd_obs]
+    dc = [[float(_lag_terms(sysm, a, int(o))[1].sum()) for a in (a_def, a_pdj)] for o in sysm.pd_obs]
     assert dc[0][0] < 0.1 * dc[0][1]                                     # PD0: 55 um vs 5 um (interim site law)
     assert all(d[0] <= d[1] for d in dc)                                 # every PD is at least as far as before
 
 
 def test_a1_rings_identical_on_both_sites_only_pd_differs(g26):
-    """Engine, A1 near its hot cusp, 3 ms from a settled start: the calibrated power is the same on both sites and
-    the rings' detuning and temperatures are identical bit for bit; the PD temperatures differ."""
+    """Engine run of A1 near its hot cusp, 3 ms from a settled start, on each site.
+
+    The calibrated aggressor power is the same on both sites. The ring detuning and temperatures are identical bit
+    for bit. Only the PD temperatures differ."""
     runner = pytest.importorskip("mrm.sim.runner")
     from mrm.sim.metrics import RecordSpec
     cfg, pp = g26
     rec = [RecordSpec("detuning_m", 10, "mean"), RecordSpec("t_ring_k", 10, "mean"), RecordSpec("t_pd_k", 10, "max")]
     out = {}
-    for key, sc in (("default", lib.a1_slide10_aggressor(phase_s=0.0)),
-                    ("stress", lib.a1_slide10_aggressor_pd_adjacent(phase_s=0.0))):
+    for key, sc in (("default", library.a1_slide10_aggressor(phase_s=0.0)),
+                    ("stress", library.a1_slide10_aggressor_pd_adjacent(phase_s=0.0))):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            r = runner.run(pp, None, sc, duration_s=3e-3, cfg=cfg, heater_code="quasi_static", settle=True,
+            r = runner.run(pp, None, sc, duration_s=3e-3, cfg=cfg, heater_code="locked_steady_state", settle=True,
                            reset_protocol="branch_high", record=rec)
         cal = r.manifest_inputs["aggressor_calibration"]
         out[key] = ({k: np.asarray(v["value"]) for k, v in r.trace.items()},

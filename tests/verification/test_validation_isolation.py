@@ -1,4 +1,7 @@
-"""Isolation of the held-out targets (07 P0-5; ARCHITECTURE.md accuracy rule 5).
+"""Checks that the held-out validation targets stay out of reach of the calibration code.
+
+The rule (docs/ARCHITECTURE.md, accuracy rule 5): calibration may read only targets/calibration.yaml, and the
+held-out targets are frozen by SHA-256. The tests check three things:
 
 1. Nothing under mrm/calibration/** may reference validation.yaml, bounds.yaml or docs/VALIDATION.md, or load a
    target role other than "calibration" (static text and AST scan, ``targets_io.held_out_reference_violations``).
@@ -13,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from mrm.validation import targets_io as tio
+from mrm.validation import targets_io
 
 
 def test_calibration_package_cannot_reach_held_out_targets():
-    assert tio.CALIBRATION_DIR.is_dir(), "mrm/calibration must exist"
-    violations = tio.held_out_reference_violations(tio.CALIBRATION_DIR)
+    assert targets_io.CALIBRATION_DIR.is_dir(), "mrm/calibration must exist"
+    violations = targets_io.held_out_reference_violations(targets_io.CALIBRATION_DIR)
     assert violations == [], "\n".join(violations)
 
 
@@ -46,13 +49,16 @@ def test_calibration_package_cannot_reach_held_out_targets():
     ("importlib_report.py", "import importlib\nR = importlib.import_module('mrm.validation.report')\n"),
     ("star.py", "from mrm.validation.targets_io import *\n"),
     ("excluded_loader.py", "from mrm.validation.targets_io import load_excluded\nX = load_excluded()\n"),
+    # an alias of a role function re-exported by the package mrm.validation
+    ("package_alias.py", "from mrm.validation import load_targets as lt\nT = lt('bounds')\n"),
+    ("package_alias_relative.py", "from ..validation import load_targets as lt\nT = lt('validation')\n"),
 ])
 def test_scanner_detects_violations(tmp_path: Path, name: str, code: str):
     pkg = tmp_path / "calibration"
     pkg.mkdir()
     (pkg / "__init__.py").write_text("")
     (pkg / name).write_text(code)
-    violations = tio.held_out_reference_violations(pkg)
+    violations = targets_io.held_out_reference_violations(pkg)
     assert violations, f"scanner missed a violation in {name}"
     assert all(name in v for v in violations)
 
@@ -71,19 +77,19 @@ def test_scanner_accepts_clean_calibration_code(tmp_path: Path):
             c = load_targets(role="calibration")
             return [t for t in a + b + c if t.id.startswith("CAL-2")]
     '''))
-    assert tio.held_out_reference_violations(pkg) == []
+    assert targets_io.held_out_reference_violations(pkg) == []
 
 
 def test_header_records_the_frozen_hashes():
-    """docs/VALIDATION.md carries the sha256 of the two held-out files, with an ISO date (07 P0-5)."""
-    header = tio.read_frozen_header(tio.DOC_VALIDATION)
-    for role in tio.FROZEN_ROLES:
+    """docs/VALIDATION.md carries the sha256 of the two held-out files, with an ISO date."""
+    header = targets_io.read_frozen_header(targets_io.DOC_VALIDATION)
+    for role in targets_io.FROZEN_ROLES:
         name = f"{role}.yaml"
         assert name in header, f"no frozen row for {name}"
         sha, date = header[name]
         assert re.fullmatch(r"[0-9a-f]{64}", sha)
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)
-    errs = tio.header_errors(tio.DOC_VALIDATION)
+    errs = targets_io.header_errors(targets_io.DOC_VALIDATION)
     assert errs == [], "\n".join(errs)
 
 
@@ -91,14 +97,14 @@ def test_header_check_detects_a_changed_file(tmp_path: Path):
     """Editing a frozen file (even a comment) breaks the hash check."""
     root = tmp_path / "targets"
     root.mkdir()
-    for role in tio.ROLES:
-        (root / f"{role}.yaml").write_bytes(tio.targets_path(role).read_bytes())
+    for role in targets_io.ROLES:
+        (root / f"{role}.yaml").write_bytes(targets_io.targets_path(role).read_bytes())
     doc = tmp_path / "VALIDATION.md"
-    doc.write_text("# Validation\n\n" + tio.frozen_header_block("2026-10-09", root) + "\n")
-    assert tio.header_errors(doc, root) == []
+    doc.write_text("# Validation\n\n" + targets_io.frozen_header_block("2026-10-09", root) + "\n")
+    assert targets_io.header_errors(doc, root) == []
     with (root / "bounds.yaml").open("a") as fh:
         fh.write("# an innocent-looking comment\n")
-    errs = tio.header_errors(doc, root)
+    errs = targets_io.header_errors(doc, root)
     assert len(errs) == 1 and "bounds.yaml" in errs[0]
 
 
@@ -106,18 +112,18 @@ def test_header_hash_ignores_only_crlf(tmp_path: Path):
     """A Windows checkout (core.autocrlf) must not look like a re-freeze; any other byte change still must."""
     root = tmp_path / "targets"
     root.mkdir()
-    for role in tio.ROLES:
-        (root / f"{role}.yaml").write_bytes(tio.targets_path(role).read_bytes())
+    for role in targets_io.ROLES:
+        (root / f"{role}.yaml").write_bytes(targets_io.targets_path(role).read_bytes())
     doc = tmp_path / "VALIDATION.md"
-    doc.write_text(tio.frozen_header_block("2026-10-09", root) + "\n")
+    doc.write_text(targets_io.frozen_header_block("2026-10-09", root) + "\n")
     raw = (root / "validation.yaml").read_bytes()
     (root / "validation.yaml").write_bytes(raw.replace(b"\n", b"\r\n"))
-    assert tio.header_errors(doc, root) == []
+    assert targets_io.header_errors(doc, root) == []
     (root / "validation.yaml").write_bytes(raw.replace(b"value: 13.0", b"value: 13.1"))
-    assert len(tio.header_errors(doc, root)) == 1
+    assert len(targets_io.header_errors(doc, root)) == 1
 
 
 def test_frozen_files_name_their_freeze_date():
-    header = tio.read_frozen_header(tio.DOC_VALIDATION)
-    for role in tio.FROZEN_ROLES:
-        assert str(tio.read_raw(role)["frozen_on"]) == header[f"{role}.yaml"][1]
+    header = targets_io.read_frozen_header(targets_io.DOC_VALIDATION)
+    for role in targets_io.FROZEN_ROLES:
+        assert str(targets_io.read_raw(role)["frozen_on"]) == header[f"{role}.yaml"][1]

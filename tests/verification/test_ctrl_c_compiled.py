@@ -1,9 +1,12 @@
-"""Compiled (numba, flat ABI of 07 P0-9) versions of the model-based baselines against their Python versions.
+"""Checks the compiled versions (numba, the flat ABI of the compiled kernel) of the model-based baselines against
+their Python versions.
 
-The Python controller runs the closed loop on the ReferencePlant; every Observation it receives is recorded and
+Read this first
+---------------
+The Python controller runs the closed loop on the ReferencePlant. Every Observation it receives is recorded and
 replayed into the compiled controller, which starts from the same applied codes. The commands must agree code for
 code, and the compiled estimator must track the Python one to rounding. The compiled step functions also run under
-NUMBA_DISABLE_JIT=1 (a subprocess replays synthetic observations and compares with the jitted result).
+NUMBA_DISABLE_JIT=1: a subprocess replays synthetic observations and compares with the jitted result.
 """
 from __future__ import annotations
 
@@ -18,8 +21,7 @@ import pytest
 
 from mrm.control import registry
 from mrm.control.api import ActionValidator, Observation
-from mrm.control.baselines import kalman_lqg as K
-from mrm.control.baselines import mpc as MP
+from mrm.control.baselines import kalman_lqg, mpc
 
 from test_ctrl_c_harness import build_rig, hold, load_cfg, run_loop
 
@@ -66,9 +68,9 @@ def _replay(cfg, py_ctrl, c_ctrl, n_ticks=1200, B=2):
 
 
 def test_compiled_lqg_matches_python(cfg):
-    py = K.KalmanLQG()
+    py = kalman_lqg.KalmanLQG()
     cc = registry.create("kalman_lqg_c")
-    assert isinstance(cc, K.CompiledLqg) and cc.latency_ticks == py.latency_ticks
+    assert isinstance(cc, kalman_lqg.CompiledLqg) and cc.latency_ticks == py.latency_ticks
     tr, codes_c, _ = _replay(cfg, py, cc)
     np.testing.assert_array_equal(codes_c, tr.heater_codes)
     # estimator state: the compiled filter equals the Python one to rounding
@@ -79,11 +81,11 @@ def test_compiled_lqg_matches_python(cfg):
     np.testing.assert_allclose(z_c, py.z, rtol=1e-7, atol=1e-9 * np.max(np.abs(py.z)))
     tel = cc.telemetry()
     np.testing.assert_allclose(tel["detuning_est_pm"], py.telemetry()["detuning_est_pm"], atol=1e-6)
-    assert np.all(s_i[:, 1:] == K.ST_LOCK)
+    assert np.all(s_i[:, 1:] == kalman_lqg.ST_LOCK)
 
 
 def test_compiled_mpc_matches_python(cfg):
-    py = MP.LinearMPC()
+    py = mpc.LinearMPC()
     cc = registry.create("mpc_c")
     tr, codes_c, _ = _replay(cfg, py, cc, n_ticks=1000)
     diff = np.abs(codes_c - tr.heater_codes)
@@ -104,17 +106,18 @@ def test_compiled_controllers_lock_in_closed_loop(cfg):
         assert np.max(np.abs(err)) < 2.0, (name, np.max(np.abs(err)))
 
 
-_SUB = r"""
+# Run in a subprocess, with and without NUMBA_DISABLE_JIT: 40 synthetic observations through each compiled controller.
+_NO_JIT_SCRIPT = r"""
 import json, sys, numpy as np, warnings
 warnings.simplefilter("ignore")
 sys.path.insert(0, "tests/verification")
 from test_ctrl_c_harness import load_cfg
 from mrm.control.api import ControllerSpec, Observation
-from mrm.control.baselines import kalman_lqg as K, mpc as MP
+from mrm.control.baselines import kalman_lqg, mpc
 cfg = load_cfg()
 spec = ControllerSpec.from_config(cfg, n_batch=1, nominal=cfg)
 out = {}
-for name, ctrl in (("lqg", K.CompiledLqg()), ("mpc", MP.CompiledMpc())):
+for name, ctrl in (("lqg", kalman_lqg.CompiledLqg()), ("mpc", mpc.CompiledMpc())):
     ctrl.reset(spec)
     d = ctrl.design if name == "lqg" else ctrl.mpc.lqg
     N, M = spec.n_rings, spec.samples_per_step
@@ -148,7 +151,7 @@ def test_compiled_steps_run_without_jit():
     env_n = dict(env_j, NUMBA_DISABLE_JIT="1")
     res = []
     for env in (env_j, env_n):
-        p = subprocess.run([sys.executable, "-c", _SUB], cwd=ROOT, env=env, capture_output=True, text=True,
+        p = subprocess.run([sys.executable, "-c", _NO_JIT_SCRIPT], cwd=ROOT, env=env, capture_output=True, text=True,
                            timeout=600)
         assert p.returncode == 0, p.stderr[-2000:]
         res.append(json.loads(p.stdout.strip().splitlines()[-1]))

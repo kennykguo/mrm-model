@@ -1,9 +1,16 @@
-"""07 P0-6 / P0-7 through the whole plant (owner: engine): the loop delay of a heater impulse equals the declared
-latencies, it does not depend on the controller rate, the FIFOs are deep enough, and the fast_kernel (once per ADC
-sample) equals a 1 MHz Python step bit for bit.
+"""Checks the timing rules through the whole plant: loop delay, rate independence, FIFO depth and the fast kernel.
+
+Read this first
+---------------
+The plant steps in integer ticks, each delay has one owner (the I/O path owns its latency in seconds), and the
+events of a tick happen in a fixed order. The tests check that the loop delay of a heater impulse equals the
+declared latencies, that it does not depend on the controller rate, that the FIFOs and the controller pipeline are
+deep enough (also with tick jitter), and that a fast_kernel (run once per ADC sample) equals a 1 MHz Python step
+bit for bit. Later tests check that two configs in one process do not share frozen globals, and parts of the Plant
+and registry API.
 
 Common random numbers make the timing tests exact: a run with the impulse and a run without it share every noise
-draw (keyed by seed, stream, ring, tick, slot; mrm.core.rng), so the first tick at which a recorded signal differs
+draw (keyed by seed, stream, ring, tick, slot; mrm.core.rng). So the first tick at which a recorded signal differs
 is the first tick the impulse reached it.
 """
 from __future__ import annotations
@@ -21,9 +28,12 @@ from mrm.core.channels import ActId
 from mrm.core.timing import fifo_capacity, first_response_tick
 from mrm.sim.runner import run
 
-HEATER = int(ActId.TX_HEATER)
+HEATER = int(ActId.TX_HEATER)   # actuator id of the heater commands
 
 
+# -------------------------------------------------------------------------------------------------------- impulse probe
+# A compiled controller that sends one impulse code at one edge and a base code at every other edge.
+# Its integer parameters p: [n_rings, heater offset in act, impulse edge tick, impulse code, base code].
 @njit(cache=True)
 def probe_init(si, sf):
     p = np.zeros(5, np.int64)
@@ -41,13 +51,16 @@ def probe_step(p, pf, s, sf, obs, act):
         act[p[1] + i] = p[3] if obs[0] == p[2] else p[4]
 
 
-def _cfg(*ov):
+def _g26_config(*ov):
+    """The g26 preset with the given config overrides (warnings silenced)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return params.load("g26", overrides=list(ov))
 
 
 def _impulse_runs(cfg, k_imp, code, n_ticks, lat=0):
+    """Two nominal runs of n_ticks with the probe: without the impulse (code 0) and with it (code at tick k_imp).
+    lat: controller latency in ticks. Both record the monitor code and the heater power every tick."""
     out = []
     for c in (0, code):
         ctrl = CompiledController("probe", probe_init, probe_step, params_i64=[k_imp, c, 0], latency_ticks=lat)
@@ -58,17 +71,18 @@ def _impulse_runs(cfg, k_imp, code, n_ticks, lat=0):
     return out
 
 
-def _first_diff(a, b):
+def _first_differing_tick(a, b):
+    """The first row (tick) where a and b differ, or -1."""
     d = np.flatnonzero(np.any(a != b, axis=1)) if a.ndim == 2 else np.flatnonzero(a != b)
     return int(d[0]) if d.size else -1
 
 
 @pytest.mark.parametrize("ctrl_latency", [0, 3])
 def test_loop_delay_impulse(ctrl_latency):
-    """07 P0-6: a one-period heater-code impulse from a probe controller first changes the heater power at
-    k + controller latency + DAC latency (incl. the thermal transport delay, 07 P1-2), and the controller first
+    """A one-period heater-code impulse from a probe controller first changes the heater power at
+    k + controller latency + DAC latency (including the thermal transport delay), and the controller first
     observes it at timing.first_response_tick(...) for every ring (its own ADC mux phase)."""
-    cfg = _cfg()
+    cfg = _g26_config()
     base, imp = _impulse_runs(cfg, 100, 65535, 200, lat=ctrl_latency)
     pl = imp.plant
     dac = int(pl.heater_params.latency_ticks[0])
@@ -77,24 +91,24 @@ def test_loop_delay_impulse(ctrl_latency):
     assert (100 - ph0) % per == 0
     p0 = base.trace["p_heater_w@1:last"]["value"][:, 0]
     p1 = imp.trace["p_heater_w@1:last"]["value"][:, 0]
-    k_act = _first_diff(p1, p0)
+    k_act = _first_differing_tick(p1, p0)
     assert k_act == 100 + ctrl_latency + dac
     m0 = base.trace["monitor_code@1:last"]["value"][:, 0]
     m1 = imp.trace["monitor_code@1:last"]["value"][:, 0]
     for n in range(pl.N):
         want = first_response_tick(100, ctrl_latency, dac, pl.monitor_hw.period_ticks, int(pl.monitor_hw.phase[n]),
                                    adc_lat, per, ph0)
-        got = _first_diff(m1[:, n], m0[:, n])
+        got = _first_differing_tick(m1[:, n], m0[:, n])
         assert got == want, (n, got, want)
 
 
 def test_latency_invariant_to_rate():
-    """07 P0-6: sweeping controller_interface.update_rate_hz from 10 to 200 kHz leaves the command-to-plant delay in
+    """Sweeping controller_interface.update_rate_hz from 10 to 200 kHz leaves the command-to-plant delay in
     seconds unchanged (latencies are owned by the I/O path in seconds, never counted in samples of the rate), and
     the first observation follows timing.first_response_tick at every rate."""
     delays = []
     for rate in (10e3, 20e3, 50e3, 100e3, 200e3):
-        cfg = _cfg(f"controller_interface.update_rate_hz={rate}")
+        cfg = _g26_config(f"controller_interface.update_rate_hz={rate}")
         per = int(round(1.0 / (rate * 1e-6)))
         k_imp = 3 * per
         base, imp = _impulse_runs(cfg, k_imp, 65535, k_imp + 2 * per + 60)
@@ -102,7 +116,7 @@ def test_latency_invariant_to_rate():
         assert pl.spec.period_ticks == per
         p0 = base.trace["p_heater_w@1:last"]["value"][:, 0]
         p1 = imp.trace["p_heater_w@1:last"]["value"][:, 0]
-        k_act = _first_diff(p1, p0)
+        k_act = _first_differing_tick(p1, p0)
         delays.append((k_act - k_imp) * pl.dt)
         m0 = base.trace["monitor_code@1:last"]["value"][:, 0]
         m1 = imp.trace["monitor_code@1:last"]["value"][:, 0]
@@ -110,7 +124,7 @@ def test_latency_invariant_to_rate():
         want = first_response_tick(k_imp, 0, int(pl.heater_params.latency_ticks[0]), pl.monitor_hw.period_ticks,
                                     int(pl.monitor_hw.phase[n]), int(pl.monitor_hw.latency_ticks[0]), per,
                                     pl.spec.phase_ticks)
-        assert _first_diff(m1[:, n], m0[:, n]) == want
+        assert _first_differing_tick(m1[:, n], m0[:, n]) == want
     assert len(set(np.round(np.asarray(delays) * 1e12).astype(int))) == 1, delays
     assert delays[0] > 0
 
@@ -139,11 +153,11 @@ class Collector:
 
 
 def test_fifo_depth():
-    """07 P0-6 test_fifo_depth: with an ADC latency longer than the controller period (26 us against 10 us) every
+    """With an ADC latency longer than the controller period (26 us against 10 us) every
     monitor sample is delivered exactly once, in sample-tick order, at the first edge at or after its release tick;
     no FIFO or block loses a sample; the plant sized the FIFO with timing.fifo_capacity(latency, ADC period,
     release period)."""
-    cfg = _cfg("ring.monitor.adc_latency_s=2.6e-5")
+    cfg = _g26_config("ring.monitor.adc_latency_s=2.6e-5")
     ctrl = Collector()
     r = run(cfg, ctrl, duration_s=600e-6, batch=1, seeds=2, uncertainty="nominal", variation="off",
             reset_protocol="branch_low", oracle=False, histogram=False)
@@ -162,9 +176,12 @@ def test_fifo_depth():
         assert got == want, n
 
 
-# ------------------------------------------------------------------------------------------------ fast kernel
+# ---------------------------------------------------------------------------------------------------------- fast kernel
+# A heater-dither lock-in: the fast kernel accumulates I / Q of every new monitor sample and sets the dither sign.
+# p: [n_rings, heater offset in act, dither amplitude, base code]; pf: [reference phase per tick];
+# s: sample count per ring; sf: [I per ring, Q per ring].
 @njit(cache=True)
-def li_init(si, sf):
+def lockin_init(si, sf):
     n = si[SPEC_I_N_RINGS]
     p = np.zeros(4, np.int64)
     p[0] = n
@@ -177,8 +194,8 @@ def li_init(si, sf):
 
 
 @njit(cache=True)
-def li_fast(p, pf, s, sf, fobs, fact):
-    n = fobs[1]
+def lockin_fast(p, pf, s, sf, fobs, fact):
+    n = fobs[1]                     # fobs = [tick, N, new[N], code[N], sample_tick[N]] (mrm.control.api)
     for i in range(n):
         if fobs[2 + i] != 0:
             code = fobs[2 + n + i]
@@ -191,7 +208,7 @@ def li_fast(p, pf, s, sf, fobs, fact):
 
 
 @njit(cache=True)
-def li_step(p, pf, s, sf, obs, act):
+def lockin_step(p, pf, s, sf, obs, act):
     return None
 
 
@@ -228,13 +245,14 @@ class PyLockIn:
 
 
 def test_fast_kernel_equals_1mhz_python_step():
-    """07 P0-7: a heater-dither lock-in written once as a fast_kernel (once per released ADC sample, inside the
+    """A heater-dither lock-in written once as a fast_kernel (once per released ADC sample, inside the
     kernel) and once as a 1 MHz Python step gives bit-identical I/Q accumulators and the same plant."""
-    cfg = _cfg("controller_interface.update_rate_hz=1000000.0")
+    cfg = _g26_config("controller_interface.update_rate_hz=1000000.0")
     amp, base = 800, 20000
     w = 2.0 * math.pi * 31.25e3 * 1e-6
     n_ticks = 1500
-    fast = CompiledController("li", li_init, li_step, params_i64=[amp, base], params_f64=[w], fast_fn=li_fast)
+    fast = CompiledController("li", lockin_init, lockin_step, params_i64=[amp, base], params_f64=[w],
+                              fast_fn=lockin_fast)
     kw = dict(duration_s=n_ticks * 1e-6, batch=1, seeds=6, uncertainty="nominal", variation="off",
               reset_protocol="branch_low", heater_code=base, record=[("p_heater_w", 1, "last")], oracle=False,
               histogram=False)
@@ -252,10 +270,10 @@ def test_fast_kernel_equals_1mhz_python_step():
 
 
 def test_two_configs_in_one_process_differ():
-    """07 P0-9 / P1-18: no frozen globals. Two configs in one process give different outputs, and the first config
-    run again reproduces its first result exactly."""
-    a = _cfg()
-    b = _cfg("laser.power_per_line_dbm=9.0")
+    """No frozen globals in the compiled code: two configs in one process give different outputs, and the first
+    config run again reproduces its first result exactly."""
+    a = _g26_config()
+    b = _g26_config("laser.power_per_line_dbm=9.0")
     kw = dict(duration_s=300e-6, batch=1, seeds=1, uncertainty="nominal", variation="off",
               reset_protocol="branch_low", record=[("p_drop_w", 1, "last")], oracle=False, histogram=False)
     ra = run(a, None, **kw)
@@ -268,7 +286,8 @@ def test_two_configs_in_one_process_differ():
     np.testing.assert_array_equal(ra.truth_final.t_ring_k, ra2.truth_final.t_ring_k)
 
 
-# ------------------------------------------------------------------------------------------------ pipelines
+# -------------------------------------------------------------------------------------------------- controller pipeline
+# A compiled controller that counts its edges and sends code 1000 + 10 * count to every heater.
 @njit(cache=True)
 def count_init(si, sf):
     p = np.zeros(2, np.int64)
@@ -285,10 +304,10 @@ def count_step(p, pf, s, sf, obs, act):
 
 
 def test_pipeline_with_edge_jitter_drops_nothing():
-    """07 P0-6 / P2-7: with tick jitter J two controller edges can be period - J apart, so the controller pipeline
-    must hold latency // (period - J) + 1 commands; with latency 9, period 10 and J = 5 a pipeline sized for the
-    nominal period dropped a third of the commands. Every command now latches, in order, at its edge + latency."""
-    cfg = _cfg("controller_interface.tick_jitter_s=5e-6")
+    """With tick jitter J two controller edges can be period - J apart, so the controller pipeline must hold
+    latency // (period - J) + 1 commands. With latency 9, period 10 and J = 5, a pipeline sized for the nominal
+    period would drop a third of the commands. Every command latches, in order, at its edge + latency."""
+    cfg = _g26_config("controller_interface.tick_jitter_s=5e-6")
     for lat in (4, 9, 14):
         c = CompiledController("count", count_init, count_step, latency_ticks=lat)
         r = run(cfg, c, duration_s=1e-3, batch=2, seeds=1, uncertainty="nominal", variation="off", oracle=False,
@@ -306,15 +325,15 @@ def test_pipeline_with_edge_jitter_drops_nothing():
 
 def test_advance_keeps_every_command():
     """Plant.advance issued more often than the controller period with a controller latency: every command latches
-    exactly latency ticks after it was issued (the pipeline grows; it used to drop three of four commands)."""
+    exactly latency ticks after it was issued (the pipeline grows; a fixed one would drop three of four commands)."""
     from mrm.control.api import ControllerSpec
     from mrm.plant.plant import Plant
-    from mrm.scenarios import registry as scen_registry
-    cfg = _cfg()
+    from mrm.scenarios import registry as scenario_registry
+    cfg = _g26_config()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         pp = params.realize(cfg, 1, seeds=1, uncertainty="nominal", variation="off")
-    sc = scen_registry.from_config(cfg)
+    sc = scenario_registry.from_config(cfg)
     spec = ControllerSpec.from_config(cfg, n_batch=1, nominal=cfg, scenario_drives=sc.drives,
                                       scenario_offsets=sc.offsets)
     pl = Plant(pp, sc, spec, controller_latency_ticks=3, oracle=False, histogram=False,
@@ -328,20 +347,21 @@ def test_advance_keeps_every_command():
     assert pl.diagnostics()["fifo_capacities"]["pipeline"] >= 4
 
 
-# ------------------------------------------------------------------------------------------------ Plant API
+# ----------------------------------------------------------------------------------------------- Plant and registry API
+
 def test_reset_repeats_an_episode_with_a_bound_compiled_controller():
     """Plant.reset() restarts a bound compiled controller from its post-init state (the state fault.controller_reset
     restores), so a second episode after reset() equals the first exactly (gym-style reuse of one Plant). reset()
-    used to overwrite the saved post-init state with the end-of-episode state."""
+    must not overwrite the saved post-init state with the end-of-episode state."""
     from mrm.control.api import ControllerSpec
     from mrm.plant.plant import Plant
-    from mrm.scenarios import registry as scen_registry
-    from mrm.sim import kernel as K
-    cfg = _cfg("sim.reset_ramp_s=1e-4")
+    from mrm.scenarios import registry as scenario_registry
+    from mrm.sim import kernel
+    cfg = _g26_config("sim.reset_ramp_s=1e-4")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         pp = params.realize(cfg, 2, seeds=3)
-    sc = scen_registry.from_config(cfg)
+    sc = scenario_registry.from_config(cfg)
     spec = ControllerSpec.from_config(cfg, n_batch=2, nominal=cfg, scenario_drives=sc.drives,
                                       scenario_offsets=sc.offsets)
     pl = Plant(pp, sc, spec, noise_seed=2, oracle=False, histogram=False, record=[("heater_code", 1, "last"),
@@ -353,7 +373,7 @@ def test_reset_repeats_an_episode_with_a_bound_compiled_controller():
     out = []
     for _ in range(2):
         pl.reset()
-        pl.run(300, mode=K.MODE_COMPILED, step_fn=c.step_fn)
+        pl.run(300, mode=kernel.MODE_COMPILED, step_fn=c.step_fn)
         tr = pl.traces()
         out.append((tr["heater_code@1:last"]["value"].copy(), tr["t_ring_k@1:last"]["value"].copy(),
                     c.state[2].copy(), pl.metrics()["heater_energy_j"].copy()))
@@ -379,12 +399,12 @@ class _Hold:
 
 def test_run_creates_registered_controllers_with_params():
     """run(cfg, "<registry name>", controller_params={...}) builds the controller through
-    mrm.control.registry.create(name, params) (the mapping is its second argument; it was passed as keywords)."""
+    mrm.control.registry.create(name, params) (the mapping is its second argument, not keywords)."""
     from mrm.control import registry
     registry.register("engine_test_hold", _Hold, overwrite=True)
     try:
-        r = run(_cfg(), "engine_test_hold", duration_s=50e-6, controller_params={"code": 12345}, batch=1, seeds=1,
-                uncertainty="nominal", variation="off", oracle=False, histogram=False)
+        r = run(_g26_config(), "engine_test_hold", duration_s=50e-6, controller_params={"code": 12345}, batch=1,
+                seeds=1, uncertainty="nominal", variation="off", oracle=False, histogram=False)
     finally:
         registry.unregister("engine_test_hold")
     assert r.manifest_inputs["controller"] == "engine_test_hold"

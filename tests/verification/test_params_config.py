@@ -1,5 +1,19 @@
-"""Loader: leaf format, provenance enforcement, extends, alternatives, overrides, artefacts, timing rule
-(07 P1-14, P1-15, P0-6; ARCHITECTURE sections 1 and 5)."""
+"""Checks the config loader mrm.params.config: leaf format, provenance rules, extends, alternatives, overrides,
+artefacts and the timing rule.
+
+Read this first
+---------------
+Most tests start from tests/data/mini.yaml as a dict (``_mini_dict``), break one rule and expect a ConfigError with
+a message that names the problem. The rules come from docs/ARCHITECTURE.md ("1. Units, naming, provenance" and
+"5. Artefact formats") and docs/PARAMETERS_FORMAT.md (the "whole ticks" rule):
+
+- every leaf carries value, provenance, generation and source, and a preset never holds a bare number;
+- provenance is enforced, and a derived value takes the weakest provenance of its inputs ("printed" is stronger than
+  "solver", which is stronger than "assumed");
+- an ``extends:`` child that changes a value restates its provenance; a corner preset only selects alternatives;
+- every latency and sample period is a whole number of plant ticks;
+- a ``from:`` artefact value is checked against the sha256 in its sidecar.
+"""
 import copy
 import hashlib
 import json
@@ -11,24 +25,27 @@ import yaml
 
 from mrm.params.config import (ArtefactError, ConfigError, load, provenance_rank, weakest, yaml_load)
 
-MINI = Path(__file__).resolve().parents[1] / "data" / "mini.yaml"
+MINI = Path(__file__).resolve().parents[1] / "data" / "mini.yaml"   # the small 4-ring test config
 
 
-def mini():
+def _mini_dict():
+    """A fresh copy of tests/data/mini.yaml as a dict (safe to modify)."""
     return copy.deepcopy(yaml_load(MINI.read_text()))
 
 
-def write(tmp_path, name, data):
+def _write_yaml(tmp_path, name, data):
+    """Write data as YAML to tmp_path/name and return the path."""
     p = tmp_path / name
     p.write_text(yaml.safe_dump(data, sort_keys=False))
     return p
 
 
-def leafv(v, prov="assumed", gen="none", src="TEST"):
+def _leaf(v, prov="assumed", gen="none", src="TEST"):
+    """A config leaf with its provenance, generation and source."""
     return {"value": v, "provenance": prov, "generation": gen, "source": src}
 
 
-# ------------------------------------------------------------------------------------------------ basics
+# --------------------------------------------------------------------------------------------------------------- basics
 
 def test_mini_loads_and_reports():
     cfg = load(MINI)
@@ -52,20 +69,20 @@ def test_provenance_ranking():
     assert weakest(["override", "printed"]) == "override"
 
 
-# ------------------------------------------------------------------------------------------------ provenance rules
+# ----------------------------------------------------------------------------------------------------- provenance rules
 
 def test_bare_number_in_preset_rejected():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["heater"]["p_fsr_mw"] = 25.45
     with pytest.raises(ConfigError, match="bare value in a preset"):
         load(d)
 
 
 def test_bare_number_in_experiment_is_override(tmp_path):
-    write(tmp_path, "base.yaml", mini())
+    _write_yaml(tmp_path, "base.yaml", _mini_dict())
     exp = {"extends": "base", "meta": {"kind": "experiment", "name": "e1"},
            "ring": {"optics": {"q_loaded": 4000}}, "experiment": {"duration_s": 0.01}}
-    cfg = load(write(tmp_path, "e1.yaml", exp))
+    cfg = load(_write_yaml(tmp_path, "e1.yaml", exp))
     assert cfg.leaf("ring.optics.q_loaded").value == 4000
     assert cfg.leaf("ring.optics.q_loaded").provenance == "override"
     assert cfg.get("experiment.duration_s") == 0.01
@@ -76,7 +93,7 @@ def test_bare_number_in_experiment_is_override(tmp_path):
 
 
 def test_leaf_needs_provenance_generation_source():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["heater"]["r_cold_ohm"] = {"value": 45.4}
     with pytest.raises(ConfigError) as e:
         load(d)
@@ -84,7 +101,7 @@ def test_leaf_needs_provenance_generation_source():
 
 
 def test_closed_enums_and_unknown_fields():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["heater"]["r_cold_ohm"] = {"value": 45.4, "provenance": "guessed", "generation": "G27",
                                          "source": "NOWHERE", "units": "ohm"}
     with pytest.raises(ConfigError) as e:
@@ -94,7 +111,7 @@ def test_closed_enums_and_unknown_fields():
 
 
 def test_calibrated_needs_targets_and_private_needs_private_dir():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["heater"]["r_cold_ohm"]["provenance"] = "calibrated"
     with pytest.raises(ConfigError, match="targets"):
         load(d)
@@ -106,32 +123,32 @@ def test_calibrated_needs_targets_and_private_needs_private_dir():
 
 
 def test_range_and_bounds():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["q_loaded"]["value"] = 5000
     with pytest.raises(ConfigError, match="outside its own range"):
         load(d)
-    d = mini()
-    d["ring"]["monitor"]["responsivity_a_per_w"] = leafv(3.0)
+    d = _mini_dict()
+    d["ring"]["monitor"]["responsivity_a_per_w"] = _leaf(3.0)
     with pytest.raises(ConfigError, match="physical bounds"):
         load(d)
 
 
 def test_derived_only_key_rejected():
-    d = mini()
-    d["ring"]["optics"]["dn_eff_dt_per_k"] = leafv(2e-4)
+    d = _mini_dict()
+    d["ring"]["optics"]["dn_eff_dt_per_k"] = _leaf(2e-4)
     with pytest.raises(ConfigError, match="R1_thermo_optic"):
         load(d)
 
 
 def test_ring_list_length_checked():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["resonance_offset_nm"]["value"] = [7.6, 7.7, 7.8]
     with pytest.raises(ConfigError, match="expected 4"):
         load(d)
 
 
 def test_sources_checked_when_known():
-    d = mini()
+    d = _mini_dict()
     d["meta"]["kind"] = "preset"
     srcs = d["meta"].pop("sources")
     with pytest.raises(ConfigError, match="LM26-P"):
@@ -139,69 +156,96 @@ def test_sources_checked_when_known():
     load(d, sources=set(srcs))
 
 
-# ------------------------------------------------------------------------------------------------ timing rule
+# ---------------------------------------------------------------------------------------------------------- timing rule
 
 def test_latency_must_be_whole_ticks():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["monitor"]["adc_latency_s"]["value"] = 1.5e-6
     with pytest.raises(ConfigError, match="ring.monitor.adc_latency_s.*whole number of ticks"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["monitor"]["adc_rate_hz"]["value"] = 300e3          # 3.33 us period
     with pytest.raises(ConfigError, match="adc_rate_hz"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["controller_interface"]["update_rate_hz"] = 30e3
     with pytest.raises(ConfigError, match="update_rate_hz"):
         load(d)
 
 
-# ------------------------------------------------------------------------------------------------ extends
+# -------------------------------------------------------------------------------------------------------------- extends
 
 def test_extends_child_must_restate_provenance(tmp_path):
-    write(tmp_path, "base.yaml", mini())
+    _write_yaml(tmp_path, "base.yaml", _mini_dict())
     child = {"extends": "base", "meta": {"name": "child", "kind": "test", "sources": {"TEST": "x"}},
              "ring": {"heater": {"p_fsr_mw": {"value": 30.0}}}}
     with pytest.raises(ConfigError, match="without restating provenance and generation"):
-        load(write(tmp_path, "child.yaml", child))
+        load(_write_yaml(tmp_path, "child.yaml", child))
     child["ring"]["heater"]["p_fsr_mw"] = {"value": 30.0, "provenance": "assumed", "generation": "none"}
-    cfg = load(write(tmp_path, "child.yaml", child))
+    cfg = load(_write_yaml(tmp_path, "child.yaml", child))
     lf = cfg.leaf("ring.heater.p_fsr_mw")
     assert lf.value == 30.0 and lf.provenance == "assumed" and lf.source == "LM-T"   # source inherited
     assert any("value changed" in o for o in lf.origin) and len(cfg.files) == 2
 
 
 def test_extends_note_only_change_is_free(tmp_path):
-    write(tmp_path, "base.yaml", mini())
+    _write_yaml(tmp_path, "base.yaml", _mini_dict())
     child = {"extends": "base", "meta": {"name": "c2", "kind": "test"},
              "ring": {"heater": {"p_fsr_mw": {"note": "new note"}}}}
     # a mapping without value/from is a section, not a leaf: p_fsr_mw.note is then an unknown key
     with pytest.raises(ConfigError):
-        load(write(tmp_path, "c2.yaml", child))
+        load(_write_yaml(tmp_path, "c2.yaml", child))
+
+
+def test_extends_yaml_path_is_tried_beside_the_extending_file_first(tmp_path, monkeypatch):
+    """``extends: parent.yaml`` loads the parent beside the extending file, not a same-named file in the working
+    directory (a bare preset name already worked this way)."""
+    beside = _mini_dict()
+    beside["ring"]["heater"]["p_fsr_mw"]["value"] = 31.0
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    _write_yaml(lib, "parent.yaml", beside)
+    child = _write_yaml(lib, "child.yaml", {"extends": "parent.yaml", "meta": {"name": "child", "kind": "test"}})
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    _write_yaml(cwd, "parent.yaml", _mini_dict())                              # p_fsr_mw 25.45, the wrong file
+    monkeypatch.chdir(cwd)
+    cfg = load(child)
+    assert cfg.leaf("ring.heater.p_fsr_mw").value == 31.0
+    assert str((lib / "parent.yaml").resolve()) in cfg.files
+
+
+def test_mapping_with_null_meta_loads(tmp_path):
+    """A mapping with ``meta: null`` loads (it raised AttributeError); its name is '<mapping>'."""
+    d = _mini_dict()
+    srcs = set(d["meta"]["sources"])
+    d["meta"] = None
+    cfg = load(d, sources=srcs)
+    assert cfg.name == "<mapping>" and cfg.n_rings == 4
 
 
 def test_extends_cycle(tmp_path):
-    write(tmp_path, "a.yaml", {"extends": "b", "meta": {"name": "a"}})
-    write(tmp_path, "b.yaml", {"extends": "a", "meta": {"name": "b"}})
+    _write_yaml(tmp_path, "a.yaml", {"extends": "b", "meta": {"name": "a"}})
+    _write_yaml(tmp_path, "b.yaml", {"extends": "a", "meta": {"name": "b"}})
     with pytest.raises(ConfigError, match="cycle"):
         load(tmp_path / "a.yaml")
 
 
 def test_corner_preset_only_selects(tmp_path):
-    write(tmp_path, "base.yaml", mini())
+    _write_yaml(tmp_path, "base.yaml", _mini_dict())
     corner = {"extends": "base", "meta": {"name": "h86", "kind": "corner"},
               "alts": {"uncertainty.thermo_optic": "H86"}}
-    cfg = load(write(tmp_path, "h86.yaml", corner))
+    cfg = load(_write_yaml(tmp_path, "h86.yaml", corner))
     assert cfg.leaf("ring.thermal.dlambda_dt_pm_per_k").value == 86.0
     assert cfg.leaf("ring.thermal.dlambda_dt_pm_per_k").provenance == "printed"
     assert cfg.leaf("ring.thermal.dlambda_dt_beta_per_k").value == 0.0
     assert cfg.uncertainty["thermo_optic"].pinned == "H86"
     corner["ring"] = {"optics": {"q_loaded": {"value": 4000, "provenance": "assumed", "generation": "none"}}}
     with pytest.raises(ConfigError, match="corner preset may contain only"):
-        load(write(tmp_path, "bad.yaml", corner))
+        load(_write_yaml(tmp_path, "bad.yaml", corner))
 
 
-# ------------------------------------------------------------------------------------------------ alts and overrides
+# --------------------------------------------------------------------------------------------------- alts and overrides
 
 def test_leaf_alternative_selection_pins_hypothesis():
     cfg = load(MINI, alts={"ring.optics.fsr_thz": "window_a"})
@@ -241,50 +285,50 @@ def test_overrides_dict_and_strings():
         load(MINI, overrides=["ring.optics.q_loaded"])
 
 
-# ------------------------------------------------------------------------------------------------ uncertainty / variation format
+# --------------------------------------------------------------------------------------- uncertainty / variation format
 
 def test_uncertainty_entry_validation():
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["thermo_optic"]["nominal"] = "H99"
     with pytest.raises(ConfigError, match="nominal 'H99'"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["thermo_optic"]["choices"]["H86"]["ring.thermal.dlambda_dt_pm_per_k"] = "H87"
     with pytest.raises(ConfigError, match="no alternative 'H87'"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["q_loaded"]["low"] = 5000
     with pytest.raises(ConfigError, match="low <= high"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["bad"] = {"kind": "interval", "target": "ring.heater.efficiency_nm_per_mw", "low": 0.3,
                                "high": 0.5, "provenance": "assumed", "generation": "none", "source": "TEST"}
     with pytest.raises(ConfigError, match="derived"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["thermal"]["time_scale_fast"]["kind"] = "range"
     with pytest.raises(ConfigError, match="kind 'range'"):
         load(d)
 
 
 def test_variation_entry_validation():
-    d = mini()
+    d = _mini_dict()
     d["variation"]["ring.heater.r_cold_ohms"] = {"ring_sigma": 1.0, "provenance": "assumed", "generation": "none",
                                                  "source": "TEST"}
     with pytest.raises(ConfigError, match="did you mean ring.heater.r_cold_ohm"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["variation"]["ring.geometry.radius_um"] = {"ring_sigma": 0.01, "provenance": "assumed", "generation": "none",
                                                  "source": "TEST"}
     with pytest.raises(ConfigError, match="free relation member"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["variation"]["ring.heater.r_cold_ohm"]["line_sigma"] = 1.0
     with pytest.raises(ConfigError, match="line_sigma needs level line"):
         load(d)
 
 
-# ------------------------------------------------------------------------------------------------ artefacts
+# ------------------------------------------------------------------------------------------------------------ artefacts
 
 def _artefact(root: Path, name="modes_test.json", data=None, good_sha=True, inputs=None):
     ext = root / "extracted"
@@ -303,7 +347,7 @@ def _artefact(root: Path, name="modes_test.json", data=None, good_sha=True, inpu
 
 def test_from_artefact(tmp_path):
     _artefact(tmp_path, inputs={"geometry": {"provenance": "assumed", "width_nm": 400}})
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["n_g"] = {"from": "extracted/modes_test.json:n_g", "generation": "none", "source": "R06"}
     d["ring"]["thermal"]["dlambda_dt_pm_per_k"] = {
         "value": {"from": "extracted/modes_test.json:dlambda_dt_pm_per_k", "at": {"t_c": 65.0}},
@@ -319,7 +363,7 @@ def test_from_artefact(tmp_path):
 
 def test_from_artefact_sha_mismatch_and_missing(tmp_path):
     _artefact(tmp_path, good_sha=False)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["n_g"] = {"from": "extracted/modes_test.json:n_g", "generation": "none", "source": "R06"}
     with pytest.raises(ArtefactError, match="sha256"):
         load(d, data_root=tmp_path)
@@ -338,7 +382,7 @@ def test_from_artefact_sha_mismatch_and_missing(tmp_path):
 
 def test_from_artefact_in_alternative(tmp_path):
     _artefact(tmp_path)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["n_g"]["alternatives"] = {
         "t200": {"from": "extracted/modes_test.json:n_g", "provenance": "solver"}}
     cfg = load(d, data_root=tmp_path, alts={"ring.optics.n_g": "t200"})
@@ -346,26 +390,26 @@ def test_from_artefact_in_alternative(tmp_path):
     assert cfg.leaf("ring.optics.n_g").artefact["file"] == "extracted/modes_test.json"
 
 
-# ------------------------------------------------------------------------------------------------ review additions
+# ----------------------------------------------------------------------------------------------------- review additions
 
 def test_fidelity_rules_hold_in_every_hypothesis_world():
     """A per-world switch reached by a hypothesis must find its required keys (it gave nan full scales before)."""
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["heater_driver"]["choices"]["power"] = {"ring.heater.driver_mode": "power"}
     with pytest.raises(ConfigError, match=r"heater_driver=power.*full_scale_w"):
         load(d)
-    d["ring"]["heater"]["full_scale_w"] = leafv(0.05)
+    d["ring"]["heater"]["full_scale_w"] = _leaf(0.05)
     load(d)
 
 
 def test_multiplicative_draws_of_affine_or_log_keys_rejected():
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["tref"] = {"kind": "interval", "target": "ring.optics.resonance_offset_ref_temp_c",
                                 "mode": "scale", "low": 0.9, "high": 1.1, "provenance": "assumed",
                                 "generation": "none", "source": "TEST"}
     with pytest.raises(ConfigError, match="affine"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["variation"]["laser.power_per_line_dbm"] = {"level": "line", "rel_sigma": 0.05, "provenance": "assumed",
                                                   "generation": "none", "source": "TEST"}
     with pytest.raises(ConfigError, match="logarithmic"):
@@ -377,7 +421,7 @@ def test_multiplicative_draws_of_affine_or_log_keys_rejected():
 
 def test_interval_and_dist_entry_checks():
     def entry(**kw):
-        d = mini()
+        d = _mini_dict()
         d["uncertainty"]["x"] = dict(kw, provenance="assumed", generation="none", source="TEST")
         return d
     with pytest.raises(ConfigError, match="triangular"):
@@ -392,15 +436,15 @@ def test_interval_and_dist_entry_checks():
 
 
 def test_alternative_values_and_ranges_are_checked():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["q_loaded"]["alternatives"]["bad"] = {"value": "high", "provenance": "assumed"}
     with pytest.raises(ConfigError, match="alternatives.bad"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["thermal"]["dlambda_dt_pm_per_k"]["alternatives"]["H86"]["value"] = 0.086    # nm/K typed as pm/K
     with pytest.raises(ConfigError, match="physical bounds"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["q_loaded"]["range"] = [3000]
     with pytest.raises(ConfigError, match="range must be"):
         load(d)
@@ -411,7 +455,7 @@ def test_hash_covers_alternatives_and_is_stable():
     it."""
     from mrm.params.realize import realize
     a = load(MINI)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["thermal"]["dlambda_dt_pm_per_k"]["alternatives"]["H86"]["value"] = 80.0
     assert load(d).hash() != a.hash()
     h0 = a.hash()
@@ -422,7 +466,7 @@ def test_hash_covers_alternatives_and_is_stable():
 def test_hash_stable_after_drawing_an_artefact_alternative(tmp_path):
     from mrm.params.realize import realize
     _artefact(tmp_path)
-    d = mini()
+    d = _mini_dict()
     d["ring"]["optics"]["n_g"]["alternatives"] = {"t200": {"from": "extracted/modes_test.json:n_g",
                                                            "provenance": "solver"}}
     d["uncertainty"]["xsec"] = {"kind": "hypothesis", "target": "ring.optics.n_g", "choices": ["default", "t200"],
@@ -451,11 +495,11 @@ def test_override_of_a_per_world_switch_holds_in_every_world():
 
 def test_hypothesis_nominal_must_be_the_config_as_written():
     """derive(), the table and explain show the leaves; the nominal world must therefore select exactly them."""
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["thermo_optic"]["nominal"] = "H86"
     with pytest.raises(ConfigError, match="nominal choice 'H86'"):
         load(d)
-    d = mini()
+    d = _mini_dict()
     d["uncertainty"]["heater_driver"]["nominal"] = "current"
     with pytest.raises(ConfigError, match="nominal choice 'current'"):
         load(d)
@@ -463,7 +507,7 @@ def test_hypothesis_nominal_must_be_the_config_as_written():
 
 
 def test_derived_tag_only_on_relation_members():
-    d = mini()
+    d = _mini_dict()
     d["ring"]["monitor"]["gain_scale"] = {"value": None, "provenance": "derived"}
     with pytest.raises(ConfigError, match="no relation computes it"):
         load(d)

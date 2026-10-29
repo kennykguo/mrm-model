@@ -1,6 +1,8 @@
-"""params review fixes (2026-10-16), one test per confirmed finding (docs/CHANGELOG.md, same date).
+"""Regression tests of the params review fixes (2026-10-16): at least one test per confirmed finding.
 
-- params-1, params-11: in g26 one geometry error moves the couplers with the resonance (07 P1-16): the coupling
+The finding IDs (params-N) are those of docs/CHANGELOG.md, same date. What each fix guarantees:
+
+- params-1, params-11: in g26 one geometry error moves the couplers with the resonance: the coupling
   Jacobian is wired, a width error closes both gaps, the gaps have one local sigma, and a device's per-pass coupling
   at its line is the nominal device's moved by exactly J dg (no double count of the coupler dispersion);
 - params-2: with sampled geometry the mask radius and the order are the nominal device's, and the FSR follows n_g;
@@ -10,7 +12,8 @@
 - params-8: the junction exponent's declared range is the span the analytic junction table accepts;
 - params-9: a world's value (interval end or corner) and every preset alternative lie in the leaf's range;
 - params-13: the R0 range holds the calibrated droop worlds;
-- params-3: the 200 nm film world is the rib200 artefact.
+- params-3: the 200 nm film world uses the rib200 artefact;
+- params-14: in every world the coupling_regime label is the regime of the cold 0 V ring.
 """
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ import numpy as np
 import pytest
 
 from mrm.params import derive, load, realize
-from mrm.params import relations as rel
+from mrm.params import relations
 from mrm.params.config import ConfigError, yaml_load
 from mrm.params.derive import effective_provenance
 from mrm.params.table import explain
@@ -34,12 +37,14 @@ ROOT = Path(__file__).resolve().parents[2]
 EXTRACTED = ROOT / "mrm" / "data" / "extracted"
 MINI = ROOT / "tests" / "data" / "mini.yaml"
 PRESETS = sorted(p.stem for p in (ROOT / "mrm" / "params" / "presets").glob("*.yaml"))
-B = 400
+B = 400                     # worlds of the sampled g26 die set
+# Jacobian input name -> geometry draw name (realize's diagnostics["geometry_draws_nm"])
 DIMS = {"width_nm": "width", "film_nm": "thickness", "slab_nm": "slab", "gap_through_nm": "gap_through",
         "gap_drop_nm": "gap_drop"}
 
 
-def _load(name, **kw):
+def _load_quiet(name, **kw):
+    """params.load with its warnings silenced (missing-artefact fallbacks warn)."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return load(name, **kw)
@@ -47,7 +52,7 @@ def _load(name, **kw):
 
 @pytest.fixture(scope="module")
 def g26_dies():
-    cfg = _load("g26")
+    cfg = _load_quiet("g26")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         p = realize(cfg, B, 3, uncertainty="nominal", variation="sample", thermal_hook=None)
@@ -55,11 +60,11 @@ def g26_dies():
     return cfg, p, nom
 
 
-def _at_line_ln_k2(o, which):
+def _at_line_ln_k2(optics, which):
     """ln K^2 of a coupler at the ring's line, as mrm.plant.phase.coupling_row evaluates it."""
-    k2 = getattr(o, f"kappa2_{which}")
-    d = getattr(o, f"dln_kappa2_{which}_dlambda_per_m")
-    return np.log(k2) + d * (o.lambda_line_m - o.lambda_res_cold_m)
+    k2 = getattr(optics, f"kappa2_{which}")
+    d = getattr(optics, f"dln_kappa2_{which}_dlambda_per_m")
+    return np.log(k2) + d * (optics.lambda_line_m - optics.lambda_res_cold_m)
 
 
 def _effective_dims(cfg, p):
@@ -71,13 +76,13 @@ def _effective_dims(cfg, p):
     return dg
 
 
-# ------------------------------------------------------------------------------------------------ params-1, -11
+# ------------------------------------------------------------------- params-1, -11: the couplers move with the geometry
 
 def test_g26_couplers_move_with_the_geometry_by_the_coupling_jacobian(g26_dies):
-    """params-1 (07 P1-16): g26 wires coupling_rib160's Jacobian, and every device's per-pass coupling at its own line
-    differs from the nominal device's by exactly sum_k J_k dg_k (litho-corrected: total = d/dw - d/dgap). Before the
-    fix the coupling at the cold resonance was the anchor's for every device, so at the line it moved by -D d lambda
-    only (about half the geometry-correlated coupling, in the wrong proportion)."""
+    """params-1: g26 wires coupling_rib160's Jacobian, and every device's per-pass coupling at its own line differs from
+    the nominal device's by exactly sum_k J_k dg_k (litho-corrected: total = d/dw - d/dgap). Before the fix the coupling
+    at the cold resonance was the anchor's for every device, so at the line it moved by -D d lambda only (about half the
+    geometry-correlated coupling, in the wrong proportion)."""
     cfg, p, nom = g26_dies
     assert "ring.geometry.jacobian_coupling" in cfg.geometry.get("jacobians", [])
     assert cfg.geometry.get("width_closes_gaps") is True
@@ -94,13 +99,14 @@ def test_g26_couplers_move_with_the_geometry_by_the_coupling_jacobian(g26_dies):
 
 
 def test_g26_offset_and_coupling_correlation_matches_the_jacobian_prediction(g26_dies):
-    """07 P1-16's test on g26: the sampled correlation (and spread) of (resonance offset, ln K^2 at the line) matches
-    the analytic Jacobian prediction from the preset's sigmas, for both couplers."""
+    """The geometry-correlation test on g26: the sampled correlation (and spread) of (resonance offset, ln K^2 at the
+    line) matches the analytic Jacobian prediction from the preset's sigmas, for both couplers."""
     cfg, p, _ = g26_dies
     g = cfg.geometry
     var = {d: float(g[d].get("die_sigma_nm", 0.0)) ** 2 + float(g[d].get("ring_sigma_nm", 0.0)) ** 2
            for d in ("width", "thickness", "gap_through", "gap_drop") if d in g}
-    jl = dict(zip(cfg.get("ring.geometry.jacobian")["d"], cfg.get("ring.geometry.jacobian")["of"]["lambda_res_nm_per_nm"]))
+    jl = dict(zip(cfg.get("ring.geometry.jacobian")["d"],
+                  cfg.get("ring.geometry.jacobian")["of"]["lambda_res_nm_per_nm"]))
     jac = cfg.get("ring.geometry.jacobian_coupling")
     off = (p.optics.resonance_offset_m * 1e9).ravel()
     for which in ("through", "drop"):
@@ -153,33 +159,33 @@ def test_mini_coupling_jacobian_moves_a_free_coupler():
     assert np.std(p.optics.q_loaded) > 0
 
 
-# ------------------------------------------------------------------------------------------------ params-2
+# --------------------------------------------------------------------- params-2: the FSR follows n_g at the mask radius
 
 def test_g26_fsr_follows_n_g_at_the_mask_radius(g26_dies):
     """params-2: the radius solved from the nominal n_g and the FSR hypothesis is held for every device of the world
     (a mask dimension), the order is the nominal device's (Jacobians at fixed r_ref and order), and each device's FSR
     is c/(n_g L) with its own n_g. Before, R absorbed the n_g draw (FSR exactly 1.8 THz, orders 78-80)."""
     cfg, p, nom = g26_dies
-    o = p.optics
-    np.testing.assert_array_equal(o.radius_m, np.broadcast_to(nom.optics.radius_m, o.radius_m.shape))
-    np.testing.assert_array_equal(o.order, np.broadcast_to(nom.optics.order, o.order.shape))
-    np.testing.assert_allclose(o.fsr_hz, C0 / (o.n_g * o.length_m), rtol=1e-12)
+    opt = p.optics
+    np.testing.assert_array_equal(opt.radius_m, np.broadcast_to(nom.optics.radius_m, opt.radius_m.shape))
+    np.testing.assert_array_equal(opt.order, np.broadcast_to(nom.optics.order, opt.order.shape))
+    np.testing.assert_allclose(opt.fsr_hz, C0 / (opt.n_g * opt.length_m), rtol=1e-12)
     jac = cfg.get("ring.geometry.jacobian")
     jn = dict(zip(jac["d"], jac["of"]["n_g_per_nm"]))
     dg = p.diagnostics["geometry_draws_nm"]
-    np.testing.assert_allclose(o.n_g, nom.optics.n_g + jn["width_nm"] * dg["width"] + jn["film_nm"] * dg["thickness"],
+    np.testing.assert_allclose(opt.n_g, nom.optics.n_g + jn["width_nm"] * dg["width"] + jn["film_nm"] * dg["thickness"],
                                rtol=1e-12)
-    rel_sd = float(np.std(o.fsr_hz / nom.optics.fsr_hz - 1.0))
+    rel_sd = float(np.std(opt.fsr_hz / nom.optics.fsr_hz - 1.0))
     assert 0.003 < rel_sd < 0.01                      # ~0.6 %: ~11 GHz of FSR spread at 1.8 THz
 
 
-# ------------------------------------------------------------------------------------------------ params-10
+# -------------------------------------------------------------------- params-10: bend radiation exponential in geometry
 
 def test_bend_radiation_is_exponential_in_the_geometry(g26_dies):
     """params-10: the Jacobian's alpha_rad secant is applied as d ln alpha_rad/dp from the artefact's stored
     evaluations, so no device gets a negative bend radiation (13 % did with the linear offset)."""
     cfg, p, nom = g26_dies
-    path = rel.P_A_RAD
+    path = relations.P_A_RAD
     a = np.asarray(p.values[path])
     a0 = np.asarray(nom.values[path])
     jac = cfg.get("ring.geometry.jacobian")
@@ -202,42 +208,42 @@ def test_exp_output_without_evaluations_uses_the_secant_over_the_leaf():
     cfg = load(d)
     p = realize(cfg, 64, 0, uncertainty="nominal", thermal_hook=None)
     w = np.broadcast_to(p.diagnostics["geometry_draws_nm"]["width"], (64, cfg.n_rings))
-    a0 = float(cfg.get(rel.P_A_RAD))
-    got = np.asarray(p.values[rel.P_A_RAD]) / (100.0 * math.log(10.0) / 10.0)
+    a0 = float(cfg.get(relations.P_A_RAD))
+    got = np.asarray(p.values[relations.P_A_RAD]) / (100.0 * math.log(10.0) / 10.0)
     np.testing.assert_allclose(got, a0 * np.exp(-1.0 / a0 * w), rtol=1e-12)
     assert got.min() > 0.0
 
 
-# ------------------------------------------------------------------------------------------------ params-4
+# ---------------------------------------------------------------------- params-4: Z_heater->ring the same on every line
 
 def test_heater_z_is_the_same_on_every_line():
     """params-4: with ring.heater.p_fsr_ref_wavelength_nm the R2 inversion uses the FSR at the P_FSR measurement line,
     so Z_heater->ring and the efficiency are the same on every line of g26 (they followed lambda_line^2: 2.3 % across
     the bank) and equal the G25 bench's."""
-    cfg = _load("g26")
+    cfg = _load_quiet("g26")
     d = derive(cfg)
     z = d.diagnostics["z_heater_ring_k_per_mw"]
     eff = d.diagnostics["heater_efficiency_nm_per_mw"]
     assert np.ptp(z) <= 1e-12 * z.max() and np.ptp(eff) <= 1e-12 * eff.max()
-    lam = cfg.si(rel.P_PFSR_LAM)
-    assert d.params.values[rel.P_FSR_SPAN][0, 0] == pytest.approx(lam * lam * 1.8e12 / C0, rel=1e-12)
-    g25 = derive(_load("g25_test_vehicle")).diagnostics["z_heater_ring_k_per_mw"]
+    lam = cfg.si(relations.P_PFSR_LAM)
+    assert d.params.values[relations.P_FSR_SPAN][0, 0] == pytest.approx(lam * lam * 1.8e12 / C0, rel=1e-12)
+    g25 = derive(_load_quiet("g25_test_vehicle")).diagnostics["z_heater_ring_k_per_mw"]
     np.testing.assert_allclose(z, g25[0], rtol=1e-12)
     # without the key every ring keeps its own line (the previous form): Z ~ lambda_line^2
     doc = yaml_load((ROOT / "mrm" / "params" / "presets" / "g26.yaml").read_text())
     del doc["ring"]["heater"]["p_fsr_ref_wavelength_nm"]
-    d2 = derive(_load(doc))
+    d2 = derive(_load_quiet(doc))
     z2 = d2.diagnostics["z_heater_ring_k_per_mw"]
     lam_l = d2.params.optics.lambda_line_m[0]
     assert z2[0] / z2[-1] == pytest.approx((lam_l[0] / lam_l[-1]) ** 2, rel=3e-3)
 
 
-# ------------------------------------------------------------------------------------------------ params-7
+# --------------------------------------------------------- params-7: line wavelengths carry the channel-plan provenance
 
 def test_line_wavelengths_carry_the_channel_plan_provenance():
-    """params-7 (07 P1-14): the line wavelengths are derived from the channel plan, so the per-ring FSR in nm and its
-    diagnostics carry the plan's 'inferred' grid placement instead of 'printed'."""
-    cfg = _load("g26")
+    """params-7: the line wavelengths are derived from the channel plan, so the per-ring FSR in nm and its diagnostics
+    carry the plan's 'inferred' grid placement instead of 'printed'."""
+    cfg = _load_quiet("g26")
     d = derive(cfg)
     der = d.params.derivations
     assert {"channel_plan.center_thz", "channel_plan.spacing_ghz"} <= set(der["derived.optics.lambda_line_m"].inputs)
@@ -248,42 +254,42 @@ def test_line_wavelengths_carry_the_channel_plan_provenance():
     assert d.provenance["fsr_nm"] == "inferred"
     assert d.provenance["heater_efficiency_nm_per_mw"] == "inferred"     # p_fsr_ref_wavelength_nm (CAL-7) is inferred
     assert "channel_plan.center_thz" in explain(cfg, "derived.optics.fsr_m")
-    for p in (rel.P_QI, "derived.optics.kappa2_through", rel.P_DNDT):
+    for p in (relations.P_QI, "derived.optics.kappa2_through", relations.P_DNDT):
         ins = set(der[p].inputs)
         assert ins & {"derived.optics.lambda_line_m", "derived.optics.lambda_res_cold_m"}, p
 
 
-# ------------------------------------------------------------------------------------------------ params-8
+# ----------------------------------------------------------------- params-8: the junction exponent range builds a table
 
 def test_depletion_exponent_range_ends_build_the_analytic_junction_table():
     """params-8: every value the leaf's range admits builds the analytic table (0.33 and 0.67 passed load and realize
     and then raised in mrm.plant.electrical); values outside [1/3, 2/3] are load errors (schema bounds)."""
     from mrm.plant.electrical import junction_table_from_plant_params
-    cfg = _load("g26")
+    cfg = _load_quiet("g26")
     lo, hi = cfg.leaves["ring.junction.depletion_exponent"].range
     for m in (lo, hi, 0.5):
-        c = _load("g26", overrides={"ring.junction.depletion_exponent": m})
+        c = _load_quiet("g26", overrides={"ring.junction.depletion_exponent": m})
         junction_table_from_plant_params(realize(c, 1, 0, uncertainty="nominal", variation="off", thermal_hook=None))
     for m in (0.33, 0.67):
         with pytest.raises(ConfigError, match="depletion_exponent"):
-            _load("g26", overrides={"ring.junction.depletion_exponent": m})
+            _load_quiet("g26", overrides={"ring.junction.depletion_exponent": m})
 
 
-# ------------------------------------------------------------------------------------------------ params-9
+# ----------------------------------------------------------------------- params-9: world values lie in the leaf's range
 
 def test_world_values_and_alternatives_lie_in_the_leaf_range():
-    """params-9: a leaf's range includes every value a world can take (params_content handoff 5.7): interval ends
-    and corners of an absolute entry, and every preset alternative (a selected alternative is range-checked, so one
-    outside could never be selected). g26 holds the OCP +9 dBm corner; g25_test_vehicle drops g26's Guide module
-    power, which is not a power at its bench ring."""
-    cfg = _load("g26")
+    """params-9: a leaf's range includes every value a world can take: interval ends and corners of an absolute entry,
+    and every preset alternative (a selected alternative is range-checked, so one outside could never be selected). g26
+    holds the OCP +9 dBm corner; g25_test_vehicle drops g26's Guide module power, which is not a power at its bench
+    ring."""
+    cfg = _load_quiet("g26")
     rng = cfg.leaves["optical_path.chip_input_loss_db"].range
     assert rng[0] <= cfg.uncertainty["chip_input_loss"].fields["corners"]["ocp_ring_plus9dbm"] <= rng[1]
-    g25 = _load("g25_test_vehicle")
+    g25 = _load_quiet("g25_test_vehicle")
     assert "guide_16_lines" not in g25.leaves["laser.power_per_line_dbm"].alternatives
     assert "guide_16_lines" in cfg.leaves["laser.power_per_line_dbm"].alternatives
     for name in PRESETS:
-        c = _load(name)
+        c = _load_quiet(name)
         for path, lf in c.leaves.items():
             if not (isinstance(lf.range, tuple) and len(lf.range) == 2):
                 continue
@@ -305,19 +311,19 @@ def test_world_values_and_alternatives_lie_in_the_leaf_range():
         load(d)
 
 
-# ------------------------------------------------------------------------------------------------ params-13
+# ------------------------------------------------------------------ params-13: the R0 range holds the calibrated worlds
 
 def test_r_cold_range_holds_the_calibrated_droop_worlds():
     """params-13: the R0 range is the G25 hot range over 1 + y P_FSR for every droop the thermo-optic worlds need
     (0.00904 here, 0.0141 / 0.0161 in g26_calibrated's order-2 CAL-4 refits); g26_calibrated's R0 41.29 ohm is a valid
     g26 override (it was refused against [42, 58])."""
-    cfg = _load("g26")
+    cfg = _load_quiet("g26")
     lo, hi = cfg.leaves["ring.heater.r_cold_ohm"].range
     p = 25.45
     for y in (0.00904, 0.0141, 0.0161):
         assert lo <= 52.8 / (1.0 + y * p) and 70.5 / (1.0 + y * p) <= hi, y
-    cal = _load("g26_calibrated").get("ring.heater.r_cold_ohm")
-    _load("g26", overrides={"ring.heater.r_cold_ohm": cal})
+    cal = _load_quiet("g26_calibrated").get("ring.heater.r_cold_ohm")
+    _load_quiet("g26", overrides={"ring.heater.r_cold_ohm": cal})
 
 
 def test_calibration_r0_prior_is_the_declared_leaf_range():
@@ -325,16 +331,16 @@ def test_calibration_r0_prior_is_the_declared_leaf_range():
     [37, 58] (fit bounds [35, 58]). heater_problems first widens the scratch range of the R0 leaf to [25, 80] for the
     swept device; the declared range must be read from the preset as written, not from that scratch child (the first
     version of this fix read the scratch child, so the refit's prior was [25, 80])."""
-    from mrm.calibration import core as CC
-    from mrm.calibration import groups as G
-    ctx = G.Context()
-    probs = G.heater_problems(ctx, CC.calibration_targets())
-    assert ctx.ranges[G.P_R0] == [25.0, 80.0]                  # the swept device's scratch range
-    declared = tuple(float(x) for x in _load(G.BENCH).leaves[G.P_R0].range)
+    from mrm.calibration import core as calibration_core
+    from mrm.calibration import groups
+    ctx = groups.Context()
+    probs = groups.heater_problems(ctx, calibration_core.calibration_targets())
+    assert ctx.ranges[groups.LEAF_R_COLD] == [25.0, 80.0]                  # the swept device's scratch range
+    declared = tuple(float(x) for x in _load_quiet(groups.BENCH).leaves[groups.LEAF_R_COLD].range)
     assert declared == (37.0, 58.0)
     assert probs
     for pr in probs:
-        par = next(x for x in pr.params if x.path == G.P_R0)
+        par = next(x for x in pr.params if x.path == groups.LEAF_R_COLD)
         assert par.declared_range == declared, pr.hypothesis
         assert (par.lo, par.hi) == (35.0, 58.0), pr.hypothesis
         assert "[37, 58]" in par.prior_source
@@ -345,16 +351,16 @@ def test_calibrated_geometry_sigma_keeps_the_coupling_jacobian(tmp_path):
     restates variation.geometry's width and thickness; the loader merges a child's geometry key by key, so the
     child keeps g26's gap dimensions, width_closes_gaps and coupling Jacobian, and only the width / film ring sigmas
     are scaled."""
-    from mrm.calibration import preset as P
-    raw = P._raw_g26()
+    from mrm.calibration import preset
+    raw = preset._raw_g26()
     var: dict = {}
-    P._variation_update(var, raw, {"path": "variation.geometry.ring_sigma_scale", "value": 0.5,
-                                   "provenance": "calibrated", "targets": ["CAL-9a"], "note": "test"})
+    preset._variation_update(var, raw, {"path": "variation.geometry.ring_sigma_scale", "value": 0.5,
+                                        "provenance": "calibrated", "targets": ["CAL-9a"], "note": "test"})
     import yaml
     f = tmp_path / "g26_child.yaml"
     f.write_text(yaml.safe_dump({"extends": "g26", "meta": {"name": "t", "kind": "preset"}, "variation": var}))
-    cfg = _load(str(f))
-    g, g0 = cfg.geometry, _load("g26").geometry
+    cfg = _load_quiet(str(f))
+    g, g0 = cfg.geometry, _load_quiet("g26").geometry
     assert g["jacobians"] == g0["jacobians"] and "ring.geometry.jacobian_coupling" in g["jacobians"]
     assert g["width_closes_gaps"] is True and g["gap_through"] == g0["gap_through"] and g["gap_drop"] == g0["gap_drop"]
     for dim in ("width", "thickness"):
@@ -363,42 +369,42 @@ def test_calibrated_geometry_sigma_keeps_the_coupling_jacobian(tmp_path):
     assert g["provenance"] == "calibrated" and g["source"] == g0["source"]
 
 
-# ------------------------------------------------------------------------------------------------ params-3
+# ------------------------------------------------------------- params-3: the 200 nm film world uses the rib200 artefact
 
 def test_film_200_world_is_the_rib200_artefact():
     """params-3: uncertainty.film_thickness '200' takes the 400 x 200 nm rib (modes_rib200: a depletion modulator
     needs the slab), not the strip stand-in; it keeps the measured G25 Q_i with the rib200 anchor term, so eta is
     ~0.83 (the strip's fictitious 11.09 dB/cm non-heating loss gave 0.77)."""
     art = json.loads((EXTRACTED / "modes_rib200.json").read_text())
-    base = realize(_load("g25_test_vehicle"), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
-    cfg = _load("g25_test_vehicle", alts={"uncertainty.film_thickness": "200"})
+    base = realize(_load_quiet("g25_test_vehicle"), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
+    cfg = _load_quiet("g25_test_vehicle", alts={"uncertainty.film_thickness": "200"})
     pp = realize(cfg, 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
     assert float(pp.optics.n_g[0, 0]) == pytest.approx(art["n_g"], rel=1e-12)
     s25 = art["dlambda_dt_pm_per_k"]["value"][art["dlambda_dt_pm_per_k"]["t_c"].index(25.0)]
     assert float(pp.thermal.dlambda_dt_s0_m_per_k[0, 0]) == pytest.approx(s25 * 1e-12, rel=1e-12)
     assert cfg.get("ring.geometry.slab_nm") == 80.0 and cfg.get("ring.geometry.film_nm") == 200.0
     assert cfg.get("ring.geometry.jacobian")["of"] == art["jacobian"]["of"]
-    assert cfg.get(rel.P_A_RAD) == pytest.approx(2.03)
+    assert cfg.get(relations.P_A_RAD) == pytest.approx(2.03)
     np.testing.assert_allclose(pp.optics.q_intrinsic, base.optics.q_intrinsic, rtol=2e-3)
     assert float(pp.optics.heat_fraction[0, 0]) == pytest.approx(0.833, abs=0.005)
 
 
-# ------------------------------------------------------------------------------------------------ params-14
+# --------------------------------------------------------------------- params-14: the coupling-regime label is realized
 
 def _cold_regime(pp):
     """The regime of every ring's cold 0 V state from the exact add-drop ring (t1 > a t2: under-coupled)."""
-    o = pp.optics
-    t1, t2 = np.sqrt(1.0 - o.kappa2_through), np.sqrt(1.0 - o.kappa2_drop)
-    return np.where(t1 > o.round_trip_amplitude * t2, "under", "over")
+    optics = pp.optics
+    t1, t2 = np.sqrt(1.0 - optics.kappa2_through), np.sqrt(1.0 - optics.kappa2_drop)
+    return np.where(t1 > optics.round_trip_amplitude * t2, "under", "over")
 
 
 @pytest.mark.parametrize("name", ["g26", "g25_test_vehicle", "g26_calibrated", "g25_test_vehicle_calibrated"])
 def test_coupling_regime_label_is_the_realized_cold_regime(name):
     """params-14: in every world a preset offers, the coupling_regime label is the regime of the cold 0 V ring at the
-    nominal Q_L (07 P1-5). In g26_calibrated the CAL-2 fit ties the branch to the extinction mechanism, so the regime
+    nominal Q_L. In g26_calibrated the CAL-2 fit ties the branch to the extinction mechanism, so the regime
     is a label entry of er_mechanism (follows + map); before, the independent under | over draw labelled the loss
     worlds 'under' while over-coupled and kept a dispersion world on the over branch that is under-coupled at 0 V."""
-    cfg = _load(name)
+    cfg = _load_quiet(name)
     cr, er = cfg.uncertainty["coupling_regime"], cfg.uncertainty["er_mechanism"]
     crs = [None] if cr.fields.get("follows") else list(cr.fields["choices"])
     worlds = 0
@@ -409,7 +415,8 @@ def test_coupling_regime_label_is_the_realized_cold_regime(name):
                         "uncertainty.q_loaded": "nominal"}
                 if c is not None:
                     alts["uncertainty.coupling_regime"] = c
-                pp = realize(_load(name, alts=alts), 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
+                pp = realize(_load_quiet(name, alts=alts), 1, 0, uncertainty="nominal", variation="off",
+                             thermal_hook=None)
                 label = pp.world_choices["coupling_regime"][int(pp.world["coupling_regime"][0])]
                 assert np.all(_cold_regime(pp) == label), (name, alts, label, _cold_regime(pp))
                 worlds += 1
@@ -422,22 +429,24 @@ def test_coupling_regime_label_is_the_realized_cold_regime(name):
 def test_pinning_a_label_entry_pins_its_leader():
     """The g26 corners pin coupling_regime; on g26_calibrated that selects the mechanisms giving the regime (the over
     corner is an over-coupled CAL-2 world, not the CAL-2 miss), and a contradictory pin is a load error."""
-    over = _load("g26_calibrated", alts={"uncertainty.coupling_regime": "over", "uncertainty.q_loaded": "nominal"})
+    over = _load_quiet("g26_calibrated",
+                       alts={"uncertainty.coupling_regime": "over", "uncertainty.q_loaded": "nominal"})
     assert over.uncertainty["er_mechanism"].restrict == ["ring_t_loss", "heater_t_loss"]
     pp = realize(over, 6, 0, uncertainty="sample", variation="off", thermal_hook=None)   # the label holds at Q_L 3850
     assert {pp.world_choices["er_mechanism"][i] for i in pp.world["er_mechanism"]} <= {"ring_t_loss", "heater_t_loss"}
     assert np.all(_cold_regime(pp) == "over")
     nom = realize(over, 1, 0, uncertainty="nominal", variation="off", thermal_hook=None)
     assert nom.world_choices["er_mechanism"][int(nom.world["er_mechanism"][0])] == "ring_t_loss"
-    under = _load("g26_calibrated", alts={"uncertainty.coupling_regime": "under"})
+    under = _load_quiet("g26_calibrated", alts={"uncertainty.coupling_regime": "under"})
     assert under.uncertainty["er_mechanism"].pinned == "dispersion"
     with pytest.raises(ConfigError, match="follows"):
-        _load("g26_calibrated", alts={"uncertainty.coupling_regime": "over", "uncertainty.er_mechanism": "dispersion"})
+        _load_quiet("g26_calibrated",
+                    alts={"uncertainty.coupling_regime": "over", "uncertainty.er_mechanism": "dispersion"})
     # every corner of the robustness set still loads on the calibrated preset
     from mrm.sim.experiment import NAMED_CORNERS
     for corner in NAMED_CORNERS:
         doc = yaml_load((ROOT / "mrm" / "params" / "presets" / f"{corner}.yaml").read_text())
-        _load("g26_calibrated", alts=dict(doc.get("alts") or {}))
+        _load_quiet("g26_calibrated", alts=dict(doc.get("alts") or {}))
 
 
 def test_label_entry_validation():
@@ -445,7 +454,8 @@ def test_label_entry_validation():
     a label of its own choices, its choices are empty, and its nominal is the leader nominal's label."""
     base = copy.deepcopy(yaml_load(MINI.read_text()))
     base["uncertainty"]["thermo_label"] = {
-        "kind": "hypothesis", "follows": "thermo_optic", "map": {"H_solver": "rising", "H86": "flat", "bench": "rising"},
+        "kind": "hypothesis", "follows": "thermo_optic",
+        "map": {"H_solver": "rising", "H86": "flat", "bench": "rising"},
         "choices": {"rising": {}, "flat": {}}, "nominal": "rising", "provenance": "assumed", "generation": "none",
         "source": "D07"}
     cfg = load(copy.deepcopy(base))

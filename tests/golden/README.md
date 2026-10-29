@@ -1,6 +1,8 @@
 # Golden traces and golden vectors
 
-Owner: hardware task (07 P1-21, section 4.9). These tests block CI (07 4.1).
+These tests block CI. The golden traces answer one question: has a refactor changed the plant that earlier
+controller results were scored on? The golden vectors fix the observation and action streams of the fixed-point
+controller, so its C and Verilog twins can be checked bit for bit.
 
 ## Golden traces: `<preset>__<scenario>.npz`
 
@@ -11,9 +13,9 @@ run conditions and the comparison rule are in `mrm/control/cli.py` (`GOLDEN_CASE
 |---|---|---|
 | `g26__static.npz` | static lock, 25 degC, 20 ms | open_loop, pi_lock_c, fxp_pi |
 | `g26__a1_slide10_aggressor.npz` | the fast aggressor (A1 slide-10), one period from the cool minimum | open_loop, pi_lock_c, fxp_pi |
-| `g26__soak_compressed.npz` | the compressed soak: one 20.3 min cycle 33 -> 108 -> 33 degC at time compression 100 (12.18 s), auto substeps, scored from 5 ms; the c = 100 case of the A4 convergence experiment, which validated compression 100 (07 P0-10) | pi_lock_c only (no convergence experiment covers the others); slow (95 s on an idle machine, ~3.5 min under load) |
+| `g26__soak_compressed.npz` | the compressed soak: one 20.3 min cycle 33 -> 108 -> 33 degC at time compression 100 (12.18 s), auto substeps, scored from 5 ms; the c = 100 case of the A4 convergence experiment, which validated compression 100 (a compressed result needs agreement at compression 1, 10 and 100) | pi_lock_c only (no convergence experiment covers the others); slow (95 s on an idle machine, ~3.5 min under load) |
 
-Every run: g26 nominal world, seeds 0, B = 1, heaters at the quasi-static lock codes with the thermal state
+Every run: g26 nominal world, seeds 0, B = 1, heaters at the steady-state lock codes with the thermal state
 settled; fixed 1 us ticks except the soak (auto). The static and A1 cases build their scenario by registry name (no
 config defaults: the bias is not driven and sits at the bias DAC's initial 1.0 V); the soak takes the scenario of
 its config (`scenario: config`, as an experiment file does: bias 1.05 V).

@@ -1,4 +1,11 @@
-"""The fitting machinery of mrm.calibration on problems with a known answer (fast; marker ``calibration``)."""
+"""Test the fitting machinery of mrm.calibration on small problems with a known answer (fast; marker ``calibration``).
+
+Read this first. Each test builds a core.Problem from one or two real calibration targets and a made-up prediction
+(for example a straight line), so the best fit, the profile interval and the chi2 are known in closed form. The
+tests cover the least-squares fit, the profile likelihood (and when it is open), the Birge-ratio widening of a poor
+fit, the residuals of interval, set and curve targets, log parameters, the half-prior rule, hypothesis comparison,
+held parameters, the common-mode covariance and the prediction cache.
+"""
 from __future__ import annotations
 
 import math
@@ -7,26 +14,27 @@ import numpy as np
 import pytest
 
 from mrm.calibration import core
-from mrm.validation import targets_io as tio
+from mrm.validation import targets_io
 
 pytestmark = pytest.mark.calibration
 
-T = core.calibration_targets()
+TARGETS = core.calibration_targets()        # target id -> calibration target (calibration.yaml)
 
 
 def _linear_problem(slope: float = 2.0, offset: float = 1.0, lo: float = 0.0, hi: float = 10.0) -> core.Problem:
     """CAL-7 (7.6 +- 0.1 nm) predicted as offset + slope * x: the answer is x = (7.6 - offset) / slope and the 95 %
     profile half-width 1.96 sigma / slope."""
-    t7 = T["CAL-7"]
+    t7 = TARGETS["CAL-7"]
     par = core.Param("x", None, lo, hi, 5.0, prior_source="test")
     return core.Problem(group="test", hypothesis="linear", params=[par], targets=[t7],
                         predict=lambda th: {"CAL-7": offset + slope * th["x"]})
 
 
 def test_only_the_calibration_role_is_read():
-    """07 P0-5: the package reaches no held-out file (the same scan as tests/verification)."""
-    assert tio.held_out_reference_violations(tio.CALIBRATION_DIR) == []
-    assert all(t.role == "calibration" for t in T.values())
+    """The calibration package reads no held-out (validation or bounds) file, and every target it loads has the
+    calibration role (the same scan as tests/verification)."""
+    assert targets_io.held_out_reference_violations(targets_io.CALIBRATION_DIR) == []
+    assert all(t.role == "calibration" for t in TARGETS.values())
 
 
 def test_least_squares_and_profile_recover_a_linear_parameter():
@@ -53,7 +61,7 @@ def test_profile_is_open_when_the_data_do_not_constrain_the_parameter():
 
 def test_birge_ratio_widens_the_interval_of_a_poor_fit():
     """Two inconsistent data on one parameter: chi2_min / dof > 1 widens the interval by sqrt(birge2)."""
-    t4 = T["CAL-4"]
+    t4 = TARGETS["CAL-4"]
     y = np.asarray(t4.value["y"])
     par = core.Param("s", None, 0.5, 2.0, 1.0)
     pred = lambda th: {"CAL-4": (y * th["s"] + np.where(np.arange(y.size) % 2, 0.3, -0.3)).tolist()}  # noqa: E731
@@ -67,7 +75,7 @@ def test_birge_ratio_widens_the_interval_of_a_poor_fit():
 
 
 def test_interval_target_without_sigma_is_a_flat_likelihood():
-    t1 = T["CAL-1"]
+    t1 = TARGETS["CAL-1"]
     assert np.all(core.target_residuals(t1, 3850.0) == 0.0)
     assert np.all(core.target_residuals(t1, 3500.0) == 0.0)
     r_out = core.target_residuals(t1, 3400.0)
@@ -75,10 +83,10 @@ def test_interval_target_without_sigma_is_a_flat_likelihood():
 
 
 def test_set_and_curve_residuals_use_each_point_sigma():
-    t9b = T["CAL-9b"]
+    t9b = TARGETS["CAL-9b"]
     r = core.target_residuals(t9b, {"at_code_maxima": 7700.0, "at_code_minima": 9100.0})
     assert sorted(np.round(np.abs(r), 6).tolist()) == [1.0, 1.0]
-    t4 = T["CAL-4"]
+    t4 = TARGETS["CAL-4"]
     y = np.asarray(t4.value["y"]) + np.asarray(t4.sigma)
     assert np.allclose(core.target_residuals(t4, y.tolist()), 1.0)
 
@@ -113,7 +121,7 @@ def test_common_mode_covariance_whitening():
     """CAL-4's shifts share one read-off error: the whitened residuals give the correlated chi2 d' C^-1 d, a common
     offset of all points costs much less than the same offset on one point, and without it the residuals are the
     independent ones."""
-    t4 = T["CAL-4"]
+    t4 = TARGETS["CAL-4"]
     y = np.asarray(t4.value["y"])
     s = np.asarray(t4.sigma)
     c = 0.025
@@ -137,3 +145,14 @@ def test_half_prior_uses_the_declared_width_when_the_prior_is_widened():
     par = core.Param("r", None, 35.0, 58.0, 45.0, declared_range=(42.0, 58.0))
     assert core.half_prior(par, [39.0, 43.0]) == pytest.approx(4.0 / 16.0)
     assert core.half_prior(core.Param("r", None, 35.0, 58.0, 45.0), [39.0, 43.0]) == pytest.approx(4.0 / 23.0)
+
+
+def test_prediction_cache_returns_the_new_prediction_when_it_clears(monkeypatch):
+    """The prediction cache is cleared when it holds more than _CACHE_MAX_ENTRIES entries. The evaluation that
+    fills it past the limit still returns its own prediction (it raised KeyError: the clear removed it)."""
+    monkeypatch.setattr(core, "_CACHE_MAX_ENTRIES", 3)
+    p = _linear_problem()
+    for i in range(10):
+        assert p.predictions({"x": float(i)}) == {"CAL-7": 1.0 + 2.0 * i}
+    assert p.n_evals == 10
+    assert len(p._cache) <= 3

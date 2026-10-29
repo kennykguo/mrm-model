@@ -1,21 +1,32 @@
-"""Closed-loop test bench for the controllers-B baselines (ramp acquisition, WDM supervisor, bit statistics, factory
-calibration), plus checks of the bench itself.
+"""Closed-loop test bench for the group-B baseline controllers, and the checks of the bench itself.
 
-:class:`CtrlBPlant` extends ``tests/verification/test_plant_wiring.py::ReferencePlant`` (the Python reference plant
-tick of docs/handoff/ENGINE_BRIEF.md) with what a closed-loop controller test needs and the reference plant leaves
-out:
+Read this first
+---------------
+The group-B controllers are ramp acquisition, the WDM supervisor, the bit-statistics lock and the factory
+calibration. Their tests import the helpers here. The usual pattern is::
+
+    cfg = load_g26(knowledge=[...]); pp = realize(cfg, 1, nominal=True); spec = make_spec(cfg, 1)
+    plant = CtrlBPlant(pp, cfg, spec, scenario=sc)
+    rec, validator = run_closed_loop(plant, ctrl, n_ticks)
+    metrics = lock_metrics(rec, t_from=...)
+
+:class:`CtrlBPlant` extends ``tests/verification/test_plant_wiring.py::ReferencePlant`` (a Python version of the
+engine's plant tick) with what a closed-loop controller test needs and the reference plant leaves out:
 
 - the ``datapath.bitstat_threshold`` actuator reaches the bit-statistics sampler (the reference plant passes 0);
-- ``tx.assignment`` writes are recorded as the declared ring-to-line map (07 P1-12);
-- an optional laser turn-on ramp (07 P0-1 item 6, ``sim.reset_protocol: laser_ramp``) and aggressor calibration
-  (07 P1-4) before the scenario is compiled;
+- ``tx.assignment`` writes are recorded as the declared ring-to-line map: the WDM supervisor declares which line
+  each ring serves, and Truth (the OMA at the declared line) refers to that map;
+- an optional laser turn-on ramp (the start-up protocol ``sim.reset_protocol: laser_ramp``) and the aggressor
+  calibration (aggressor power into the thermal model, targets in resonance units), both before the scenario is
+  compiled;
 - Truth, for the TEST only: the resonance-minus-line detuning of every ring against every line, the OMA at the
   declared line and the static OMA optimum (:meth:`CtrlBPlant.truth`). Controllers never see it.
 
-:func:`run_closed_loop` steps a controller through the plant in the 07 P0-6 event order (release the sensors at an
-edge, step the controller, validate and latch its actions, then advance the plant interval) and records Truth.
-:func:`lock_metrics` reduces a record to the acceptance numbers of 07 4.8: lock error (pm), OMA penalty (dB), lock
-excursion count (5 pm threshold, 1 pm hysteresis, metrics section of g26) and time to lock.
+:func:`run_closed_loop` steps a controller through the plant in the engine's event order: release the sensors at an
+edge, step the controller, validate and latch its actions, then advance the plant interval. It records Truth.
+:func:`lock_metrics` reduces a record to the acceptance numbers: lock error (pm), lock excursion count (5 pm
+threshold, 1 pm hysteresis, the metrics section of g26) and time to lock. ``CtrlBPlant.oma_penalty_db`` gives the
+OMA penalty (dB).
 """
 from __future__ import annotations
 
@@ -28,11 +39,8 @@ import pytest
 
 from mrm import params
 from mrm.control.api import ActionValidator, ControllerSpec, Observation, controller_telemetry
-from mrm.plant import optics as op
-from mrm.plant import phase as ph
-from mrm.scenarios import calibrate_scenario, foster_from_system, stack
-from mrm.scenarios import generators as g
-from mrm.scenarios import library as lib
+from mrm.plant import optics
+from mrm.scenarios import calibrate_scenario, foster_from_system, generators, library, stack
 from mrm.units import C0
 
 from test_plant_wiring import ReferencePlant
@@ -67,14 +75,14 @@ def make_spec(cfg, batch, scenario=None):
                                       scenario_offsets=offsets)
 
 
-def laser_ramp(ramp_s: float) -> g.Scenario:
-    """Lines ramp from 0 to full power over ``ramp_s`` (07 P0-1 item 6 laser_ramp reset protocol)."""
-    return g.Scenario(name="laser_ramp", components=(
-        g.pwl("laser.line_enable", [0.0, ramp_s], [0.0, 1.0], absolute=True, label="laser_ramp"),))
+def laser_ramp(ramp_s: float) -> generators.Scenario:
+    """Lines ramp from 0 to full power over ``ramp_s`` (the start-up protocol sim.reset_protocol: laser_ramp)."""
+    return generators.Scenario(name="laser_ramp", components=(
+        generators.pwl("laser.line_enable", [0.0, ramp_s], [0.0, 1.0], absolute=True, label="laser_ramp"),))
 
 
-def calibrated(sc: g.Scenario, pp, *, ring_t0_k=None) -> g.Scenario:
-    """Calibrate the pending aggressors of ``sc`` on this plant (ENGINE_BRIEF section 1)."""
+def calibrated(sc: generators.Scenario, pp, *, ring_t0_k=None) -> generators.Scenario:
+    """Calibrate the pending aggressors of ``sc`` on this plant's own thermal system, as the engine does."""
     if not sc.pending_aggressors:
         return sc
     sysm = pp.thermal.system
@@ -92,7 +100,7 @@ def calibrated(sc: g.Scenario, pp, *, ring_t0_k=None) -> g.Scenario:
     return sc
 
 
-def delay_aggressors(sc: g.Scenario, t0_s: float) -> g.Scenario:
+def delay_aggressors(sc: generators.Scenario, t0_s: float) -> generators.Scenario:
     """Start every calibrated aggressor power waveform at t0_s (its own time axis starts there, 0 before)."""
     import dataclasses
     aggs = tuple(dataclasses.replace(a, power=tuple(dataclasses.replace(c, t0_s=float(t0_s)) for c in a.power))
@@ -105,7 +113,7 @@ class CtrlBPlant(ReferencePlant):
 
     def __init__(self, pp, cfg, spec, *, scenario=None, noise_seed: int = 11, scenario_seed: int = 5,
                  laser_ramp_s: float | None = None, aggressor_delay_s: float | None = None):
-        sc = lib.static() if scenario is None else scenario
+        sc = library.static() if scenario is None else scenario
         if laser_ramp_s:
             sc = stack([sc, laser_ramp(laser_ramp_s)])
         sc = calibrated(sc, pp)
@@ -114,7 +122,7 @@ class CtrlBPlant(ReferencePlant):
         super().__init__(pp, cfg, scenario=sc, noise_seed=noise_seed, scenario_seed=scenario_seed,
                          pop_period=spec.period_ticks)
         self.spec = spec
-        self.thr = np.zeros((self.B, self.N), np.int64)
+        self.bitstat_threshold = np.zeros((self.B, self.N), np.int64)          # latched threshold actuator, codes
         r2l = np.asarray(pp.layout.ring_to_line, np.int64).reshape(-1)
         self.assignment = np.repeat(r2l[None, :], self.B, axis=0)
         self.lam = C0 / np.asarray(pp.laser.line_freq_hz, float)
@@ -134,10 +142,16 @@ class CtrlBPlant(ReferencePlant):
         sensors.update(s2)
         new.update(n2)
         last = self.last
-        if last:                     # no window before the first plant interval
-            self.dp.bitstat_from_monitor(k, self.mon, last["out_r"][:, op.R_DROP_SUM1],
-                                         last["out_r"][:, op.R_DROP_SUM0], self.thr, density=last["dens"],
-                                         rin_per_hz=np.asarray(self.pp.laser.rin_per_hz).reshape(-1))
+        if last:  # no window before the first plant interval
+            self.dp.bitstat_from_monitor(
+                k,
+                self.mon,
+                last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER],
+                last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER],
+                self.bitstat_threshold,
+                density=last["dens"],
+                rin_per_hz=np.asarray(self.pp.laser.rin_per_hz).reshape(-1),
+            )
         s3, n3 = self.dp.release(k)
         sensors.update(s3)
         new.update(n3)
@@ -147,7 +161,7 @@ class CtrlBPlant(ReferencePlant):
         new["tx.bias.applied"] = np.ones((self.B, self.N), bool)
         return sensors, new
 
-    # ---- Truth (tests only) -----------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------- Truth (tests only)
     def detuning_m(self) -> np.ndarray:
         """(B, N, L) resonance-minus-line detuning (m) of the nearest order, mean of the two NRZ levels, at the
         current ring temperatures. Positive = resonance red of the line (phase.py: phi = 2 pi m on the line and
@@ -170,11 +184,21 @@ class CtrlBPlant(ReferencePlant):
         state, with this ring's present input power, levels and couplings (other rings fixed)."""
         o = self._optics_inputs(b, self.lam[b], self.v_lo[b], self.v_hi[b])
         dpl = TWO_PI * C0 * o["trt"][n, line] / self.lam[b][line] ** 2
-        p_in = float(self.last["out_rl"][b, op.RL_PIN, n, line])
-        r1 = op.ring_exact(o["phi1"][n, line] + dpl * dx_m, o["k2t"][n, line], o["k2d"][n, line], o["a1"][n, line],
-                           o["trt"][n, line])
-        r0 = op.ring_exact(o["phi0"][n, line] + dpl * dx_m, o["k2t"][n, line], o["k2d"][n, line], o["a0"][n, line],
-                           o["trt"][n, line])
+        p_in = float(self.last["out_rl"][b, optics.RING_LINE_OUTPUT_ROW_INPUT_POWER, n, line])
+        r1 = optics.ring_exact(
+            o["phi1"][n, line] + dpl * dx_m,
+            o["k2t"][n, line],
+            o["k2d"][n, line],
+            o["a1"][n, line],
+            o["trt"][n, line],
+        )
+        r0 = optics.ring_exact(
+            o["phi0"][n, line] + dpl * dx_m,
+            o["k2t"][n, line],
+            o["k2d"][n, line],
+            o["a0"][n, line],
+            o["trt"][n, line],
+        )
         return p_in * np.abs(r1.p_thru - r0.p_thru)
 
     def oma_penalty_db(self, assignment=None, span_fwhm: float = 3.0, n_grid: int = 241):
@@ -263,10 +287,11 @@ class Record:
 
 def run_closed_loop(plant: CtrlBPlant, ctrl, n_ticks: int, *, k0: int = 0, record_every: int = 1,
                     reset: bool = True, validator: ActionValidator | None = None, keep_monitor: bool = False):
-    """Run ``ctrl`` on ``plant`` for ticks k0 .. k0 + n_ticks - 1 (07 P0-6 order). Returns (Record, validator).
+    """Run ``ctrl`` on ``plant`` for ticks k0 .. k0 + n_ticks - 1 in the engine's event order. Returns (Record,
+    validator).
 
     At an edge k (k % period == phase): release the sensors of the intervals before k, step the controller, validate
-    (clip and count, 07 P1-19) and latch at k + ctrl.latency_ticks: tx.heater goes to the heater DAC path,
+    the action (clip and count) and latch it at k + ctrl.latency_ticks. tx.heater goes to the heater DAC path,
     datapath.bitstat_threshold to the sampler of the next edge, tx.assignment to the declared map. Then the plant
     advances [k, k + 1)."""
     spec = plant.spec
@@ -299,7 +324,7 @@ def run_closed_loop(plant: CtrlBPlant, ctrl, n_ticks: int, *, k0: int = 0, recor
             if "tx.heater" in act:
                 heater_cmd = act["tx.heater"].astype(np.int64)
             if "datapath.bitstat_threshold" in act:
-                plant.thr = act["datapath.bitstat_threshold"].astype(np.int64)
+                plant.bitstat_threshold = act["datapath.bitstat_threshold"].astype(np.int64)
             if "tx.assignment" in act:
                 plant.assignment = act["tx.assignment"].astype(np.int64)
         plant.tick(k, heater_cmd)
@@ -316,8 +341,8 @@ def run_closed_loop(plant: CtrlBPlant, ctrl, n_ticks: int, *, k0: int = 0, recor
 
 
 def excursions(x_pm: np.ndarray, thr_pm: float = 5.0, hyst_pm: float = 1.0) -> int:
-    """Lock-excursion count with hysteresis (07 P0-8): entering |x| > thr counts once; leaving needs
-    |x| < thr - hyst."""
+    """Lock-excursion count with hysteresis, as the engine's online metric counts it: entering |x| > thr counts once;
+    leaving needs |x| < thr - hyst."""
     out = 0
     above = False
     for v in np.abs(np.asarray(x_pm, float)):
@@ -353,9 +378,7 @@ def lock_metrics(rec: Record, *, t_from: int, lock_pm: float = 5.0, hyst_pm: flo
     return {"rms_pm": rms, "max_pm": mx, "excursions": exc, "t_lock_ticks": t_lock}
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# checks of the bench itself
-# ---------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------- checks of the bench itself
 
 @pytest.fixture(scope="module")
 def nominal_bench():
@@ -369,8 +392,8 @@ def test_truth_detuning_sign_and_scale(nominal_bench):
     """Heating a ring moves its resonance red: the Truth detuning grows by s(T) dT, and the cold nominal detuning
     against the ring's own line is minus the 7.6 nm design offset (modulo the FSR)."""
     cfg, pp, spec = nominal_bench
-    dark = g.Scenario(name="dark", components=(g.const("laser.line_enable", 0.0, absolute=True),
-                                               g.const("data.driver_enable", 0.0, absolute=True)))
+    dark = generators.Scenario(name="dark", components=(generators.const("laser.line_enable", 0.0, absolute=True),
+                                                        generators.const("data.driver_enable", 0.0, absolute=True)))
     plant = CtrlBPlant(pp, cfg, spec, scenario=dark)
     plant.tick(0)
     d0 = plant.detuning_m()[0]
