@@ -1,8 +1,8 @@
 # calculate settled optical fields, powers, and stored energies in the ring bank.
 
 # desc
-# ring_exact solves the two-direction fields of one ring.
-# ring_rows_nb uses the general field solve for both zero and nonzero backscatter.
+# evaluate_exact_ring_response solves the two-direction fields of one ring.
+# evaluate_ring_response_per_input_watt uses the general field solve for both zero and nonzero backscatter.
 # bus_propagate follows rings in bus order - each ring's through power feeds the next.
 # the drop port feeds the monitor, and the absorbed share of intrinsic loss heats the ring.
 # reflections and counter-clockwise add-port output do not reach the monitor.
@@ -279,7 +279,7 @@ SELF_HEATING_RING_LINE_ROW_PHASE_RESONANCE_WAVELENGTH_DERIVATIVE = 12
 # number of self-heating parameter rows per ring and laser line (1).
 SELF_HEATING_RING_LINE_ROW_COUNT = 13
 
-# shared views returned by selfheat_views
+# shared views returned by unpack_self_heating_optical_state
 # p_in (L,) - power per line at the bus input (W)
 SELF_HEATING_VIEW_INDEX_BUS_INPUT_POWER = 0
 # bus_t2 (N,) - power transmission of the bus segment before each ring (1)
@@ -414,7 +414,8 @@ FAR_LINE_CACHE_FIELD_COUNT = 19
 
 
 # array type aliases describe storage precision and dimensions.
-# shape metadata documents the array contract; runtime guards enforce workspace dtype and capacity.
+# shape metadata describes array dimensions.
+# runtime guards enforce workspace dtype and capacity.
 Float64Array: TypeAlias = NDArray[np.float64]
 Complex128Array: TypeAlias = NDArray[np.complex128]
 Float64Vector: TypeAlias = Annotated[np.ndarray[tuple[int], np.dtype[np.float64]], "shape (length,)"]
@@ -592,7 +593,7 @@ def tcmt_backscatter_rate(
     rb: NumericValue,  # rb = r_b (1) - complex round-trip coupling - type numeric scalar or NumPy array
     t_rt_s: RealValue,  # t_rt_s = T_rt (s) - round-trip group delay - type real scalar or real NumPy array
 ) -> (
-    NumericValue  # return = g (rad/s), with g = r_b/T_rt - type numeric scalar or NumPy array
+    NumericValue  # return = g (rad/s), with g = r_b/T_rt - complex mode-coupling rate - type numeric scalar or NumPy array
 ):
     return rb / t_rt_s
 
@@ -609,14 +610,14 @@ def exact_to_tcmt(
     rb: ArrayLike | None = None,  # rb = r_b (1) - optional complex round-trip backscatter - type scalar, sequence, NumPy array, or None
 ) -> (
     tuple[
-        RealValue,  # intrinsic_decay_rate = kappa_i (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
-        RealValue,  # through_coupling_decay_rate = kappa_e (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
-        RealValue,  # drop_coupling_decay_rate = kappa_d (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # intrinsic_decay_rate = kappa_i (1/s) - intrinsic energy decay rate - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # through_coupling_decay_rate = kappa_e (1/s) - energy leakage rate to the through bus - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # drop_coupling_decay_rate = kappa_d (1/s) - energy leakage rate to the drop bus - type float64 scalar or float64 ndarray, broadcast input shape
     ]
     | tuple[
-        RealValue,  # intrinsic_decay_rate = kappa_i (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
-        RealValue,  # through_coupling_decay_rate = kappa_e (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
-        RealValue,  # drop_coupling_decay_rate = kappa_d (1/s) - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # intrinsic_decay_rate = kappa_i (1/s) - intrinsic energy decay rate - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # through_coupling_decay_rate = kappa_e (1/s) - energy leakage rate to the through bus - type float64 scalar or float64 ndarray, broadcast input shape
+        RealValue,  # drop_coupling_decay_rate = kappa_d (1/s) - energy leakage rate to the drop bus - type float64 scalar or float64 ndarray, broadcast input shape
         ComplexValue,  # beta_hz = g/(2*pi) (Hz) - returned only when rb is supplied - type complex scalar or complex NumPy array
     ]
 ):
@@ -649,9 +650,9 @@ def tcmt_to_exact(
     kappa_d: ArrayLike,  # kappa_d = kappa_d (1/s) - leakage to the drop guide - type scalar, sequence, or NumPy array
     t_rt_s: ArrayLike,  # t_rt_s = T_rt (s) - round-trip group delay - type scalar, sequence, or NumPy array
 ) -> tuple[
-    RealValue,  # return[0] = K_th^2 (1), with K_th^2 = 1-exp(-kappa_e*T_rt) - type float64 scalar or float64 ndarray, broadcast input shape
-    RealValue,  # return[1] = K_dr^2 (1), with K_dr^2 = 1-exp(-kappa_d*T_rt) - type float64 scalar or float64 ndarray, broadcast input shape
-    RealValue,  # return[2] = a (1), with a = exp(-kappa_i*T_rt/2) - type float64 scalar or float64 ndarray, broadcast input shape
+    RealValue,  # return[0] = K_th^2 (1), with K_th^2 = 1-exp(-kappa_e*T_rt) - through-coupler power fraction - type float64 scalar or float64 ndarray, broadcast input shape
+    RealValue,  # return[1] = K_dr^2 (1), with K_dr^2 = 1-exp(-kappa_d*T_rt) - drop-coupler power fraction - type float64 scalar or float64 ndarray, broadcast input shape
+    RealValue,  # return[2] = a (1), with a = exp(-kappa_i*T_rt/2) - retained round-trip field amplitude - type float64 scalar or float64 ndarray, broadcast input shape
 ]:
     kappa_i, kappa_e, kappa_d, t_rt_s = (
         np.asarray(x, dtype=float) for x in (kappa_i, kappa_e, kappa_d, t_rt_s)
@@ -671,7 +672,7 @@ def backscatter_hz_to_round_trip_coupling(
     beta_hz: NumericValue,  # beta_hz = g/(2*pi) (Hz) - complex coupling rate - type numeric scalar or NumPy array
     fsr_hz: RealValue,  # fsr_hz = FSR (Hz) - free spectral range - type real scalar or real NumPy array
 ) -> (
-    NumericValue  # return = r_b (1), with r_b = 2*pi*beta_hz/FSR - type numeric scalar or NumPy array
+    NumericValue  # return = r_b (1), with r_b = 2*pi*beta_hz/FSR - round-trip backscatter coupling - type numeric scalar or NumPy array
 ):
     return TWO_PI * beta_hz / fsr_hz
 
@@ -685,7 +686,7 @@ def phase_sensitivity_to_resonance_shift(
     t_rt_s: RealValue,  # t_rt_s = T_rt (s) - round-trip group delay - type real scalar or real NumPy array
     lam_m: RealValue,  # lam_m = lambda_L (m) - laser wavelength - type real scalar or real NumPy array
 ) -> (
-    RealValue  # return = dphi/dlambda_r (rad/m) - type real scalar or real NumPy array
+    RealValue  # return = dphi/dlambda_r (rad/m) - phase change per resonance-wavelength shift - type real scalar or real NumPy array
 ):
     return TWO_PI * C0 * t_rt_s / (lam_m * lam_m)
 
@@ -700,7 +701,7 @@ def average_binary_data_levels(
     x1: NumericValue,  # x1 = x_1 (same units as x0) - value at level one - type numeric scalar or NumPy array
     x0: NumericValue,  # x0 = x_0 (same units as x1) - value at level zero - type numeric scalar or NumPy array
 ) -> (
-    NumericValue  # return = mean(x) (same units as x1 and x0) - type numeric scalar or NumPy array
+    NumericValue  # return = mean(x) (same units as x1 and x0) - binary-data average - type numeric scalar or NumPy array
 ):
     return p1 * x1 + (1.0 - p1) * x0
 
@@ -731,7 +732,7 @@ def _wrap_order_index(
 # both interpolation weights have zero phase slope at each resonance.
 # x
 @njit(cache=True)
-def _interpolated_scatterer_amplitude(
+def interpolate_scatterer_reflection_and_phase_derivative(
     round_trip_phase_rad: float,  # round_trip_phase_rad = phi (rad) - absolute round-trip phase including coupler phase - type float scalar
     round_trip_backscatter: Complex128Vector,  # round_trip_backscatter = r_b[n] (1) - complex round-trip backscatter coupling by resonance order - type complex128 ndarray, shape (backscatter_order_count,)
 ) -> tuple[
@@ -787,7 +788,7 @@ def _interpolated_scatterer_amplitude(
 def _squared_magnitude(
     amplitude: complex,  # amplitude = A (input amplitude units) - complex field, mode, or normalized coefficient - type complex scalar
 ) -> (
-    float  # return = |A|^2 (squared input units) - type float scalar
+    float  # return = |A|^2 (squared input units) - squared amplitude magnitude - type float scalar
 ):
     return amplitude.real * amplitude.real + amplitude.imag * amplitude.imag
 
@@ -800,7 +801,7 @@ def _squared_magnitude_derivative(
     amplitude: complex,  # amplitude = A (input amplitude units) - complex field, mode, or normalized coefficient - type complex scalar
     d_amplitude_dphi: complex,  # d_amplitude_dphi = dA/dphi (input amplitude units/rad) - phase derivative of amplitude - type complex scalar
 ) -> (
-    float  # return = d|A|^2/dphi (squared input units/rad) - type float scalar
+    float  # return = d|A|^2/dphi (squared input units/rad) - phase derivative of squared amplitude magnitude - type float scalar
 ):
     return 2.0 * (amplitude.real * d_amplitude_dphi.real + amplitude.imag * d_amplitude_dphi.imag)
 
@@ -809,7 +810,7 @@ def _squared_magnitude_derivative(
 # a lossless segment retains finite energy and loses no power.
 # x
 @njit(cache=True)
-def _quarter_ring_energy_and_loss(
+def calculate_quarter_ring_energy_per_power_and_loss_fraction(
     round_trip_field_loss_exponent: float,  # round_trip_field_loss_exponent = -ln(a) (1) - full-trip field attenuation - type float scalar
     round_trip_delay_s: float,  # round_trip_delay_s = T_rt (s) - full-trip group delay - type float scalar
 ) -> tuple[
@@ -829,16 +830,22 @@ def _quarter_ring_energy_and_loss(
 
 
 # exact steady state of one ring at one line - the plain form of the loop, kept as the reference.
-# nothing in the package calls it (the structure is in the ring_exact comments).
-# `_exact_line_d` (the same loop with phase slopes) and `_exact_stages` (unit forward input, all lines at once) are the forms in use.
-# tests/verification/test_optics.py checks that it agrees with `_exact_line_d`.
-# Method - the state x = (u, v) at z = 0+ obeys x = M x + c with M = C1 H C2 H, where
-# H = Q S Q = (1/tau) [[P2, -conj(rho)], [-rho, 1/P2]] is the half ring (quarter propagation Q = diag(p, 1/p), p = exp(-(xi + i phi)/4), P2 = p^2, scatterer S, quarter propagation) and C_j = diag(t_j, 1/t_j) are the couplers' ring-side transfers - c holds the bus inputs.
+# nothing in the package calls it (the structure is in the evaluate_exact_ring_response comments).
+# the derivative solver carries the same loop and its phase derivatives.
+# the staged solver evaluates all wavelengths for unit forward input.
+# tests/verification/test_optics.py checks that it agrees with `solve_exact_ring_fields_and_phase_derivatives`.
+# solve x=M*x+c for the clockwise and counterclockwise fields at z=0+.
+# M=C1*H*C2*H maps the fields through one round trip.
+# H=Q*S*Q maps the fields through half a ring.
+# Q=diag(p,1/p) propagates a quarter trip, with p=exp(-(xi+i*phi)/4).
+# P2=p^2 and H=[[P2,-conj(rho)],[-rho,1/P2]]/tau.
+# C_j=diag(t_j,1/t_j) maps fields through coupler j.
+# c contains the bus-input drive terms.
 # one 2x2 solve, then one pass for fields and energies.
 # (todo) convert to numpy matmul to reduce code size
 # x
 @njit(cache=True)
-def _exact_line(
+def solve_exact_ring_fields_and_energy(
     round_trip_phase_rad: float,  # round_trip_phase_rad = phi (rad) - round-trip phase including coupler phase - type float scalar
     round_trip_field_loss_exponent: float,  # round_trip_field_loss_exponent = -ln(a_rt) (1) - round-trip field attenuation exponent - type float scalar
     through_self_coupling: float,  # through_self_coupling = t_th (1) - through-coupler field self-coupling - type float scalar
@@ -863,7 +870,7 @@ def _exact_line(
     # s0/s1 enter the input/through ports and drive CW/CCW fields [sqrt(W)].
     # s2/s3 enter the drop/add ports and drive CCW/CW fields [sqrt(W)].
     # rho is each scatterer's reflection coefficient - tau = sqrt(1 - |rho|^2).
-    scatterer_reflection, _ = _interpolated_scatterer_amplitude(round_trip_phase_rad, round_trip_backscatter)
+    scatterer_reflection, _ = interpolate_scatterer_reflection_and_phase_derivative(round_trip_phase_rad, round_trip_backscatter)
     scatterer_reflection_conj = scatterer_reflection.conjugate()
     inverse_scatterer_field_transmission = 1.0 / math.sqrt(1.0 - _squared_magnitude(scatterer_reflection))
 
@@ -949,7 +956,7 @@ def _exact_line(
     ) / loop_determinant  # CCW at 0+
 
     # trace the solved fields around the ring to read outputs and segment powers
-    # convention used here: CW enters each segment at its left end - CCW enters at its right end
+    # CW enters a segment at its left end - CCW enters at its right end
     reflected_field = (
         through_self_coupling * backward_through_field - 1j * through_cross_coupling * ccw_field
     )  # reflection out of the input port
@@ -989,7 +996,7 @@ def _exact_line(
     ccw_segment_power_sum += _squared_magnitude(ccw_field)
     through_field = through_self_coupling * input_field - 1j * through_cross_coupling * cw_field  # through
     # convert segment-entry powers to stored energy and intrinsic lost power
-    quarter_ring_energy_per_power, quarter_ring_loss_fraction = _quarter_ring_energy_and_loss(
+    quarter_ring_energy_per_power, quarter_ring_loss_fraction = calculate_quarter_ring_energy_per_power_and_loss_fraction(
         round_trip_field_loss_exponent, round_trip_delay_s
     )
     return (
@@ -1003,15 +1010,17 @@ def _exact_line(
     )
 
 
-# `_exact_line` plus analytic derivatives with respect to the round-trip phase.
+# `solve_exact_ring_fields_and_energy` plus analytic derivatives with respect to the round-trip phase.
 # return port fields, directional energies, intrinsic loss, and the loss/through/drop phase derivatives.
-# Forward-mode differentiation - dM = C1 (dH C2 H + H C2 dH) - (I - M) x = c  =>  dx = (I - M)^-1 (dc + dM x) -
+# differentiate each field with respect to round-trip phase phi.
+# dM=C1*(dH*C2*H+H*C2*dH).
+# differentiating (I-M)*x=c gives dx=(I-M)^-1*(dc+dM*x).
 # then the field pass carries (field, d field).
 # coupling and loss are held fixed (they do not depend on phi).
 # complex set of chain rules and derivatives. not worth rlly reading. worth just verifying end to end though
 # x
 @njit(cache=True)
-def _exact_line_d(
+def solve_exact_ring_fields_and_phase_derivatives(
     round_trip_phase_rad: float,  # round_trip_phase_rad = phi (rad) - absolute round-trip phase including coupler phase - type float scalar
     round_trip_field_loss_exponent: float,  # round_trip_field_loss_exponent = -ln(a_rt) (1) - round-trip field attenuation exponent - type float scalar
     through_self_coupling: float,  # through_self_coupling = t_th (1) - through-coupler field self-coupling - type float scalar
@@ -1032,11 +1041,11 @@ def _exact_line_d(
     float,  # return[4] = U_cw (J) - clockwise stored energy - type float scalar
     float,  # return[5] = U_ccw (J) - counter-clockwise stored energy - type float scalar
     float,  # return[6] = P_loss (W) - total intrinsic-loss power - type float scalar
-    float,  # return[7] = dP_loss/dphi (W/rad) - type float scalar
-    float,  # return[8] = dP_through/dphi (W/rad) - type float scalar
-    float,  # return[9] = dP_drop/dphi (W/rad) - type float scalar
+    float,  # return[7] = dP_loss/dphi (W/rad) - intrinsic-loss power derivative with respect to phase - type float scalar
+    float,  # return[8] = dP_through/dphi (W/rad) - through-port power derivative with respect to phase - type float scalar
+    float,  # return[9] = dP_drop/dphi (W/rad) - drop-port power derivative with respect to phase - type float scalar
 ]:
-    scatterer_reflection, d_scatterer_reflection_dphi = _interpolated_scatterer_amplitude(
+    scatterer_reflection, d_scatterer_reflection_dphi = interpolate_scatterer_reflection_and_phase_derivative(
         round_trip_phase_rad, round_trip_backscatter
     )
     scatterer_reflection_conj = scatterer_reflection.conjugate()
@@ -1247,7 +1256,7 @@ def _exact_line_d(
     d_ccw_segment_power_sum_dphi += _squared_magnitude_derivative(ccw_field, d_ccw_field_dphi)
     through_field = through_self_coupling * input_field - 1j * through_cross_coupling * cw_field
     d_through_field_dphi = -1j * through_cross_coupling * d_cw_field_dphi
-    quarter_ring_energy_per_power, quarter_ring_loss_fraction = _quarter_ring_energy_and_loss(
+    quarter_ring_energy_per_power, quarter_ring_loss_fraction = calculate_quarter_ring_energy_per_power_and_loss_fraction(
         round_trip_field_loss_exponent, round_trip_delay_s
     )
     return (
@@ -1271,7 +1280,7 @@ def _exact_line_d(
 def _complex_reciprocal(
     value: complex,  # value = z (input units) - finite nonzero complex value - type complex scalar
 ) -> (
-    complex  # return = 1/z (inverse input units) - type complex scalar
+    complex  # return = 1/z (inverse input units) - complex reciprocal - type complex scalar
 ):
     # 1/z = conj(z)/|z|^2 - reverse the angle and invert the magnitude.
     if value == 0j:
@@ -1290,7 +1299,7 @@ def _complex_reciprocal(
 # the absolute order supplies the remaining quarter turns.
 # x
 @njit(cache=True)
-def _phase_parts(
+def calculate_propagation_and_scatterer_coefficients(
     round_trip_phase_rad: float,  # round_trip_phase_rad = phi (rad) - absolute round-trip phase including coupler phase - type float scalar
     round_trip_backscatter: Complex128Vector,  # round_trip_backscatter = r_b (1) - complex round-trip backscatter coupling by resonance order - type complex128 ndarray, shape (backscatter_order_count,)
     round_trip_field_loss_exponent: float,  # round_trip_field_loss_exponent = -ln(a_rt) (1) - round-trip field attenuation exponent - type float scalar
@@ -1298,7 +1307,7 @@ def _phase_parts(
     complex,  # return[0] = p (1) - quarter-trip field propagation factor - type complex scalar
     complex,  # return[1] = 1/p (1) - inverse quarter-trip propagation factor - type complex scalar
     complex,  # return[2] = rho (1) - complex scatterer reflection coefficient - type complex scalar
-    complex,  # return[3] = drho/dphi (1/rad) - type complex scalar
+    complex,  # return[3] = drho/dphi (1/rad) - scatterer reflection derivative with respect to phase - type complex scalar
 ]:
     backscatter_order_count = round_trip_backscatter.shape[0]
     lower_order = int(np.floor(round_trip_phase_rad / TWO_PI)) # n
@@ -1342,7 +1351,8 @@ def _phase_parts(
     quarter_field_transmission = math.exp(-0.25 * round_trip_field_loss_exponent)
 
     # return a weighted sum
-    # p has negative phase; 1/p has positive phase and inverse attenuation.
+    # p applies negative phase and field attenuation.
+    # 1/p applies positive phase and inverse attenuation.
     return (
         complex(
             quarter_field_transmission * quarter_total_phase_cos,
@@ -1360,7 +1370,7 @@ def _phase_parts(
 # exact ring - per-ring kernels over all rings
 # the exact ring is latency-bound per line (a serial chain of ~20 dependent complex operations).
 # so the ring kernels below run each stage as its own loop over the L lines ("vectorized over lines"), and independent lines overlap in the CPU pipeline.
-# Measured on the 16 GB M2 - about 80 ns per (ring, line) against about 150 ns for the scalar form.
+# measured on the 16 GB M2 - about 80 ns per (ring, line) against about 150 ns for the scalar form.
 
 
 # allocate reusable complex, real, and per-line scratch arrays for the ring kernels.
@@ -1447,11 +1457,16 @@ def _validate_ring_workspace_buffers(
 
 
 # exact ring, unit forward input, values only - solve, then the field pass in two half-ring stages.
-# the round-trip matrix in closed form - with P2 = p^2, S = t2 P2 + 1/(t2 P2), 1/tau^2 = 1/(1 - |rho|^2), the matrix K = H C2 H of `_exact_line` has k11 = (t2 P2^2 + |rho|^2/t2)/tau^2, k22 = (t2|rho|^2 + 1/(t2 P2^2))/tau^2, k12 = -conj(rho) S/tau^2, k21 = -rho S/tau^2, so det(I - C1 K) = a11 a22 - |rho|^2 S^2/tau^4.
+# use the closed-form half-ring matrix K=H*C2*H.
+# P2=p^2, S=t2*P2+1/(t2*P2), and tau^2=1-|rho|^2.
+# k11=(t2*P2^2+|rho|^2/t2)/tau^2.
+# k22=(t2*|rho|^2+1/(t2*P2^2))/tau^2.
+# k12=-conj(rho)*S/tau^2 and k21=-rho*S/tau^2.
+# det(I-C1*K)=a11*a22-|rho|^2*S^2/tau^4.
 # this is just doing prev. functions with multiple lasers and unpacking matrices
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def _exact_stages(
+def solve_ring_fields_at_all_laser_wavelengths(
     line_count: int,  # line_count = L (1) - number of laser lines - type int scalar
     complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
     real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
@@ -1598,7 +1613,7 @@ def _exact_stages(
             * real_workspace[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_CROSS_COUPLING, line_index]
             * cw_field
         )
-        quarter_ring_energy_per_power, quarter_ring_loss_fraction = _quarter_ring_energy_and_loss(
+        quarter_ring_energy_per_power, quarter_ring_loss_fraction = calculate_quarter_ring_energy_per_power_and_loss_fraction(
             real_workspace[REAL_WORKSPACE_ROW_ROUND_TRIP_FIELD_LOSS_EXPONENT, line_index],
             round_trip_delay_row_s[line_index],
         )
@@ -1616,11 +1631,13 @@ def _exact_stages(
         ] = 0.0
 
 
-# `_exact_stages` plus d(loss)/d(phi) - quotient rule on the closed-form solution, then forward mode through the field pass (coupling and loss held fixed - they do not depend on phi).
+# solve the fields and differentiate intrinsic loss with respect to round-trip phase.
+# apply the quotient rule to the field solution, then differentiate each propagation step.
+# hold couplings and round-trip loss fixed during this derivative.
 # also doing similar things to the stuff above.
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def _exact_stages_slope(
+def solve_ring_fields_and_loss_phase_derivative_at_all_laser_wavelengths(
     line_count: int,  # line_count = L (1) - number of laser lines - type int scalar
     complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
     real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
@@ -1948,7 +1965,7 @@ def _exact_stages_slope(
             * real_workspace[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_CROSS_COUPLING, line_index]
             * cw_field
         )
-        quarter_ring_energy_per_power, quarter_ring_loss_fraction = _quarter_ring_energy_and_loss(
+        quarter_ring_energy_per_power, quarter_ring_loss_fraction = calculate_quarter_ring_energy_per_power_and_loss_fraction(
             real_workspace[REAL_WORKSPACE_ROW_ROUND_TRIP_FIELD_LOSS_EXPONENT, line_index],
             round_trip_delay_row_s[line_index],
         )
@@ -1972,11 +1989,11 @@ def _exact_stages_slope(
 # write res[RING_RESPONSE_*, line].
 # port entries are power fractions, energy entries are J/W, and the loss slope is per radian.
 # inputs are per-line phase/coupling/loss/delay rows - rbk contains that ring's per-order backscatter.
-# cw and fw are reusable workspaces, not physical outputs.
+# complex_workspace and real_workspace are reusable workspaces, not physical outputs.
 # also doing similar things to the things above.
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def ring_rows_nb(
+def evaluate_ring_response_per_input_watt(
     phi_row: Float64Vector,  # phi_row = phi (rad) - round-trip phase before adding coupler phase - type float64 ndarray, shape (L,)
     psi_row: Float64Vector,  # psi_row = psi (rad) - additional coupler phase - type float64 ndarray, shape (L,)
     k2t_row: Float64Vector,  # k2t_row = K_th^2 (1) - through-coupler power fraction - type float64 ndarray, shape (L,)
@@ -1987,8 +2004,8 @@ def ring_rows_nb(
     use_tcmt: bool,  # use_tcmt = reserved flag (1) - must be false to preserve the compiled call layout - type bool scalar
     m_orders: int,  # m_orders = reserved count (1) - retained for existing call layouts - type int scalar
     with_d: bool,  # with_d = slope_enabled (1) - also calculate the intrinsic-loss phase slope - type bool scalar
-    cw: ComplexWorkspace,  # cw = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
-    fw: RealWorkspace,  # fw = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
+    complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
+    real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
     res: RingResponseBlock,  # res = R_opt (mixed units) - RING_RESPONSE_* power fractions (1), energies (J/W), and loss slope (1/rad) - type float64 ndarray, capacity at least (8, L)
 ) -> (
     None  # return = None - results are written into the output buffers - type None
@@ -1998,42 +2015,42 @@ def ring_rows_nb(
         raise ValueError("TCMT is archived - use exact ring optics")
     _validate_ring_workspace_buffers(
         line_count,
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
         trt_row,
         res,
     )
     for line_index in range(line_count):
         round_trip_field_loss_exponent = -math.log(a_row[line_index])
-        fw[REAL_WORKSPACE_ROW_ROUND_TRIP_FIELD_LOSS_EXPONENT, line_index] = round_trip_field_loss_exponent
-        fw[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_SELF_COUPLING, line_index] = math.sqrt(
+        real_workspace[REAL_WORKSPACE_ROW_ROUND_TRIP_FIELD_LOSS_EXPONENT, line_index] = round_trip_field_loss_exponent
+        real_workspace[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_SELF_COUPLING, line_index] = math.sqrt(
             1.0 - k2t_row[line_index]
         )
-        fw[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_CROSS_COUPLING, line_index] = math.sqrt(
+        real_workspace[REAL_WORKSPACE_ROW_THROUGH_COUPLER_FIELD_CROSS_COUPLING, line_index] = math.sqrt(
             k2t_row[line_index]
         )
-        fw[REAL_WORKSPACE_ROW_DROP_COUPLER_FIELD_SELF_COUPLING, line_index] = math.sqrt(
+        real_workspace[REAL_WORKSPACE_ROW_DROP_COUPLER_FIELD_SELF_COUPLING, line_index] = math.sqrt(
             1.0 - k2d_row[line_index]
         )
-        fw[REAL_WORKSPACE_ROW_DROP_COUPLER_FIELD_CROSS_COUPLING, line_index] = math.sqrt(k2d_row[line_index])
+        real_workspace[REAL_WORKSPACE_ROW_DROP_COUPLER_FIELD_CROSS_COUPLING, line_index] = math.sqrt(k2d_row[line_index])
         (
             quarter_propagation,
             inverse_quarter_propagation,
             scatterer_reflection,
             d_scatterer_reflection_dphi,
-        ) = _phase_parts(phi_row[line_index] + psi_row[line_index], rbk, round_trip_field_loss_exponent)
-        cw[COMPLEX_WORKSPACE_ROW_QUARTER_RING_FIELD_PROPAGATION_FACTOR, line_index] = quarter_propagation
-        cw[COMPLEX_WORKSPACE_ROW_INVERSE_QUARTER_RING_FIELD_PROPAGATION_FACTOR, line_index] = (
+        ) = calculate_propagation_and_scatterer_coefficients(phi_row[line_index] + psi_row[line_index], rbk, round_trip_field_loss_exponent)
+        complex_workspace[COMPLEX_WORKSPACE_ROW_QUARTER_RING_FIELD_PROPAGATION_FACTOR, line_index] = quarter_propagation
+        complex_workspace[COMPLEX_WORKSPACE_ROW_INVERSE_QUARTER_RING_FIELD_PROPAGATION_FACTOR, line_index] = (
             inverse_quarter_propagation
         )
-        cw[COMPLEX_WORKSPACE_ROW_SCATTERER_FIELD_REFLECTION_COEFFICIENT, line_index] = scatterer_reflection
-        cw[COMPLEX_WORKSPACE_ROW_SCATTERER_FIELD_REFLECTION_ROUND_TRIP_PHASE_DERIVATIVE, line_index] = (
+        complex_workspace[COMPLEX_WORKSPACE_ROW_SCATTERER_FIELD_REFLECTION_COEFFICIENT, line_index] = scatterer_reflection
+        complex_workspace[COMPLEX_WORKSPACE_ROW_SCATTERER_FIELD_REFLECTION_ROUND_TRIP_PHASE_DERIVATIVE, line_index] = (
             d_scatterer_reflection_dphi
         )
     if with_d:
-        _exact_stages_slope(line_count, cw, fw, trt_row, res)
+        solve_ring_fields_and_loss_phase_derivative_at_all_laser_wavelengths(line_count, complex_workspace, real_workspace, trt_row, res)
     else:
-        _exact_stages(line_count, cw, fw, trt_row, res)
+        solve_ring_fields_at_all_laser_wavelengths(line_count, complex_workspace, real_workspace, trt_row, res)
 
 
 # one ring at every line (used by the bus and the self-heating solve)
@@ -2071,23 +2088,23 @@ def evaluate_ring_optical_outputs(
     out_rl: RingLineOutputs,  # out_rl = Y_ring,line (mixed units) - RING_LINE_OUTPUT_* powers (W), energies (J), and power slope (W/rad) - type float64 ndarray, shape (16, N, L)
     out_r: RingOutputs,  # out_r = Y_ring (mixed units) - RING_OUTPUT_* powers (W) and resonance-wavelength slope (W/m) - type float64 ndarray, shape (6, N)
     p_thru: Float64Vector,  # p_thru = P_through (W) - per-line power sent toward the next ring - type float64 ndarray, shape (L,)
-    cw: ComplexWorkspace,  # cw = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
-    fw: RealWorkspace,  # fw = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
+    complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
+    real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
     line_count = pin.shape[0]
     ring_backscatter = rb[k]
-    level0_response = fw[
+    level0_response = real_workspace[
         REAL_WORKSPACE_LEVEL_ZERO_RESPONSE_START_ROW : REAL_WORKSPACE_LEVEL_ZERO_RESPONSE_START_ROW
         + RING_RESPONSE_ROW_COUNT
     ]
-    level1_response = fw[
+    level1_response = real_workspace[
         REAL_WORKSPACE_LEVEL_ONE_RESPONSE_START_ROW : REAL_WORKSPACE_LEVEL_ONE_RESPONSE_START_ROW
         + RING_RESPONSE_ROW_COUNT
     ]
     # solve the response per input watt at data level zero.
-    ring_rows_nb(
+    evaluate_ring_response_per_input_watt(
         phi0[k],
         psi[k],
         k2_th[k],
@@ -2098,13 +2115,13 @@ def evaluate_ring_optical_outputs(
         use_tcmt,
         m_orders,
         with_slope,
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
         level0_response,
     )
     # solve data level one only when binary modulation is enabled.
     if two_level:
-        ring_rows_nb(
+        evaluate_ring_response_per_input_watt(
             phi1[k],
             psi[k],
             k2_th[k],
@@ -2115,8 +2132,8 @@ def evaluate_ring_optical_outputs(
             use_tcmt,
             m_orders,
             with_slope,
-            cw,
-            fw,
+            complex_workspace,
+            real_workspace,
             level1_response,
         )
         one_probability = p1
@@ -2267,15 +2284,15 @@ def evaluate_ring_optical_outputs(
 
 # calculate absorbed power and its resonance-wavelength slope for one ring.
 # hold its input power fixed - upstream rings have already set that power.
-# Average binary levels, then sum every line and travelling direction.
+# average binary levels, then sum every line and travelling direction.
 # return power in W and slope in W/m.
-# Couplings, attenuation, and absorbed-loss fractions stay fixed during this derivative - phase changes with resonance wavelength.
+# couplings, attenuation, and absorbed-loss fractions stay fixed during this derivative - phase changes with resonance wavelength.
 # this is the slope used by the thermal solver.
 # absorbed power sensitivity calculation
 # (todo) maybe wrap things in enums to make it easier to understand what's going on clearly?
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def dpabs_dlambda_res_nb(
+def evaluate_ring_absorbed_power_and_resonance_wavelength_derivative(
     k: int,  # k = k (1) - physical ring index - type int scalar
     pin: Float64Vector,  # pin = P_in,k (W) - power delivered to this ring per laser line - type float64 ndarray, shape (L,)
     p1: float,  # p1 = p_1 (1) - probability of data level one - type float scalar
@@ -2294,23 +2311,23 @@ def dpabs_dlambda_res_nb(
     two_level: bool,  # two_level = nrz_enabled (1) - evaluate and average both binary data levels - type bool scalar
     use_tcmt: bool,  # use_tcmt = reserved flag (1) - must be false to preserve the compiled call layout - type bool scalar
     m_orders: int,  # m_orders = reserved count (1) - retained for existing call layouts - type int scalar
-    cw: ComplexWorkspace,  # cw = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
-    fw: RealWorkspace,  # fw = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
+    complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
+    real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
 ) -> tuple[
     float,  # return[0] = P_abs (W) - total absorbed power of ring k - type float scalar
     float,  # return[1] = dP_abs/dlambda_r (W/m) - rigid resonance-shift derivative - type float scalar
 ]:
     line_count = pin.shape[0]
     ring_backscatter = rb[k]
-    level0_response = fw[
+    level0_response = real_workspace[
         REAL_WORKSPACE_LEVEL_ZERO_RESPONSE_START_ROW : REAL_WORKSPACE_LEVEL_ZERO_RESPONSE_START_ROW
         + RING_RESPONSE_ROW_COUNT
     ]
-    level1_response = fw[
+    level1_response = real_workspace[
         REAL_WORKSPACE_LEVEL_ONE_RESPONSE_START_ROW : REAL_WORKSPACE_LEVEL_ONE_RESPONSE_START_ROW
         + RING_RESPONSE_ROW_COUNT
     ]
-    ring_rows_nb(
+    evaluate_ring_response_per_input_watt(
         phi0[k],
         psi[k],
         k2_th[k],
@@ -2321,13 +2338,13 @@ def dpabs_dlambda_res_nb(
         use_tcmt,
         m_orders,
         True,
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
         level0_response,
     )
     one_probability = 0.0
     if two_level:
-        ring_rows_nb(
+        evaluate_ring_response_per_input_watt(
             phi1[k],
             psi[k],
             k2_th[k],
@@ -2338,8 +2355,8 @@ def dpabs_dlambda_res_nb(
             use_tcmt,
             m_orders,
             True,
-            cw,
-            fw,
+            complex_workspace,
+            real_workspace,
             level1_response,
         )
         one_probability = p1
@@ -2398,8 +2415,7 @@ def dpabs_dlambda_res_nb(
 # see docs/research/03_mrm_compact_models.md, section 2.5, for the split-mode response.
 # the backscatter bound is verified only for |rb| <= MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS = 1 at every order.
 # larger values reshape the response and can exceed the curvature bound.
-# test_optics.py
-# includes |rb| = 1.6 as a counterexample.
+# test_optics.py includes |rb| = 1.6 as a counterexample.
 # multiply phase curvature by (dphi/dT)**2 for temperature curvature.
 # the adapter also includes the tuning law's d²phi/dT² term.
 # (todo) 5% should be a hyperparameter in a dedicated file same with 25%
@@ -2411,7 +2427,7 @@ def dpabs_dlambda_res_nb(
     # - leaving it off can also make predictions less accurate if the real device has appreciable backscatter.
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def pabs_bounds_nb(
+def bound_ring_absorbed_power_and_phase_curvature(
     k: int,  # k = k (1) - physical ring index - type int scalar
     pin: Float64Vector,  # pin = P_in,k (W) - power delivered to this ring per laser line - type float64 ndarray, shape (L,)
     p1: float,  # p1 = p_1 (1) - probability of data level one - type float scalar
@@ -2471,7 +2487,7 @@ def pabs_bounds_nb(
 # multiply by |dphi/dT| for a W/K bound.
 # the thermal model uses this to check that optical heating through other rings remains weak.
 # sum lines and average binary levels with p1.
-# use the Airy loss C/den(phi) defined in pabs_bounds_nb().
+# use the Airy loss C/den(phi) defined in bound_ring_absorbed_power_and_phase_curvature().
 # with A = 1+r**2,
 # |d(loss)/dphi| = 2*r*C*|sin(phi)|/den(phi)**2.
 # its maximum occurs at cos(phi) = (sqrt(A**2+32*r**2)-A)/(4*r), the root of 2*r*cos(phi)**2+A*cos(phi)-4*r = 0.
@@ -2481,7 +2497,7 @@ def pabs_bounds_nb(
 # test_optics.py verifies this for |rb| <= MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS at every order.
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def pabs_slope_bound_nb(
+def bound_ring_absorbed_power_phase_derivative(
     k: int,  # k = k (1) - physical ring index - type int scalar
     pin: Float64Vector,  # pin = P_in,k (W) - power delivered to this ring per laser line - type float64 ndarray, shape (L,)
     p1: float,  # p1 = p_1 (1) - probability of data level one - type float scalar
@@ -2538,41 +2554,49 @@ def pabs_slope_bound_nb(
     return 1.10 * absorbed_power_phase_derivative_bound
 
 
-# After every ring has been solved - bus output, per-level outputs, reflection return and the single-pass bound.
-# fills out_rl[RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER/RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER] (ring k fixed at a level, all other rings NRZ-averaged - exact for independent data because the single-pass power transfer is a product), out_l[LASER_LINE_OUTPUT_ROW_BUS_OUTPUT_POWER], out_l[LASER_LINE_OUTPUT_ROW_BUS_INPUT_RETURNED_REFLECTION_POWER] and out_l[LASER_LINE_OUTPUT_ROW_FORWARD_POWER_RELATIVE_ERROR_BOUND] (the bound - bus_propagate comments).
+# after every ring has been solved - bus output, per-level outputs, reflection return and the single-pass bound.
+# write each ring's conditional zero-level and one-level powers at the bus output.
+# average the data levels of every other ring.
+# write total bus power, returned reflection, and the forward-power error bound.
 # LASER_LINE_OUTPUT_ROW_BUS_INPUT_RETURNED_REFLECTION_POWER is the incoherent sum of single reflections returned to the bus input.
-# by reciprocity the backward
-# through transmission of a ring equals its forward one (S_01 = S_10), and the backward path crosses the same bus
-# segments, so ring k's return is P_in E[R_k] prod_{j<=k} t2_j^2 prod_{j<k} E[T_j^2].
+# reciprocity gives equal forward and backward through transmission - S_01 = S_10.
+# returned light crosses each upstream bus segment and ring twice.
+# ring k returns P_in*E[R_k]*prod_{j<=k}(t2_j^2)*prod_{j<k}(E[T_j^2]).
 # the light crosses ring j twice within one data state, so the mean of the SQUARE of T_j enters.
-# with p1 the ones density, E[(P T)^2] = p1 THRU1^2 + (1 - p1) THRU0^2 = THRU0^2 + (THRU - THRU0)(THRU1 + THRU0) (because THRU = p1 THRU1 + (1 - p1) THRU0), so p1 is not needed here.
+# average squared through transmission over the same binary state on both crossings.
+# E[(P*T)^2]=p1*THRU1^2+(1-p1)*THRU0^2.
+# this equals THRU0^2+(THRU-THRU0)*(THRU1+THRU0).
+# the saved mean and level powers therefore remove the need to pass p1.
 # exact for independent data on different rings.
 # with CW optics it reduces to refl_k * pin_k / P_in.
 # with NRZ the bound uses the RMS reflection amplitude sqrt(E[R]) of each ring.
-# To leading order the error is linear in the pair products and E|r_i||r_j| <= sqrt(E r_i^2) sqrt(E r_j^2) for independent data, so it bounds the data-averaged error to leading order in eps - it is not a worst case over data states.
+# to leading order, the error grows with products of reflection amplitudes from ring pairs.
+# independent data gives E[|r_i|*|r_j|]<=sqrt(E[|r_i|^2])*sqrt(E[|r_j|^2]).
+# this bounds the data-averaged error to leading order in eps.
+# it does not bound every possible data pattern.
 # x
 @njit(cache=True, _nrt=False)
-def bus_finalize_nb(
+def write_bus_output_and_returned_reflection_powers(
     p_in_w: Float64Vector,  # p_in_w = P_in (W) - bus input power per laser line - type float64 ndarray, shape (L,)
     bus_order: Int64Vector,  # bus_order = b_j (1) - physical ring index at bus position j - type int64 ndarray, shape (N,)
-    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (L,)
+    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (N,)
     bus_t2_out: float,  # bus_t2_out = B_out (1) - power transmission of the final bus segment - type float scalar
     out_rl: RingLineOutputs,  # out_rl = Y_ring,line (mixed units) - RING_LINE_OUTPUT_* powers (W), energies (J), and power slope (W/rad) - type float64 ndarray, shape (16, N, L)
     out_l: LaserLineOutputs,  # out_l = Y_line (mixed units) - LASER_LINE_OUTPUT_* powers (W) and relative error bound (1) - type float64 ndarray, shape (3, L)
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    _bus_pout_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l)
-    _bus_refl_nb(p_in_w, bus_order, bus_t2, out_rl, out_l)
+    write_bus_output_powers(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l)
+    write_returned_reflection_power_and_forward_error_bound(p_in_w, bus_order, bus_t2, out_rl, out_l)
 
 
-# the bus-output part of `bus_finalize_nb` - RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER / RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER of every ring and line and LASER_LINE_OUTPUT_ROW_BUS_OUTPUT_POWER.
+# write conditional ring-level powers and total power at the bus output.
 # x
 @njit(cache=True, _nrt=False)
-def _bus_pout_nb(
+def write_bus_output_powers(
     p_in_w: Float64Vector,  # p_in_w = P_in (W) - bus input power per laser line - type float64 ndarray, shape (L,)
     bus_order: Int64Vector,  # bus_order = b_j (1) - physical ring index at bus position j - type int64 ndarray, shape (N,)
-    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (L,)
+    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (N,)
     bus_t2_out: float,  # bus_t2_out = B_out (1) - power transmission of the final bus segment - type float scalar
     out_rl: RingLineOutputs,  # out_rl = Y_ring,line (mixed units) - RING_LINE_OUTPUT_* powers (W), energies (J), and power slope (W/rad) - type float64 ndarray, shape (16, N, L)
     out_l: LaserLineOutputs,  # out_l = Y_line (mixed units) - LASER_LINE_OUTPUT_* powers (W) and relative error bound (1) - type float64 ndarray, shape (3, L)
@@ -2617,13 +2641,13 @@ def _bus_pout_nb(
         )
 
 
-# the reflection part of `bus_finalize_nb` - LASER_LINE_OUTPUT_ROW_BUS_INPUT_RETURNED_REFLECTION_POWER and LASER_LINE_OUTPUT_ROW_FORWARD_POWER_RELATIVE_ERROR_BOUND (reads no output of `_bus_pout_nb`, so the two parts are independent).
+# write returned reflection and the forward-power error bound independently of bus-output powers.
 # x
 @njit(cache=True, _nrt=False)
-def _bus_refl_nb(
+def write_returned_reflection_power_and_forward_error_bound(
     p_in_w: Float64Vector,  # p_in_w = P_in (W) - bus input power per laser line - type float64 ndarray, shape (L,)
     bus_order: Int64Vector,  # bus_order = b_j (1) - physical ring index at bus position j - type int64 ndarray, shape (N,)
-    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (L,)
+    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (N,)
     out_rl: RingLineOutputs,  # out_rl = Y_ring,line (mixed units) - RING_LINE_OUTPUT_* powers (W), energies (J), and power slope (W/rad) - type float64 ndarray, shape (16, N, L)
     out_l: LaserLineOutputs,  # out_l = Y_line (mixed units) - LASER_LINE_OUTPUT_* powers (W) and relative error bound (1) - type float64 ndarray, shape (3, L)
 ) -> (
@@ -2678,18 +2702,18 @@ def _bus_refl_nb(
         )
 
 
-# Pass every laser line through the rings in bus_order, writing results in place.
+# pass every laser line through the rings in bus_order, writing results in place.
 # apply each preceding bus segment's power loss, solve that ring, and pass its through power on.
-# Finalize the bus after the last ring.
+# finalize the bus after the last ring.
 # this is the compiled full-bus entry point.
 # the implicit thermal solver instead advances ring by ring as it solves their temperatures.
-# outputs come from make_bus_outputs() - work, cw, and fw come from make_workspace().
+# outputs come from make_bus_outputs() - work, complex_workspace, and real_workspace come from make_workspace().
 # x
 @njit(cache=True, error_model="numpy", _nrt=False)
-def bus_propagate_nb(
+def propagate_bus_optical_power_into_output_buffers(
     p_in_w: Float64Vector,  # p_in_w = P_in (W) - bus input power per laser line - type float64 ndarray, shape (L,)
     bus_order: Int64Vector,  # bus_order = b_j (1) - physical ring index at bus position j - type int64 ndarray, shape (N,)
-    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (L,)
+    bus_t2: Float64Vector,  # bus_t2 = B_k (1) - power transmission of the bus segment before each ring - type float64 ndarray, shape (N,)
     bus_t2_out: float,  # bus_t2_out = B_out (1) - power transmission of the final bus segment - type float scalar
     p1: Float64Vector,  # p1 = p_1 (1) - probability of data level one - type float64 ndarray, shape (N,)
     phi0: Float64Matrix,  # phi0 = phi_0 (rad) - round-trip phase at data level zero - type float64 ndarray, shape (N, L)
@@ -2712,8 +2736,8 @@ def bus_propagate_nb(
     out_r: RingOutputs,  # out_r = Y_ring (mixed units) - RING_OUTPUT_* powers (W) and resonance-wavelength slope (W/m) - type float64 ndarray, shape (6, N)
     out_l: LaserLineOutputs,  # out_l = Y_line (mixed units) - LASER_LINE_OUTPUT_* powers (W) and relative error bound (1) - type float64 ndarray, shape (3, L)
     work: Float64Vector,  # work = P_forward (W) - reusable per-line forward-power buffer - type float64 ndarray, shape (L,)
-    cw: ComplexWorkspace,  # cw = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
-    fw: RealWorkspace,  # fw = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
+    complex_workspace: ComplexWorkspace,  # complex_workspace = C_work (mixed units) - COMPLEX_WORKSPACE_* factors, fields, and field phase slopes - type complex128 ndarray, capacity at least (8, L)
+    real_workspace: RealWorkspace,  # real_workspace = F_work (mixed units) - REAL_WORKSPACE_* factors, powers, slopes, and RING_RESPONSE_* response blocks - type float64 ndarray, capacity at least (27, L)
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
@@ -2747,10 +2771,10 @@ def bus_propagate_nb(
             out_rl,
             out_r,
             work,
-            cw,
-            fw,
+            complex_workspace,
+            real_workspace,
         )
-    bus_finalize_nb(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l)
+    write_bus_output_and_returned_reflection_powers(p_in_w, bus_order, bus_t2, bus_t2_out, out_rl, out_l)
 
 
 # self-heating adapter - packed layout
@@ -2764,12 +2788,18 @@ def bus_propagate_nb(
 # lambda_res,k(T) - lambda_res,k(T_ref) = s0_k [dT + beta_k dT^2/2],     dT = T - T_ref,k
 # so the phase at line l is phi_kl(T) = phi_kl(T_ref) + (dphi/dlambda_res)_kl * that shift (`phase_sensitivity_to_resonance_shift`).
 # K^2, a_rt and eta are held at the values that the plant writes for the substep.
-# the plant evaluates a_rt and eta at the previous ring temperature - their ~1e-3/K temperature dependence then lags one substep, and dP_abs/dT stays exact, which the solver's guarantee never to skip a root needs.
+# evaluate a_rt and eta at the previous ring temperature.
+# their roughly 1e-3/K temperature dependence is delayed by one substep.
+# differentiate absorbed power while holding those values fixed.
+# the root solver therefore uses the exact derivative of this frozen-parameter step.
 # layout.
 # packed_i holds the sizes, flags and block offsets SELF_HEATING_HEADER_* below, then bus_order (N,) and the bus position of every ring (N,).
 # packed_f holds the blocks.
-# all (N, L) fields form ONE contiguous (SELF_HEATING_RING_LINE_ROW_COUNT, N, L) block and the per-ring fields one (SELF_HEATING_RING_ROW_COUNT, N) block, so an evaluation builds only a handful of views (a numba reshape costs ~27 ns, a slice ~1 ns).
-# `pack_selfheat_args` builds the arrays of one world.
+# store ring-line fields in one contiguous (SELF_HEATING_RING_LINE_ROW_COUNT, N, L) block.
+# store ring-only fields in one contiguous (SELF_HEATING_RING_ROW_COUNT, N) block.
+# each evaluation needs only a few shared views.
+# a Numba reshape costs about 27 ns and a slice about 1 ns in the measured configuration.
+# `pack_self_heating_optical_state` builds the arrays of one world.
 # for a batch, stack them with np.stack - every world of a bank has the same layout, and the length is even, so the complex views stay 16-byte aligned.
 
 
@@ -2779,7 +2809,7 @@ def bus_propagate_nb(
 # do not allocate copies inside the compiled thermal solve.
 # x
 @njit(cache=True, inline="always")
-def _selfheating_input_views(
+def unpack_self_heating_optical_inputs(
     packed_f: PackedOpticalValues,  # packed_f = optics_state (mixed units) - SELF_HEATING_HEADER_* blocks with SELF_HEATING_RING_ROW_*, SELF_HEATING_RING_LINE_ROW_*, and cache field units - type float64 ndarray, shape (packed_value_count,)
     packed_i: PackedOpticalIndices,  # packed_i = offsets (1) - SELF_HEATING_HEADER_* counts, flags, and packed-array positions - type int64 ndarray, shape (packed_index_count,)
 ) -> tuple[
@@ -2838,7 +2868,7 @@ def _selfheating_input_views(
 # read shared views of packed outputs - per ring/line, per ring, and per laser line.
 # x
 @njit(cache=True, inline="always")
-def _selfheating_output_views(
+def unpack_self_heating_optical_outputs(
     packed_f: PackedOpticalValues,  # packed_f = optics_state (mixed units) - SELF_HEATING_HEADER_* blocks with SELF_HEATING_RING_ROW_*, SELF_HEATING_RING_LINE_ROW_*, and cache field units - type float64 ndarray, shape (packed_value_count,)
     packed_i: PackedOpticalIndices,  # packed_i = offsets (1) - SELF_HEATING_HEADER_* counts, flags, and packed-array positions - type int64 ndarray, shape (packed_index_count,)
 ) -> tuple[
@@ -2870,13 +2900,13 @@ def _selfheating_output_views(
 assert len(SELF_HEATING_VIEW_FIELD_NAMES) == SELF_HEATING_VIEW_INDEX_BUS_POSITIONS_BY_RING + 1  # one name per view
 
 
-# Expose named positions in the packed optical arrays without copying.
+# expose named positions in the packed optical arrays without copying.
 # the plant updates inputs through these views before a thermal substep, then reads outputs after the solve.
 # select entries with SELF_HEATING_VIEW_INDEX_* constants - SELF_HEATING_VIEW_FIELD_NAMES gives their names.
 # shapes, units, and fixed tuple positions are documented by SELF_HEATING_VIEW_INDEX_*, SELF_HEATING_RING_ROW_*, and SELF_HEATING_RING_LINE_ROW_* above.
 # x
 @njit(cache=True, inline="always")
-def selfheat_views(
+def unpack_self_heating_optical_state(
     packed_f: PackedOpticalValues,  # packed_f = optics_state (mixed units) - SELF_HEATING_HEADER_* blocks with SELF_HEATING_RING_ROW_*, SELF_HEATING_RING_LINE_ROW_*, and cache field units - type float64 ndarray, shape (packed_value_count,)
     packed_i: PackedOpticalIndices,  # packed_i = offsets (1) - SELF_HEATING_HEADER_* counts, flags, and packed-array positions - type int64 ndarray, shape (packed_index_count,)
 ) -> tuple[
@@ -2910,10 +2940,10 @@ def selfheat_views(
     Int64Vector,  # return[27] = bus_order (1) - ring indices in bus order - type int64 ndarray, shape (N,)
     Int64Vector,  # return[28] = bus_positions (1) - bus positions indexed by ring - type int64 ndarray, shape (N,)
 ]:
-    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, cw, fw = _selfheating_input_views(
+    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, complex_workspace, real_workspace = unpack_self_heating_optical_inputs(
         packed_f, packed_i
     )
-    out_rl, out_r, out_l = _selfheating_output_views(packed_f, packed_i)
+    out_rl, out_r, out_l = unpack_self_heating_optical_outputs(packed_f, packed_i)
     ring_count = packed_i[SELF_HEATING_HEADER_INDEX_RING_COUNT]
     block_offset = packed_i[SELF_HEATING_HEADER_INDEX_BUS_OUTPUT_SEGMENT_TRANSMISSION_OFFSET]
     return (
@@ -2942,8 +2972,8 @@ def selfheat_views(
         out_rl,
         out_r,
         out_l,
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
         packed_i[SELF_HEATING_HEADER_FIXED_FIELD_COUNT : SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count],
         packed_i[
             SELF_HEATING_HEADER_FIXED_FIELD_COUNT
@@ -3020,7 +3050,7 @@ def absorbed_power_at_trial_temperature(
     float,  # return[0] = P_abs(T) (W) - total absorbed power - type float scalar
     float,  # return[1] = dP_abs/dT (W/K) - temperature derivative - type float scalar
 ]:
-    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, cw, fw = _selfheating_input_views(
+    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, complex_workspace, real_workspace = unpack_self_heating_optical_inputs(
         packed_f, packed_i
     )
     ring_count = packed_i[SELF_HEATING_HEADER_INDEX_RING_COUNT]
@@ -3033,7 +3063,7 @@ def absorbed_power_at_trial_temperature(
         ring_rows,
         line_rows,
     )
-    absorbed_power_w, d_absorbed_power_d_resonance_wavelength = dpabs_dlambda_res_nb(
+    absorbed_power_w, d_absorbed_power_d_resonance_wavelength = evaluate_ring_absorbed_power_and_resonance_wavelength_derivative(
         k,
         current_ring_input_power_w,
         ring_rows[SELF_HEATING_RING_ROW_PROBABILITY_OF_ONE, k],
@@ -3052,8 +3082,8 @@ def absorbed_power_at_trial_temperature(
         packed_i[SELF_HEATING_HEADER_INDEX_TWO_DATA_LEVELS_FLAG] != 0,
         packed_i[SELF_HEATING_HEADER_INDEX_RESERVED_MODEL_FLAG] != 0,
         packed_i[SELF_HEATING_HEADER_INDEX_RESERVED_MODE_ORDER_COUNT],
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
     )
     return (
         absorbed_power_w,
@@ -3063,7 +3093,7 @@ def absorbed_power_at_trial_temperature(
 
 # save optical outputs after the thermal solver accepts a ring temperature.
 # write ring outputs, pass through power to the next ring, and finalize bus outputs after the last ring.
-# Starting at the first ring resets the forward pass, so repeated outer sweeps need no separate reset.
+# starting at the first ring resets the forward pass, so repeated outer sweeps need no separate reset.
 # x
 @njit(cache=True, _nrt=False)
 def commit_optics_at_solved_temperature(
@@ -3074,10 +3104,10 @@ def commit_optics_at_solved_temperature(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, cw, fw = _selfheating_input_views(
+    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, complex_workspace, real_workspace = unpack_self_heating_optical_inputs(
         packed_f, packed_i
     )
-    out_rl, out_r, out_l = _selfheating_output_views(packed_f, packed_i)
+    out_rl, out_r, out_l = unpack_self_heating_optical_outputs(packed_f, packed_i)
     ring_count = packed_i[SELF_HEATING_HEADER_INDEX_RING_COUNT]
     bus_position = packed_i[SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count + k]
     _set_trial_temperature_phase(t, k, bus_position, p_in, current_ring_input_power_w, ring_rows, line_rows)
@@ -3104,8 +3134,8 @@ def commit_optics_at_solved_temperature(
         out_rl,
         out_r,
         current_ring_input_power_w,
-        cw,
-        fw,
+        complex_workspace,
+        real_workspace,
     )
     if bus_position + 1 < ring_count:
         next_segment_transmission = ring_rows[
@@ -3118,7 +3148,7 @@ def commit_optics_at_solved_temperature(
         output_transmission_offset = packed_i[
             SELF_HEATING_HEADER_INDEX_BUS_OUTPUT_SEGMENT_TRANSMISSION_OFFSET
         ]
-        bus_finalize_nb(
+        write_bus_output_and_returned_reflection_powers(
             p_in,
             packed_i[
                 SELF_HEATING_HEADER_FIXED_FIELD_COUNT : SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count
@@ -3130,17 +3160,16 @@ def commit_optics_at_solved_temperature(
         )
 
 
-# Fill conservative limits for absorbed power and its temperature derivatives, for each ring.
+# fill conservative limits for absorbed power and its temperature derivatives, for each ring.
 # p_max is in W, dpdt_max in W/K, and d2p_max in W/K².
-# Upstream rings can only reduce input power.
+# upstream rings can only reduce input power.
 # convert phase derivative bounds using the tuning law over |dT| <= dt_max_k.
-# Backscatter bounds require |rb| <= MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS.
-# this uses the forward-pass buffer as scratch -
-# call between substeps, not during a ring pass.
+# backscatter bounds require |rb| <= MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS.
+# use the forward-pass buffer as scratch between substeps.
 # caching step
 # x
 @njit(cache=True, _nrt=False)
-def selfheat_bounds(
+def bound_absorbed_power_temperature_response(
     packed_f: PackedOpticalValues,  # packed_f = optics_state (mixed units) - SELF_HEATING_HEADER_* blocks with SELF_HEATING_RING_ROW_*, SELF_HEATING_RING_LINE_ROW_*, and cache field units - type float64 ndarray, shape (packed_value_count,)
     packed_i: PackedOpticalIndices,  # packed_i = offsets (1) - SELF_HEATING_HEADER_* counts, flags, and packed-array positions - type int64 ndarray, shape (packed_index_count,)
     dt_max_k: float,  # dt_max_k = Delta_T_max (K) - bound on the temperature excursion from the reference - type float scalar
@@ -3150,17 +3179,17 @@ def selfheat_bounds(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    selfheat_bounds_general(packed_f, packed_i, dt_max_k, p_max, d2p_max, dpdt_max)
+    bound_absorbed_power_temperature_response_from_ring_parameters(packed_f, packed_i, dt_max_k, p_max, d2p_max, dpdt_max)
 
 
 # calculate thermal-solver bounds through the separate power and slope kernels.
-# use the same expressions and order as sh_bounds(), with no far-line hold.
-# this gives the reference engine an independent check.
+# use the general ring response to calculate each power and derivative bound.
+# the public bounds wrapper and sh_bounds alias both call this implementation.
 # outputs are p_max in W, d2p_max in W/K², and dpdt_max in W/K.
 # use the forward-pass buffer as scratch between substeps.
 # x
 @njit(cache=True, _nrt=False)
-def selfheat_bounds_general(
+def bound_absorbed_power_temperature_response_from_ring_parameters(
     packed_f: PackedOpticalValues,  # packed_f = optics_state (mixed units) - SELF_HEATING_HEADER_* blocks with SELF_HEATING_RING_ROW_*, SELF_HEATING_RING_LINE_ROW_*, and cache field units - type float64 ndarray, shape (packed_value_count,)
     packed_i: PackedOpticalIndices,  # packed_i = offsets (1) - SELF_HEATING_HEADER_* counts, flags, and packed-array positions - type int64 ndarray, shape (packed_index_count,)
     dt_max_k: float,  # dt_max_k = Delta_T_max (K) - bound on the temperature excursion from the reference - type float scalar
@@ -3170,7 +3199,7 @@ def selfheat_bounds_general(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, cw, fw = _selfheating_input_views(
+    p_in, current_ring_input_power_w, ring_rows, line_rows, rb, complex_workspace, real_workspace = unpack_self_heating_optical_inputs(
         packed_f, packed_i
     )
     ring_count = packed_i[SELF_HEATING_HEADER_INDEX_RING_COUNT]
@@ -3182,7 +3211,7 @@ def selfheat_bounds_general(
         bus_segment_transmission = ring_rows[SELF_HEATING_RING_ROW_BUS_SEGMENT_POWER_TRANSMISSION, ring_index]
         for line_index in range(current_ring_input_power_w.shape[0]):
             current_ring_input_power_w[line_index] *= bus_segment_transmission
-        absorbed_power_bound_w, absorbed_power_phase_curvature_bound = pabs_bounds_nb(
+        absorbed_power_bound_w, absorbed_power_phase_curvature_bound = bound_ring_absorbed_power_and_phase_curvature(
             ring_index,
             current_ring_input_power_w,
             ring_rows[SELF_HEATING_RING_ROW_PROBABILITY_OF_ONE, ring_index],
@@ -3194,7 +3223,7 @@ def selfheat_bounds_general(
             line_rows[SELF_HEATING_RING_LINE_ROW_DROP_COUPLER_POWER_COUPLING],
             use_two_data_levels,
         )
-        absorbed_power_phase_derivative_bound = pabs_slope_bound_nb(
+        absorbed_power_phase_derivative_bound = bound_ring_absorbed_power_phase_derivative(
             ring_index,
             current_ring_input_power_w,
             ring_rows[SELF_HEATING_RING_ROW_PROBABILITY_OF_ONE, ring_index],
@@ -3244,8 +3273,8 @@ def selfheat_bounds_general(
 
 # send the solved ring's through power to the next ring, including bus-segment loss.
 # after the last ring, finalize the bus.
-# full=False updates only bus outputs needed inside
-# a simulation block - full=True also updates reflection and error-bound outputs.
+# full=False writes the bus powers needed inside a simulation block.
+# full=True also writes returned reflection and the forward-power error bound.
 # once ring temp is accepted, apply that segment power transmission to the next ring
 @njit(cache=True, _nrt=False)
 def pass_through_power_to_next_ring(
@@ -3288,7 +3317,7 @@ def pass_through_power_to_next_ring(
             (LASER_LINE_OUTPUT_ROW_COUNT, line_count)
         )
         if full:
-            bus_finalize_nb(
+            write_bus_output_and_returned_reflection_powers(
                 p_in,
                 packed_i[
                     SELF_HEATING_HEADER_FIXED_FIELD_COUNT : SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count
@@ -3299,7 +3328,7 @@ def pass_through_power_to_next_ring(
                 out_l,
             )
         else:
-            _bus_pout_nb(
+            write_bus_output_powers(
                 p_in,
                 packed_i[
                     SELF_HEATING_HEADER_FIXED_FIELD_COUNT : SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count
@@ -3332,7 +3361,7 @@ def cache_matches_last_optical_evaluation(
     )
 
 
-# Invalidate the last optical evaluation so the next commit must evaluate again.
+# invalidate the last optical evaluation so the next commit must evaluate again.
 # x
 @njit(cache=True, _nrt=False)
 def cache_clear_last_optical_evaluation(
@@ -3348,7 +3377,7 @@ def cache_clear_last_optical_evaluation(
     ] = -1.0
 
 
-# Prepare one world's optical arrays for the implicit thermal solver.
+# prepare one world's optical arrays for the implicit thermal solver.
 # if this ring ended the step at this temperature, how much optical power would it absorb?
 # use the bus_propagate inputs, with phi_ref and nrz["phi1"] evaluated at t_ref_k.
 # lam_m gives laser wavelengths in m.
@@ -3356,13 +3385,13 @@ def cache_clear_last_optical_evaluation(
 # shift = s0*(dT + beta*dT**2/2).
 # commit_slope requests derivative outputs.
 # (packed_f, packed_i) - float values/caches/outputs and integer sizes/flags/positions.
-# Offsets are even so complex views stay aligned.
-# use selfheat_views() to update inputs before each substep and read results afterwards.
+# offsets are even so complex views stay aligned.
+# use unpack_self_heating_optical_state() to update inputs before each substep and read results afterwards.
 # for parallel worlds, allocate separate packed arrays.
 # (todo) still has some confusing var names
 # (todo) remove all retired/deprecated references
 # x
-def pack_selfheat_args(
+def pack_self_heating_optical_state(
     p_in_w: ArrayLike,  # p_in_w = P_in (W) - bus input power per laser line - type scalar, sequence, or NumPy array
     phi_ref: ArrayLike,  # phi_ref = phi_ref (rad) - round-trip phase at the reference temperature - type array-like, shape (N, L), converted to float64
     k2_th: ArrayLike,  # k2_th = K_th^2 (1) - through-coupler power fraction - type scalar, sequence, or NumPy array
@@ -3484,7 +3513,7 @@ def pack_selfheat_args(
     packed_i[SELF_HEATING_HEADER_FIXED_FIELD_COUNT + ring_count + ordered_ring_indices] = np.arange(
         ring_count
     )
-    input_output_views = selfheat_views(packed_f, packed_i)
+    input_output_views = unpack_self_heating_optical_state(packed_f, packed_i)
     for destination_view, source_values in (
         (0, bus_input_power_w),
         (1, bus_segment_power_transmission),
@@ -3524,10 +3553,11 @@ def pack_selfheat_args(
 
 # Python API - one ring with the general steady-state field solve
 # the loop of `_evaluate_ring_response` over flattened inputs.
-# out_c (4, n) - outgoing amplitudes (refl, thru, drop, add_out) [sqrt(W)] - out_f (6, n) - u_cw, u_ccw [J], p_loss [W], dloss/dphi, dthru/dphi, ddrop/dphi [W/rad].
+# out_c stores four outgoing port fields in sqrt(W).
+# out_f stores two energies in J, intrinsic loss in W, and three phase derivatives in W/rad.
 # x
 @njit(cache=True)
-def _evaluate_ring_input_array(
+def evaluate_ring_response_for_input_samples(
     phi: Float64Vector,  # phi = phi (rad) - total round-trip phase including coupler phase - type float64 ndarray, shape (evaluation_count,)
     k2_th: Float64Vector,  # k2_th = K_th^2 (1) - through-coupler power fraction - type float64 ndarray, shape (evaluation_count,)
     k2_dr: Float64Vector,  # k2_dr = K_dr^2 (1) - drop-coupler power fraction - type float64 ndarray, shape (evaluation_count,)
@@ -3549,7 +3579,7 @@ def _evaluate_ring_input_array(
         raise ValueError("TCMT is archived - use exact ring optics")
     evaluation_count = phi.shape[0]
     for evaluation_index in range(evaluation_count):
-        line_response = _exact_line_d(
+        line_response = solve_exact_ring_fields_and_phase_derivatives(
             phi[evaluation_index],
             -math.log(a_rt[evaluation_index]),
             math.sqrt(1.0 - k2_th[evaluation_index]),
@@ -3602,6 +3632,7 @@ class RingResponse:
     dthru_dphi: Float64Array
     ddrop_dphi: Float64Array
 
+    # return reflected power in W from the squared field magnitude.
     @property
     def p_refl(
         self: RingResponse,  # self = response (mixed units) - RingResponse fields with units defined above the class - type RingResponse record
@@ -3610,6 +3641,7 @@ class RingResponse:
     ):
         return np.abs(self.refl) ** 2
 
+    # return through-port power in W from the squared field magnitude.
     @property
     def p_thru(
         self: RingResponse,  # self = response (mixed units) - RingResponse fields with units defined above the class - type RingResponse record
@@ -3618,6 +3650,7 @@ class RingResponse:
     ):
         return np.abs(self.thru) ** 2
 
+    # return monitor drop-port power in W from the squared field magnitude.
     @property
     def p_drop(
         self: RingResponse,  # self = response (mixed units) - RingResponse fields with units defined above the class - type RingResponse record
@@ -3626,6 +3659,7 @@ class RingResponse:
     ):
         return np.abs(self.drop) ** 2
 
+    # return add-port power in W from the squared field magnitude.
     @property
     def p_add_out(
         self: RingResponse,  # self = response (mixed units) - RingResponse fields with units defined above the class - type RingResponse record
@@ -3634,7 +3668,7 @@ class RingResponse:
     ):
         return np.abs(self.add_out) ** 2
 
-    # Total incoming power [W] for an energy-balance check.
+    # total incoming power [W] for an energy-balance check.
     def p_in_total(
         self: RingResponse,  # self = response (mixed units) - RingResponse fields with units defined above the class - type RingResponse record
         s_in: ArrayLike,  # s_in = s_in,0 (sqrt(W)) - incoming field at port 0 - type scalar, sequence, or NumPy array
@@ -3652,7 +3686,7 @@ class RingResponse:
 
 # check per-order backscatter and return a one-dimensional complex array.
 # None means no backscatter and becomes one zero.
-# Require at least one entry and |rb| < 2, so each scatterer's amplitude reflection magnitude |rb|/2 remains below one.
+# require at least one entry and |rb| < 2, so each scatterer's amplitude reflection magnitude |rb|/2 remains below one.
 # x
 def _validate_backscatter_array(
     rb: ArrayLike | None,  # rb = r_b (1) - complex round-trip backscatter coupling by resonance order - type scalar, sequence, NumPy array, or None
@@ -3669,7 +3703,7 @@ def _validate_backscatter_array(
     return rb
 
 
-# Broadcast inputs to a shared shape, validate them, solve, and return RingResponse.
+# broadcast inputs to a shared shape, validate them, solve, and return RingResponse.
 # x
 def _evaluate_ring_response(
     phi_rad: ArrayLike,  # phi_rad = phi (rad) - round-trip phase before adding coupler phase - type scalar, sequence, or NumPy array
@@ -3739,7 +3773,7 @@ def _evaluate_ring_response(
         raise ValueError("t_rt_s must be > 0")
     outgoing_fields = np.empty((4, round_trip_phase.size), np.complex128)
     power_energy_and_slopes = np.empty((6, round_trip_phase.size), np.float64)
-    _evaluate_ring_input_array(
+    evaluate_ring_response_for_input_samples(
         round_trip_phase + coupler_phase,
         through_power_coupling,
         drop_power_coupling,
@@ -3784,7 +3818,7 @@ def _evaluate_ring_response(
 # re-anchoring by 2*pi*len(rb) preserves the order assignment.
 # see docs/research/03_mrm_compact_models.md for the equivalent-scatterer assumptions.
 # (todo) - what's the point of this function if we can just wrap the other function in here?
-def ring_exact(
+def evaluate_exact_ring_response(
     phi_rad: ArrayLike,  # phi_rad = phi (rad) - absolute round-trip phase - type scalar, sequence, or NumPy array
     k2_th: ArrayLike,  # k2_th = K_th^2 (1) - through-coupler power fraction - type scalar, sequence, or NumPy array
     k2_dr: ArrayLike,  # k2_dr = K_dr^2 (1) - drop-coupler power fraction - type scalar, sequence, or NumPy array
@@ -3805,8 +3839,8 @@ def ring_exact(
 
 
 # return S[output_port, input_port], the 4×4 complex field scattering matrix.
-# Excite one port at a time with unit amplitude.
-# Ports follow the module's 0–3 order.
+# excite one port at a time with unit amplitude.
+# ports follow the module's 0–3 order.
 # the exact matrix is reciprocal, S=S.T, and passive, S.H*S<=I - it is unitary when a_rt=1.
 # x
 def ring_scattering_matrix(
@@ -3826,7 +3860,7 @@ def ring_scattering_matrix(
         raise ValueError("only exact ring optics is supported - TCMT is archived")
     scattering_matrix = np.empty((4, 4), np.complex128)
     for input_port, input_argument in enumerate(("s_in", "s_thru_in", "s_drop_in", "s_add")):
-        response = ring_exact(
+        response = evaluate_exact_ring_response(
             float(phi_rad),
             float(k2_th),
             float(k2_dr),
@@ -3848,10 +3882,10 @@ def ring_scattering_matrix(
 # Python API - the bus
 
 
-# Optical powers and stored energies after following the shared bus.
+# optical powers and stored energies after following the shared bus.
 # use [physical_ring_index, laser_line_index], not bus position.
 # p_in, thru, drop, add_out, refl, loss, and absorbed are powers in W - u_cw/u_ccw are energies in J.
-# Suffixes 0/1 are individual data levels - unsuffixed powers are averaged.
+# suffixes 0/1 are individual data levels - unsuffixed powers are averaged.
 # drop_sum is total monitor input power per ring.
 # abs_sum is optical heating power per ring.
 # p_out is power per laser line at the bus end.
@@ -3890,7 +3924,7 @@ class BusResult:
     dabs_dlam: Float64Vector
 
 
-# Broadcast values to the requested shape, make them contiguous, and reject nonfinite entries.
+# broadcast values to the requested shape, make them contiguous, and reject nonfinite entries.
 # x
 def _broadcast_finite_array(
     values: ArrayLike,  # values = A (input units) - numerical values to broadcast - type scalar, sequence, or NumPy array
@@ -3908,8 +3942,8 @@ def _broadcast_finite_array(
 
 # validate bus inputs and expand scalars/arrays into consistent ring/line shapes.
 # return the arrays needed by the kernels, preserving the fixed tuple order.
-# Per-ring/per-line inputs have shape (N, L) - per-ring values have shape (N,).
-# Without binary data, level one reuses level zero.
+# per-ring/per-line inputs have shape (N, L) - per-ring values have shape (N,).
+# without binary data, level one reuses level zero.
 # a bus-order entry is a physical ring index, not a resonance order.
 # x
 def _validate_and_broadcast_bus_inputs(
@@ -4045,23 +4079,23 @@ def _validate_and_broadcast_bus_inputs(
     )
 
 
-# Follow each laser line through N rings and return BusResult.
+# follow each laser line through N rings and return BusResult.
 # p_in_w is input power per laser line (L,), in W.
 # phi is phase at level zero (N,L), in rad.
-# Couplings k2_th/k2_dr, amplitude a_rt, delay t_rt_s, and absorbed-loss fraction eta broadcast to (N,L).
+# couplings k2_th/k2_dr, amplitude a_rt, delay t_rt_s, and absorbed-loss fraction eta broadcast to (N,L).
 # bus_order gives physical ring indices in encounter order.
 # bus_t2 is segment POWER transmission before each ring - bus_t2_out is transmission after the last ring.
 # psi adds coupler phase.
 # rb holds per-order backscatter.
 # nrz supplies p1 and level-one phi1/a1/eta1 - None uses one fixed data level.
 # method must be exact - m_orders is retained for call compatibility.
-# Supply lam_m, in m, to request absorbed-power derivatives as well.
-# Multiply upstream through power by the intervening bus transmission.
-# Average independent binary data before passing power on.
-# Different laser lines contribute powers independently.
-# Reflected light is reported but not re-injected for repeated passes between rings.
-# for steady input, let eps=sum over ring pairs of |reflection_i|*|reflection_j|, using field
-# reflection magnitudes.
+# supply lam_m, in m, to request absorbed-power derivatives as well.
+# multiply upstream through power by the intervening bus transmission.
+# average independent binary data before passing power on.
+# different laser lines contribute powers independently.
+# reflected light is reported but not re-injected for repeated passes between rings.
+# for steady input, eps sums |reflection_i|*|reflection_j| over ring pairs.
+# each reflection is a dimensionless field coefficient.
 # the forward-power relative error bound is 1/(1-eps)**2-1 for eps<1 - it is infinite otherwise.
 # with binary data it uses RMS reflection amplitudes to bound the averaged error to leading order, not the worst data pattern.
 # it can grow when several rings approach the same laser line.
@@ -4124,7 +4158,7 @@ def bus_propagate(
         d_phase_d_resonance_wavelength = np.zeros((ring_count, line_count))
     ring_line_outputs, ring_outputs, line_outputs = make_bus_outputs(ring_count, line_count)
     complex_workspace, real_workspace, current_ring_power_w = make_workspace(line_count)
-    bus_propagate_nb(
+    propagate_bus_optical_power_into_output_buffers(
         bus_input_power_w,
         ordered_ring_indices,
         bus_segment_power_transmission,
@@ -4185,8 +4219,8 @@ def bus_propagate(
 # return each ring's absorbed power (W) and resonance-wavelength derivative (W/m).
 # p_in_ring_w has shape (N,L) and fixes the input power already delivered to each ring.
 # lam_m is the laser wavelength in m.
-# Other inputs follow bus_propagate().
-# Shift each ring's resonance comb rigidly - hold input power, coupling, attenuation, and absorption fraction fixed.
+# other inputs follow bus_propagate().
+# shift each ring's resonance comb rigidly - hold input power, coupling, attenuation, and absorption fraction fixed.
 # this analytic derivative is used by the implicit thermal solver.
 # (todo) why are there so many wrappers??
 # x
@@ -4247,7 +4281,7 @@ def absorbed_power_and_resonance_slope(
     d_absorbed_power_d_resonance_wavelength = np.empty(ring_count)
     for ring_index in range(ring_count):
         absorbed_power_w[ring_index], d_absorbed_power_d_resonance_wavelength[ring_index] = (
-            dpabs_dlambda_res_nb(
+            evaluate_ring_absorbed_power_and_resonance_wavelength_derivative(
                 ring_index,
                 np.ascontiguousarray(p_in_ring_w[ring_index]),
                 one_probability[ring_index],
@@ -4277,6 +4311,29 @@ def absorbed_power_and_resonance_slope(
 
 
 # previous names remain available to existing callers, tests, and compiled kernels.
+_interpolated_scatterer_amplitude = interpolate_scatterer_reflection_and_phase_derivative
+_quarter_ring_energy_and_loss = calculate_quarter_ring_energy_per_power_and_loss_fraction
+_exact_line = solve_exact_ring_fields_and_energy
+_exact_line_d = solve_exact_ring_fields_and_phase_derivatives
+_phase_parts = calculate_propagation_and_scatterer_coefficients
+_exact_stages = solve_ring_fields_at_all_laser_wavelengths
+_exact_stages_slope = solve_ring_fields_and_loss_phase_derivative_at_all_laser_wavelengths
+ring_rows_nb = evaluate_ring_response_per_input_watt
+dpabs_dlambda_res_nb = evaluate_ring_absorbed_power_and_resonance_wavelength_derivative
+pabs_bounds_nb = bound_ring_absorbed_power_and_phase_curvature
+pabs_slope_bound_nb = bound_ring_absorbed_power_phase_derivative
+bus_finalize_nb = write_bus_output_and_returned_reflection_powers
+_bus_pout_nb = write_bus_output_powers
+_bus_refl_nb = write_returned_reflection_power_and_forward_error_bound
+bus_propagate_nb = propagate_bus_optical_power_into_output_buffers
+_selfheating_input_views = unpack_self_heating_optical_inputs
+_selfheating_output_views = unpack_self_heating_optical_outputs
+selfheat_views = unpack_self_heating_optical_state
+selfheat_bounds = bound_absorbed_power_temperature_response
+selfheat_bounds_general = bound_absorbed_power_temperature_response_from_ring_parameters
+pack_selfheat_args = pack_self_heating_optical_state
+_evaluate_ring_input_array = evaluate_ring_response_for_input_samples
+ring_exact = evaluate_exact_ring_response
 last_optical_evaluation_matches = cache_matches_last_optical_evaluation
 clear_last_optical_evaluation = cache_clear_last_optical_evaluation
 # (todo) get rid of this
@@ -4288,16 +4345,16 @@ nrz_average = average_binary_data_levels
 ring_smatrix = ring_scattering_matrix
 dpabs_dlambda_res = absorbed_power_and_resonance_slope
 _pos_mod = _wrap_order_index
-_rho_pair = _interpolated_scatterer_amplitude
+_rho_pair = interpolate_scatterer_reflection_and_phase_derivative
 _abs2 = _squared_magnitude
 _dabs2 = _squared_magnitude_derivative
-_seg_factors = _quarter_ring_energy_and_loss
+_seg_factors = calculate_quarter_ring_energy_per_power_and_loss_fraction
 _inv = _complex_reciprocal
 # _has_backscatter = _ring_has_backscatter
-_sh_core = _selfheating_input_views
-_sh_outputs = _selfheating_output_views
+_sh_core = unpack_self_heating_optical_inputs
+_sh_outputs = unpack_self_heating_optical_outputs
 _sh_prepare = _set_trial_temperature_phase
-_ring_vec = _evaluate_ring_input_array
+_ring_vec = evaluate_ring_response_for_input_samples
 _as_rb = _validate_backscatter_array
 _ring_eval = _evaluate_ring_response
 _finite_array = _broadcast_finite_array
@@ -4311,4 +4368,4 @@ sh_last_clear = cache_clear_last_optical_evaluation
 # compatibility names share the single general implementation
 selfheat_pabs_general = absorbed_power_at_trial_temperature
 selfheat_commit_general = commit_optics_at_solved_temperature
-sh_bounds = selfheat_bounds
+sh_bounds = bound_absorbed_power_temperature_response
