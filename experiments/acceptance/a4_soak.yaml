@@ -1,15 +1,15 @@
-# Acceptance A4 (textbook Ch17 group A, scenario a4): the 30.4 h TEC soak as ONE experiment (07 D12, P0-10): base
+# Acceptance A4 (textbook Ch17 group A, scenario a4): the 30.4 h TEC soak as ONE experiment: base
 # temperature 33 <-> 108 degC, 90 cycles of 20.3 min, 0.123 degC/s (LM26-S slide 10, read-off; LM26-P Fig. 3(a):
-# 8 lanes, BER < 1e-9 at 50 Gb/s over the whole soak). Run at time compression 100 (the 07 P0-10 rule allows <= 173:
+# 8 lanes, BER < 1e-9 at 50 Gb/s over the whole soak). Run at time compression 100 (the compression rule allows <= 173:
 # compressed ramp <= 1 % of the 2127 K/s fast transient); the mandatory convergence experiment (one 20.3 min cycle
 # at compression 1, 10 and 100, same plant, controller, start and seeds) runs first unless
-# experiment.convergence_certificate names an earlier run. Substep policy auto (exact multi-tick thermal steps,
-# 07 P0-10) for every factor.
+# experiment.convergence_certificate names an earlier run. Substep policy auto (exact multi-tick thermal steps)
+# for every factor.
 # The base temperature is driven by the scenario, so the lock is judged by the oracle OMA penalty, the BER windows
 # and the actuator range instead of a self reference.
 # Criteria and sources:
 #   ber      no 2 s BER window above 1e-9 on any lane (LM26-P Fig. 3(a))
-#   line     no ring on a foreign line at the end, no wrong-line event (07 P1-12)
+#   line     no ring on a foreign line at the end, no wrong-line event (the wrong-line rule)
 #   hop      no FSR hop (BND-2): the order nearest the declared line never changes (order_changes == 0, the
 #            lock-independent count of mrm.sim.metrics). The engine's fsr_hop_events counter only counts RE-LOCKS on
 #            another order, and with the line reference at 5 pm a side-of-fringe lock never "locks" (pi_lock_c sits
@@ -36,7 +36,7 @@ experiment:
            "t_ring_k@auto:mean", "reloma@auto:mean", "oracle_reloma@auto:mean", "line_on@auto:last"]
   acceptance:
     - {id: A4-ber, metric: ber_windows_over_limit, reduce: sum, op: "==", value: 0, source: "LM26-P Fig. 3(a)"}
-    - {id: A4-line, metric: wrong_line_events, reduce: sum, op: "==", value: 0, source: "07 P1-12"}
+    - {id: A4-line, metric: wrong_line_events, reduce: sum, op: "==", value: 0, source: "wrong-line rule"}
     - {id: A4-hop, metric: order_changes, reduce: sum, op: "==", value: 0,
        source: "BND-2 (the order nearest the declared line never changes)"}
     - {id: A4-rail-hi, metric: heater_sat_s, op: "==", value: 0.0, source: "BND-2, CAL-9"}

@@ -1,4 +1,4 @@
-# Example (kind compare, 07 4.8): four lock controllers under A1 on the nominal world, the 12 named corners and 256
+# Example (kind compare): four lock controllers under A1 on the nominal world, the 12 named corners and 256
 # Latin-hypercube worlds (metrics only); reports the nominal result, the worst named corner, quantiles over the
 # worlds and the Kendall-tau stability of the ranking. The model-based controllers need the model_nominal token.
 #   mrm compare experiments/examples/compare_locks.yaml --dry-run
@@ -14,7 +14,7 @@ experiment:
   n_mc: 256
   seeds: {device: 100, uncertainty: 200, noise: 300, scenario: 400}
   uncertainty: lhs
-  variation: "off"            # epistemic worlds only (07 P0-4): device variation would add warm-start failures
+  variation: "off"            # epistemic worlds only: device variation would add warm-start failures
   start: warm
   score_from_s: 0.005
   self_reference: {duration_s: 0.02, window_s: 0.005}

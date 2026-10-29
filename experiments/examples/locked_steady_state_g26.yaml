@@ -1,9 +1,9 @@
-# Example (kind quasi_static, 07 P0-10, BND-4): the locked steady state of every g26 ring over ambient 0-105 degC
+# Example (kind locked_steady_state, bound BND-4): the locked steady state of every g26 ring over ambient 0-105 degC
 # and bias 1.0-3.75 V (no time stepping): code-range coverage, FSR-hop and wrong-line risk, the oracle relOMA map.
 extends: g26
-meta: {name: quasi_static_g26, kind: experiment}
+meta: {name: locked_steady_state_g26, kind: experiment}
 experiment:
-  kind: quasi_static
+  kind: locked_steady_state
   uncertainty: nominal
   variation: "off"
   grid:

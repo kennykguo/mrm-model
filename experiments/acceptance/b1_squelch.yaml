@@ -16,5 +16,5 @@ experiment:
   self_reference: {duration_s: 0.02, window_s: 0.005}
   acceptance:
     - {id: B1-lock, metric: max_abs_lock_error_pm, op: "<=", value: 5.0, source: "04 section 4 (5 pm lock budget)"}
-    - {id: B1-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: B1-line, metric: wrong_line_rings, op: "==", value: 0, source: "wrong-line rule"}
     - {id: B1-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}

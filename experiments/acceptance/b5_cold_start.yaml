@@ -1,5 +1,5 @@
 # Acceptance B5 (textbook Ch17 group B, scenario b5): cold start in an unknown thermal environment: heaters at zero,
-# no stored calibration (07 P1-1), the ambient drawn uniformly over 0-105 degC per world (printed closed-loop range,
+# no stored calibration, the ambient drawn uniformly over 0-105 degC per world (printed closed-loop range,
 # LM26-S slide 9), lasers on at power-up (sim.reset_protocol laser_ramp). Eight worlds of the nominal plant.
 # Controller: wdm_supervisor (map, assign, acquire, track; it owns tx.assignment, cyclic policy: a barrel-shifted
 # assignment is legal, PAT-1), with the nominal design tokens a firmware would carry.
@@ -23,4 +23,4 @@ experiment:
   start: cold
   acceptance:
     - {id: B5-lock, metric: locked_final, reduce: all, op: "==", value: 1, source: "LM26-P (initialized automatically)"}
-    - {id: B5-line, metric: wrong_line_final, reduce: sum, op: "==", value: 0, source: "07 P1-12"}
+    - {id: B5-line, metric: wrong_line_final, reduce: sum, op: "==", value: 0, source: "wrong-line rule"}

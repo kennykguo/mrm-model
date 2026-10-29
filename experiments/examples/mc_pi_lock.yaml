@@ -1,5 +1,5 @@
 # Example (kind mc): 64 sampled worlds of the g26 uncertainty set with per-device variation, pi_lock_c from a
-# settled warm start, 20 ms of steady lock, metrics only (07 P0-8). Rings whose quasi-static lock code is out of
+# settled warm start, 20 ms of steady lock, metrics only. Rings whose locked-steady-state lock code is out of
 # heater range start at code_min (world summary warm_start_no_code_rings counts them).
 #   mrm mc experiments/examples/mc_pi_lock.yaml --set experiment.n_mc=256
 extends: g26

@@ -1,5 +1,5 @@
 # Example (kind run): the 30.4 h soak at time compression 100 reusing the convergence certificate of an earlier
-# run of experiments/acceptance/a4_soak.yaml (07 P0-10): set experiment.convergence_certificate to that run
+# run of experiments/acceptance/a4_soak.yaml: set experiment.convergence_certificate to that run
 # directory, e.g.  mrm run experiments/examples/soak_reuse_certificate.yaml \
 #                    --set experiment.convergence_certificate=runs/<UTC>_<hash8>
 # The certificate holds only for the same plant, controller, start, scenario and worlds (the acceptance main case is
