@@ -1,14 +1,14 @@
-# Published numbers that are deliberately NOT fitted and NOT scored, each with its reason (07 section 4.7).
+# published values excluded from fitting and scoring, with a reason for each.
+# each underlying data point has one home in the target split.
 #
-# EXC-1 to EXC-8 are 07 4.7. EXC-9 to EXC-18 were added by this split so that every public number the model could be
-# tempted to fit or score has exactly one home (calibration, validation/bounds, or here). Categories:
-#   excluded        not evidence of plant accuracy for the reason given (07 4.7);
-#   closure_only    appears only in the closure and conflict table of VALIDATION.md (07 4.6), never fitted or scored;
-#   hypothesis_only defines or bounds an uncertainty hypothesis (07 4.8), not a target;
-#   scenario_input  used directly as a scenario definition, not fitted and not scored;
-#   prior_only      a different device or platform: it may set a prior range, never a target;
-#   not_a_limit     a measured demand that must not be turned into a hardware limit (07 P1-11);
-#   controller_specific  a property of Lightmatter's unknown controller, not of the plant.
+# categories explain how a value can still be used —
+# excluded — no evidence of plant accuracy for the stated reason.
+# closure_only — report a consistency comparison without fitting or scoring.
+# hypothesis_only — define or bound an uncertainty hypothesis.
+# scenario_input — define a stimulus directly.
+# prior_only — inform a range from another device or platform.
+# not_a_limit — measured demand, which does not define a hardware limit.
+# controller_specific — a property of the unpublished controller, not the plant.
 schema: mrm.validation.targets/1
 role: excluded
 frozen_on: "2026-10-09"
