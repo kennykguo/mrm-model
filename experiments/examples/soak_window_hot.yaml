@@ -1,6 +1,6 @@
-# Example (kind run): a dynamic soak window (07 P0-10: "dynamic soak windows (turnarounds, the fastest ramps)
+# Example (kind run): a dynamic soak window (the design asks for "dynamic soak windows (turnarounds, the fastest ramps)
 # start from quasi-static states"): 60 s of the soak at compression 1 from its hot turnaround (108 degC, the
-# triangle's maximum), from the quasi-static lock at that ambient (start warm). Uncompressed, so no convergence
+# triangle's maximum), from the locked steady state at that ambient (start warm). Uncompressed, so no convergence
 # certificate is needed. ~5 min wall at the auto policy (mrm run --dry-run).
 extends: g26
 meta: {name: soak_window_hot, kind: experiment}

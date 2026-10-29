@@ -14,4 +14,4 @@ experiment:
   self_reference: {duration_s: 0.02, window_s: 0.005}
   grid:
     controller.params.crossover_hz: [1000.0, 2500.0, 5000.0]
-    controller.params.fraction: [0.6, 0.7, 0.8]
+    controller.params.fraction: [0.6, 0.7, 0.8]  # tunable hyperparameter; 0.7 (70% of the monitor peak) is the default

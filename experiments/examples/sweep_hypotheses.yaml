@@ -1,4 +1,4 @@
-# Example (kind sweep): the plant hypotheses that move a lock most (07 D2, P1-6, 4.8): thermo-optic hypothesis x
+# Example (kind sweep): the plant hypotheses that move a lock most: thermo-optic hypothesis x
 # FSR window, with pi_lock_c under A1. alt:<path> selects an alternative (here: pins an uncertainty entry).
 extends: g26
 meta: {name: sweep_hypotheses, kind: experiment}
