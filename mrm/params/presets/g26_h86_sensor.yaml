@@ -1,5 +1,6 @@
-# Corner (07 D2): H_solver at the ring, with Lightmatter's degC read at a node that sees 0.8 of the ring's rise
-# (ring.thermal.reference_rise_frac = 0.8). The plant equals g26; degC scenario targets and replicas change.
+# temperature-reference corner — keep H_solver physics at the ring.
+# the reported temperature node sees 0.8 of the ring's rise.
+# this changes temperature-labelled scenarios and replicas, not ring physics.
 extends: g26
 meta:
   name: g26_h86_sensor

@@ -1,5 +1,7 @@
-# Corner (07 P1-5, BND-4): the extinction change of the G25 sweep comes from loss that follows the heater temperature
-# (heater doping overlapping the mode); the only mechanism that drifts the ER under lock.
+# heater-loss corner — attribute the G25 notch change to loss that follows
+# heater temperature, as with heater doping that overlaps the optical mode.
+# this mechanism changes extinction ratio under lock. BND-4 checks whether
+# relOMA stays within 1 dB across 0-105 degC.
 extends: g26
 meta:
   name: g26_heater_loss

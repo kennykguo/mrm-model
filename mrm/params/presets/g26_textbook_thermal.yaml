@@ -1,13 +1,13 @@
-# Corner (07 D22, P1-2): the textbook's thermal network as a pessimistic corner: 10 us (75 %) + 300 us (25 %) self
-# path with no package tail, crosstalk 10 % / 3 % / 0 with fast dynamics, TCR 1e-3 /K. The textbook gives the
-# crosstalk the self-path shape; ring.thermal.crosstalk_dynamics = self is a global setting that a corner cannot
-# select, so one 25 us pole stands in for it (the minimax single pole: within 0.16 of the DC at every time), fast
-# while keeping the 07 P0-1 lag bound at dt = 1 us (max 0.044 over 5 x 512 sampled worlds; the earlier 20 us pole reached
-# 0.050 and made realize() fail for batches of a few hundred worlds; docs/handoff/params_content.md). Time scales,
-# crosstalk scale, stack and scaling are pinned so the corner is the textbook's network in every world. The optical
-# power and the self-heating strength are pinned at their nominal too: with fast 10 % crosstalk the one-substep lag of
-# the cross-ring optical heating reaches ~0.11 at +8 dBm, eta 0.95, z 2 (07 P0-1 bound 0.05), so combining this network with
-# high-power worlds needs --set sim.dt_plant_s=2.5e-7.
+# textbook thermal corner — self heat uses 10 us at 75 percent and
+# 300 us at 25 percent, with no package tail. crosstalk is 10/3/0 percent
+# and TCR is 1e-3 /K. a 25 us crosstalk pole approximates the textbook's
+# self-path shape within 0.16 of DC. the corner cannot select the global
+# crosstalk_dynamics setting.
+# pin time scales, stack, scaling, optical power, and absorption strength.
+# this keeps the sampled self-heating lag bound below 0.05 at 1 us steps
+# (the observed maximum was 0.044). combining fast crosstalk with +8 dBm,
+# eta 0.95, and z ratio 2 can raise that lag to about 0.11.
+# use --set sim.dt_plant_s=2.5e-7 to study that stronger combination.
 extends: g26
 meta:
   name: g26_textbook_thermal

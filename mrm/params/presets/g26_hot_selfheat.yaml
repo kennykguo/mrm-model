@@ -1,8 +1,8 @@
-# Corner (07 P0-1, 4.8): the strongest self-heating inside the uncertainty set: eta 0.95, Z_opt/Z_heater 2, and
-# +8 dBm at the first ring (chip input loss 2 dB with the 10 dBm G26 laser). The coupling regime and the film are
-# pinned to under / 160 nm because the eta alternatives are exact only there (the over-coupled branch lowers the
-# heating loss, the 200 nm world adds non-heating loss: eta would fall to 0.946 / 0.876), and the under-coupled
-# 160 nm ring absorbs the most.
+# strong self-heating corner — eta 0.95, Z_opt/Z_heater 2, and +8 dBm
+# at the first ring after 2 dB chip-input loss from the 10 dBm laser.
+# pin under-coupling and the 160 nm film so these eta alternatives are exact.
+# the over-coupled branch reduces heating loss and the 200 nm film adds
+# non-heating loss. their eta would instead be 0.946 and 0.876.
 extends: g26
 meta:
   name: g26_hot_selfheat

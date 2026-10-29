@@ -1,7 +1,8 @@
-# teaching_basic: g26 for first experiments. Optical self-heating off (the only preset allowed to do so, 07 P0-1 item
-# 1), every noise source off, ideal converters, the nominal world of every uncertainty entry and no per-device
-# variation, so one realize() gives one deterministic plant. The physics is otherwise g26 (same thermo-optics, thermal
-# poles, heater law and optics), so a controller tuned here transfers to g26 and its corners.
+# deterministic g26 plant for first experiments.
+# disable optical self-heating and noise. use ideal converter linearity,
+# nominal uncertainty choices, and no device variation.
+# retain g26 thermo-optics, thermal poles, heater law, and ring optics.
+# self-heating may be disabled only in teaching_* presets.
 extends: g26
 meta:
   name: teaching_basic
