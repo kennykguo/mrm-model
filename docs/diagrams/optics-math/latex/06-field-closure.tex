@@ -1,0 +1,20 @@
+\section*{06 - field closure and derivatives}
+
+\[
+\begin{array}{ll}\mathbf x\ [\sqrt{\mathrm W}]&\text{circulating field pair}\\[0.6em]\mathbf H,\mathbf C_j\ [1]&\text{half-ring, coupler transfers}\\[0.6em]s_j\ [\sqrt{\mathrm W}]&\text{incoming port fields}\\[0.6em]t_j,k_j\ [1]&\text{coupler coefficients}\\[0.6em]\phi\ [\mathrm{rad}]&\text{round-trip phase}\end{array}
+\]
+
+\subsection*{couplers and drive}
+\[
+\displaystyle \begin{aligned}\mathbf C_j&=\operatorname{diag}(t_j,t_j^{-1})\\\mathbf e&=\begin{pmatrix}-ik_2s_3\\ik_2s_2/t_2\end{pmatrix},\quad\mathbf d=\begin{pmatrix}-ik_1s_0\\ik_1s_1/t_1\end{pmatrix}\end{aligned}
+\]
+
+\subsection*{closed loop}
+\[
+\displaystyle \begin{aligned}\mathbf M&=\mathbf C_1\mathbf H\mathbf C_2\mathbf H\\\mathbf c&=\mathbf C_1\mathbf H\mathbf e+\mathbf d\\(\mathbf I-\mathbf M)\mathbf x&=\mathbf c\end{aligned}
+\]
+
+\subsection*{analytic phase derivative}
+\[
+\displaystyle \frac{d\mathbf x}{d\phi}=(\mathbf I-\mathbf M)^{-1}\!\left(\frac{d\mathbf c}{d\phi}+\frac{d\mathbf M}{d\phi}\mathbf x\right)
+\]

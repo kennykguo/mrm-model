@@ -1,0 +1,25 @@
+\section*{18 - monitor target}
+
+\[
+\begin{array}{ll}y,\widehat y_{\mathrm{pk}}\ [\mathrm{codes}]&\text{reading, measured peak}\\[0.6em]y_*\ [\mathrm{codes}]&\text{monitor target}\\[0.6em]f\ [1]&\text{target hyperparameter}\\[0.6em]P_L\ [\mathrm W]&\text{laser power}\\[0.6em]\lambda_L,\lambda_r\ [\mathrm m]&\text{laser, resonance wavelength}\\[0.6em]T\ [\mathrm K]&\text{ring temperature}\end{array}
+\]
+
+\subsection*{target hyperparameter}
+\[
+\displaystyle y_*=f\widehat y_{\mathrm{pk}},\qquad f_{\mathrm{default}}=0.70
+\]
+
+\subsection*{changed peak}
+\[
+\displaystyle \frac{y_*}{\widehat y_{\mathrm{pk,new}}}=f\frac{\widehat y_{\mathrm{pk,old}}}{\widehat y_{\mathrm{pk,new}}}
+\]
+
+\subsection*{example}
+\[
+\displaystyle \widehat y_{\mathrm{pk,old}}=100,\quad y_*=70,\quad\widehat y_{\mathrm{pk,new}}=80,\quad\frac{70}{80}=87.5\%
+\]
+
+\subsection*{power drift}
+\[
+\displaystyle d\lambda_L=0,\quad dP_L\ne0\quad\Longrightarrow\quad dT\ne0,\quad d\lambda_r\ne0\quad\text{in general}
+\]

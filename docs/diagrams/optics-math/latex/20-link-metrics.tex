@@ -1,0 +1,25 @@
+\section*{20 - optical modulation and BER}
+
+\[
+\begin{array}{ll}P_0,P_1\ [\mathrm W]&\text{zero, one output levels}\\[0.6em]L_{\mathrm{link}}\ [\mathrm{dB}]&\text{link loss}\\[0.6em]\mathrm{OMA}_{\mathrm{sens}}\ [\mathrm W]&\text{receiver sensitivity}\\[0.6em]\mathrm{BER}_{\mathrm{ref}}\ [1]&\text{reference error probability}\\[0.6em]N_{\mathrm{bits}}\ [1]&\text{transmitted bit count}\\[0.6em]\Lambda\ [1]&\text{expected error count}\\[0.6em]\mathrm{BER}_{\mathrm{floor}}\ [1]&\text{error floor}\end{array}
+\]
+
+\subsection*{modulation amplitude}
+\[
+\displaystyle \begin{aligned}\mathrm{OMA}_{\mathrm{tx}}&=P_1-P_0\\\mathrm{OMA}_{\mathrm{rx}}&=\mathrm{OMA}_{\mathrm{tx}}10^{-L_{\mathrm{link}}/10}\end{aligned}
+\]
+
+\subsection*{Gaussian receiver - positive levels}
+\[
+\displaystyle \begin{aligned}Q_{\mathrm{ref}}&=\sqrt2\operatorname{erfc}^{-1}(2\mathrm{BER}_{\mathrm{ref}})\\Q&=Q_{\mathrm{ref}}\frac{\mathrm{OMA}_{\mathrm{rx}}}{\mathrm{OMA}_{\mathrm{sens}}}\\\mathrm{BER}&=\max\!\left\{\mathrm{BER}_{\mathrm{floor}},\frac12\operatorname{erfc}\!\left(\frac Q{\sqrt2}\right)\right\}\end{aligned}
+\]
+
+\subsection*{degenerate levels}
+\[
+\displaystyle \min(\mathrm{OMA}_{\mathrm{rx}},\mathrm{OMA}_{\mathrm{sens}})\le0\quad\Rightarrow\quad\mathrm{BER}=\tfrac12
+\]
+
+\subsection*{error counter}
+\[
+\displaystyle \Lambda=\sum_n\mathrm{BER}_n N_{\mathrm{bits},n},\qquad N_{\mathrm{err}}\sim\operatorname{Poisson}(\Lambda)
+\]

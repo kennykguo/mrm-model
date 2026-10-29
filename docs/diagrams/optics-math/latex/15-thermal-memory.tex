@@ -1,0 +1,25 @@
+\section*{15 - thermal time discretization}
+
+\[
+\begin{array}{ll}x_n,x_{n+1}\ [\mathrm K]&\text{old, new lag rise}\\[0.6em]h,\tau\ [\mathrm s]&\text{step, thermal time constant}\\[0.6em]R\ [\mathrm{K/W}]&\text{thermal resistance}\\[0.6em]P\ [\mathrm W]&\text{held heat input}\\[0.6em]\alpha\ [1]&\text{memory coefficient}\\[0.6em]P_{\mathrm{abs}}(t)\ [\mathrm W]&\text{continuous optical heating}\end{array}
+\]
+
+\subsection*{held-power solution}
+\[
+\displaystyle \begin{aligned}\tau\dot x&=-x+RP\\\alpha&=e^{-h/\tau}\\x_{n+1}&=\alpha x_n+(1-\alpha)RP\end{aligned}
+\]
+
+\subsection*{continuously changing input}
+\[
+\displaystyle x_{n+1}=\alpha x_n+\frac R\tau\int_0^h e^{-(h-u)/\tau}P(t_n+u)\,du
+\]
+
+\subsection*{linear power ramp}
+\[
+\displaystyle \begin{aligned}P(t_n+u)&=P_n+(P_{n+1}-P_n)\frac uh\\b_0&=\frac{1-\alpha}{h/\tau}-\alpha,\quad b_1=1-\frac{1-\alpha}{h/\tau}\\x_{n+1}&=\alpha x_n+R(b_0P_n+b_1P_{n+1})\end{aligned}
+\]
+
+\subsection*{endpoint optical heating}
+\[
+\displaystyle P_{\mathrm{abs}}(t_n+u)\approx P_{\mathrm{abs}}(T_{n+1}),\qquad0\le u\le h
+\]

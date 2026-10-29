@@ -1,0 +1,25 @@
+\section*{17 - temperature sensitivity bounds}
+
+\[
+\begin{array}{ll}T,T_{\mathrm{ref}}\ [\mathrm K]&\text{trial, reference temperature}\\[0.6em]P_\ell\ [\mathrm W]&\text{absorbed line power}\\[0.6em]\Delta T_{\max}\ [\mathrm K]&\text{covered temperature interval}\\[0.6em]s_{\mathrm{ref}}\ [\mathrm{m/K}]&\text{reference tuning slope}\\[0.6em]\beta\ [\mathrm{K}^{-1}]&\text{relative tuning curvature}\\[0.6em]D_{\max}\ [\mathrm{rad/m}]&\text{largest phase sensitivity}\\[0.6em]B_\phi\ [\mathrm{W/rad}]&\text{phase-slope bound}\\[0.6em]B_{\phi\phi}\ [\mathrm{W/rad^2}]&\text{phase-curvature bound}\\[0.6em]B_T\ [\mathrm{W/K}]&\text{temperature-slope bound}\\[0.6em]B_{TT}\ [\mathrm{W/K^2}]&\text{temperature-curvature bound}\end{array}
+\]
+
+\subsection*{interval and tuning}
+\[
+\displaystyle \begin{aligned}|T-T_{\mathrm{ref}}|&\le\Delta T_{\max}\\s_{\max}&=|s_{\mathrm{ref}}|(1+|\beta|\Delta T_{\max})\\D_{\max}&=\max_\ell|D_\ell|\end{aligned}
+\]
+
+\subsection*{per-line chain rule}
+\[
+\displaystyle \begin{aligned}P&=\sum_\ell P_\ell\\\frac{dP_\ell}{dT}&=\frac{\partial P_\ell}{\partial\phi_\ell}\frac{d\phi_\ell}{dT}\\\frac{d^2P_\ell}{dT^2}&=\frac{\partial^2P_\ell}{\partial\phi_\ell^2}\left(\frac{d\phi_\ell}{dT}\right)^2+\frac{\partial P_\ell}{\partial\phi_\ell}\frac{d^2\phi_\ell}{dT^2}\end{aligned}
+\]
+
+\subsection*{converted envelopes}
+\[
+\displaystyle \begin{aligned}B_T&=B_\phi D_{\max}s_{\max}\\B_{TT}&=B_{\phi\phi}(D_{\max}s_{\max})^2\\&\quad+B_\phi D_{\max}|s_{\mathrm{ref}}\beta|\end{aligned}
+\]
+
+\subsection*{solver curvature}
+\[
+\displaystyle |P'(T)|\le B_T,\quad|P''(T)|\le B_{TT},\quad|F''(T)|\le |g|B_{TT}
+\]

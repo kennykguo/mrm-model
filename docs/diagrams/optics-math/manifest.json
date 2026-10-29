@@ -1,0 +1,164 @@
+[
+  {
+    "slug": "00-ring-model-reference",
+    "title": "ports and travelling fields",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "01-operating-side",
+    "title": "transmission and operating side",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "02-resonance-orders",
+    "title": "resonance orders",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "03-coupling-and-interference",
+    "title": "coupling and interference",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "04-backscatter-and-splitting",
+    "title": "backscatter and resonance splitting",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "05-travel-and-coordinate",
+    "title": "propagation and coordinate direction",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "06-field-closure",
+    "title": "field closure and derivatives",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "07-energy-and-heating",
+    "title": "energy, loss, and absorbed heat",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "08-two-data-levels",
+    "title": "binary modulation and averaging",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "09-eight-ring-bus",
+    "title": "shared-bus propagation",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "10-reflections",
+    "title": "returned reflections",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "11-heat-paths",
+    "title": "thermal paths and observer temperatures",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "12-self-heating-loop",
+    "title": "thermal tuning and optical feedback",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "13-heating-cooling-vector-fields",
+    "title": "thermal vector field and stability",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "14-folds-and-history",
+    "title": "folds and bistability",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "15-thermal-memory",
+    "title": "thermal time discretization",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "16-trial-temperature",
+    "title": "implicit endpoint temperature",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "17-local-slope-and-bounds",
+    "title": "temperature sensitivity bounds",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "17a-phase-envelopes",
+    "title": "phase envelopes",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "18-controller-target",
+    "title": "monitor target",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "19-monitor-measurement",
+    "title": "photodiode and ADC",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "20-link-metrics",
+    "title": "optical modulation and BER",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "21-model-and-evidence",
+    "title": "mathematical verification",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "22-one-control-interval",
+    "title": "time scales",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "23-stored-heat-and-cooling",
+    "title": "thermal storage and resistance",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "24-ring-model-choice",
+    "title": "field model and near-resonance TCMT",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "25-peak-seeking-and-lock-loss",
+    "title": "self-stabilization and fold sensitivity",
+    "subtitle": "",
+    "code": ""
+  }
+]

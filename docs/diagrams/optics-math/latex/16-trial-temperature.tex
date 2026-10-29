@@ -1,0 +1,30 @@
+\section*{16 - implicit endpoint temperature}
+
+\[
+\begin{array}{ll}T,T_{\mathrm{other}}\ [\mathrm K]&\text{trial, known contribution}\\[0.6em]g\ [\mathrm{K/W}]&\text{finite-step thermal gain}\\[0.6em]P(T)\ [\mathrm W]&\text{absorbed-power callback}\\[0.6em]R_j\ [\mathrm{K/W}]&\text{self-heating lag resistance}\\[0.6em]h,\tau_j\ [\mathrm s]&\text{step, lag time constant}\\[0.6em]P_{\max}\ [\mathrm W]&\text{power bound}\\[0.6em]B_{TT}\ [\mathrm{W/K^2}]&\text{absorption curvature bound}\\[0.6em]\varepsilon_T\ [\mathrm K]&\text{solve tolerance}\end{array}
+\]
+
+\subsection*{finite-step gain}
+\[
+\displaystyle g=\sum_{j\in\mathrm{self}}(1-e^{-h/\tau_j})R_j
+\]
+
+\subsection*{endpoint residual}
+\[
+\displaystyle \begin{aligned}F(T)&=T-T_{\mathrm{other}}-gP(T)\\F(T_{n+1})&=0\\F'(T)&=1-gP'(T)\end{aligned}
+\]
+
+\subsection*{bracket - nonnegative gain}
+\[
+\displaystyle g\ge0,\quad0\le P\le P_{\max}\quad\Rightarrow\quad T_{\mathrm{other}}\le T\le T_{\mathrm{other}}+gP_{\max}
+\]
+
+\subsection*{curvature-limited candidate}
+\[
+\displaystyle \begin{aligned}K_2&=|g|B_{TT}>0\\d_{\min}&=\frac{2|F|}{F'+\sqrt{(F')^2+2K_2|F|}}\\T_{\mathrm{trial}}&=T-\operatorname{sgn}(F)d_{\min}\end{aligned}
+\]
+
+\subsection*{Newton candidate - safeguarded in code}
+\[
+\displaystyle T^{(k+1)}_{\mathrm N}=T^{(k)}-\frac{F(T^{(k)})}{F'(T^{(k)})},\qquad |F(T)|\le\varepsilon_T
+\]

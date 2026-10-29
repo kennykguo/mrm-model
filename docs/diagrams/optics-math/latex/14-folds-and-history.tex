@@ -1,0 +1,30 @@
+\section*{14 - folds and bistability}
+
+\[
+\begin{array}{ll}T,T_{\mathrm b}\ [\mathrm K]&\text{ring, base temperature}\\[0.6em]R\ [\mathrm{K/W}]&\text{thermal resistance}\\[0.6em]P_h,P_{\mathrm{pk}}\ [\mathrm W]&\text{heater, peak absorption}\\[0.6em]P_{\mathrm{abs}}\ [\mathrm W]&\text{absorbed optical power}\\[0.6em]\gamma\ [\mathrm m]&\text{resonance HWHM}\\[0.6em]G_{\mathrm{sh}}\ [\mathrm{m/W}]&\text{optical thermal tuning}\\[0.6em]s\ [\mathrm{m/K}]&\text{constant tuning slope}\\[0.6em]\lambda_0\ [\mathrm m]&\text{resonance without optical heat}\\[0.6em]\lambda_L,\lambda_r\ [\mathrm m]&\text{laser, hot resonance}\end{array}
+\]
+
+\subsection*{single-state steady residual}
+\[
+\displaystyle \mathcal E(T;P_h)=T-T_{\mathrm b}-R\bigl[P_h+P_{\mathrm{abs}}(T)\bigr]
+\]
+
+\subsection*{fold}
+\[
+\displaystyle \mathcal E=0,\qquad\frac{\partial\mathcal E}{\partial T}=0\quad\Longleftrightarrow\quad R\frac{dP_{\mathrm{abs}}}{dT}=1
+\]
+
+\subsection*{single-line Lorentzian - linear tuning}
+\[
+\displaystyle \begin{aligned}G_{\mathrm{sh}}&=Rs\\y&=\frac{\lambda_r-\lambda_L}{\gamma},\quad y_0=\frac{\lambda_0-\lambda_L}{\gamma}\\A&=\frac{G_{\mathrm{sh}}P_{\mathrm{pk}}}{\gamma}\\y-y_0&=\frac{A}{1+y^2}\end{aligned}
+\]
+
+\subsection*{Lorentzian folds}
+\[
+\displaystyle \begin{aligned}\mathcal F&=\{y_f\in\mathbb R:(1+y_f^2)^2+2Ay_f=0\}\\y_{0,\min}&=\min_{y_f\in\mathcal F}\left[y_f-\frac A{1+y_f^2}\right]\\y_{0,\max}&=\max_{y_f\in\mathcal F}\left[y_f-\frac A{1+y_f^2}\right]\end{aligned}
+\]
+
+\subsection*{bistable interval}
+\[
+\displaystyle A>\frac{8}{3\sqrt3},\quad y_{0,\min}<y_0<y_{0,\max},\quad\mathrm{FWHM}=2\gamma
+\]

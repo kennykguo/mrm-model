@@ -1,0 +1,20 @@
+\section*{07 - energy, loss, and absorbed heat}
+
+\[
+\begin{array}{ll}s_j,o_j\ [\sqrt{\mathrm W}]&\text{incoming, outgoing fields}\\[0.6em]\eta\ [1]&\text{absorbed share of loss}\\[0.6em]\xi=-\ln a\ [1]&\text{round-trip field loss}\\[0.6em]\Pi_d\ [\mathrm W]&\text{segment-entry power sum}\\[0.6em]E_{d,q}\ [\sqrt{\mathrm W}]&\text{segment-entry field}\\[0.6em]d\in\{\mathrm{CW},\mathrm{CCW}\}&\text{travel direction}\\[0.6em]U_d\ [\mathrm J]&\text{stored energy}\\[0.6em]T_{\mathrm{rt}}\ [\mathrm s]&\text{round-trip group delay}\end{array}
+\]
+
+\subsection*{power balance}
+\[
+\displaystyle \sum_{j=0}^{3}|s_j|^2=\sum_{j=0}^{3}|o_j|^2+P_{\mathrm{loss}}
+\]
+
+\subsection*{quarter-ring integration}
+\[
+\displaystyle \begin{aligned}\ell_q&=1-e^{-\xi/2}\\u_q&=\frac{T_{\mathrm{rt}}}{4}\frac{1-e^{-\xi/2}}{\xi/2},\qquad\lim_{\xi\to0}u_q=\frac{T_{\mathrm{rt}}}{4}\\\Pi_d&=\sum_{q=1}^{4}|E_{d,q}|^2,\qquad U_d=u_q\Pi_d\end{aligned}
+\]
+
+\subsection*{loss and heat}
+\[
+\displaystyle \begin{aligned}P_{\mathrm{loss}}&=\ell_q(\Pi_{\mathrm{CW}}+\Pi_{\mathrm{CCW}})\\P_{\mathrm{abs}}&=\eta P_{\mathrm{loss}},\qquad0\le\eta\le1\end{aligned}
+\]

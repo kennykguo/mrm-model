@@ -1,0 +1,25 @@
+\section*{19 - photodiode and ADC}
+
+\[
+\begin{array}{ll}P_{\mathrm{monitor}}\ [\mathrm W]&\text{drop optical power}\\[0.6em]I_{\mathrm{PD}}\ [\mathrm A]&\text{photodiode current}\\[0.6em]y\ [\mathrm{codes}]&\text{ADC reading}\\[0.6em]\mathcal R\ [\mathrm{A/W}]&\text{responsivity}\\[0.6em]I_0,I_{\mathrm d}\ [\mathrm A]&\text{reference, dark current}\\[0.6em]E_a\ [\mathrm J]&\text{activation energy}\\[0.6em]k_B\ [\mathrm{J/K}]&\text{Boltzmann constant}\\[0.6em]T_{\mathrm{PD}},T_0\ [\mathrm K]&\text{diode, reference temperature}\\[0.6em]h_{\mathrm{int}},\tau_{\mathrm{ADC}}\ [\mathrm s]&\text{integration, latency}\\[0.6em]G\ [\mathrm{codes/A}]&\text{conversion gain}\\[0.6em]\nu\ [\mathrm{codes}]&\text{measurement noise}\\[0.6em]b_{\mathrm{ADC}}\ [1]&\text{ADC bit count}\end{array}
+\]
+
+\subsection*{light and dark current}
+\[
+\displaystyle \begin{aligned}I_{\mathrm{PD}}(t)&=\mathcal R P_{\mathrm{monitor}}(t)+I_{\mathrm d}(T_{\mathrm{PD}})\\I_{\mathrm d}(T)&=I_0\exp\!\left[-\frac{E_a}{k_B}\left(\frac1T-\frac1{T_0}\right)\right]\end{aligned}
+\]
+
+\subsection*{integration}
+\[
+\displaystyle \overline I(t)=\frac1{h_{\mathrm{int}}}\int_{t-h_{\mathrm{int}}}^{t}I_{\mathrm{PD}}(u)\,du
+\]
+
+\subsection*{measurement abstraction}
+\[
+\displaystyle y(t)=\operatorname{clip}_{[0,\,2^{b_{\mathrm{ADC}}}-1]}\!\left(\operatorname{round}\!\left[G\overline I(t-\tau_{\mathrm{ADC}})+\nu\right]\right)
+\]
+
+\subsection*{default timing}
+\[
+\displaystyle h_{\mathrm{int}}=2\,\mu\mathrm s,\quad\tau_{\mathrm{ADC}}=2\,\mu\mathrm s,\quad f_s=250\,\mathrm{kHz}
+\]

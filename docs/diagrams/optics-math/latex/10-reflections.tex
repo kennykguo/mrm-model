@@ -1,0 +1,25 @@
+\section*{10 - returned reflections}
+
+\[
+\begin{array}{ll}q_k,R_k\ [1]&\text{through, reflection fractions}\\[0.6em]B_k\ [1]&\text{segment power transmission}\\[0.6em]P_L\ [\mathrm W]&\text{input line power}\\[0.6em]M_b,\overline M\ [\mathrm W]&\text{level, mean through power}\\[0.6em]P_{\mathrm{in}}\ [\mathrm W]&\text{local arriving power}\\[0.6em]p_1\ [1]&\text{one-bit probability}\\[0.6em]\epsilon,E_{\mathrm{diag}}\ [1]&\text{pair sum, diagnostic}\end{array}
+\]
+
+\subsection*{single-return power}
+\[
+\displaystyle P_{\mathrm{return}}=P_L\sum_k\mathbb E[R_k]\prod_{j\le k}B_j^2\prod_{j<k}\mathbb E[q_j^2]
+\]
+
+\subsection*{same bit on both crossings}
+\[
+\displaystyle \begin{aligned}\mathbb E[q^2]&=\frac{(1-p_1)M_0^2+p_1M_1^2}{P_{\mathrm{in}}^2}\\&=\frac{M_0^2+(\overline M-M_0)(M_1+M_0)}{P_{\mathrm{in}}^2}\end{aligned}
+\]
+
+\subsection*{omitted-bounce diagnostic}
+\[
+\displaystyle \begin{aligned}r_k^{\mathrm{rms}}&=\sqrt{\mathbb E[R_k]}\\\epsilon&=\sum_{i<j}r_i^{\mathrm{rms}}r_j^{\mathrm{rms}}\\E_{\mathrm{diag}}&=\begin{cases}(1-\epsilon)^{-2}-1&\epsilon<1\\+\infty&\epsilon\ge1\end{cases}\end{aligned}
+\]
+
+\subsection*{NRZ scope}
+\[
+\displaystyle \text{data-averaged}\qquad O(\epsilon)
+\]
