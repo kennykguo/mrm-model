@@ -1,12 +1,11 @@
-# Calibration targets: the ONLY published numbers that mrm/calibration may fit (07 P0-5, section 4.3).
+# published values that calibration code may fit.
+# the split was fixed on 2026-10-09 before any fitting. validation.yaml and
+# bounds.yaml hold separate frozen tests. excluded.yaml records unused values.
+# see README.md for the schema, units, uncertainty, and acceptance rules.
 #
-# Split frozen on 2026-10-09, before any fitting. Held-out targets are in validation.yaml and bounds.yaml
-# (frozen by sha256 in the header of docs/VALIDATION.md); numbers that are deliberately not used are in
-# excluded.yaml. Schema, units and tolerance semantics: README.md in this folder and mrm/validation/targets_io.py.
-#
-# Every value was re-checked against docs/research/01_lightmatter_public.md and 06_textbook_audit.md, including
-# their [verified] / [corrected] notes and verification logs. Where a value rests on a source the research could
-# not reach (the OFC 2025 talk, tag LM-T), the entry says `rechecked: false`.
+# values were checked against the public-source and textbook research audits,
+# including their corrections. entries state rechecked false when the research
+# could not reach the underlying source, such as the OFC 2025 talk.
 schema: mrm.validation.targets/1
 role: calibration
 frozen_on: "2026-10-09"
