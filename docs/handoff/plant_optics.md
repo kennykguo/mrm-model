@@ -13,7 +13,7 @@ bus_propagate_nb(p_in_w(L), bus_order(N) int64, bus_t2(N), bus_t2_out, p1(N),
                  phi0(N,L), phi1(N,L), a0(N,L), a1(N,L), eta0(N,L), eta1(N,L), psi(N,L),
                  k2_th(N,L), k2_dr(N,L), t_rt(N,L), rb(N,M_b) complex, dphi_dlamres(N,L),
                  two_level, use_tcmt, m_orders, with_slope,
-                 out_rl(N_RL,N,L), out_r(N_R,N), out_l(N_L,L), work(L), cw(N_CW,L) complex, fw(N_FW,L))
+                 out_rl(RING_LINE_OUTPUT_ROW_COUNT,N,L), out_r(RING_OUTPUT_ROW_COUNT,N), out_l(LASER_LINE_OUTPUT_ROW_COUNT,L), work(L), cw(COMPLEX_WORKSPACE_ROW_COUNT,L) complex, fw(REAL_WORKSPACE_ROW_COUNT,L))
 ring_lines_nb(k, pin(L), p1_k, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th, k2_dr, t_rt, rb, dphi_dlamres,
               two_level, use_tcmt, m_orders, with_slope, out_rl, out_r, p_thru(L), cw, fw)
 dpabs_dlambda_res_nb(k, pin(L), p1_k, phi0, phi1, a0, a1, eta0, eta1, psi, k2_th, k2_dr, t_rt, rb,
@@ -52,9 +52,9 @@ selfheat_views(args_f, args_i) -> 29 views: inputs to update per substep, out_rl
   T = T_other + g P_abs(T) against an independent `bus_propagate`, and the bounds hold over a 40 K scan. A cold start
   7 K from the root needs 13-16 certified-Newton evaluations; a warm restart needs none beyond the residual check.
 
-Output fields: `RL_*` per (ring, line) (p_in, thru, CW drop, CCW add-port output, refl, loss, absorbed, energies,
-per-level thru/drop, per-level bus output pout1/pout0, dabs_dphi), `R_*` per ring (drop_sum = the monitor's optical
-input over every line and order, abs_sum = the self-heating source, per-level drop sums P1/P0, dabs_dlam), `L_*`
+Output fields: `RING_LINE_OUTPUT_*` per (ring, line) (p_in, thru, CW drop, CCW add-port output, refl, loss, absorbed, energies,
+per-level thru/drop, per-level bus output pout1/pout0, dabs_dphi), `RING_OUTPUT_*` per ring (drop_sum = the monitor's optical
+input over every line and order, abs_sum = the self-heating source, per-level drop sums P1/P0, dabs_dlam), `LASER_LINE_OUTPUT_*`
 per line (bus output, refl returned to input, single-pass bound).
 
 Inputs the plant must prepare each substep (07 P1-5, P1-6, P1-7, P0-2):
@@ -84,7 +84,7 @@ Python path (analysis, calibration, tests): `ring_exact`, `ring_tcmt`, `ring_sma
 `dphi_dlambda_res`, `nrz_average`.
 
 Parallel batches: every kernel writes its workspace (`cw`, `fw`, `work`) and outputs. With `prange` over B, give
-each batch element its own (for example `cw` of shape (B, N_CW, L), passing `cw[b]`).
+each batch element its own (for example `cw` of shape (B, COMPLEX_WORKSPACE_ROW_COUNT, L), passing `cw[b]`).
 
 ## 2. For the self-heating, thermal and kernel owners
 
@@ -95,7 +95,7 @@ each batch element its own (for example `cw` of shape (B, N_CW, L), passing `cw[
   from the new exact Airy slope bound `pabs_slope_bound_nb` (max |dP/dphi| in closed form; it reduces to
   (3 sqrt 3/8) peak/HWHM in the Lorentzian limit).
 - Bound validity: `pabs_bounds_nb`, `pabs_slope_bound_nb` and therefore `selfheat_bounds` are verified for
-  `|r_b| <= RB_MAX_BOUNDS = 1` (beta up to FSR/2 pi, about 290 GHz at 1.8 THz; 07 P2-2 expects 1 to 10 GHz). Beyond
+  `|r_b| <= MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS = 1` (beta up to FSR/2 pi, about 290 GHz at 1.8 THz; 07 P2-2 expects 1 to 10 GHz). Beyond
   it the curvature bound can fail (8 % above d2p_max at |r_b| = 1.6). realize's Gaussian beta with the schema's
   100 GHz splitting ceiling stays far inside.
 - **Compute budget (07 P0-9): a serious concern.** Measured on the shared M2 (load average 10-18 during the runs,
@@ -126,11 +126,11 @@ convention (beta = g/2 pi, splitting = 2|beta|). Two small requests:
 
 ## 4. For the data-path owner (`mrm/plant/datapath.py`)
 
-- P1/P0 at the monitor of ring k: `out_r[R_DROP_SUM1, k]`, `out_r[R_DROP_SUM0, k]` (every line, other rings
+- P1/P0 at the monitor of ring k: `out_r[RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER, k]`, `out_r[RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER, k]` (every line, other rings
   averaged over their own data).
-- P1/P0 at the receiver for line l modulated by ring k: `out_rl[RL_POUT1, k, l]`, `out_rl[RL_POUT0, k, l]`.
+- P1/P0 at the receiver for line l modulated by ring k: `out_rl[RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER, k, l]`, `out_rl[RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER, k, l]`.
 - These are exact for independent data on different rings (the single-pass cascade factorizes; test
-  `test_nrz_average_factorizes_over_independent_rings`). `L_REFL_IN` is now exact for independent data too (it uses
+  `test_nrz_average_factorizes_over_independent_rings`). `LASER_LINE_OUTPUT_ROW_BUS_INPUT_RETURNED_REFLECTION_POWER` is now exact for independent data too (it uses
   E[T^2] for the double crossing).
 
 ## 5. Contract issues (please review)
@@ -168,7 +168,7 @@ convention (beta = g/2 pi, splitting = 2|beta|). Two small requests:
      P2-10 S-matrix netlist (deferred), or a dedicated coherent backward pass with a lumped drifting phase per ring.
    - Either way, backward light makes ring k depend on rings after it, so the self-heating walk must lag that part
      by one substep.
-6. **Single pass.** The bound returned per line (`L_BOUND`) is `1/(1 - eps)^2 - 1` with
+6. **Single pass.** The bound returned per line (`LASER_LINE_OUTPUT_ROW_FORWARD_POWER_RELATIVE_ERROR_BOUND`) is `1/(1 - eps)^2 - 1` with
    `eps = sum_{i<j} |r_i||r_j|` over all pairs (corrected; see section 6). It is the exact two-ring worst case,
    tight to leading order for N in-phase reflectors, and below 1e-3 in normal operation. With NRZ it uses the RMS
    reflection of each ring and bounds the data-averaged error to leading order.
@@ -179,14 +179,14 @@ convention (beta = g/2 pi, splitting = 2|beta|). Two small requests:
 
 - Fixed: the TCMT order window was not centred for even M. M = 2 used orders n_c and n_c + 1 on both sides, giving
   -5.3 dB against +2.0 dB at -+0.4 FSR. It now takes the M nearest orders.
-- Fixed: `L_REFL_IN` under NRZ used E[T]^2 for the double crossing of upstream rings; it now uses E[T^2], from the
+- Fixed: `LASER_LINE_OUTPUT_ROW_BUS_INPUT_RETURNED_REFLECTION_POWER` under NRZ used E[T]^2 for the double crossing of upstream rings; it now uses E[T^2], from the
   identity E[(P T)^2] = THRU0^2 + (THRU - THRU0)(THRU1 + THRU0).
 - Fixed: the single-pass bound. The earlier max-over-cuts formula is not a bound for three or more rings: rings
   detuned +4, +1.6 and -4 half-widths with r_b = 0.15 give a 14.8 % coherent error against a reported 8.5 %. The
   all-pairs eps bounds it (16.5 %); checked by an independent coherent-cascade test, and over 3000 random lossless
   chains, where it is tight to 1e-4.
 - Fixed: `pabs_bounds_nb` now caps each line's peak at loss fraction 1, and documents its validity domain
-  (`RB_MAX_BOUNDS`). Added `pabs_slope_bound_nb` and the self-heating adapter.
+  (`MAX_ROUND_TRIP_BACKSCATTER_FOR_VERIFIED_POWER_BOUNDS`). Added `pabs_slope_bound_nb` and the self-heating adapter.
 - Fixed: the module docstring said that where the backscatter sits changes the port powers at O(r_b^2/F). It is a
   relative O(1/F) of the reflected power and O(F r_b^2) of through and drop.
 - Added input validation (finite inputs; eta, p1, a1, eta1, bus_t2 and bus_t2_out in range; non-negative line power;

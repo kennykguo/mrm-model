@@ -125,7 +125,7 @@ Lock error = detuning minus the controller's own settled detuning; excursions = 
 
 | controller, scenario | lock detuning | rms / max lock error (pm) | excursions | OMA penalty mean / max (dB) | time to lock | notes |
 |---|---|---|---|---|---|---|
-| pi_lock, steady | 128 pm (f = 0.7) | 0.016 / 0.045 | 0 | 0.00 / 0.00 | 3.9 ms incl. MAP | peak ~58.8 k codes, slope -10.0 codes/code, relOMA -6.57 dB; MAP passes the peak by 2-5 pm, never the fold |
+| pi_lock, steady | 128 pm (tunable hyperparameter f = 0.7) | 0.016 / 0.045 | 0 | 0.00 / 0.00 | 3.9 ms incl. MAP | peak ~58.8 k codes, slope -10.0 codes/code, relOMA -6.57 dB; MAP passes the peak by 2-5 pm, never the fold |
 | pi_lock, laser -1 dB / +1 dB | shift -57 / +48 pm | (the shift) | 1 (permanent) | 1.44 / 1.45 ; -0.10 | | 04 C3 failure mode, measured |
 | pi_lock, capture start (N = L = 1) | 121 pm | 0.015 / 0.04 | 0 | 0 | 5.1 ms | |
 | pi_lock, 2 sampled worlds (13 placeable rings) | spread 110 pm | 0.033 / 0.10 | 0 | 0.00 | <= 9.5 ms | 3 rings unplaceable (cold resonance red of the line) |

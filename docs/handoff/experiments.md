@@ -1,7 +1,7 @@
 # Handoff: experiments, run manifests and the CLI (`mrm/sim/experiment.py`, `manifest.py`, `cli.py`)
 
 Task key: experiments. Implements 07 P1-17 (experiment files, run directories, `mrm.run`), the parts of P0-10 that
-were not in the engine (`experiment.kind: quasi_static`, time compression with its load-time rule and the mandatory
+were not in the engine (`experiment.kind: locked_steady_state`, time compression with its load-time rule and the mandatory
 convergence experiment, the soak as one experiment, `--dry-run`), P2-12 on the run side (`mrm run | sweep | mc |
 compare | robust | acceptance | rerun`) and the "judging a controller" rules of 07 section 4.8. 07 =
 docs/research/07_design_critique.md.
@@ -16,7 +16,7 @@ New (owned):
 | `mrm/sim/manifest.py` | run directories `runs/<UTC>_<hash8>/`, git state and dirty-diff hash, environment, artefact hashes, JSON and HDF5 writers/readers, bit-for-bit `compare_runs` |
 | `mrm/sim/cli.py` | `register_cli`: `mrm run`, `sweep`, `mc`, `compare`, `robust`, `acceptance`, `rerun` (mrm/cli.py already listed the provider) |
 | `experiments/acceptance/*.yaml` | 10 acceptance experiments (section 7) |
-| `experiments/examples/*.yaml` | 11 examples: steady_pi_lock, a1_pi_lock, mc_pi_lock, sweep_pi_gains, sweep_hypotheses, compare_locks, robust_pi_lock, quasi_static_g26, ones_density_steps, soak_window_hot, soak_reuse_certificate |
+| `experiments/examples/*.yaml` | 11 examples: steady_pi_lock, a1_pi_lock, mc_pi_lock, sweep_pi_gains, sweep_hypotheses, compare_locks, robust_pi_lock, locked_steady_state_g26, ones_density_steps, soak_window_hot, soak_reuse_certificate |
 | `tests/verification/test_experiment.py` | 37 tests: loading, extension schema, criteria, summaries, ranking, planning, estimate, input copies, monitor windows, every shipped file loads (~13 s) |
 | `tests/verification/test_experiment_runs.py` | 16 tests: every kind on the engine, rerun bit for bit (also of a compressed run, and from a run directory whose original parent file changed), scoring start (scored metrics equal the scored ticks of a per-tick trace; oracle reference and peak slew across the split), self reference, compression gate and certificate reuse, MC chunking, NUMBA_DISABLE_JIT=1, git state captured at the start (~30 s) |
 | `tests/verification/test_manifest.py` | 10 tests: git, environment, artefacts (ROM included), JSON, HDF5 bits, compare_runs, run-dir names (~1 s) |
@@ -123,7 +123,7 @@ enum values raise `ExperimentError` with a did-you-mean over both key sets):
 | `experiment.compression_factors` | list | [1, 10, 100] | factors of the convergence experiment |
 | `experiment.histogram` | bool | false | detuning histogram (~2.1 MB per world) |
 | `experiment.oracle` | bool | true | in-kernel oracle |
-| `experiment.p_in_w` | float | plant's | quasi_static: power per line at the chip (BND-4 is stated at 1 mW into the MRM) |
+| `experiment.p_in_w` | float | plant's | locked_steady_state: power per line at the chip (BND-4 is stated at 1 mW into the MRM) |
 | `experiment.max_worlds_per_plant` | int | 512 | MC chunk size (~1.55 MB per world) |
 | `experiment.rank_metrics` | list | `RANK_METRICS` | compare ranking metrics (names of `RANKABLE`: lower is better) |
 
@@ -140,7 +140,7 @@ enum word in both loaders (YAML 1.1 reads off as False; request 10.8).
 
 Grid keys (`experiment.grid`, kind sweep): a config path (overrides, config units; `controller.params.<p>` and
 `scenario.params.<p>` included), `alt:<path>` (a leaf alternative or an `uncertainty.<entry>` pin), `corner`,
-`controller` (an entry). Kind quasi_static uses `grid.ambient_c` and `grid.bias_v`. Controller entries (compare,
+`controller` (an entry). Kind locked_steady_state uses `grid.ambient_c` and `grid.bias_v`. Controller entries (compare,
 sweep): a name or `{name, params, overrides, alts, start, label}` (bias controllers need their bindings as entry
 overrides).
 
@@ -154,7 +154,7 @@ overrides).
 | compare | per controller: nominal (B = 1, nominal, variation off), every corner (B = 1, pins, variation off), `n_mc` (default 256) worlds (uncertainty default lhs, experiment.variation), metrics only | nominal result, worst named corner (overall and per metric), quantiles (p5..p95, max, nan), Kendall-tau stability per rank metric |
 | robust | the same for the one `controller` | + criteria over the whole set |
 | acceptance | main case (nominal / variation off unless set; `batch` worlds) + corners and worlds when given | criteria; RESULT PASS/FAIL |
-| quasi_static | runner.quasi_static over `grid.ambient_c` x `grid.bias_v` (defaults 0..105 by 5, 1.0..3.75 by 0.25), plus one survey per corner | code-range coverage, points without a code, FSR-hop risk, wrong-line risk, heater-code range, BND-4 variation, oracle relOMA map |
+| locked_steady_state | runner.solve_locked_steady_state over `grid.ambient_c` x `grid.bias_v` (defaults 0..105 by 5, 1.0..3.75 by 0.25), plus one survey per corner | code-range coverage, points without a code, FSR-hop risk, wrong-line risk, heater-code range, BND-4 variation, oracle relOMA map |
 
 Compressed scenarios are allowed in run and acceptance (main case only); elsewhere `ExperimentError` (a certificate
 is per plant and controller).
@@ -174,7 +174,7 @@ is per plant and controller).
   ranking (the LHS worlds and the corners) and the nominal ranking (scipy.stats.kendalltau); reported: mean, median,
   min, fraction of worlds with the same order, fraction defined (tau is undefined when a ranking is all ties, e.g.
   two controllers with 0 excursions), and the order of the per-controller medians.
-- Lock reference. A side-of-fringe lock (pi_lock: 0.7 of the peak) sits 0.3-0.5 FWHM from its line and ~20 pm from
+- Lock reference. A side-of-fringe lock (pi_lock: tunable hyperparameter, default 0.7 of the peak) sits 0.3-0.5 FWHM from its line and ~20 pm from
   the oracle optimum by design, so neither `lock_reference: line` nor `oracle` judges its loop dynamics (with
   `oracle` it never "locks", so it scores 0 excursions: a ranking trap). `experiment.self_reference` runs a steady
   pre-run of the same worlds, controller and start under the static scenario with the main scenario's signal
@@ -207,7 +207,7 @@ is per plant and controller).
   chain of files with sha256, inputs}, options, artefacts (sha256 now, recorded sha256, sidecar sha256, used_by,
   selected), cases {runner manifest_inputs incl. aggressor calibration, warm start, diagnostics, warnings, wall
   time}, convergence), `metrics.json` (summary + every case's metrics; NaN -> null), `trace.h5` (exact arrays:
-  /metrics, /trace, /truth_final, /self_reference, /quasi_static/<case>/<array> with or without corners),
+  /metrics, /trace, /truth_final, /self_reference, /locked_steady_state/<case>/<array> with or without corners),
   `inputs/` (the experiment file, every non-preset file of its `extends:` chain as `_extends_<i>_<name>`, the
   copies' `extends:` naming each other, and every corner file given by path as `_corner_<i>_<name>`, its manifest
   entry naming the corner as given: the directory reruns, and can be sent elsewhere, without the original files;
@@ -347,8 +347,8 @@ was needed; the runner change is plain Python).
   start, auto policy): 407 s wall (estimate 295 s at the static auto factor), no excursion, no wrong line, worst-lane
   OMA penalty 0.85 dB, BER 3e-151, `runs/experiments_examples/20261010T120938Z_1c448ae3`.
 - Every other example runs (exit 0, scratch run directories): steady_pi_lock 1.3 s, a1_pi_lock 2.3 s, mc_pi_lock
-  (64 worlds) 7.4 s, sweep_hypotheses 7.5 s, quasi_static_g26 1.4 s, ones_density_steps 7.2 s, sweep_pi_gains 16 s.
-  sweep_pi_gains (`runs/experiments_examples/20261010T170031Z_f350a251`): set-point fraction 0.6 / 0.7 / 0.8 gives a
+  (64 worlds) 7.4 s, sweep_hypotheses 7.5 s, locked_steady_state_g26 1.4 s, ones_density_steps 7.2 s, sweep_pi_gains 16 s.
+  sweep_pi_gains (`runs/experiments_examples/20261010T170031Z_f350a251`): the tunable set-point fraction hyperparameter 0.6 / 0.7 / 0.8 gives a
   worst-lane OMA penalty of 0.79 / 0.32 / 0.24 dB under A1; the crossover (1 / 2.5 / 5 kHz) changes little; every
   point leaves ring 0's point by 326-371 pm at the hot cusp (heater authority, not loop gain). This run found a bug,
   fixed and tested: a sweep over `controller.params.<p>` (or `controller.name`) did not reach the controller (every
@@ -438,7 +438,7 @@ was needed; the runner change is plain Python).
    S("experiment.compression_factors", "list_float", "convergence factors", default=(1.0, 10.0, 100.0)),
    S("experiment.histogram", "bool", "detuning histogram", default=False),
    S("experiment.oracle", "bool", "in-kernel oracle", default=True),
-   S("experiment.p_in_w", "float", "quasi_static power per line at the chip"),
+   S("experiment.p_in_w", "float", "locked_steady_state power per line at the chip"),
    S("experiment.max_worlds_per_plant", "int", "Monte Carlo chunk", default=512),
    S("experiment.rank_metrics", "list_str", "compare rank metrics"),
    # open subtrees validated by mrm.sim.experiment (add to OPEN_PREFIXES, type map):
@@ -454,12 +454,12 @@ was needed; the runner change is plain Python).
    ARCHITECTURE section 2 (`sim/cli.py`).
 4. **Engine owner (warm start)**: (a) in the stacked_eic world the settled state at the quasi-static codes is
    800-1100 pm blue of the lines (section 9 item 7). Diagnosis (nominal world, 25 degC, 1.0 V): at the same codes
-   quasi_static expects 19.4-20.5 mW of heater power and the engine delivers 18.0-19.0 mW (7 % less; side_by_side:
+   solve_locked_steady_state expects 19.4-20.5 mW of heater power and the engine delivers 18.0-19.0 mW (7 % less; side_by_side:
    equal to 0.001 mW), so the ring ends 12-16 K colder than the quasi-static 133.8 degC, on the COLD self-heating
    branch (P_abs 0.14-0.79 mW against 1.52 mW at the lock; heater resistor 128-131 degC). Probably the static
-   heater-resistor temperature (TCR) or the heater gains quasi_static uses for the stacked EIC; the probe is
+   heater-resistor temperature (TCR) or the heater gains solve_locked_steady_state uses for the stacked EIC; the probe is
    `params.load("g26", alts={"uncertainty.thermal.stack": "stacked_eic"})` + `runner.run(cfg, None, "static",
-   duration_s=2e-3, uncertainty="nominal", variation="off", heater_code="quasi_static", settle=True)`.
+   duration_s=2e-3, uncertainty="nominal", variation="off", heater_code="locked_steady_state", settle=True)`.
    (b) `warm_start_codes`: when the quasi-static heater power is negative (fsr_hop_risk) or the code is above
    code_max, try the neighbouring order instead of starting the ring at code_min (0.9 rings per sampled world with
    variation). Until both are fixed, LHS quantiles of lock-only controllers mostly measure the warm start.
@@ -507,7 +507,7 @@ Reviewed against 07 P0-10, P1-17, P2-12 and 4.8. Fixed in place (each with a tes
 | 10 | minor | experiment.py | a bad sweep value, corner or controller entry failed only after the earlier cases ran (possibly hours) | every case's config, scenario and controller built before the first run |
 | 11 | minor | experiment.py | `rank_metrics` not validated (a typo crashed after the runs; relOMA, higher is better, would rank inverted) | must be names of `RANKABLE` |
 | 12 | minor | experiment.py | open-loop acceptance reports started with the Q1 controller caveat | caveat only when a case has a controller |
-| 13 | minor | experiment.py | quasi_static trace.h5 layout differed with and without corners | always /quasi_static/<case>/<array> |
+| 13 | minor | experiment.py | locked_steady_state trace.h5 layout differed with and without corners | always /locked_steady_state/<case>/<array> |
 | 14 | minor | experiment.py | manifest artefacts only from the main config | union over every case config |
 | 15 | minor | experiment.py, cli.py | `--dry-run` ignored `--threads` and costed every sweep point with the base controller | `estimate(..., options=)`; per-case config and controller |
 | 16 | minor | cli.py | a malformed `--alt` exited 1 via SystemExit (documented: 2); `mrm rerun` leaked tracebacks for KeyError / TypeError | exit 2; caught |
@@ -546,19 +546,19 @@ another agent's golden files).
   every shipped file. PARAMETERS_FORMAT.md appendix regenerated.
 - 10.2 **done** (pyproject.toml). 10.3 **done** (CHANGELOG; ENGINE.md sections 2, 3, 6, 10 and the new section 11;
   ARCHITECTURE section 2).
-- 10.4a **diagnosed and fixed in quasi_static**: the stacked_eic disagreement is the array heater supply limit (07
-  P1-12), which the plant applies and quasi_static did not check (integrator.md 8.2 item 2). quasi_static reports
+- 10.4a **diagnosed and fixed in solve_locked_steady_state**: the stacked_eic disagreement is the array heater supply limit (07
+  P1-12), which the plant applies and solve_locked_steady_state did not check (integrator.md 8.2 item 2). solve_locked_steady_state reports
   `supply_scale` / `supply_limited`; a supply-limited point counts no ring as reachable. 10.4b **done as an opt-in**:
-  `heater_code="quasi_static_reachable"`, used by `start: warm` (`_start_kwargs`); the runner default is unchanged
+  `heater_code="locked_steady_state_reachable"`, used by `start: warm` (`_start_kwargs`); the runner default is unchanged
   (the regression scenario mc8_pi has 10 rings without a code).
 - 10.8 **done** in mrm.params (`parse_overrides` maps a YAML boolean to the enum word); `_enum_word` here is kept.
 - 10.10 **done**: `MetricsState.restart(k0, reg)`; the runner calls it.
 - Open: 10.5, 10.6, 10.7, 10.9, 10.11, 10.12 (owners named in section 10).
 
 New fields reach the reports: world summaries `warm_start_order_hopped_rings` and `warm_start_supply_limited`
-(and the metrics `warm_start_order_hopped` (B, N), `warm_start_supply_limited` (B,)); the quasi_static kind reports
+(and the metrics `warm_start_order_hopped` (B, N), `warm_start_supply_limited` (B,)); the locked_steady_state kind reports
 supply-limited points with the smallest droop factor (`supply_limited_points`, `supply_scale_min`; trace.h5
-`/quasi_static/<case>/supply_scale|supply_limited`).
+`/locked_steady_state/<case>/supply_scale|supply_limited`).
 
 ### 12.2 Every acceptance and example experiment, end to end (integrated tree, `mrm acceptance` / `mrm run`)
 
@@ -587,9 +587,9 @@ flags. `mrm rerun` of the new A1, A7 and B5 directories: bit-for-bit identical.
 | steady_pi_lock | worst-lane OMA penalty 0.117 dB, lock 0.062 pm, no excursion | 2.6 s |
 | a1_pi_lock | as A1: OMA penalty 0.316 dB, 4 excursions, ring 0 348.7 pm | 4.3 s |
 | mc_pi_lock (64 sampled worlds, static) | median OMA penalty 1.63 dB, p75 15.0, p95 31.9 dB; wrong-line rings p75 1, p95 5; warm start: 9 rings without a code in the 64 worlds (98 with the heater-up order: 89 moved one order bluer; per world median 1, max 6), 1 supply-limited world; 26 worlds have a ring > 5 pm from its own operating point, 10 of them without any warm-start flag (worlds 1, 3, 11, 13, 30, 32, 33, 39, 43, 48). Rerun 2026-10-16 after the engine review fixes (iterated order hop, per-world settle stop; runs/engine_fix/exp): median 1.63 dB, p75 15.8, p95 31.0 dB; 1 ring without a code (world 21 ring 4), 101 hopped rings, 2 supply-limited worlds (36, 63); 27 worlds off by > 5 pm, the same 10 unflagged | 20 s |
-| sweep_pi_gains | fraction 0.6 / 0.7 / 0.8: OMA penalty 0.79 / 0.32 / 0.24 dB; crossover changes little; ring 0 326-371 pm at the cusp in every point (as before) | 32 s |
+| sweep_pi_gains | tunable fraction hyperparameter 0.6 / 0.7 / 0.8: OMA penalty 0.79 / 0.32 / 0.24 dB; crossover changes little; ring 0 326-371 pm at the cusp in every point (as before) | 32 s |
 | sweep_hypotheses | default: 0.316 dB; FSR window A: 2 wrong-line rings, 12.7 dB; H86: 2 wrong-line rings, 4.0 dB; H86 + window A: 5 wrong-line rings, 53.8 dB | 13 s |
-| quasi_static_g26 | coverage 1, no supply-limited point, BND-4 5.11e-9 dB; oracle relOMA -5.99 (1 V) to -9.23 dB (3.75 V) | 2.7 s |
+| locked_steady_state_g26 | coverage 1, no supply-limited point, BND-4 5.11e-9 dB; oracle relOMA -5.99 (1 V) to -9.23 dB (3.75 V) | 2.7 s |
 | ones_density_steps | OMA penalty 0.236 dB, max lock error 48.9 pm (lock reference: line), BER 1.2e-190 | 9.5 s |
 | robust_pi_lock (A1, 12 corners + 128 LHS worlds) | FAIL over the set (as before): lock up to 8627 pm, up to 8 rings on foreign lines; worst corner g26_hot_selfheat (8 rings on foreign lines, 19.8 dB); 40 of 128 worlds start supply-limited | 114 s (6 threads) |
 | compare_locks (4 controllers, A1, 12 corners + 256 LHS worlds) | as before: median wrong-line rings 2 (PI locks) and 5-6 (kalman_lqg_c, mpc_c), OMA-penalty rank stability tau mean -0.13; **82 of 256 worlds start supply-limited**; without them (174 worlds) median wrong-line rings 1 (PI) and 4.5-5 (model based), median worst-lane OMA penalty 3.6 / 17-18 dB | 928 s (6 threads, loaded) |

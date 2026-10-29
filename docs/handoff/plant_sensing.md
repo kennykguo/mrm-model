@@ -31,19 +31,19 @@ Order inside plant interval [k, k+1) (tick convention of `mrm/core/timing.py`):
    rho (B, N) (`traffic_on` may be the float signal: on at >= 0.5). The optics averages the two NRZ levels with
    rho.
 3. Optics and self-heating.
-4. `MonitorBank.tick(k, p_pd_w = R_DROP_SUM (rho-weighted), p_bg_w = total bus power at ring n,
+4. `MonitorBank.tick(k, p_pd_w = RING_OUTPUT_ROW_TOTAL_CLOCKWISE_DROP_POWER (rho-weighted), p_bg_w = total bus power at ring n,
    t_pd_k = T at the ROM observer monitor_pd (K), t_adc_k = None with t_base_k = thermal.t_base_k +
    thermal.xpu_rise_k at k + 1 (the bank applies ring.monitor.adc_ref_site: the package base by default, t_pd_k for
    monitor_pd; MonitorHw.adc_temperature), pga_select = actuator monitor.pga_select,
    fault = sensing.fault_mask(B, N, adc_drop=fault.adc_drop, adc_stuck=fault.adc_stuck,
    adc_saturate=fault.adc_saturate, dac_glitch_codes=fault.dac_glitch_codes))` (`fault_mask_row` in the kernel).
-5. `DatapathBank.errors(k, oma_tx_w = RL_POUT1 - RL_POUT0 of ring n's assigned line at the bus output)`.
+5. `DatapathBank.errors(k, oma_tx_w = RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER - RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER of ring n's assigned line at the bus output)`.
 6. `TempSensorBank.tick(k, T at the temp_sensor observers (B, S))`.
 7. `ReadbackBank.tick(k, HeaterTickOut.v_v, HeaterTickOut.i_a)`.
 
 At a controller edge (event order step 2 of timing.py): `MonitorBank.release(edge)` and `.channels(rel)`,
 `TempSensorBank.release(edge)`, `ReadbackBank.release(edge)`, then `DatapathBank.bitstat_from_monitor(edge,
-monitor_bank, p1 = R_DROP_SUM1, p0 = R_DROP_SUM0, thr = actuator datapath.bitstat_threshold, density = the
+monitor_bank, p1 = RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER, p0 = RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER, thr = actuator datapath.bitstat_threshold, density = the
 scenario's data.ones_density of the last interval (not the rho that `pattern` returned), rin_per_hz =
 pp.laser.rin_per_hz)`, then
 `DatapathBank.release(edge)`. `SensingBank.release` merges the sensor dicts. Each bank returns `(sensors, new)` dicts

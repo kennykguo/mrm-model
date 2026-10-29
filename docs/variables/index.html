@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRM · Physics & variable map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js"></script>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="map.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#content">skip to the map</a>
+<header>
+  <div><p class="eyebrow">MRM / learning reference</p><h1>where does each quantity come from?</h1><p class="sub">search a symbol or code name. follow its definitions back to constants and preset inputs.</p></div>
+  <button id="jump-symbols" class="text-button" type="button">browse all symbols ↓</button>
+</header>
+<nav class="mode-bar" aria-label="Learning layer">
+  <button id="mode-derive" type="button" aria-pressed="true">01 · derivation map</button>
+  <button id="mode-physics" type="button" aria-pressed="false">02 · physical overview</button>
+  <button id="mode-model" type="button" aria-pressed="false">03 · stored values</button>
+  <span id="mode-note">definitions from the ground up</span>
+</nav>
+<main id="content" tabindex="-1">
+  <p id="loading" role="status">loading the variable reference…</p>
+  <div id="error" role="alert" hidden></div>
+  <section id="derive" hidden>
+    <div class="section-heading"><div><p class="eyebrow">the complete reference</p><h2>how is this quantity built from simpler ones?</h2></div><p>start with one equation. follow its inputs toward constants and preset values, or follow its uses toward the simulation.</p></div>
+    <p id="derive-summary" class="note"></p>
+    <div class="derive-search-tools">
+      <label class="search">search everything<input id="derive-search" type="search" placeholder="try g, r_b, t_rt, dark current, or a function name" autocomplete="off"></label>
+      <label>search layer<select id="derive-category"><option value="all">everything</option><option value="physics">math & physics</option><option value="implementation">programming & simulation</option></select></label>
+      <button id="derive-example" type="button">try the g = r_b / t_rt example</button>
+    </div>
+    <details id="definition-index" class="definition-index"><summary id="derive-count"></summary><section class="definition-search-results" aria-label="Matching definitions"><div id="derive-results"></div></section></details>
+    <div class="trace-toolbar">
+      <div class="trace-layout" role="group" aria-label="Derivation layout"><button id="trace-tree" type="button" aria-pressed="true">relationships</button><button id="trace-reading" type="button" aria-pressed="false">complete derivation ↓</button><button id="trace-global" type="button" aria-pressed="false">whole-index overview</button></div>
+      <label class="trace-code-option"><input id="trace-code" type="checkbox" checked> include code mappings in the reading order</label>
+    </div>
+    <p id="trace-help" class="note" hidden></p><p id="trace-count" class="note" role="status" hidden></p>
+    <div id="visual-map-host"></div>
+    <div id="global-map-host" hidden></div>
+    <div id="trace-canvas" aria-label="Derivation ancestry" hidden></div>
+    <div class="derive-workspace">
+      <section id="derive-focus" aria-labelledby="derive-selected">
+        <div class="derivation-heading"><button id="trace-back" type="button" class="text-button" disabled>← previous quantity</button><p class="eyebrow">selected quantity or definition</p><h3 id="derive-selected"></h3></div>
+        <section id="nominal-example" hidden></section>
+        <section id="definition-inspector" aria-label="Definition and source"></section>
+      </section>
+    </div>
+    <p class="reference-boundary note">equation inputs, preset derivations, code mappings, and function calls have separate labels. a boundary means that the source or registry does not record an earlier input. a function-call link is not a physical derivation or a dynamic execution trace.</p>
+  </section>
+  <section id="physics" hidden>
+    <div class="section-heading"><div><p class="eyebrow">the physical feedback loop</p><h2>how does heat change the optical response?</h2></div><p>arrows show physical influence at a fixed laser wavelength and bias. choose a quantity to see its equation, symbols, and units.</p></div>
+    <div class="physics-workspace">
+      <div>
+        <div id="physics-map" role="group" aria-label="Physical relationships between heater power, temperature, resonance, optical phase, absorption, and photodiode current">
+          <svg id="physics-links" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z"></path></marker></defs></svg>
+        </div>
+        <p class="map-caption"><span class="feedback-swatch"></span>absorbed light heats the ring again — this return path creates thermal feedback.</p>
+        <p class="note">this is a map of relationships. it is not a time trace or a plot of live readings.</p>
+      </div>
+      <aside id="concept" aria-live="polite" aria-label="Selected physical quantity"></aside>
+    </div>
+    <section class="symbol-section" aria-labelledby="symbols-title">
+      <div class="section-heading"><div><p class="eyebrow">the notation reference</p><h2 id="symbols-title">what does each mathematical symbol mean?</h2></div><p>browse every physical quantity with defined notation. identical symbols can refer to different reference states or data levels — their definitions stay separate.</p></div>
+      <div class="reference-tools"><nav id="topics" aria-label="Physics topics"></nav><label class="search">find a symbol or quantity<input id="symbol-search" type="search" placeholder="try λ, absorbed power, or thermal" autocomplete="off"></label></div>
+      <p id="symbol-count" class="note" role="status"></p>
+      <div id="symbol-list"></div>
+    </section>
+  </section>
+  <section id="model" hidden>
+    <div class="section-heading"><div><p class="eyebrow">the implementation layer</p><h2>where does a quantity live in the simulation?</h2></div><p>physical quantities are stored alongside solver settings, cached arrays, indices, and codes. a programming term keeps its code name and is explicitly labelled.</p></div>
+    <div class="model-tools"><label class="search">find a stored value<input id="model-search" type="search" placeholder="try temperature, observer index, or monitor" autocomplete="off"></label><label>show<select id="model-kind"><option value="all">all stored values</option><option value="physics">physical quantities with symbols</option><option value="implementation">implementation records & aliases</option></select></label><label>category<select id="model-layer"><option value="all">all categories</option></select></label></div>
+    <div id="model-focus" hidden><button id="back-model" type="button">← all stored values</button><h3 id="focus-title"></h3><p class="note">only immediate recorded dependencies are shown. click a neighbour to follow another step.</p><div id="dependency-map"></div><div id="record"></div></div>
+    <div id="model-browse"><p id="model-count" class="note" role="status"></p><div id="model-list" class="model-grid"></div></div>
+  </section>
+</main>
+<footer>physics equations explain the quantities. code mappings explain how the simulator stores and updates them.</footer>
+</body>
+</html>

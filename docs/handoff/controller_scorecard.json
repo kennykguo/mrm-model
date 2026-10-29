@@ -2,7 +2,7 @@
  "pi_lock": {
   "name": "pi_lock",
   "start": "warm",
-  "note": "defaults: MAP from the hand-off code, PI at 0.7 of the peak (red side)",
+  "note": "defaults: MAP from the hand-off code, PI at 0.7 of the peak (tunable fraction hyperparameter, red side)",
   "errors": [],
   "steady": {
    "ref_pm": [
@@ -136,7 +136,7 @@
     46.01588526929248
    ]
   },
-  "steady_wall_s": 2.4345320419524796,
+  "steady_wall_s": 1.3214349580230191,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.1771937293815218,
@@ -257,7 +257,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 6.536877916951198,
+  "a1_wall_s": 3.8857252079760656,
   "a1_pd_adjacent": {
    "max_pm": [
     5202.419088817425,
@@ -350,7 +350,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 6.567719084036071
+  "a1_pd_adjacent_wall_s": 3.7687352501088753
  },
  "pi_lock_c": {
   "name": "pi_lock_c",
@@ -489,7 +489,7 @@
     46.01588526929248
    ]
   },
-  "steady_wall_s": 0.9774961249786429,
+  "steady_wall_s": 0.533040540991351,
   "path": "compiled",
   "engine_oma_penalty_db_run": [
    0.1771937293815218,
@@ -610,7 +610,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 2.670579333032947,
+  "a1_wall_s": 1.525173707981594,
   "a1_pd_adjacent": {
    "max_pm": [
     5202.419088817425,
@@ -703,7 +703,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 2.672034542018082
+  "a1_pd_adjacent_wall_s": 1.632113792002201
  },
  "dither_lockin": {
   "name": "dither_lockin",
@@ -842,7 +842,7 @@
     46.03854529160918
    ]
   },
-  "steady_wall_s": 2.1360342500265688,
+  "steady_wall_s": 1.7286571669392288,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.14978733739610153,
@@ -963,7 +963,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 6.44717695802683,
+  "a1_wall_s": 3.778842208092101,
   "a1_pd_adjacent": {
    "max_pm": [
     3416.918309028169,
@@ -1056,7 +1056,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 6.575994374987204
+  "a1_pd_adjacent_wall_s": 3.7847165409475565
  },
  "dither_lockin_c": {
   "name": "dither_lockin_c",
@@ -1195,7 +1195,7 @@
     46.03854529160918
    ]
   },
-  "steady_wall_s": 0.9878348750062287,
+  "steady_wall_s": 1.255740875029005,
   "path": "compiled",
   "engine_oma_penalty_db_run": [
    0.14978733739610153,
@@ -1316,7 +1316,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 2.6592102499562316,
+  "a1_wall_s": 1.7274288330227137,
   "a1_pd_adjacent": {
    "max_pm": [
     3416.918309028169,
@@ -1409,7 +1409,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 2.8054675000021234
+  "a1_pd_adjacent_wall_s": 1.5390534170437604
  },
  "bias_dither": {
   "name": "bias_dither",
@@ -1548,7 +1548,7 @@
     45.863913629480464
    ]
   },
-  "steady_wall_s": 1.0833043330349028,
+  "steady_wall_s": 1.3986526250373572,
   "path": "compiled",
   "engine_oma_penalty_db_run": [
    0.11498424308275756,
@@ -1669,7 +1669,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 2.78852179198293,
+  "a1_wall_s": 2.120362375047989,
   "a1_pd_adjacent": {
    "max_pm": [
     4688.702279282704,
@@ -1762,7 +1762,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 2.822011084004771
+  "a1_pd_adjacent_wall_s": 1.8506305830087513
  },
  "es_po": {
   "name": "es_po",
@@ -1901,7 +1901,7 @@
     45.93733099855501
    ]
   },
-  "steady_wall_s": 2.1437613329617307,
+  "steady_wall_s": 1.3348479999694973,
   "path": "python",
   "engine_oma_penalty_db_run": [
    5.097856462192175,
@@ -2022,7 +2022,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 6.614543292031158,
+  "a1_wall_s": 3.967586625018157,
   "a1_pd_adjacent": {
    "max_pm": [
     4842.514977753495,
@@ -2115,7 +2115,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 6.565824499994051
+  "a1_pd_adjacent_wall_s": 3.9641124999616295
  },
  "es_sine": {
   "name": "es_sine",
@@ -2254,7 +2254,7 @@
     45.86448611228411
    ]
   },
-  "steady_wall_s": 2.119143541029189,
+  "steady_wall_s": 1.6345956249861047,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.025434000000549815,
@@ -2375,7 +2375,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 6.504670249996707,
+  "a1_wall_s": 3.882531207986176,
   "a1_pd_adjacent": {
    "max_pm": [
     5179.791248816671,
@@ -2468,7 +2468,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 6.494056917028502
+  "a1_pd_adjacent_wall_s": 3.7424093339359388
  },
  "feedforward_pi": {
   "name": "feedforward_pi",
@@ -2607,7 +2607,7 @@
     46.016191060680114
    ]
   },
-  "steady_wall_s": 2.765283124987036,
+  "steady_wall_s": 1.4886371250031516,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.1771808975677182,
@@ -2728,7 +2728,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 7.752255333994981,
+  "a1_wall_s": 4.75865158403758,
   "a1_pd_adjacent": {
    "max_pm": [
     5212.142414971243,
@@ -2821,7 +2821,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 8.339640958001837
+  "a1_pd_adjacent_wall_s": 4.875296458019875
  },
  "midranging": {
   "name": "midranging",
@@ -2960,7 +2960,7 @@
     45.95242752240773
    ]
   },
-  "steady_wall_s": 2.296816000016406,
+  "steady_wall_s": 1.3861668750178069,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.18701900384703324,
@@ -3081,7 +3081,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 7.115291916008573,
+  "a1_wall_s": 4.158432791940868,
   "a1_pd_adjacent": {
    "max_pm": [
     5208.521336596697,
@@ -3174,7 +3174,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 7.038846291950904
+  "a1_pd_adjacent_wall_s": 4.237314707948826
  },
  "ramp_acquire": {
   "name": "ramp_acquire",
@@ -3313,7 +3313,7 @@
     32.573175639113856
    ]
   },
-  "steady_wall_s": 2.7282041659927927,
+  "steady_wall_s": 1.829259708058089,
   "path": "python",
   "engine_oma_penalty_db_run": [
    32.315095118768,
@@ -3434,7 +3434,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 8.389921499998309,
+  "a1_wall_s": 5.2702077919384465,
   "a1_pd_adjacent": {
    "max_pm": [
     9942.65292142005,
@@ -3527,7 +3527,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 8.503566041996237
+  "a1_pd_adjacent_wall_s": 5.0765427919104695
  },
  "acquire_then_lock": {
   "name": "acquire_then_lock",
@@ -3666,7 +3666,7 @@
     31.970454838514627
    ]
   },
-  "steady_wall_s": 2.1719634169712663,
+  "steady_wall_s": 1.3096359160263091,
   "path": "python",
   "engine_oma_penalty_db_run": [
    32.273259572262575,
@@ -3787,7 +3787,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 6.54926462500589,
+  "a1_wall_s": 4.000376874930225,
   "a1_pd_adjacent": {
    "max_pm": [
     9825.01684035509,
@@ -3880,7 +3880,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 6.586397624982055
+  "a1_pd_adjacent_wall_s": 3.9018668339122087
  },
  "bitstat_lock": {
   "name": "bitstat_lock",
@@ -4019,7 +4019,7 @@
     32.135597825501634
    ]
   },
-  "steady_wall_s": 3.499342625029385,
+  "steady_wall_s": 2.1225463750306517,
   "path": "python",
   "engine_oma_penalty_db_run": [
    32.24067642158775,
@@ -4140,7 +4140,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 11.167844915995374,
+  "a1_wall_s": 6.855475999996997,
   "a1_pd_adjacent": {
    "max_pm": [
     9887.226025917225,
@@ -4233,7 +4233,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 11.341230917023495
+  "a1_pd_adjacent_wall_s": 7.661794958985411
  },
  "wdm_supervisor": {
   "name": "wdm_supervisor",
@@ -4372,7 +4372,7 @@
     42.88008645853648
    ]
   },
-  "steady_wall_s": 4.207345541974064,
+  "steady_wall_s": 2.5178937920136377,
   "path": "python",
   "engine_oma_penalty_db_run": [
    1.929954903345274,
@@ -4493,7 +4493,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 10.536690542008728,
+  "a1_wall_s": 6.189895207993686,
   "a1_pd_adjacent": {
    "max_pm": [
     5130.02090518749,
@@ -4586,7 +4586,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 10.590663917013444
+  "a1_pd_adjacent_wall_s": 6.298123957938515
  },
  "kalman_lqg": {
   "name": "kalman_lqg",
@@ -4725,7 +4725,7 @@
     45.87910899908138
    ]
   },
-  "steady_wall_s": 2.5715495409676805,
+  "steady_wall_s": 4.438723125029355,
   "path": "python",
   "engine_oma_penalty_db_run": [
    -0.0007904784839691128,
@@ -4846,7 +4846,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 7.129250833997503,
+  "a1_wall_s": 4.694345416035503,
   "a1_pd_adjacent": {
    "max_pm": [
     5160.619191020136,
@@ -4939,7 +4939,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 7.100577792036347
+  "a1_pd_adjacent_wall_s": 4.775859417044558
  },
  "kalman_lqg_c": {
   "name": "kalman_lqg_c",
@@ -5078,7 +5078,7 @@
     45.87910899908138
    ]
   },
-  "steady_wall_s": 0.997206375002861,
+  "steady_wall_s": 1.2889219169737771,
   "path": "compiled",
   "engine_oma_penalty_db_run": [
    -0.0007904784839691128,
@@ -5199,7 +5199,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 2.6439240420004353,
+  "a1_wall_s": 1.7096772079821676,
   "a1_pd_adjacent": {
    "max_pm": [
     5160.619191020136,
@@ -5292,7 +5292,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 2.692549917032011
+  "a1_pd_adjacent_wall_s": 1.6365043750265613
  },
  "mpc": {
   "name": "mpc",
@@ -5431,7 +5431,7 @@
     45.879112426444976
    ]
   },
-  "steady_wall_s": 3.000533999991603,
+  "steady_wall_s": 1.9385519159259275,
   "path": "python",
   "engine_oma_penalty_db_run": [
    -0.000787660854171667,
@@ -5552,7 +5552,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 19.587810208031442,
+  "a1_wall_s": 13.911634833086282,
   "a1_pd_adjacent": {
    "max_pm": [
     5187.0204566457305,
@@ -5645,7 +5645,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 46.46028012497118
+  "a1_pd_adjacent_wall_s": 33.25364025007002
  },
  "mpc_c": {
   "name": "mpc_c",
@@ -5784,7 +5784,7 @@
     45.879112426444976
    ]
   },
-  "steady_wall_s": 1.0192186660133302,
+  "steady_wall_s": 1.7620188330765814,
   "path": "compiled",
   "engine_oma_penalty_db_run": [
    -0.000787660854171667,
@@ -5905,7 +5905,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 2.8818973339512013,
+  "a1_wall_s": 2.0716535840183496,
   "a1_pd_adjacent": {
    "max_pm": [
     5187.0204566457305,
@@ -5998,7 +5998,7 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 2.975100375013426
+  "a1_pd_adjacent_wall_s": 1.8805460840230808
  },
  "composite": {
   "name": "composite",
@@ -6137,7 +6137,7 @@
     46.01588526929248
    ]
   },
-  "steady_wall_s": 2.7043671249994077,
+  "steady_wall_s": 1.541416790918447,
   "path": "python",
   "engine_oma_penalty_db_run": [
    0.1771937293815218,
@@ -6258,7 +6258,7 @@
     0.0
    ]
   },
-  "a1_wall_s": 8.083107999991626,
+  "a1_wall_s": 5.210748250014149,
   "a1_pd_adjacent": {
    "max_pm": [
     5202.419088817425,
@@ -6351,6 +6351,6 @@
     0.0
    ]
   },
-  "a1_pd_adjacent_wall_s": 8.138051666028332
+  "a1_pd_adjacent_wall_s": 5.013159999973141
  }
 }

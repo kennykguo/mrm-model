@@ -78,7 +78,7 @@ fxp_mlp_eval(p, base, buf, x_off, y_off, s_off) -> n_out      # numba; no alloca
 fxp_mlp_forward_batch(p, x (B, n_in), y (B, n_out))            # numba
 fxp_mlp_check(p, base) -> 0 | error code 1..13                  # numba; 0 = fxp_mlp_eval cannot raise (WRAP/SAT)
 memh_lines(raw, bits) -> list[str]
-ACT_LINEAR, ACT_RELU, ACT_HARDTANH; packed layout constants H_*, L_*, H_SIZE, L_SIZE, MAGIC, VERSION
+ACT_LINEAR, ACT_RELU, ACT_HARDTANH; packed layout constants H_*, LASER_LINE_OUTPUT_*, H_SIZE, L_SIZE, MAGIC, VERSION
 ```
 
 Usage:
@@ -90,7 +90,7 @@ obs, info = env.reset(seed=0)                     #    vectorization_mode="vecto
 obs, r, term, trunc, info = env.step(env.action_space.sample())
 info["truth"]["detuning_m"], info["truth"]["reward_per_ring"]           # Truth only here
 mlp = quantize_mlp(weights, biases, ["relu", "relu", "hardtanh"])       # a trained policy
-runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heater_code="quasi_static", settle=True)
+runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heater_code="locked_steady_state", settle=True)
 ```
 
 ## 3. Design: how each 07 P1-22 item is met
@@ -191,7 +191,7 @@ runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heat
 - Earlier checks of the dispatch: 16 chunks instead of 8 over the 8 threads gave 5-10 % (noisy; not used: it
   needs the engine's private chunk function); 4 or 16 threads were not faster than 8; the detuning histogram off
   (the env always turns it off) saved ~25 % at B = 256.
-- **Reset cost**: realize 0.09 s + Plant 0.12 s + warm start; at B = 256 the warm start's `quasi_static` (a Python
+- **Reset cost**: realize 0.09 s + Plant 0.12 s + warm start; at B = 256 the warm start's `solve_locked_steady_state` (a Python
   loop over worlds and rings: 32 768 `ring_exact` calls) takes 3-5 s of the 3.4-5.3 s. With 1000-step episodes
   (~10 s at B = 256) that is a 25-35 % overhead; `start='cold'` costs 0.2 s. Request 7.2.
 - Notebook: ~5 s end to end (warm numba cache), 8 code cells, 3.9 KB of text output.
@@ -261,7 +261,7 @@ runner.run("g26", env.compiled_policy(mlp), None, duration_s=..., batch=64, heat
    arrays, ~0.1 ms under the GIL); (c) consider dynamic chunk scheduling for the 4 P + 4 E cores. For the 07 target
    itself the plant needs ~1 us per world-tick at B = 256 (2.3-2.5x); an opt-in RL fidelity would have to be a
    documented approximation (perf.md 5.4 rule).
-2. **runner owner** (mrm/sim/runner.py): vectorize `quasi_static` over worlds (3-5 s of every B = 256 reset), and a
+2. **runner owner** (mrm/sim/runner.py): vectorize `solve_locked_steady_state` over worlds (3-5 s of every B = 256 reset), and a
    public form of `_warm_start_codes` that returns the no-code mask (the env imports the private one).
 3. **engine / params** (optional): a Plant method to replace the worlds of a mask with newly realized ones (same
    array types) would allow per-world termination and autoreset (section 6 item 1).
@@ -364,17 +364,17 @@ helper) and the public part of 7.2: `runner.warm_start_codes(plant, cfg, mode=..
 (codes, no_code); gym_env uses it instead of the private `_warm_start_codes` (whose return now has four items).
 
 Changes that reach the env through the runner (results of the env unchanged in every test):
-- `runner.quasi_static` checks the array heater supply limit (07 P1-12). A warm start in a world whose lock powers
+- `runner.solve_locked_steady_state` checks the array heater supply limit (07 P1-12). A warm start in a world whose lock powers
   exceed it warns (`warm_start_codes: ... exceed the array heater supply limit`; the env filters warnings that start
   with `warm_start_codes`) and keeps its codes, but its rings settle below their locks. About a third of the g26 LHS
   worlds are supply-limited at 25 degC (128 worlds, variation off: 42; 29 of the 32 stacked_eic worlds). The env does
   not report it yet: add `info['truth']['warm_start_supply_limited']` (the mask is
   `runner._warm_start_codes(...)[2]`) and consider excluding those worlds from the reward like the no-code rings.
-- `heater_code="quasi_static_reachable"` / `quasi_static(order="reachable")`: a ring whose heater-up order needs a
+- `heater_code="locked_steady_state_reachable"` / `solve_locked_steady_state(order="reachable")`: a ring whose heater-up order needs a
   negative heater power locks one order bluer instead of starting at code_min (g26 seeds 1000, B = 8: 10 -> 3 rings
   without a code; since 2026-10-16 the hop repeats while hopped rings push others below zero: 10 -> 0). The env's
-  'warm' start still uses 'quasi_static' (its tests and the tutorial outputs depend on it); switching is a one-line
+  'warm' start still uses 'locked_steady_state' (its tests and the tutorial outputs depend on it); switching is a one-line
   change in `MRMEnv._reset_worlds` for the rl owner.
 
-Still open: 7.1 (Python-path per-call cost), 7.2 (vectorized quasi_static), 7.3 (per-world reset), the 1e5 steps/s
+Still open: 7.1 (Python-path per-call cost), 7.2 (vectorized solve_locked_steady_state), 7.3 (per-world reset), the 1e5 steps/s
 target. (7.5, the per-world settle stop, was done on 2026-10-16: engine review.)
