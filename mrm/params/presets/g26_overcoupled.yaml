@@ -1,5 +1,6 @@
-# Corner (07 P1-5): the over-coupled mirror of the G25 notch (27.9 dB at 0 V); Q_L pinned at its nominal 3850 so the
-# branch is exact (with Q_L drawn independently the regime holds only near the nominal, see the q_loaded note).
+# over-coupled mirror of the 27.9 dB G25 notch at zero heater voltage.
+# pin loaded Q to 3850 so the branch is exact. independently varying Q
+# can move the ring across critical coupling.
 extends: g26
 meta:
   name: g26_overcoupled

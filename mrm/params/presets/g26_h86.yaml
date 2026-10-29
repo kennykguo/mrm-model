@@ -1,4 +1,5 @@
-# Corner (07 D2, required robustness corner): the printed ~15 GHz/degC = 86 pm/K as a constant at the ring (beta 0).
+# required thermal-shift corner — use a constant 86 pm/K at the ring.
+# this represents the printed approximate 15 GHz/degC reading. beta is zero.
 extends: g26
 meta:
   name: g26_h86

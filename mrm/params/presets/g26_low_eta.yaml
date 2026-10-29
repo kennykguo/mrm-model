@@ -1,6 +1,7 @@
-# Corner (07 D1, P0-2): the textbook's absorbed fraction 0.3 as a named stress corner (outside the 0.5-0.95 set).
-# The coupling regime and the film are pinned to under / 160 nm, where the eta alternatives are exact (the
-# over-coupled branch would give 0.24, the 200 nm world 0.28).
+# low-absorption stress corner — eta 0.3 from the textbook.
+# this lies outside the nominal 0.5-0.95 uncertainty set.
+# pin under-coupling and the 160 nm film, where this eta alternative is exact.
+# the over-coupled branch would give 0.24 and the 200 nm film about 0.28.
 extends: g26
 meta:
   name: g26_low_eta

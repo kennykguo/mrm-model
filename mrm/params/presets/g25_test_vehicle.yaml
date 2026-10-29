@@ -1,13 +1,13 @@
-# g25_test_vehicle: the OFC 2025 Tu3J.6 single-wavelength test vehicle (LM-P, LM-T): one MRM and one laser line near
-# 1309.5 nm, about +4 dBm at the ring, a bench voltage source on the heater, 56 Gb/s NRZ characterization. Its device
-# physics is the g26 device physics (g26 takes it from G25), so this preset extends g26 and changes only what the G25
-# bench changes. It is the plant the calibration replicas of 07 section 4.3 (CAL-1..CAL-5, CAL-7, CAL-10, CAL-11) run
-# on. The G25 paper draws the TX ring as all-pass while later slides show an input/thru/drop micrograph (01 D14); the
-# ring here keeps the g26 drop coupler and its monitor keys (the replicas support both readings).
+# g25 bench device from OFC 2025 — one MRM and one line near 1309.5 nm.
+# about +4 dBm reaches the ring. a bench voltage source drives its heater.
+# characterization uses 56 Gb/s NRZ. inherit shared device physics from g26.
+# calibration replicas use this preset for the G25 device measurements.
+# TX topology is ambiguous in the sources. keep the g26 drop monitor here.
+# replicas compare both all-pass and add-drop readings.
 extends: g26
 alts:
   # the G25 heater sweep (CAL-3, CAL-4) is printed against the voltage of a bench source, so the driver law is known
-  # here: voltage drive in every world (g26 keeps uncertainty.heater.driver_mode open, 07 P1-11)
+  # here: voltage drive in every world (g26 keeps uncertainty.heater.driver_mode open)
   uncertainty.heater.driver_mode: voltage
 meta:
   name: g25_test_vehicle

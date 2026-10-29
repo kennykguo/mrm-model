@@ -1,5 +1,5 @@
-# Corner (07 section 4.8, D15): both die-level thermal time scales at x2 (slow end of 0.5-2x on top of the family).
-# A thin extends: file that only selects alternatives (07 D3).
+# slow thermal corner — pin both die-level time scales to 2.
+# this is the slow end of the declared 0.5-2 range, applied to the family.
 extends: g26
 meta:
   name: g26_slow_thermal

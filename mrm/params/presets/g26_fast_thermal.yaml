@@ -1,4 +1,5 @@
-# Corner (07 section 4.8, D15): both die-level thermal time scales at x0.5 (fast end of 0.5-2x).
+# fast thermal corner — pin both die-level time scales to 0.5.
+# this is the fast end of the declared 0.5-2 range.
 extends: g26
 meta:
   name: g26_fast_thermal

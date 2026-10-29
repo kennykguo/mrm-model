@@ -1,11 +1,12 @@
-# Source keys for the `source:` field of every preset leaf, uncertainty entry and variation entry (07 P1-14).
+# source keys for preset leaves, uncertainty entries, and variation entries.
+# a source key identifies where a value came from. provenance describes how
+# it was obtained — printed, read-off, inferred, solver, literature, or assumed.
+# the loader reads this registry with mrm.params.config.load_sources.
 #
-# Format: {KEY: citation}. The Lightmatter tags mirror the textbook's tags
-# (/Users/kenny/interactive-textbooks/lightmatter-capstone/docs/SOURCES_AND_GENERATIONS.md section 2) and the corpus
-# table of docs/research/01_lightmatter_public.md section 1. The other keys name the research reports of this
-# repository, the extraction artefacts, the literature the reports cite, and this model's own choices. A key says
-# WHERE a number comes from; the leaf's `provenance` word says HOW (printed, read-off, inferred, solver, literature,
-# assumed). Owner: params_content. Loaded by mrm.params.config.load_sources.
+# Lightmatter keys match the textbook source tags and the public-source corpus
+# in docs/research/01_lightmatter_public.md. other keys identify literature,
+# extraction artifacts, research notes, or explicit model assumptions.
+# keep citation text and source keys unchanged.
 sources:
   # ------------------------------------------------------------------------------------------------- Lightmatter
   LM-P: "R. Baghdadi, C. Dorta-Quinones et al., 'Monolithically Integrated Microring Transmitter and Receiver for High-Density 3D Co-Packaged Optics', OFC 2025 Tu3J.6 - the paper (submission version, lightmatter.co/wp-content/uploads/2025/04/OFC-2025-submission.pdf). G25."

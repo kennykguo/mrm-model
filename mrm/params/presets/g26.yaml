@@ -1,15 +1,14 @@
-# g26: the default preset. The G26 transmit MRM bank of Lightmatter's OFC 2026 M4B.3 link (Passage EVK50): 8
-# add-drop depletion MRMs on one bus, a drop-port monitor PD per ring, an in-ring resistive heater, 8 lines on a
-# 400 GHz grid, 50 Gb/s NRZ. Where G26 is silent the G25 test vehicle (OFC 2025 Tu3J.6, same GF 45SPCLO platform)
-# supplies the device physics; meta.generation_mix says which block comes from where.
+# default G26 transmit bank — eight add-drop MRMs on one bus, each with
+# a drop monitor and resistive heater. eight lines use a 400 GHz grid near
+# 1310 nm and 50 Gb/s NRZ. G25 supplies device properties not published for G26.
+# meta.generation_mix records which generation or source supplies each block.
 #
-# Format: docs/PARAMETERS_FORMAT.md. Every physical number is a leaf {value, provenance, generation, source, ...}; a
-# solver-derived leaf takes its value from an extraction artefact ({from: "extracted/<file>:<key>"}) and carries a
-# 'fallback' alternative with a literature or inferred value (see docs/handoff/params_content.md: until an artefact
-# exists the loader uses that fallback with a warning). Disputed values are alternatives on the leaf; epistemic
-# unknowns are uncertainty entries (one draw per world, 07 4.8); per-device spread is variation (07 P1-16).
-# Numbers and their reasoning: docs/research/01..06 (corrected notes win) and 07 (decisions D1-D22, 4.3, 4.8).
-# Generated documentation: docs/PARAMETERS.md (mrm params table g26 --out docs/PARAMETERS.md).
+# physical leaves carry value, provenance, generation, and source. extracted
+# values use from paths and a fallback alternative. the loader warns when an
+# artifact is absent. alternatives represent disputed choices. uncertainty
+# entries are shared world draws. variation represents device-to-device spread.
+# see docs/PARAMETERS_FORMAT.md for syntax and the research notes for evidence.
+# generate the reference table with mrm params table g26 --out docs/PARAMETERS.md.
 meta:
   name: g26
   kind: preset
@@ -27,8 +26,8 @@ meta:
     dispersion. PAT-2: integrating ADC and DAC+PWM heater drive. Everything else is assumed and says so.
   inventory:
     # docs/research/00_prior_notes_checklist.md: every item is a key, excluded with a reason, or unknown.
-    # status key: modelled through the listed keys (schema paths, uncertainty.<entry>, variation.<path>);
-    # excluded: deliberately not modelled, with the reason; unknown: no public number, with what stands in for it.
+    # key — represented by the listed parameter, uncertainty, or variation paths.
+    # excluded — omitted with a reason. unknown — no public value, with its substitute stated.
     A:
       "ring radius / round-trip length": {status: key, keys: [ring.geometry.radius_um, ring.optics.fsr_thz], reason: "R3 derives the radius from the FSR hypothesis and n_g; L = 2 pi R"}
       "bus-ring gap": {status: key, keys: [ring.optics.kappa_d_over_kappa, ring.optics.q_through, ring.geometry.jacobian_coupling, variation.geometry], reason: "gaps live in coupling_<xsec>.json; at runtime the couplers are Q_t (derived from Q_L) and kappa_d/kappa of the nominal-geometry device; each device's gap errors (variation.geometry gap_through / gap_drop, one local sigma, and the width error that closes both) move its per-pass couplings through ring.geometry.jacobian_coupling, and its Q_L follows (07 P1-16)"}
@@ -231,30 +230,30 @@ meta:
       "production distributions": {status: unknown, keys: [variation.geometry, variation.ring.heater.p_fsr_mw], reason: "G25 60-die wafer maps (P_FSR, R) and 500-part responsivity only; geometry spread from Berkeley literature"}
 
 fidelity:
-  self_heating: "on"                 # 07 P0-1 item 1: on in every preset except teaching_*
-  thermo_optic_order: 2              # 07 P0-3: s(T) = s0 (1 + beta (T - T0))
-  thermal_model: interim             # ARCHITECTURE 5.3 / 07 P1-2: interim until the FEM ROM passes the calibration split
-  junction_model: analytic           # the rib160 LUT exists (mrm/data/extracted/junction_rib160.json, devsim); analytic
-                                     # is kept: no rib200 or lateral LUT exists while uncertainty.film_thickness is
-                                     # sampled (lut_file names one file), and the switch waits for the integrator's
-                                     # CAL-5 / CAL-10 decision (docs/handoff/extract_junction.md, calibration.md 4.3)
+  self_heating: "on"                 # on in every preset except teaching_* (self-heating changes the lock side)
+  thermo_optic_order: 2              # one thermo-optic anchor — s(T) = s0 (1 + beta (T - T0))
+  thermal_model: interim             # docs/ARCHITECTURE.md 5.3: interim until the FEM ROM passes the calibration split
+  junction_model: analytic           # junction_rib160.json exists in mrm/data/extracted.
+                                     # no rib200 or lateral LUT covers uncertainty.film_thickness.
+                                     # one lut_file cannot switch between those worlds.
+                                     # compare bias-shift and EO-bandwidth fits before switching.
   optics_model: exact
   backscatter: "off"                 # schema default; turn on for BiDi and reflection studies (cost, plant_optics 2)
   shot_noise: "on"
   pattern_noise: "off"
   data_modulation: mean
-  nonlinear_optics: "off"            # 07 P2-1: excluded with a computed bound
-  heater_anchor: fsr_integral       # R2: Z = dT_FSR/P_FSR, the exact inversion of the P_FSR anchor (07 D16); 07 P0-3
-                                   # lock_slope is 4-5 % low and offset-dependent (integrator decision,
-                                   # docs/handoff/integrator.md; lock_slope stays selectable with --set)
+  nonlinear_optics: "off"            # TPA, FCA, and Kerr — excluded with a computed bound
+  heater_anchor: fsr_integral       # Z = dT_FSR/P_FSR from the full tuning interval.
+                                   # lock_slope is 4-5 percent lower and depends on offset.
+                                   # select it explicitly with --set for comparison.
   heater_pwm_ripple: "off"
   plasma_dispersion: nedeljkovic2011
 
 sim:
-  dt_plant_s: 1.0e-6                 # 07 P0-1 item 3 keeps 1 us (implicit self-heating solve)
+  dt_plant_s: 1.0e-6                 # 1 us is enough because the self-heating solve is implicit
   substep_policy: fixed
-  reset_protocol: laser_ramp         # 07 P0-1 item 6
-  # 07 P0-1 item 6: lasers ramp over >= 10 tau_slow. tau_slow x time_scale_slow is at most 2 x 45.7 us (undercut
+  reset_protocol: laser_ramp         # reset through a defined history — the lasers ramp up, every heater at code_min
+  # The lasers ramp over >= 10 tau_slow. tau_slow x time_scale_slow is at most 2 x 45.7 us (undercut
   # family) in the drawn worlds and 300 us in the textbook corner (time scales pinned at 1), so 3 ms covers every
   # preset (the textbook family with a drawn x2 slow scale would need 6 ms). MODEL choice.
   reset_ramp_s: 3.0e-3
@@ -711,10 +710,10 @@ ring:
       note: "1: Lightmatter's degC are ring degC. H86_sensor (07 D2) reads them at a node that sees 0.77-0.86 of the ring's rise"
       alternatives:
         sensor: {value: 0.8, provenance: inferred, generation: G26, source: R06, note: "s_solver/86 pm/K = 66-74/86 = 0.77-0.86 over 25-105 degC (06 section 2.7)"}
-    family: inring_noundercut          # 07 P1-3 default; "heater and PN inside the ring" (LM26-S slide 7 schematic)
-    stack: side_by_side                # 07 P1-3: G26 SerDes beside the PIC
-    scaling_hypothesis: resistance     # 07 P1-2: tau scales with its residue (tau = RC)
-    xt_tau_law: capped                 # plant_thermal handoff 6.1: the literal 07 law is not monotone
+    family: inring_noundercut          # default family; "heater and PN inside the ring" (LM26-S slide 7 schematic)
+    stack: side_by_side                # G26 SerDes beside the PIC
+    scaling_hypothesis: resistance     # tau scales with its residue (tau = RC)
+    xt_tau_law: capped                 # docs/handoff/plant_thermal.md 6.1: the uncapped crosstalk law is not monotone
     crosstalk_dynamics: imec
     tau_fast_s:
       value: 3.18e-6
@@ -920,7 +919,7 @@ ring:
         silicide: {value: 2.0e-3, provenance: assumed, source: R02, note: "low end of silicides (2-4e-3, assumed in 02); higher values contradict the G25 droop"}
         tin: {value: 5.0e-4, provenance: literature, source: R02, note: "TiN"}
         textbook: {value: 1.0e-3, provenance: assumed, source: textbook-REF}
-    driver_mode: voltage               # 07 P1-11 hypothesis; textbook Ch11 voltage DAC
+    driver_mode: voltage               # a driver-law hypothesis; textbook Ch11 voltage DAC
     full_scale_v:
       value: 1.6
       provenance: assumed
@@ -1017,7 +1016,7 @@ ring:
                          note: "x1.6 per 10 degC near room temperature (mrm.materials.ge_pd_dark_ea_ev); 0.5 eV stress"}
     background_fraction: {value: 0.0, provenance: assumed, generation: none, source: D07, range: [0.0, 3.0e-4],
                           note: "stray or substrate light at the PD (07 P1-9), a fraction of the TOTAL bus power at the ring (all 8 lines: 3.1-8.0 x the declared line's power at the g26 nominal lock). 1e-4 adds 0.68-1.9 uA to the 26.6 uA lock current; the top 3e-4 keeps every nominal drop peak (31.8-32.2 uA) plus the background ~2 uA below the 40 uA full scale (bound 4.1e-4 with the whole chip input at every ring); 0.01 put 69-191 uA on the rings"}
-    afe_type: integrate_dump           # 07 P0-7 default (PAT-2 dual-slope integrating ADC)
+    afe_type: integrate_dump           # default front end (PAT-2 dual-slope integrating ADC)
     integration_window_s: {value: 2.0e-6, provenance: inferred, generation: PAT, source: PAT-2, range: [1.0e-6, 1.0e-5],
                            note: "T_int 1-10 us, example 2 us = 400 x 5 ns"}
     adc_rate_hz: {value: 250000.0, provenance: inferred, generation: PAT, source: PAT-2,
@@ -1058,7 +1057,7 @@ ring:
     flicker_corner_hz: {value: 1000.0, provenance: assumed, generation: none, source: MODEL}
     adc_ref_tempco_ppm_per_k: {value: 20.0, provenance: assumed, generation: none, source: MODEL,
                                note: "the reference's drift about its 25 degC trim, at the temperature of adc_ref_site (sign and size assumed)"}
-    adc_ref_site: package_base         # assumed: the converter sits on the electronic die beside the PIC (07 P1-3
+    adc_ref_site: package_base         # assumed: the converter sits on the electronic die beside the PIC (stack
                                        # side_by_side), at the package base temperature; monitor_pd = at each ring's PD
     pga_gains: {value: [1.0, 2.0, 4.0, 8.0], provenance: assumed, generation: none, source: D07,
                 note: "07 P1-10 PGA steps (for connector re-mates and laser power steps)"}
@@ -1149,13 +1148,13 @@ controller_interface:
       assignment: scenario
     laser:
       tune: scenario
-  knowledge: [line_grid, ring_to_line]  # 07 P1-12: the spec gives the bus order and the nominal grid only
+  knowledge: [line_grid, ring_to_line]  # WDM acquisition: the spec gives the bus order and the nominal grid only
   schedule: simultaneous
   on_out_of_range: clip
 
 scenario:
   ambient_c: 25.0
-  bias_v: 1.05                          # best stabilized relOMA (-2.1 dB) sits near 1.05 V (LM26-S slide 9, 07 D9)
+  bias_v: 1.05                          # best stabilized relOMA (-2.1 dB) sits near 1.05 V (LM26-S slide 9)
   time_compression: 1.0
 
 metrics:
@@ -1166,7 +1165,7 @@ metrics:
   allowed_assignments: fixed
 
 uncertainty:
-  # ----- 07 section 4.8: one draw per world, shared by every ring. Entries are applied in sorted name order, so an
+  # ----- uncertainty: one draw per world, shared by every ring. Entries are applied in sorted name order, so an
   # entry later in the alphabet overrides a leaf an earlier one set (film_thickness < thermo_optic).
   thermo_optic:
     kind: hypothesis
@@ -1445,7 +1444,7 @@ uncertainty:
       note: "07 4.8 lists 'slide-10 parabolic'; the re-digitized slide-10 trace is a rectified sine (01 D7 correction, CAL-13a)"
 
 variation:
-  # ----- 07 P1-16: per device, separate stream from the worlds
+  # ----- variation: per device, separate stream from the worlds
   geometry:
     width: {die_sigma_nm: 5.0, ring_sigma_nm: 2.0}
     thickness: {die_sigma_nm: 4.2, ring_sigma_nm: 1.3}
