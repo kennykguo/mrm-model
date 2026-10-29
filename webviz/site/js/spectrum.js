@@ -2,8 +2,9 @@
 // levels) and drop port at the nearest key frame, with the laser lines; a strip above places the window
 // within the whole comb, with every ring's resonance.
 
-import { plotBase, axis, PLOT_CONFIG, token } from './theme.js';
+import { plotBase, axis, PLOT_CONFIG, token, renderPlot } from './theme.js';
 import { hexA } from './traces.js';
+import { cat } from './ui.js';
 
 const Y_MIN = -50;
 
@@ -16,9 +17,23 @@ function withNotch(lam, y, lr, nd) {
 }
 
 export class SpectrumView {
-  constructor(card) {
+  constructor(card, { comparison = true } = {}) {
+    this.card = card;
+    this.comparison = comparison;
     this.gd = card.querySelector('.plot');
     this.readout = card.querySelector('.readout');
+    if (comparison) {
+      this.grid = document.createElement('div');
+      this.grid.className = 'ring-grid';
+      this.grid.hidden = true;
+      this.gd.parentElement.after(this.grid);
+      new ResizeObserver(() => {
+        const width = this.card.clientWidth;
+        if (width > 0 && this.lastUpdate && this.paint && Math.abs(width - this.paint[4]) > 1) {
+          this.update(...this.lastUpdate);
+        }
+      }).observe(card);
+    }
   }
 
   setScenario(S) {
@@ -28,9 +43,38 @@ export class SpectrumView {
     for (const row of S.spec.line_nm) for (const v of row) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
     for (const row of S.spec.lam_res_nm) for (const v of row) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
     this.locRange = [lo - 1.4, hi + 1.4];
+    this.S = S;
+    this.paint = null;
+    if (this.children) this.children.forEach((v) => v.setScenario(S));
   }
 
-  update(S, ring, k) {
+  update(S, ring, k, all = false) {
+    this.lastUpdate = [S, ring, k, all];
+    // The scrubber advances more often than saved spectra change. Reuse the
+    // last rendering until the key frame, selection, theme or width changes.
+    const paint = [S, ring, k, all, this.card.clientWidth, token('--text-primary')];
+    if (this.paint && paint.every((v, i) => v === this.paint[i])) return this.result;
+    this.paint = paint;
+    if (this.comparison) {
+      this.grid.hidden = !all;
+      this.gd.parentElement.hidden = all;
+      this.card.classList.toggle('bank-spectrum', all);
+      this.card.querySelector('h2').textContent = all ? 'Where is every ring’s resonance relative to its laser line?' : "Where is this ring's resonance relative to its laser line?";
+      if (all) {
+        if (!this.children || this.children.length !== S.nR) {
+          this.grid.innerHTML = Array.from({ length: S.nR }, (_, q) => `<article class="ring-panel"><h3><span class="sw" style="background:${cat(q)}"></span>R${q}</h3><p class="readout"></p><div class="plotwrap"><div class="plot"></div></div></article>`).join('');
+          this.children = [...this.grid.children].map((host) => { const v = new SpectrumView(host, { comparison: false }); v.setScenario(S); return v; });
+        }
+        let selected;
+        this.children.forEach((v, q) => {
+          v.card.classList.toggle('selected', q === ring);
+          const result = v.update(S, q, k);
+          v.readout.textContent = `Assigned L${result.decl} · detuning ${result.detuning.toFixed(1)} pm${q === ring ? ' · selected' : ''}`;
+          if (q === ring) selected = result;
+        });
+        return (this.result = selected);
+      }
+    }
     const sp = S.spec;
     const b = plotBase();
     const ink = token('--text-primary');
@@ -60,7 +104,7 @@ export class SpectrumView {
     const nl = lines.length;
     data.push({
       x: lines, y: lines.map(() => 0.45), xaxis: 'x2', yaxis: 'y2', mode: 'markers+text', showlegend: false, cliponaxis: false,
-      text: lines.map((_, i) => `L${i}`), textposition: 'top center', textfont: { size: 10, color: lines.map((_, i) => (i === decl ? ink : muted)) },
+      text: lines.map((_, i) => `L${i}`), textposition: 'top center', textfont: { size: 11, color: lines.map((_, i) => (i === decl ? ink : muted)) },
       marker: { symbol: 'line-ns-open', size: 14, line: { width: lines.map((_, i) => (i === decl ? 3 : 1.5)), color: lines.map((_, i) => (i === decl ? ink : muted)) } },
       hovertemplate: lines.map((_, i) => `line L${i}<br>%{x:.3f} nm<extra></extra>`),
     });
@@ -76,7 +120,7 @@ export class SpectrumView {
     }
     data.push({
       x: res, y: res.map(() => -0.45), xaxis: 'x2', yaxis: 'y2', mode: 'markers+text', showlegend: false, cliponaxis: false,
-      text: resText, textposition: 'bottom center', textfont: { size: 10, color: res.map((_, i) => (i === ring ? ink : muted)) },
+      text: resText, textposition: 'bottom center', textfont: { size: 11, color: res.map((_, i) => (i === ring ? ink : muted)) },
       marker: { size: res.map((_, i) => (i === ring ? 10 : 7)), color: res.map((_, i) => (i === ring ? ink : muted)) },
       hovertemplate: res.map((_, i) => `R${i} resonance<br>%{x:.3f} nm<extra></extra>`),
     });
@@ -92,7 +136,7 @@ export class SpectrumView {
     });
     const red = lres >= own;
     if (inWin(own)) {
-      ann.push({ x: own, y: 2, xref: 'x', yref: 'y', yanchor: 'bottom', xanchor: red ? 'right' : 'left', showarrow: false, text: `L${decl} (own line)`, font: { size: 11, color: ink } });
+      ann.push({ x: own, y: 2, xref: 'x', yref: 'y', yanchor: 'bottom', xanchor: red ? 'right' : 'left', xshift: red ? -8 : 8, showarrow: false, text: `L${decl} (own line)`, font: { size: 11, color: ink } });
     } else {
       const right = own > lam[lam.length - 1];
       ann.push({ x: right ? 1 : 0, xref: 'paper', xanchor: right ? 'right' : 'left', y: 2, yref: 'y', yanchor: 'bottom', showarrow: false,
@@ -100,17 +144,17 @@ export class SpectrumView {
     }
     if (inWin(lres)) {
       shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: lres, x1: lres, y0: Y_MIN, y1: 2, line: { width: 1, color: ink2, dash: 'dot' } });
-      ann.push({ x: lres, y: 2, xref: 'x', yref: 'y', yanchor: 'bottom', xanchor: red ? 'left' : 'right', showarrow: false, text: 'resonance', font: { size: 11, color: ink2 } });
+      ann.push({ x: lres, y: 2, xref: 'x', yref: 'y', yanchor: 'bottom', xanchor: red ? 'left' : 'right', xshift: red ? 8 : -8, showarrow: false, text: 'resonance', font: { size: 11, color: ink2 } });
     }
     // a notch deeper than the axis: say how deep
     const deep = [0, 1].filter((l) => notch[l] != null && notch[l] < Y_MIN && inWin(resl[l]));
     if (deep.length) {
       ann.push({ x: lres, xref: 'x', y: Y_MIN, yref: 'y', yanchor: 'bottom', xanchor: 'center', showarrow: false, bgcolor: token('--surface-1'),
-        text: deep.map((l) => `bit ${l} notch ${notch[l].toFixed(0)} dB ↓`).join(' · '), font: { size: 10, color: ink2 } });
+        text: deep.map((l) => `bit ${l} notch ${notch[l].toFixed(0)} dB ↓`).join(' · '), font: { size: 11, color: ink2 } });
     }
     const layout = {
       paper_bgcolor: b.paper_bgcolor, plot_bgcolor: b.plot_bgcolor, font: b.font, hoverlabel: b.hoverlabel,
-      height: 470,
+      height: 520,
       margin: { l: 58, r: 16, t: 30, b: 44 },
       hovermode: 'closest',
       showlegend: true,
@@ -123,9 +167,9 @@ export class SpectrumView {
       yaxis2: { domain: [0.84, 1], range: [-1.25, 1.25], visible: false, fixedrange: true },
       shapes,
       annotations: ann.concat([{ xref: 'paper', x: 0, yref: 'paper', y: 1, yanchor: 'bottom', xanchor: 'left', showarrow: false,
-        text: 'whole comb (shaded: the window below)', font: { size: 10, color: muted } }]),
+        text: 'whole comb (shaded: the window below)', font: { size: 11, color: muted } }]),
     };
-    Plotly.react(this.gd, data, layout, PLOT_CONFIG);
-    return { decl, detuning: (lres - own) * 1e3 };
+    renderPlot(this.gd, data, layout, PLOT_CONFIG);
+    return (this.result = { decl, detuning: (lres - own) * 1e3 });
   }
 }

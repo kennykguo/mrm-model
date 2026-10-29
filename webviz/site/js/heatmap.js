@@ -2,7 +2,7 @@
 // heat law on a 120 x 50 grid), same colour scale as the 3-D view. The rings are filled with their own
 // (engine) temperature, because the point law under-reads inside a ring.
 
-import { plotBase, axis, PLOT_CONFIG, token } from './theme.js';
+import { plotBase, axis, PLOT_CONFIG, token, renderPlot } from './theme.js';
 import { K0 } from './data.js';
 import { fmtNum } from './traces.js';
 
@@ -96,7 +96,7 @@ export class HeatmapView {
       yaxis: axis(b, { title: { text: 'y (µm)' }, range: [th.grid.y_um[0], th.grid.y_um[th.grid.y_um.length - 1]], showgrid: false, zeroline: false, scaleanchor: 'x', scaleratio: 1, constrain: 'domain', dtick: 50 }),
       shapes, annotations: ann,
     };
-    Plotly.react(this.gd, data, layout, PLOT_CONFIG);
+    renderPlot(this.gd, data, layout, PLOT_CONFIG);
   }
 }
 

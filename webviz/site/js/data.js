@@ -1,5 +1,10 @@
 // Loading the data files (site/data/*.json, written by webviz/generate.py) and the few derived arrays the
 // views share. Nothing here adds physics: every derived number is a difference, a sum or a lookup.
+//
+// loadScenario returns the scenario object that every view reads. The views call it S, and use r for a ring
+// index, f for a frame index and k for a key-frame index (spectra and thermal maps exist only at key frames).
+// S.scn, S.spec, S.therm, S.dev, S.st: the five data files of the scenario; S.meta: meta.json;
+// S.nearestKey[f]: the index k of the key frame nearest frame f; S.err: lock error [frame][ring] (pm).
 
 import { Scale, niceUp } from './scales.js';
 
@@ -30,10 +35,16 @@ function maxOf(rows) {
 export async function loadScenario(meta, id) {
   const m = meta.scenarios.find((s) => s.id === id);
   if (!m) throw new Error(`unknown scenario ${id}`);
-  const [scn, spec, therm] = await Promise.all([
+  const [scn, spec, therm, dev, st] = await Promise.all([
     getJSON(`data/${m.files.scenario}`), getJSON(`data/${m.files.spectra}`), getJSON(`data/${m.files.thermal}`),
+    m.files.devices ? getJSON(`data/${m.files.devices}`) : Promise.resolve(null),
+    m.files.stats ? getJSON(`data/${m.files.stats}`) : Promise.resolve(null),
   ]);
-  return derive(meta, m, scn, spec, therm);
+  const S = derive(meta, m, scn, spec, therm);
+  S.dev = dev;
+  S.st = st;
+  S.meta = meta;
+  return S;
 }
 
 function derive(meta, m, scn, spec, therm) {

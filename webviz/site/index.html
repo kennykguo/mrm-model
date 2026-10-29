@@ -6,7 +6,9 @@
 <title>MRM Bank Viewer</title>
 <meta name="description" content="The g26 microring-modulator plant model running: 8 rings on one bus, heater lock, aggressor, laser step, cold start.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2214%22 r=%229%22 fill=%22none%22 stroke=%22%23eb6834%22 stroke-width=%224%22/%3E%3Crect x=%222%22 y=%2226%22 width=%2228%22 height=%223%22 fill=%22%2300a3b8%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
 <link rel="stylesheet" href="style.css">
+<script src="vendor/katex/katex.min.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -22,14 +24,27 @@
 <header class="topbar">
   <div class="bar-row">
     <div class="brand"><strong>MRM bank</strong><span>g26 plant model, running</span></div>
-    <label class="ctl">Scenario
+    <nav class="nav" id="nav" aria-label="Views">
+      <a href="#v=scenario" data-v="scenario">Scenario</a>
+      <a href="#v=die" data-v="die">3-D die</a>
+      <a href="#v=parts" data-v="parts">Parts over the run</a>
+      <a href="#v=stats" data-v="stats">Statistics</a>
+      <a href="#v=metrics" data-v="metrics">Metrics</a>
+      <a href="#v=limits" data-v="limits">Hardware limits</a>
+      <a href="#v=xtalk" data-v="xtalk">Crosstalk</a>
+      <a href="variables/" target="_blank" rel="noopener">Math &amp; physics ↗</a>
+    </nav>
+    <button id="theme" type="button" class="ghost"></button>
+  </div>
+  <div class="bar-row controls-row">
+    <label class="ctl scenario-control">Scenario
       <select id="scenario" aria-label="Scenario"></select>
     </label>
-    <div class="ctl" role="group" aria-label="Selected ring">
+    <div class="ctl ring-control" role="group" aria-label="Selected ring">
       <span>Ring</span>
       <div id="rings" class="segs"></div>
     </div>
-    <div class="ctl">
+    <div class="ctl playback-controls">
       <button id="play" type="button" class="primary" aria-label="Play">Play</button>
       <label>Speed
         <select id="speed" aria-label="Playback speed">
@@ -42,7 +57,6 @@
       </label>
       <span id="rate" class="muted small"></span>
     </div>
-    <button id="theme" type="button" class="ghost"></button>
   </div>
   <div class="bar-row scrub-row">
     <div class="scrub">
@@ -51,70 +65,140 @@
     </div>
     <output id="time" class="time" for="scrub">t = 0.00 ms</output>
   </div>
-  <p id="desc" class="desc"></p>
 </header>
 
 <main>
   <div id="status" class="status" role="status"></div>
 
-  <section class="card" id="card3d">
-    <div class="card-head">
-      <div>
-        <h2>What is happening on the die right now?</h2>
-        <p class="sub">The 8 rings on one bus waveguide, to scale, with their heaters, monitor PDs, drivers and the aggressor site.
-          Drag to orbit, scroll to zoom, hover for numbers, click a ring to select it.</p>
-      </div>
-      <div class="tools">
-        <div class="segs" role="group" aria-label="Ring colour" id="colorMode">
-          <button type="button" data-v="temp">Ring: temperature</button>
-          <button type="button" data-v="err">Ring: lock error</button>
-          <button type="button" data-v="det">Ring: detuning</button>
-        </div>
-        <div class="segs" role="group" aria-label="Temperature map" id="mapMode">
-          <button type="button" data-v="flat">Map: flat</button>
-          <button type="button" data-v="height">Map: height</button>
-          <button type="button" data-v="off">Map: off</button>
-        </div>
-        <div class="segs">
-          <button type="button" id="reset">Reset view</button>
-          <button type="button" id="top">Top view</button>
-        </div>
-      </div>
-    </div>
-    <div class="stage" id="stage">
-      <div id="keynote" class="keynote"></div>
-      <div id="tooltip" class="tooltip" hidden></div>
-    </div>
-    <div id="legend3d" class="legend3d" aria-label="3-D colour and size legend"></div>
-    <p class="foot">Waveguides are drawn 3× their 0.4 µm width so they show at full view; the model has no layout beyond the site positions (README, Limits).</p>
-  </section>
-
-  <div class="grid2">
-    <section class="card" id="cardSpec">
-      <h2>Where is this ring's resonance relative to its laser line?</h2>
-      <p class="readout"></p>
-      <div class="plotwrap"><div class="plot"></div></div>
-      <p class="foot">Each ring alone, from the model's phase model and exact ring at its state at the key frame. The notch bottom is the exact value (the 12.5 pm grid cannot resolve it).</p>
+  <!-- ============================================================ Scenario -->
+  <div class="view" data-view="scenario" hidden>
+    <section class="card" id="cardScn">
+      <h2>What does this scenario test?</h2>
+      <p class="lead" data-role="para"></p>
+      <dl class="facts" data-role="facts"></dl>
     </section>
-
-    <section class="card" id="cardTraces">
-      <h2>What is the controller doing over time?</h2>
-      <p class="readout"></p>
-      <div class="plotwrap"><div class="plot"></div></div>
-      <p class="foot">Frame means (band: min to max detuning in each frame; grey: start-up, not scored); codes are the value at the frame end. Click a trace to jump there; drag to zoom, double-click to reset.</p>
+    <section class="card" id="cardInputs">
+      <h2>Disturbance inputs over the run</h2>
+      <p class="sub">What the scenario does to the plant, from the start to the end. Dotted lines: events. Grey: start-up, not scored.
+        Drag across the plot to zoom; below 1.5 ms the controller steps show as thin lines. Double-click to zoom out.</p>
+      <p class="readout" data-role="zoom"></p>
+      <div class="plotwrap"></div>
+      <p class="foot">Inputs are the scenario's own signals, evaluated every 10 µs (frame means). The laser panels show the plant's laser state, so they also show the cold start's turn-on ramp (a reset protocol, not a scenario signal).</p>
+    </section>
+    <div class="grid2">
+      <section class="card" id="cardTiming">
+        <h2>When does the controller act?</h2>
+        <p class="sub">Read left to right: bars collect photodiode current, dots release ADC codes, ticks run the controller, and diamonds apply heater updates. The gaps show why sensing and correction are delayed. Time is in µs across three controller steps.</p>
+        <div data-role="timing" class="timing"></div>
+        <p class="foot" data-role="timingNote"></p>
+      </section>
+      <section class="card" id="cardEvents">
+        <h2>Events</h2>
+        <p class="sub">Times found in the data. Click an event to move the time scrubber there.</p>
+        <div class="tablewrap"><table class="summary ev" data-role="events"></table></div>
+      </section>
+    </div>
+    <section class="card" id="cardSignals">
+      <h2>Every scenario input</h2>
+      <p class="sub">The plant has these input signals. "Driven" means the scenario changes it; the others keep one value for the whole run.</p>
+      <div class="tablewrap"><table class="summary sig" data-role="signals"></table></div>
+    </section>
+    <section class="card limits">
+      <h2>What the model does not show</h2>
+      <ul id="limits"></ul>
+      <p id="prov" class="foot"></p>
     </section>
   </div>
 
-  <section class="card" id="cardHeat">
-    <h2>How hot is the die?</h2>
-    <p class="readout"></p>
-    <div class="plotwrap"><div class="plot"></div></div>
-    <p class="foot">The model's point-site heat law on a 4 × 2.5 µm grid, not a 3-D field solve. Exact at the PDs; it reads low inside a ring, so each ring is filled with its own engine temperature.</p>
-  </section>
+  <!-- ============================================================ 3-D die -->
+  <div class="view" data-view="die" hidden>
+    <section class="card" id="card3d">
+      <div class="card-head">
+        <div>
+          <h2>What is happening on the die right now?</h2>
+          <p class="sub">The 8 rings share one bus waveguide. Choose ring color to compare temperature, lock error or detuning; heater colors show heater temperature. The map shows temperature across the die; height mode raises hotter regions.
+            Drag to orbit, scroll to zoom, hover for numbers, click a ring to select it.</p>
+        </div>
+        <div class="tools">
+          <div class="segs" role="group" aria-label="Ring colour" id="colorMode">
+            <button type="button" data-v="temp">Ring: temperature</button>
+            <button type="button" data-v="err">Ring: lock error</button>
+            <button type="button" data-v="det">Ring: detuning</button>
+          </div>
+          <div class="segs" role="group" aria-label="Temperature map" id="mapMode">
+            <button type="button" data-v="flat">Map: flat</button>
+            <button type="button" data-v="height">Map: height</button>
+            <button type="button" data-v="off">Map: off</button>
+          </div>
+          <div class="segs">
+            <button type="button" id="reset">Reset view</button>
+            <button type="button" id="top">Top view</button>
+          </div>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <div id="keynote" class="keynote"></div>
+        <div id="tooltip" class="tooltip" hidden></div>
+      </div>
+      <ul class="badges" aria-label="Limits of this view">
+        <li><b>Drawn wider:</b> the waveguides (rib 0.4 µm) are drawn 3× wide so they show at full view.</li>
+        <li><b>Lumped heat law:</b> the temperature map is the model's point-site law, not a 3-D field solve; it reads low inside a ring.</li>
+        <li><b>Assumed layout:</b> the PD, driver and aggressor positions and the heater placement are assumed (the G26 layout is not published).</li>
+        <li><b>Assumed sizes:</b> PD, driver and aggressor discs use the FEM extraction's assumed site radii; the plant treats every site as a point.</li>
+      </ul>
+      <div class="grid3d">
+        <div id="legend3d" class="legend3d" aria-label="3-D colour and size legend"></div>
+        <div id="distances" class="distances" aria-label="Distances between the sites"></div>
+      </div>
+    </section>
 
-  <div class="grid2">
-    <section class="card" id="cardBist">
+    <section class="card" id="cardBank">
+      <div class="card-head">
+        <div>
+          <h2>Bank overview: how is each ring now?</h2>
+          <p class="sub">One row per ring at the scrubber frame. Click a row to select the ring. The last column shows one quantity over the whole run (the vertical line is the scrubber).</p>
+        </div>
+        <div class="tools"><label class="ctl">Sparkline <select aria-label="Sparkline quantity"></select></label></div>
+      </div>
+      <h3 data-role="spark-question"></h3>
+      <p class="sub" data-role="spark-description"></p>
+      <div class="tablewrap"><table class="summary bank"></table></div>
+      <p class="foot">Codes and line indices: value at the frame end; the rest: frame means. Loop gain: the self-heating loop gain at the nearest key frame (stable below 1). "out": the lock error is outside the lock band.</p>
+    </section>
+
+    <div class="grid2">
+      <section class="card" id="cardSpec">
+        <h2>Where is this ring's resonance relative to its laser line?</h2>
+        <p class="sub">Read across wavelength: the through-port dips show the two bit states, and the drop curve shows light sent to the monitor. Their values at the assigned laser’s vertical line determine data contrast and monitor signal. Each top strip locates that panel’s wavelength window among all laser lines and ring resonances. All 8 shows one panel per ring on a common transmission scale.</p>
+        <p class="readout"></p>
+        <div class="plotwrap"><div class="plot"></div></div>
+        <p class="foot">Each ring alone, from the model's phase model and exact ring at its state at the key frame. The notch bottom is the exact value (the 12.5 pm grid cannot resolve it).</p>
+      </section>
+      <section class="card" id="cardHeat">
+        <h2>How hot is the die?</h2>
+        <p class="sub">A spatial snapshot at the nearest saved key frame: brighter colors mean hotter regions. Axes are position, not time. Filled circles use each ring’s own temperature; squares mark monitor PDs. Move the scrubber to see heat spread.</p>
+        <p class="readout"></p>
+        <div class="plotwrap"><div class="plot"></div></div>
+        <p class="foot">The model's point-site heat law on a 4 × 2.5 µm grid, not a 3-D field solve. Exact at the PDs; it reads low inside a ring, so each ring is filled with its own engine temperature.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================================================ Parts over the run -->
+  <div class="view" data-view="parts" hidden>
+    <section class="card" id="cardParts">
+      <div class="segs tabs" role="tablist" aria-label="Part" data-role="parts"></div>
+      <h2 class="dq"></h2>
+      <p class="sub dx"></p>
+      <p class="readout" data-role="ringnote"></p>
+      <div class="tiles"></div>
+      <div class="plotwrap"></div>
+      <div class="extra" hidden></div>
+      <p class="foot">Plots: the whole run (grey: start-up, not scored; dotted lines: events). All 8 compares every ring by default; the selected ring is thicker. Identical traces overlap; click legend entries to isolate rings. The snapshot table compares the rings at the scrubber frame. Toggle All 8 off for single-ring tiles and detail. Device rows are engine state read every 10 µs (each controller step); records are every 1 µs tick, reduced per frame.</p>
+    </section>
+    <section class="card" id="cardBist" hidden>
       <h2>Why is the ring bistable?</h2>
+      <p class="sub" data-role="plot-explanation"></p>
       <p class="readout"></p>
       <div class="tools left">
         <div class="segs" role="group" aria-label="Light at the ring" data-role="powers"></div>
@@ -124,22 +208,172 @@
         </div>
       </div>
       <div class="plotwrap"><div class="plot"></div></div>
-      <p class="foot">The ring's own light heats it and pulls its resonance red. Between the two folds one heater code holds two stable temperatures; the middle branch cannot be held open loop. Not tied to the scrubber.</p>
+      <p class="foot">This separate demonstration exports only ring 0, swept open loop; it is not an eight-ring comparison. The ring's own light heats it and pulls its resonance red. Between the two folds one heater code holds two stable temperatures; the middle branch cannot be held open loop. Not tied to the scrubber.</p>
     </section>
+  </div>
 
-    <section class="card" id="cardSum">
-      <h2>How well is it locked overall?</h2>
+  <!-- ============================================================ Statistics -->
+  <div class="view" data-view="stats" hidden>
+    <section class="card" id="cardStats">
+      <div class="card-head">
+        <div>
+          <h2>Statistics of the whole run</h2>
+          <p class="sub" data-role="basis"></p>
+        </div>
+        <div class="tools">
+          <div class="segs" role="group" aria-label="Time window" data-role="window">
+            <button type="button" data-v="run">Whole run</button>
+            <button type="button" data-v="scored">Scored time</button>
+          </div>
+          <label class="ctl" data-role="statpick">Statistic <select aria-label="Statistic"></select></label>
+        </div>
+      </div>
+      <div class="segs tabs" role="tablist" aria-label="Part" data-role="parts"></div>
+      <h3 data-role="title"></h3>
+      <div class="tablewrap"><table class="summary stat" data-role="table"></table></div>
+      <p class="foot" data-role="foot"></p>
+    </section>
+    <section class="card" id="cardStates">
+      <h2>Time in each state, and counts</h2>
+      <p class="sub" data-role="sub"></p>
+      <div class="tablewrap"><table class="summary stat" data-role="states"></table></div>
+      <h3>Counts</h3>
+      <div class="tablewrap"><table class="summary stat" data-role="counts"></table></div>
+      <p class="foot">"(engine)": the engine's own per-tick metric over the scored time. The other times count 10 µs samples. "starts": how many times the state began.</p>
+    </section>
+  </div>
+
+  <!-- ============================================================ Metrics -->
+  <div class="view" data-view="metrics" hidden>
+    <section class="card" id="cardMetrics">
+      <h2>Metrics: how good is the lock, ring by ring?</h2>
       <p class="readout"></p>
-      <div class="tablewrap"><table class="summary"></table></div>
+      <div class="tablewrap"><table class="summary metrics"></table></div>
+      <p class="foot">Each value is the engine's own metric (mrm/sim/metrics.py), accumulated over every 1 µs tick after scoring starts. "must be 0" metrics show "≠ 0" when they fail. Choose a metric to read its definition and time history. Underlined values mark the worst ring when results differ. Ring headings select the ring to emphasize.</p>
+      <h3 class="mtitle"></h3>
+      <div class="plotwrap"></div>
+    </section>
+    <section class="card" id="cardBer">
+      <h2>BER: how many bits does each ring get wrong?</h2>
+      <div class="ber-def" data-role="def"></div>
+      <div class="tablewrap"><table class="summary metrics" data-role="table"></table></div>
+      <h3>BER over the run (frame means, log scale)</h3>
+      <div class="plotwrap"></div>
+      <p class="foot">A BER below 1e-300 is drawn at 1e-300. The frame BER is the mean of the instantaneous BER over the frame's 1 µs ticks.</p>
+    </section>
+  </div>
+
+  <!-- ============================================================ Hardware limits -->
+  <div class="view" data-view="limits" hidden>
+    <section class="card" id="cardReach">
+      <div class="card-head">
+        <div>
+          <h2>Which hardware limits does this scenario reach?</h2>
+          <p class="sub">For each limit: the closest approach (margin, worst ring, time), how long the plant sat at the limit and when it first got there. Click a row to plot its margin over the run.</p>
+        </div>
+        <div class="tools">
+          <div class="segs" role="group" aria-label="Time window" data-role="window">
+            <button type="button" data-v="run">Whole run</button>
+            <button type="button" data-v="scored">Scored time</button>
+          </div>
+        </div>
+      </div>
+      <div class="tablewrap"><table class="summary reach" data-role="table"></table></div>
+      <h3 data-role="title"></h3>
+      <div class="plotwrap"></div>
+      <p class="foot">Margins from 10 µs samples (tick extremes for the codes and the lock error; key frames for the loop gain). The margin plot uses the frame values of the same quantities. "Reached": at least one sample at or past the limit.</p>
+    </section>
+    <section class="card" id="cardHw">
+      <h2>Hardware limits the model assumes</h2>
+      <p class="sub">The g26 preset's values as the realized plant uses them. The tag gives the provenance; "assumed" means there is no published value.</p>
+      <div class="tablewrap"><table class="summary hw" data-role="table"></table></div>
+      <p class="foot" data-role="foot"></p>
+    </section>
+    <section class="card" id="cardConst">
+      <h2>All fixed device settings</h2>
+      <p class="sub">The realized plant (g26, nominal world), read from the engine's hardware objects.</p>
+      <div class="tablewrap"><table class="summary consts"></table></div>
       <p class="foot note"></p>
     </section>
   </div>
 
-  <section class="card limits">
-    <h2>Limits</h2>
-    <ul id="limits"></ul>
-    <p id="prov" class="foot"></p>
-  </section>
+  <!-- ============================================================ Crosstalk -->
+  <div class="view" data-view="xtalk" hidden>
+    <section class="card" id="cardDc">
+      <div class="card-head">
+        <div>
+          <h2>Who heats whom? The static coupling</h2>
+          <p class="sub">Each cell answers: how much would this observer (row) warm if this source (column) supplied 1 mW long enough to settle? Stronger color means stronger coupling on a logarithmic scale. Off-diagonal cells show heat spreading to other devices; these are static gains, not the current temperatures.</p>
+        </div>
+        <div class="tools">
+          <label class="ctl">Observers <select data-role="obs" aria-label="Observers"></select></label>
+          <label class="ctl">Sources <select data-role="src" aria-label="Sources"></select></label>
+        </div>
+      </div>
+      <div class="plotwrap matrix-scroll"><div class="plot dc"></div></div>
+      <p class="foot">Observers: each ring (mode-weighted), its heater resistor, its monitor PD, and the die sensor. Sources: each ring's heater, absorbed light, junction and driver, and the two aggressor sites. On the rings × heaters view the diagonal is the heater efficiency.</p>
+    </section>
+    <section class="card" id="cardTau">
+      <div class="card-head">
+        <div>
+          <h2>How fast does the heat arrive?</h2>
+          <p class="sub" data-role="sub"></p>
+        </div>
+        <div class="tools"><label class="ctl">Observer <select data-role="obs" aria-label="Observer"></select></label></div>
+      </div>
+      <div data-role="bank-step" hidden><h3></h3><p class="sub">One trace per ring: the thermal response to a 1 mW step in its own heater. Faster rises mean quicker heat paths; the plateau is the final coupling. Identical model paths overlap; the selected ring is thicker.</p><div class="plotwrap"><div class="plot"></div></div></div>
+      <h3>Which heat paths reach the selected observer?</h3>
+      <div class="tau-details">
+        <div class="plotwrap"><div class="plot step"></div></div>
+        <div><h3>What are the time constants of these heat paths?</h3><div class="tablewrap"><table class="summary tau" data-role="table"></table></div></div>
+      </div>
+      <p class="foot">Step response of each source: the sum of its lags, \(r(1-e^{-t/\tau})\), in K per mW, after a 1 mW step at t = 0. t10 / t63 / t90: the time to 10 / 63 / 90 % of the DC gain.</p>
+    </section>
+    <section class="card" id="cardShare">
+      <div class="card-head">
+        <div>
+          <h2>How much of each ring's temperature is crosstalk?</h2>
+          <p class="sub">The rise above the base, split by heat source: the engine's own thermal lag states, grouped by source, read at every controller step (10 µs) and averaged per frame.</p>
+        </div>
+        <div class="tools">
+          <div class="segs" role="group" aria-label="Observer" data-role="which">
+            <button type="button" data-v="ring" aria-pressed="true">Ring</button>
+            <button type="button" data-v="pd" aria-pressed="false">Its monitor PD</button>
+          </div>
+          <div class="segs" role="group" aria-label="Time window" data-role="window">
+            <button type="button" data-v="run">Whole run</button>
+            <button type="button" data-v="scored">Scored time</button>
+          </div>
+        </div>
+      </div>
+      <div class="tiles"></div>
+      <div class="plotwrap" data-role="area"></div>
+      <h3>Mean split over the time window, every ring</h3>
+      <div class="tablewrap"><table class="summary share" data-role="table"></table></div>
+      <h3>Which sources are heating each ring at this instant?</h3>
+      <p class="sub">Rows are heated rings; columns identify the ring or site supplying heat. Cell values are temperature rises in K at the nearest key frame, with stronger color for a larger contribution. The outlined row is the selected ring; source buttons choose which heat paths to include.</p>
+      <p class="readout" data-role="mtitle"></p>
+      <div class="tools left">
+        <div class="segs" role="group" aria-label="Heat source kind" data-role="xtkind">
+          <button type="button" data-v="all" aria-pressed="true">All sources</button>
+          <button type="button" data-v="heater" aria-pressed="false">Heaters</button>
+          <button type="button" data-v="light" aria-pressed="false">Absorbed light</button>
+          <button type="button" data-v="jd" aria-pressed="false">Junction + driver</button>
+        </div>
+      </div>
+      <div class="plotwrap"><div class="plot xtmat"></div></div>
+      <p class="foot">"Crosstalk" here = heat from the other rings (heaters, light, junctions and drivers) plus the aggressor. The matrix is at the nearest key frame: the rise of each ring (row) caused by the sources of each owner (column).</p>
+    </section>
+    <section class="card" id="cardOpt">
+      <h2>Optical crosstalk between the lines</h2>
+      <div class="ber-def" data-role="def"></div>
+      <div class="grid2 tight">
+        <div><h3>Which laser lines reach each monitor?</h3><p class="sub">Rows are monitors; columns are laser lines. Stronger color means more drop-port light on a logarithmic scale. The box marks the assigned line; light outside it adds background the photodiode cannot separate.</p><p class="readout" data-role="mtitle"></p><div class="plotwrap"><div class="plot omat"></div></div></div>
+        <div><h3>How much monitor light and optical heat come from foreign lines?</h3><p class="sub">Each color is a ring: solid curves show the foreign-line share of monitor light, dotted curves the share of absorbed light. Higher means more background or heat from other channels. Percentages use a logarithmic axis; the vertical line marks the nearest key frame.</p><div class="plotwrap"><div class="plot oshare"></div></div></div>
+      </div>
+      <p class="foot">The engine's own optics outputs at each key frame: the drop-port and absorbed power of every line in every ring, averaged over the data.</p>
+    </section>
+  </div>
 </main>
 </body>
 </html>
