@@ -476,3 +476,79 @@ bus_propagate is used by the controller model and wraps the established bus calc
 absorbed_power_and_resonance_slope has no simulation caller, including through dpabs_dlambda_res. skip its repeated body.
 validation helpers and compatibility aliases introduce no physical model.
 the optics.py physical calculations have now been covered. the next new topic is the safeguarded temperature root search in selfheat.py.
+
+## phase walkthrough begins - 28 october 2026
+
+start phase.py in code order after completing optics.py.
+covered module purpose, imports, RP_* storage indices, PhaseParams and its setup methods, and bus_t2_from_plant_params.
+PhaseParams prepares fixed parameters and voltage tables. it does not advance state.
+reference resonance and intrinsic loss already include the junction at reference bias.
+explain ring-level junction index and free-carrier loss differences relative to that bias before describing cached reference values.
+distinguish table per-length quantities from ring-level outputs. defer their electrical derivations to electrical.py.
+B counts simulated worlds, N rings, and G voltage-grid points. array dimensions are software layout.
+bus attenuation follows dP/dz = -alpha_bus P and gives power transmission exp(-alpha_bus d).
+this is a power fraction, not a field amplitude fraction.
+the first segment is unity because input loss is handled upstream. downstream segments share the supplied spacing. the final segment is unity here.
+existing reference-state checks verify zero shift, resonance phase, field attenuation, absorbed fraction, coupling, and FSR. no new tests were run for this explanation.
+next function - thermal_shift_m, followed by local_thermo_optic. derive the integral with distinct T_ref and T_0 before mapping to code.
+
+## equation-free visual atlas - 28 october 2026
+
+read EXCALIDRAW.md and the new supplied clipboard drawing before creating the atlas.
+preserve the supplied drawing unchanged as 00-ring-model-reference.excalidraw.
+add 25 native editable diagrams covering the physical concepts discussed in this chat.
+use Excalidraw font family 5 at size 36, dark sketch strokes, and spacious transparent shapes.
+add no mathematical equations. label geometry, directions, graphs, and calculation flows in plain language.
+keep physical schematics separate from solver and control-flow drawings.
+provide individual native files, a combined atlas with 26 named frames, SVG/PNG previews, and an offline gallery.
+the atlas is in docs/diagrams/optics and the layout generator is tools/build_excalidraw_atlas.py.
+export previews through the official Excalidraw renderer with the reference font loaded.
+inspect rendered layouts and check text bounds for collisions.
+check all 26 gallery selections, local-file image loading, editable-file targets, enlargement, and mobile overflow.
+curves remain schematic. illustrative measurement dots are not experimental data.
+no production simulation code changed for this request.
+
+## equation-only visual companion - 28 october 2026
+
+create docs/diagrams/optics-math as a separate companion to the labelled concept drawings.
+use short topic labels, rendered LaTeX equations, and symbol definitions with units.
+include no explanatory paragraphs on the equation sheets.
+cover topics 00 through 25 and add 17a for phase envelopes.
+keep the full ring model, zero-backscatter limit, scalar thermal illustration, Lorentzian study model, and archived TCMT labelled separately.
+include the finite-step gain, safeguarded trial candidates, held-power solution, linear input ramp, phase-to-temperature bounds, and statistical link model.
+render 127 expressions on 27 sheets with MathJax. KaTeX also accepts every expression.
+store vector SVG equation images in Excalidraw and preserve their LaTeX in customData, source.json, equations.tex, and individual latex files.
+provide individual native sheets, a combined atlas, SVG/PNG previews, and an offline gallery.
+check image assets, native frame contents, label and equation overlap, gallery navigation, and local-file loading.
+no simulation code changed. creating equation sheets does not establish that the user has understood the next root-solver lesson.
+
+## thermal tuning law and rebasing - 29 october 2026
+
+covered calculate_thermal_resonance_shift_m and rebase_thermal_tuning_coefficients.
+these retain thermal_shift_m and local_thermo_optic as aliases after the user's readability renames.
+explain the temperature-to-resonance map with bias fixed before introducing code.
+T_ref anchors the known resonance. T_0 anchors the specified tuning slope. neither is necessarily ambient or the previous temperature.
+define s(T) = d lambda_r/dT and derive the linear-in-temperature slope model and its integrated quadratic shift.
+use the integral between T_ref and T, retaining the lower-limit term.
+illustrative example - T_0=300 K, T_ref=310 K, T=330 K, s_0=75 pm/K, beta=.001/K gives 1530 pm shift.
+rebasing is exact algebra within the quadratic model, not a linear-only approximation or a time integration step.
+at T_prev=330 K, s_local=77.25 pm/K and beta_local=.001/1.03 per K. a 2 K increment gives 154.65 pm, including .15 pm curvature contribution.
+derive s_local*beta_local = s_0*beta to show curvature is retained.
+engine uses the previous ring temperature as the trial-phase reference and passes these rebased coefficients to the optical adapter.
+state the fitted-law limitation and the nonzero denominator assumption for rebasing.
+existing phase test checks rebased shift differences and finite-difference slope. no tests rerun for this explanation.
+next - evaluate_ring_resonance_shifts and its workspace equivalent. explain the voltage contribution and junction lookup before mapping code. skip only duplicate allocation wrapper mechanics.
+
+## optics, phase, and thermal style - 29 october 2026
+
+completed the optics audit fixes and applied the same style to phase.py and thermal.py sequentially.
+all 151 authored functions and methods have typed same-line physical contracts, including nested helpers.
+function names, workspace names, and phase column names state their physical role. prior API names remain aliases.
+record fields, configuration keys, numeric layouts, arithmetic, defaults, and loop order remain unchanged.
+comments use short lowercase statements with dashes. existing reader annotations remain intact.
+detailed thermal equations and assumptions are retained in docs/THERMAL_IMPLEMENTATION_NOTES.md.
+the normalized calculation AST matches the starting source in all three files.
+272 physics checks pass with one expected failure and the separately reproduced legacy TCMT-requesting phase failure.
+seven engine and self-heating integration checks pass.
+see docs/PHYSICS_READABILITY.md for the complete function inventory.
+work folder - the path in /tmp/mrm-physics-readability-workdir.

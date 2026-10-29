@@ -1,0 +1,20 @@
+\section*{08 - binary modulation and averaging}
+
+\[
+\begin{array}{ll}V_b\ [\mathrm V]&\text{bit-level voltage}\\[0.6em]p_b\ [1]&\text{bit probability}\\[0.6em]X_b&\text{level quantity}\\[0.6em]n_g,\Delta n\ [1]&\text{group index, index change}\\[0.6em]\lambda_{\mathrm{ref}}\ [\mathrm m]&\text{reference wavelength}\\[0.6em]D_\ell\ [\mathrm{rad/m}]&\text{phase sensitivity}\\[0.6em]\mathcal L_{b\ell}\ [1]&\text{intrinsic-loss fraction}\\[0.6em]P_{\mathrm{in},\ell}\ [\mathrm W]&\text{arriving line power}\\[0.6em]\eta_{b\ell}\ [1]&\text{absorbed loss share}\end{array}
+\]
+
+\subsection*{voltage tuning}
+\[
+\displaystyle \begin{aligned}b&\in\{0,1\},\qquad p_0=1-p_1\\\Delta\lambda_b&\simeq\frac{\lambda_{\mathrm{ref}}}{n_g}\Delta n(V_b)\\\phi_{b\ell}&=\phi_{\mathrm{ref},\ell}+D_\ell\Delta\lambda_b\end{aligned}
+\]
+
+\subsection*{power average}
+\[
+\displaystyle \overline X=p_0X_0+p_1X_1
+\]
+
+\subsection*{thermal input}
+\[
+\displaystyle \overline P_{\mathrm{abs}}=\sum_{\ell}\sum_{b=0}^{1}p_bP_{\mathrm{in},\ell}\eta_{b\ell}\mathcal L_{b\ell}
+\]

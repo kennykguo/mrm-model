@@ -1,0 +1,25 @@
+\section*{22 - time scales}
+
+\[
+\begin{array}{ll}R_b\ [\mathrm{bits/s}]&\text{bit rate}\\[0.6em]T_b\ [\mathrm s]&\text{bit period}\\[0.6em]h\ [\mathrm s]&\text{plant step}\\[0.6em]h_c\ [\mathrm s]&\text{controller interval}\\[0.6em]N_{\mathrm{bits}}\ [1]&\text{bits per plant step}\\[0.6em]\mathbf A\ [\sqrt{\mathrm J}]&\text{optical mode amplitudes}\\[0.6em]V_b\ [\mathrm V]&\text{bit-level voltage}\\[0.6em]\tau_{\mathrm{opt}},\tau_{\mathrm{th}}\ [\mathrm s]&\text{optical, thermal time scales}\end{array}
+\]
+
+\subsection*{binary data}
+\[
+\displaystyle R_b=50\times10^9\,\mathrm{bits/s},\qquad T_b=R_b^{-1}=20\,\mathrm{ps}
+\]
+
+\subsection*{plant and controller}
+\[
+\displaystyle h=1\,\mu\mathrm s,\qquad h_c=10\,\mu\mathrm s=10h
+\]
+
+\subsection*{bits per step}
+\[
+\displaystyle N_{\mathrm{bits}}=R_bh=50{,}000
+\]
+
+\subsection*{thermal-scale optical solve}
+\[
+\displaystyle \tau_{\mathrm{opt}}\ll\tau_{\mathrm{th}},\qquad\left.\dot{\mathbf A}\right|_{T,V_b}\approx\mathbf0
+\]

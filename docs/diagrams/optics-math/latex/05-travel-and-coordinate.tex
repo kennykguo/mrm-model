@@ -1,0 +1,20 @@
+\section*{05 - propagation and coordinate direction}
+
+\[
+\begin{array}{ll}a\ [1]&\text{round-trip field retention}\\[0.6em]\phi\ [\mathrm{rad}]&\text{round-trip phase}\\[0.6em]\rho,\tau\ [1]&\text{scatterer reflection, transmission}\\[0.6em]u,v\ [\sqrt{\mathrm W}]&\text{CW, CCW fields}\\[0.6em]p\ [1]&\text{quarter-trip factor}\end{array}
+\]
+
+\subsection*{quarter trip}
+\[
+\displaystyle \xi=-\ln a,\qquad p=e^{-(\xi+i\phi)/4},\qquad\mathbf Q=\begin{pmatrix}p&0\\0&p^{-1}\end{pmatrix}
+\]
+
+\subsection*{physical scatterer}
+\[
+\displaystyle \begin{aligned}u_{\mathrm R}&=\tau u_{\mathrm L}-\rho^*v_{\mathrm R}\\v_{\mathrm L}&=\rho u_{\mathrm L}+\tau v_{\mathrm R}\end{aligned}
+\]
+
+\subsection*{clockwise-coordinate transfer}
+\[
+\displaystyle \begin{aligned}\mathbf S_{\mathrm{tr}}&=\frac1\tau\begin{pmatrix}1&-\rho^*\\-\rho&1\end{pmatrix}\\\mathbf H=\mathbf Q\mathbf S_{\mathrm{tr}}\mathbf Q&=\frac1\tau\begin{pmatrix}p^2&-\rho^*\\-\rho&p^{-2}\end{pmatrix}\end{aligned}
+\]

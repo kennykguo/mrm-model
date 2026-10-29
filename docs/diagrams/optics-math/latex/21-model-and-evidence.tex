@@ -1,0 +1,25 @@
+\section*{21 - mathematical verification}
+
+\[
+\begin{array}{ll}\mathbf S\ [1]&\text{port scattering matrix}\\[0.6em]a\ [1]&\text{round-trip field retention}\\[0.6em]s_j,o_j\ [\sqrt{\mathrm W}]&\text{incoming, outgoing fields}\\[0.6em]P,P_{\mathrm{loss}}\ [\mathrm W]&\text{power, intrinsic loss}\\[0.6em]\phi,\epsilon\ [\mathrm{rad}]&\text{phase, perturbation}\end{array}
+\]
+
+\subsection*{power balance}
+\[
+\displaystyle \sum_j|s_j|^2-\sum_j|o_j|^2-P_{\mathrm{loss}}\simeq0
+\]
+
+\subsection*{reciprocity and passivity}
+\[
+\displaystyle \mathbf S=\mathbf S^{\mathsf T},\qquad\mathbf S^\dagger\mathbf S\preceq\mathbf I
+\]
+
+\subsection*{lossless limit}
+\[
+\displaystyle a=1\quad\Longrightarrow\quad\mathbf S^\dagger\mathbf S=\mathbf I
+\]
+
+\subsection*{derivative comparison}
+\[
+\displaystyle \frac{\partial P}{\partial\phi}\simeq\frac{P(\phi+\epsilon)-P(\phi-\epsilon)}{2\epsilon}
+\]

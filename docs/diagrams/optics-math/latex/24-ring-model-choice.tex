@@ -1,0 +1,25 @@
+\section*{24 - field model and near-resonance TCMT}
+
+\[
+\begin{array}{ll}a\ [1]&\text{round-trip field retention}\\[0.6em]k_1,k_2\ [1]&\text{cross-coupling amplitudes}\\[0.6em]T_{\mathrm{rt}}\ [\mathrm s]&\text{round-trip group delay}\\[0.6em]\kappa_i,\kappa_e,\kappa_d\ [\mathrm{s}^{-1}]&\text{energy decay rates}\\[0.6em]g\ [\mathrm{rad/s}]&\text{CW-CCW mode coupling}\\[0.6em]r_{b,n}\ [1]&\text{round-trip backscatter}\\[0.6em]\phi\ [\mathrm{rad}]&\text{round-trip phase}\\[0.6em]n\in\mathbb Z&\text{longitudinal order}\\[0.6em]A_+,A_-\ [\sqrt{\mathrm J}]&\text{TCMT mode amplitudes}\\[0.6em]d_+,d_-\ [\sqrt{\mathrm J}/\mathrm s]&\text{mode drives}\end{array}
+\]
+
+\subsection*{rate conversion}
+\[
+\displaystyle \begin{aligned}\kappa_i&=-\frac{2\ln a}{T_{\mathrm{rt}}}\\\kappa_e&=-\frac{\ln(1-k_1^2)}{T_{\mathrm{rt}}},\quad\kappa_d=-\frac{\ln(1-k_2^2)}{T_{\mathrm{rt}}}\\\kappa&=\kappa_i+\kappa_e+\kappa_d\end{aligned}
+\]
+
+\subsection*{near-resonance variables}
+\[
+\displaystyle \Delta_n=\frac{\phi-2\pi n}{T_{\mathrm{rt}}},\quad g=\frac{r_{b,n}}{T_{\mathrm{rt}}},\quad d=\frac\kappa2+i\Delta_n
+\]
+
+\subsection*{archived steady-state TCMT}
+\[
+\displaystyle \begin{pmatrix}d&ig\\ig^*&d\end{pmatrix}\begin{pmatrix}A_+\\A_-\end{pmatrix}=\begin{pmatrix}d_+\\d_-\end{pmatrix}
+\]
+
+\subsection*{energy normalization}
+\[
+\displaystyle U_{\mathrm{CW}}=|A_+|^2,\qquad U_{\mathrm{CCW}}=|A_-|^2
+\]

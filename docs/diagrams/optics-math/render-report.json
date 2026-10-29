@@ -1,0 +1,434 @@
+[
+  {
+    "slug": "00-ring-model-reference",
+    "bounds": [
+      80,
+      65,
+      1463.8,
+      1124.1080000000002
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "01-operating-side",
+    "bounds": [
+      80,
+      65,
+      1691.608,
+      1255.904
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "02-resonance-orders",
+    "bounds": [
+      80,
+      65,
+      1534,
+      1084.692
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "03-coupling-and-interference",
+    "bounds": [
+      80,
+      65,
+      1698.376,
+      881.256
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "04-backscatter-and-splitting",
+    "bounds": [
+      80,
+      65,
+      1629.22,
+      982.308
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "05-travel-and-coordinate",
+    "bounds": [
+      80,
+      65,
+      1804.576,
+      967.872
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "06-field-closure",
+    "bounds": [
+      80,
+      65,
+      1602.7959999999998,
+      966.72
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "07-energy-and-heating",
+    "bounds": [
+      80,
+      65,
+      1622.02,
+      1066.9080000000001
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "08-two-data-levels",
+    "bounds": [
+      80,
+      65,
+      1492.564,
+      936.0840000000001
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "09-eight-ring-bus",
+    "bounds": [
+      80,
+      65,
+      1470.568,
+      1089.6599999999999
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "10-reflections",
+    "bounds": [
+      80,
+      65,
+      1605.784,
+      1358.6840000000002
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "11-heat-paths",
+    "bounds": [
+      80,
+      65,
+      1438.96,
+      763.8240000000001
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "12-self-heating-loop",
+    "bounds": [
+      80,
+      65,
+      1513,
+      966.0360000000001
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "13-heating-cooling-vector-fields",
+    "bounds": [
+      80,
+      65,
+      1691.032,
+      1190.42
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "14-folds-and-history",
+    "bounds": [
+      80,
+      65,
+      1828,
+      1746.58
+    ],
+    "elements": 13,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "15-thermal-memory",
+    "bounds": [
+      80,
+      65,
+      1695.1,
+      1241.6480000000001
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "16-trial-temperature",
+    "bounds": [
+      80,
+      65,
+      1927.876,
+      1471.684
+    ],
+    "elements": 13,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "17-local-slope-and-bounds",
+    "bounds": [
+      80,
+      65,
+      1846.876,
+      1381.4720000000002
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "17a-phase-envelopes",
+    "bounds": [
+      80,
+      65,
+      1770.016,
+      1402.676
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "18-controller-target",
+    "bounds": [
+      80,
+      65,
+      1956.568,
+      1014.2719999999999
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "19-monitor-measurement",
+    "bounds": [
+      80,
+      65,
+      1771.744,
+      1108
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "20-link-metrics",
+    "bounds": [
+      80,
+      65,
+      1765,
+      1218.5
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "21-model-and-evidence",
+    "bounds": [
+      80,
+      65,
+      1555,
+      1015.2439999999999
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "22-one-control-interval",
+    "bounds": [
+      80,
+      65,
+      1705.396,
+      943.0279999999999
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "23-stored-heat-and-cooling",
+    "bounds": [
+      80,
+      65,
+      1618,
+      974.492
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "24-ring-model-choice",
+    "bounds": [
+      80,
+      65,
+      1713.208,
+      1204.424
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "25-peak-seeking-and-lock-loss",
+    "bounds": [
+      80,
+      65,
+      1681,
+      1107.332
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  }
+]

@@ -1,0 +1,20 @@
+\section*{09 - shared-bus propagation}
+
+\[
+\begin{array}{ll}k\in\{0,\ldots,7\}&\text{bus position}\\[0.6em]\ell\in\{0,\ldots,7\}&\text{laser line}\\[0.6em]B_k,B_{\mathrm{out}}\ [1]&\text{segment power transmission}\\[0.6em]\overline q_{k\ell}\ [1]&\text{mean through fraction}\\[0.6em]P_{\mathrm{in},k\ell}\ [\mathrm W]&\text{arriving power}\\[0.6em]P_{L,\ell}\ [\mathrm W]&\text{laser input power}\end{array}
+\]
+
+\subsection*{forward walk}
+\[
+\displaystyle \begin{aligned}P_{\mathrm{in},0\ell}&=B_0P_{L,\ell}\\P_{\mathrm{in},k+1,\ell}&=B_{k+1}\overline q_{k\ell}P_{\mathrm{in},k\ell}\\P_{\mathrm{out},\ell}&=B_{\mathrm{out}}P_{L,\ell}\prod_{k=0}^{7}B_k\overline q_{k\ell}\end{aligned}
+\]
+
+\subsection*{per-ring totals}
+\[
+\displaystyle \begin{aligned}P_{\mathrm{monitor},k}&=\sum_\ell\overline P_{\mathrm{drop},k\ell}\\P_{\mathrm{abs},k}&=\sum_\ell\overline P_{\mathrm{abs},k\ell}\end{aligned}
+\]
+
+\subsection*{independent data}
+\[
+\displaystyle \mathbb E\!\left[\prod_k q_k\right]=\prod_k\mathbb E[q_k]
+\]

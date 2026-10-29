@@ -1,0 +1,25 @@
+\section*{17 - phase envelopes}
+
+\[
+\begin{array}{ll}a,t_j,k_j\ [1]&\text{ring, coupler coefficients}\\[0.6em]\phi\ [\mathrm{rad}]&\text{round-trip phase}\\[0.6em]P_{\mathrm{in}}\ [\mathrm W]&\text{arriving power}\\[0.6em]\eta\ [1]&\text{absorbed share of loss}\\[0.6em]B_\phi\ [\mathrm{W/rad}]&\text{phase-slope bound}\\[0.6em]B_{\phi\phi}\ [\mathrm{W/rad^2}]&\text{phase-curvature bound}\\[0.6em]r_{b,n}\ [1]&\text{backscatter by order}\end{array}
+\]
+
+\subsection*{single line - one data level}
+\[
+\displaystyle \begin{aligned}r&=at_1t_2\in[0,1),\quad\mathcal N=k_1^2(1-a)(1+t_2^2a)\\\mathcal A(\phi)&=1-2r\cos\phi+r^2\\\mathcal L(\phi)&=\frac{\mathcal N}{\mathcal A(\phi)}\quad(r_b=0)\end{aligned}
+\]
+
+\subsection*{power and curvature envelopes}
+\[
+\displaystyle \begin{aligned}P_{\max}&=P_{\mathrm{in}}\eta\min\!\left\{1,\frac{1.05\mathcal N}{(1-r)^2}\right\}\\B_{\phi\phi}&=1.25P_{\mathrm{in}}\eta\frac{2r\mathcal N}{(1-r)^4}\end{aligned}
+\]
+
+\subsection*{slope envelope}
+\[
+\displaystyle \begin{aligned}c_*&=\frac{8r}{\sqrt{(1+r^2)^2+32r^2}+1+r^2}\\B_\phi&=1.10P_{\mathrm{in}}\eta\frac{2r\mathcal N\sqrt{1-c_*^2}}{(1-2rc_*+r^2)^2}\end{aligned}
+\]
+
+\subsection*{verified backscatter domain}
+\[
+\displaystyle \max_n|r_{b,n}|\le1
+\]

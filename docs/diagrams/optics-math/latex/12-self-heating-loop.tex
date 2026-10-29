@@ -1,0 +1,20 @@
+\section*{12 - thermal tuning and optical feedback}
+
+\[
+\begin{array}{ll}T,T_{\mathrm{ref}}\ [\mathrm K]&\text{ring, reference temperature}\\[0.6em]s_{\mathrm{ref}}\ [\mathrm{m/K}]&\text{reference tuning slope}\\[0.6em]\beta\ [\mathrm{K}^{-1}]&\text{relative tuning curvature}\\[0.6em]D_\ell\ [\mathrm{rad/m}]&\text{phase sensitivity}\\[0.6em]c\ [\mathrm{m/s}]&\text{vacuum light speed}\\[0.6em]T_{\mathrm{rt}}\ [\mathrm s]&\text{round-trip group delay}\\[0.6em]\lambda_L\ [\mathrm m]&\text{fixed laser wavelength}\\[0.6em]P_{\mathrm{abs}}\ [\mathrm W]&\text{absorbed heat}\end{array}
+\]
+
+\subsection*{thermal tuning}
+\[
+\displaystyle \begin{aligned}\delta T&=T-T_{\mathrm{ref}}\\\Delta\lambda_r(T)&=s_{\mathrm{ref}}\delta T+\tfrac12s_{\mathrm{ref}}\beta\delta T^2\\s(T)&=s_{\mathrm{ref}}(1+\beta\delta T)\end{aligned}
+\]
+
+\subsection*{phase conversion}
+\[
+\displaystyle \begin{aligned}D_\ell&\simeq\frac{2\pi cT_{\mathrm{rt}}}{\lambda_{L,\ell}^2}\\\phi_{b\ell}(T)&=\phi_{b\ell,\mathrm{ref}}+D_\ell\Delta\lambda_r(T)\end{aligned}
+\]
+
+\subsection*{temperature sensitivity}
+\[
+\displaystyle \frac{dP_{\mathrm{abs}}}{dT}=s(T)\frac{\partial P_{\mathrm{abs}}}{\partial\lambda_r}
+\]

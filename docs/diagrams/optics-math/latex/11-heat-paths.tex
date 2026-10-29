@@ -1,0 +1,20 @@
+\section*{11 - thermal paths and observer temperatures}
+
+\[
+\begin{array}{ll}x_j\ [\mathrm K]&\text{thermal lag rise}\\[0.6em]R_j\ [\mathrm{K/W}]&\text{lag thermal resistance}\\[0.6em]\tau_j\ [\mathrm s]&\text{lag time constant}\\[0.6em]P_j\ [\mathrm W]&\text{lag heat input}\\[0.6em]T_{\mathrm b}\ [\mathrm K]&\text{background base}\\[0.6em]T_o\ [\mathrm K]&\text{observer temperature}\\[0.6em]w_{oj}\ [1]&\text{observer weights}\end{array}
+\]
+
+\subsection*{lag dynamics}
+\[
+\displaystyle \tau_j\dot x_j=-x_j+R_jP_j
+\]
+
+\subsection*{observer}
+\[
+\displaystyle T_o=T_{\mathrm b}+\sum_jw_{oj}x_j
+\]
+
+\subsection*{heat sources}
+\[
+\displaystyle P_j\in\left\{P_{\mathrm{heater}},P_{\mathrm{abs}},P_{\mathrm{nearby}}\right\}
+\]

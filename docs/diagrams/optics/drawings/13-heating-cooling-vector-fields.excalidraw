@@ -1,0 +1,5875 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mrm-model optical walkthrough",
+  "elements": [
+    {
+      "id": "13-heating-cooling-vector-fields-000",
+      "type": "text",
+      "x": 80,
+      "y": 65,
+      "width": 756,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 30766981,
+      "version": 2,
+      "versionNonce": 771987207,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "which temperatures attract or repel?",
+      "originalText": "which temperatures attract or repel?",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a0"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-001",
+      "type": "text",
+      "x": 80,
+      "y": 135,
+      "width": 1554,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 5768121,
+      "version": 2,
+      "versionNonce": 1458209001,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "compare absorbed heating with heat loss after accounting for other heating",
+      "originalText": "compare absorbed heating with heat loss after accounting for other heating",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a1"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-002",
+      "type": "text",
+      "x": 150,
+      "y": 250,
+      "width": 1596,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 63560221,
+      "version": 2,
+      "versionNonce": 1135156775,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "solid hump - absorbed power     dashed line - heat loss still to be supplied",
+      "originalText": "solid hump - absorbed power     dashed line - heat loss still to be supplied",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a2"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-003",
+      "type": "text",
+      "x": 160,
+      "y": 370,
+      "width": 420,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 64009511,
+      "version": 2,
+      "versionNonce": 2107407305,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "one cold equilibrium",
+      "originalText": "one cold equilibrium",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a3"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-004",
+      "type": "arrow",
+      "x": 160,
+      "y": 950,
+      "width": 610,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 96738866,
+      "version": 2,
+      "versionNonce": 357613895,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          610,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "a4"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-005",
+      "type": "arrow",
+      "x": 160,
+      "y": 950,
+      "width": 0,
+      "height": 430,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 77547558,
+      "version": 2,
+      "versionNonce": 906762921,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -430
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "a5"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-006",
+      "type": "text",
+      "x": 160,
+      "y": 435,
+      "width": 105,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 149523361,
+      "version": 2,
+      "versionNonce": 341246055,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "power",
+      "originalText": "power",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a6"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-007",
+      "type": "text",
+      "x": 349.5,
+      "y": 990,
+      "width": 231,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 248761747,
+      "version": 2,
+      "versionNonce": 1088740745,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "temperature",
+      "originalText": "temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "a7"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-008",
+      "type": "line",
+      "x": 160,
+      "y": 905.0852830188679,
+      "width": 610,
+      "height": 299.04807979904433,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 13871052,
+      "version": 2,
+      "versionNonce": 1384668039,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.3884892086331035,
+          -0.2658672838692837
+        ],
+        [
+          8.776978417266179,
+          -0.5418198363885267
+        ],
+        [
+          13.165467625899282,
+          -0.8283674134810326
+        ],
+        [
+          17.553956834532386,
+          -1.1260519206302888
+        ],
+        [
+          21.94244604316546,
+          -1.4354498379827874
+        ],
+        [
+          26.330935251798564,
+          -1.7571748577140625
+        ],
+        [
+          30.71942446043164,
+          -2.091880754711724
+        ],
+        [
+          35.10791366906474,
+          -2.440264513948705
+        ],
+        [
+          39.49640287769785,
+          -2.803069740523597
+        ],
+        [
+          43.88489208633092,
+          -3.181090381249305
+        ],
+        [
+          48.273381294964025,
+          -3.5751747899463453
+        ],
+        [
+          52.66187050359713,
+          -3.9862301722600932
+        ],
+        [
+          57.050359712230204,
+          -4.415227449944609
+        ],
+        [
+          61.43884892086331,
+          -4.863206589185552
+        ],
+        [
+          65.82733812949641,
+          -5.331282442745987
+        ],
+        [
+          70.21582733812949,
+          -5.820651161581395
+        ],
+        [
+          74.60431654676259,
+          -6.332597238170138
+        ],
+        [
+          78.9928057553957,
+          -6.868501251241128
+        ],
+        [
+          83.38129496402877,
+          -7.429848389957101
+        ],
+        [
+          87.76978417266187,
+          -8.018237845045974
+        ],
+        [
+          92.15827338129498,
+          -8.635393165012033
+        ],
+        [
+          96.54676258992805,
+          -9.2831736875346
+        ],
+        [
+          100.93525179856113,
+          -9.96358716965608
+        ],
+        [
+          105.32374100719426,
+          -10.67880375554762
+        ],
+        [
+          109.71223021582733,
+          -11.431171437714738
+        ],
+        [
+          114.10071942446041,
+          -12.22323318668316
+        ],
+        [
+          118.48920863309354,
+          -13.057745945706074
+        ],
+        [
+          122.87769784172662,
+          -13.93770171108497
+        ],
+        [
+          127.26618705035969,
+          -14.866350945521845
+        ],
+        [
+          131.65467625899282,
+          -15.847228601728034
+        ],
+        [
+          136.0431654676259,
+          -16.884183066473838
+        ],
+        [
+          140.43165467625897,
+          -17.981408371475595
+        ],
+        [
+          144.8201438848921,
+          -19.14348005697832
+        ],
+        [
+          149.20863309352518,
+          -20.375395116421032
+        ],
+        [
+          153.59712230215825,
+          -21.682616495736397
+        ],
+        [
+          157.9856115107914,
+          -23.07112266782383
+        ],
+        [
+          162.37410071942446,
+          -24.547462850183138
+        ],
+        [
+          166.76258992805754,
+          -26.11881847945972
+        ],
+        [
+          171.15107913669067,
+          -27.793071597494645
+        ],
+        [
+          175.53956834532374,
+          -29.578880834574306
+        ],
+        [
+          179.92805755395682,
+          -31.48576568998044
+        ],
+        [
+          184.31654676258995,
+          -33.52419979767137
+        ],
+        [
+          188.70503597122303,
+          -35.70571381185209
+        ],
+        [
+          193.0935251798561,
+          -38.043008433507566
+        ],
+        [
+          197.48201438848923,
+          -40.55007789706815
+        ],
+        [
+          201.8705035971223,
+          -43.242343908090106
+        ],
+        [
+          206.25899280575538,
+          -46.13679951572283
+        ],
+        [
+          210.64748201438852,
+          -49.25216164623282
+        ],
+        [
+          215.03597122302153,
+          -52.60902991902208
+        ],
+        [
+          219.42446043165467,
+          -56.23004778415691
+        ],
+        [
+          223.8129496402878,
+          -60.14005978717864
+        ],
+        [
+          228.20143884892087,
+          -64.3662556553071
+        ],
+        [
+          232.58992805755395,
+          -68.9382876148834
+        ],
+        [
+          236.97841726618708,
+          -73.88834152089885
+        ],
+        [
+          241.3669064748201,
+          -79.25113454905011
+        ],
+        [
+          245.75539568345323,
+          -85.06380183328031
+        ],
+        [
+          250.14388489208636,
+          -91.36562094311978
+        ],
+        [
+          254.53237410071944,
+          -98.1975059304524
+        ],
+        [
+          258.9208633093525,
+          -105.60118146851562
+        ],
+        [
+          263.3093525179856,
+          -113.6179224740323
+        ],
+        [
+          267.6978417266187,
+          -122.28671664862543
+        ],
+        [
+          272.0863309352518,
+          -131.64167948517377
+        ],
+        [
+          276.4748201438849,
+          -141.7085293112632
+        ],
+        [
+          280.863309352518,
+          -152.49992428466396
+        ],
+        [
+          285.2517985611511,
+          -164.00949066832766
+        ],
+        [
+          289.64028776978415,
+          -176.20445674392488
+        ],
+        [
+          294.0287769784173,
+          -189.01698144675993
+        ],
+        [
+          298.41726618705036,
+          -202.3345663860291
+        ],
+        [
+          302.8057553956835,
+          -215.99039044919925
+        ],
+        [
+          307.1942446043165,
+          -229.7550011810082
+        ],
+        [
+          311.58273381294964,
+          -243.33146212709403
+        ],
+        [
+          315.9712230215827,
+          -256.35660956770016
+        ],
+        [
+          320.3597122302158,
+          -268.411212376098
+        ],
+        [
+          324.7482014388489,
+          -279.0411783624785
+        ],
+        [
+          329.136690647482,
+          -287.79021338049654
+        ],
+        [
+          333.52517985611513,
+          -294.2415511501089
+        ],
+        [
+          337.9136690647482,
+          -298.0631318710732
+        ],
+        [
+          342.3021582733813,
+          -299.04807979904433
+        ],
+        [
+          346.6906474820144,
+          -297.1418304680436
+        ],
+        [
+          351.0791366906475,
+          -292.44952296553265
+        ],
+        [
+          355.4676258992806,
+          -285.2218437417839
+        ],
+        [
+          359.85611510791364,
+          -275.82276789450555
+        ],
+        [
+          364.24460431654666,
+          -264.6866072572949
+        ],
+        [
+          368.6330935251799,
+          -252.27314038835527
+        ],
+        [
+          373.0215827338129,
+          -239.02832720927802
+        ],
+        [
+          377.41007194244605,
+          -225.3552064495592
+        ],
+        [
+          381.7985611510792,
+          -211.59637500209408
+        ],
+        [
+          386.1870503597122,
+          -198.02696131108075
+        ],
+        [
+          390.57553956834533,
+          -184.8556331903377
+        ],
+        [
+          394.96402877697847,
+          -172.23082355748954
+        ],
+        [
+          399.3525179856115,
+          -160.24966980458794
+        ],
+        [
+          403.7410071942446,
+          -148.96777950255967
+        ],
+        [
+          408.12949640287775,
+          -138.4085916320031
+        ],
+        [
+          412.51798561151077,
+          -128.57165533494197
+        ],
+        [
+          416.9064748201438,
+          -119.43954894629314
+        ],
+        [
+          421.29496402877703,
+          -110.98341806271583
+        ],
+        [
+          425.68345323741005,
+          -103.16725359519523
+        ],
+        [
+          430.07194244604307,
+          -95.95109417843025
+        ],
+        [
+          434.4604316546763,
+          -89.29335186084666
+        ],
+        [
+          438.84892086330933,
+          -83.15244763821056
+        ],
+        [
+          443.23741007194246,
+          -77.48791864868963
+        ],
+        [
+          447.6258992805756,
+          -72.26113046959438
+        ],
+        [
+          452.0143884892086,
+          -67.43570069581779
+        ],
+        [
+          456.40287769784175,
+          -62.977716044256226
+        ],
+        [
+          460.7913669064749,
+          -58.855805333364856
+        ],
+        [
+          465.1798561151079,
+          -55.04111475190655
+        ],
+        [
+          469.568345323741,
+          -51.50721940511687
+        ],
+        [
+          473.95683453237416,
+          -48.22999563312294
+        ],
+        [
+          478.3453237410072,
+          -45.18747146131591
+        ],
+        [
+          482.7338129496402,
+          -42.35966725327728
+        ],
+        [
+          487.12230215827344,
+          -39.72843476439732
+        ],
+        [
+          491.51079136690646,
+          -37.27729999232031
+        ],
+        [
+          495.8992805755396,
+          -34.9913132172901
+        ],
+        [
+          500.2877697841727,
+          -32.85690821245419
+        ],
+        [
+          504.67625899280574,
+          -30.86177162289289
+        ],
+        [
+          509.0647482014389,
+          -28.99472284395779
+        ],
+        [
+          513.4532374100719,
+          -27.24560428637153
+        ],
+        [
+          517.841726618705,
+          -25.605181632635777
+        ],
+        [
+          522.2302158273382,
+          -24.06505351920032
+        ],
+        [
+          526.6187050359712,
+          -22.61756998714077
+        ],
+        [
+          531.0071942446043,
+          -21.255759005922755
+        ],
+        [
+          535.3956834532374,
+          -19.973260372408845
+        ],
+        [
+          539.7841726618706,
+          -18.76426630793162
+        ],
+        [
+          544.1726618705036,
+          -17.623468111121156
+        ],
+        [
+          548.5611510791367,
+          -16.54600826702233
+        ],
+        [
+          552.9496402877699,
+          -15.52743745963869
+        ],
+        [
+          557.3381294964029,
+          -14.56367598252848
+        ],
+        [
+          561.726618705036,
+          -13.650979088597978
+        ],
+        [
+          566.115107913669,
+          -12.785905864630877
+        ],
+        [
+          570.5035971223022,
+          -11.965291257668014
+        ],
+        [
+          574.8920863309353,
+          -11.186220918786262
+        ],
+        [
+          579.2805755395683,
+          -10.446008564989143
+        ],
+        [
+          583.6690647482014,
+          -9.742175591859677
+        ],
+        [
+          588.0575539568346,
+          -9.072432698454577
+        ],
+        [
+          592.4460431654676,
+          -8.43466331183788
+        ],
+        [
+          596.8345323741007,
+          -7.826908621857569
+        ],
+        [
+          601.2230215827338,
+          -7.247354057505049
+        ],
+        [
+          605.611510791367,
+          -6.6943170546767305
+        ],
+        [
+          610,
+          -6.1662359816047
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "a8"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-009",
+      "type": "line",
+      "x": 160,
+      "y": 950,
+      "width": 19.239346413954962,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 159921997,
+      "version": 2,
+      "versionNonce": 1029850217,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.3884892086331035,
+          -4.640287769784209
+        ],
+        [
+          8.776978417266179,
+          -9.280575539568304
+        ],
+        [
+          13.165467625899282,
+          -13.920863309352512
+        ],
+        [
+          17.553956834532386,
+          -18.56115107913672
+        ],
+        [
+          19.239346413954962,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "a9"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-010",
+      "type": "line",
+      "x": 192.98173670963703,
+      "y": 915.1258685611215,
+      "width": 19.23934641395499,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 174070516,
+      "version": 2,
+      "versionNonce": 1948340903,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.12617695942771,
+          -2.2481707193949205
+        ],
+        [
+          6.514666168060813,
+          -6.8884584891790155
+        ],
+        [
+          10.903155376693888,
+          -11.528746258963224
+        ],
+        [
+          15.291644585326992,
+          -16.16903402874732
+        ],
+        [
+          19.23934641395499,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aA"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-011",
+      "type": "line",
+      "x": 225.96347341927415,
+      "y": 880.251737122243,
+      "width": 19.239346413954934,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 180550731,
+      "version": 2,
+      "versionNonce": 1464848201,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.252353918855334,
+          -4.496341438789727
+        ],
+        [
+          8.640843127488438,
+          -9.136629208573936
+        ],
+        [
+          13.029332336121541,
+          -13.776916978358031
+        ],
+        [
+          17.417821544754617,
+          -18.41720474814224
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aB"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-012",
+      "type": "line",
+      "x": 258.9452101289112,
+      "y": 845.3776056833644,
+      "width": 19.239346413954934,
+      "height": 20.343243339345918,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 71843849,
+      "version": 2,
+      "versionNonce": 1640916423,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.9900416696499406,
+          -2.1042243884004392
+        ],
+        [
+          6.3785308782830725,
+          -6.744512158184534
+        ],
+        [
+          10.767020086916148,
+          -11.384799927968743
+        ],
+        [
+          15.155509295549223,
+          -16.02508769775295
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345918
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aC"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-013",
+      "type": "line",
+      "x": 291.9269468385483,
+      "y": 810.5034742444859,
+      "width": 19.239346413954934,
+      "height": 20.343243339345918,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 108326157,
+      "version": 2,
+      "versionNonce": 889781801,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.1162186290775935,
+          -4.352395107795246
+        ],
+        [
+          8.504707837710669,
+          -8.992682877579455
+        ],
+        [
+          12.8931970463438,
+          -13.632970647363663
+        ],
+        [
+          17.281686254976876,
+          -18.27325841714776
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345918
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aD"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-014",
+      "type": "line",
+      "x": 324.90868354818537,
+      "y": 775.6293428056073,
+      "width": 19.239346413954934,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 125702411,
+      "version": 2,
+      "versionNonce": 984356071,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.8539063798721713,
+          -1.9602780574058443
+        ],
+        [
+          6.242395588505303,
+          -6.600565827190053
+        ],
+        [
+          10.630884797138378,
+          -11.240853596974148
+        ],
+        [
+          15.019374005771454,
+          -15.881141366758357
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aE"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-015",
+      "type": "line",
+      "x": 357.8904202578224,
+      "y": 740.7552113667288,
+      "width": 19.239346413954934,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 70961058,
+      "version": 2,
+      "versionNonce": 628707593,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.980083339299881,
+          -4.208448776800765
+        ],
+        [
+          8.368572547932956,
+          -8.84873654658486
+        ],
+        [
+          12.757061756566088,
+          -13.489024316369068
+        ],
+        [
+          17.145550965199106,
+          -18.129312086153163
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aF"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-016",
+      "type": "line",
+      "x": 390.8721569674595,
+      "y": 705.8810799278502,
+      "width": 19.23934641395499,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 230100222,
+      "version": 2,
+      "versionNonce": 105308167,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.717771090094459,
+          -1.816331726411363
+        ],
+        [
+          6.106260298727591,
+          -6.456619496195572
+        ],
+        [
+          10.49474950736061,
+          -11.096907265979667
+        ],
+        [
+          14.883238715993741,
+          -15.737195035763875
+        ],
+        [
+          19.23934641395499,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aG"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-017",
+      "type": "line",
+      "x": 423.85389367709655,
+      "y": 671.0069484889717,
+      "width": 19.239346413954934,
+      "height": 20.343243339345918,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 7084856,
+      "version": 2,
+      "versionNonce": 236734441,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.8439480495221687,
+          -4.06450244580617
+        ],
+        [
+          8.232437258155244,
+          -8.704790215590378
+        ],
+        [
+          12.620926466788376,
+          -13.345077985374587
+        ],
+        [
+          17.00941567542145,
+          -17.985365755158796
+        ],
+        [
+          19.239346413954934,
+          -20.343243339345918
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aH"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-018",
+      "type": "line",
+      "x": 456.83563038673367,
+      "y": 636.1328170500932,
+      "width": 19.239346413954877,
+      "height": 20.343243339345918,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 188629428,
+      "version": 2,
+      "versionNonce": 647710503,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.5816358003166897,
+          -1.6723853954168817
+        ],
+        [
+          5.970125008949822,
+          -6.31267316520109
+        ],
+        [
+          10.35861421758284,
+          -10.952960934985299
+        ],
+        [
+          14.747103426215972,
+          -15.593248704769508
+        ],
+        [
+          19.135592634849047,
+          -20.233536474553716
+        ],
+        [
+          19.239346413954877,
+          -20.343243339345918
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aI"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-019",
+      "type": "line",
+      "x": 489.81736709637073,
+      "y": 601.2586856112146,
+      "width": 19.23934641395499,
+      "height": 20.343243339345804,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 181976251,
+      "version": 2,
+      "versionNonce": 419259081,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.7078127597443995,
+          -3.9205561148116885
+        ],
+        [
+          8.096301968377475,
+          -8.560843884595897
+        ],
+        [
+          12.48479117701055,
+          -13.201131654379992
+        ],
+        [
+          16.87328038564368,
+          -17.8414194241642
+        ],
+        [
+          19.23934641395499,
+          -20.343243339345804
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aJ"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-020",
+      "type": "line",
+      "x": 522.7991038060078,
+      "y": 566.3845541723359,
+      "width": 19.239346413955104,
+      "height": 20.34324333934569,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 89939540,
+      "version": 2,
+      "versionNonce": 169200199,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4455005105388636,
+          -1.5284390644222867
+        ],
+        [
+          5.833989719172109,
+          -6.168726834206495
+        ],
+        [
+          10.222478927805128,
+          -10.80901460399059
+        ],
+        [
+          14.61096813643826,
+          -15.449302373774799
+        ],
+        [
+          18.99945734507139,
+          -20.089590143558894
+        ],
+        [
+          19.239346413955104,
+          -20.34324333934569
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aK"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-021",
+      "type": "line",
+      "x": 555.780840515645,
+      "y": 531.5104227334574,
+      "width": 7.9601666785996485,
+      "height": 8.416897553601302,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-9"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 249275275,
+      "version": 2,
+      "versionNonce": 582492585,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.5716774699665166,
+          -3.7766097838172072
+        ],
+        [
+          7.9601666785996485,
+          -8.416897553601302
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aL"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-022",
+      "type": "arrow",
+      "x": 161.41688907422852,
+      "y": 1080,
+      "width": 42.70000000000002,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 154140652,
+      "version": 2,
+      "versionNonce": 496167271,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          42.70000000000002,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "aM"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-023",
+      "type": "arrow",
+      "x": 509.11688907422854,
+      "y": 1080,
+      "width": 42.700000000000045,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 135299958,
+      "version": 2,
+      "versionNonce": 1752695945,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -42.700000000000045,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "aN"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-024",
+      "type": "ellipse",
+      "x": 195.53377814845703,
+      "y": 891.7580547822165,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 1377331,
+      "version": 2,
+      "versionNonce": 2120164487,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "index": "aO"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-025",
+      "type": "text",
+      "x": 160,
+      "y": 1170,
+      "width": 630,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 209670417,
+      "version": 2,
+      "versionNonce": 1979222889,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "arrows show temperature motion",
+      "originalText": "arrows show temperature motion",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "aP"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-026",
+      "type": "text",
+      "x": 930,
+      "y": 370,
+      "width": 441,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 17847479,
+      "version": 2,
+      "versionNonce": 1815542695,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "two stable equilibria",
+      "originalText": "two stable equilibria",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "aQ"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-027",
+      "type": "arrow",
+      "x": 930,
+      "y": 950,
+      "width": 610,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 199076799,
+      "version": 2,
+      "versionNonce": 1401239113,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          610,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "aR"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-028",
+      "type": "arrow",
+      "x": 930,
+      "y": 950,
+      "width": 0,
+      "height": 430,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 162751381,
+      "version": 2,
+      "versionNonce": 2068246215,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -430
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "aS"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-029",
+      "type": "text",
+      "x": 930,
+      "y": 435,
+      "width": 105,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 104929013,
+      "version": 2,
+      "versionNonce": 1945732393,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "power",
+      "originalText": "power",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "aT"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-030",
+      "type": "text",
+      "x": 1119.5,
+      "y": 990,
+      "width": 231,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 118675590,
+      "version": 2,
+      "versionNonce": 103513575,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "temperature",
+      "originalText": "temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "aU"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-031",
+      "type": "line",
+      "x": 930,
+      "y": 905.0852830188679,
+      "width": 610,
+      "height": 299.04807979904433,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 131953554,
+      "version": 2,
+      "versionNonce": 1656813577,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.388489208633132,
+          -0.2658672838692837
+        ],
+        [
+          8.77697841726615,
+          -0.5418198363885267
+        ],
+        [
+          13.165467625899282,
+          -0.8283674134810326
+        ],
+        [
+          17.553956834532414,
+          -1.1260519206302888
+        ],
+        [
+          21.942446043165432,
+          -1.4354498379827874
+        ],
+        [
+          26.330935251798564,
+          -1.7571748577140625
+        ],
+        [
+          30.719424460431696,
+          -2.091880754711724
+        ],
+        [
+          35.107913669064715,
+          -2.440264513948705
+        ],
+        [
+          39.49640287769785,
+          -2.803069740523597
+        ],
+        [
+          43.88489208633098,
+          -3.181090381249305
+        ],
+        [
+          48.273381294964,
+          -3.5751747899463453
+        ],
+        [
+          52.66187050359713,
+          -3.9862301722600932
+        ],
+        [
+          57.05035971223026,
+          -4.415227449944609
+        ],
+        [
+          61.43884892086328,
+          -4.863206589185552
+        ],
+        [
+          65.82733812949641,
+          -5.331282442745987
+        ],
+        [
+          70.21582733812954,
+          -5.820651161581395
+        ],
+        [
+          74.60431654676256,
+          -6.332597238170138
+        ],
+        [
+          78.9928057553957,
+          -6.868501251241128
+        ],
+        [
+          83.38129496402883,
+          -7.429848389957101
+        ],
+        [
+          87.76978417266184,
+          -8.018237845045974
+        ],
+        [
+          92.15827338129498,
+          -8.635393165012033
+        ],
+        [
+          96.546762589928,
+          -9.2831736875346
+        ],
+        [
+          100.93525179856124,
+          -9.96358716965608
+        ],
+        [
+          105.32374100719426,
+          -10.67880375554762
+        ],
+        [
+          109.71223021582728,
+          -11.431171437714738
+        ],
+        [
+          114.10071942446052,
+          -12.22323318668316
+        ],
+        [
+          118.48920863309354,
+          -13.057745945706074
+        ],
+        [
+          122.87769784172656,
+          -13.93770171108497
+        ],
+        [
+          127.2661870503598,
+          -14.866350945521845
+        ],
+        [
+          131.65467625899282,
+          -15.847228601728034
+        ],
+        [
+          136.04316546762584,
+          -16.884183066473838
+        ],
+        [
+          140.4316546762591,
+          -17.981408371475595
+        ],
+        [
+          144.8201438848921,
+          -19.14348005697832
+        ],
+        [
+          149.20863309352512,
+          -20.375395116421032
+        ],
+        [
+          153.59712230215837,
+          -21.682616495736397
+        ],
+        [
+          157.9856115107914,
+          -23.07112266782383
+        ],
+        [
+          162.3741007194244,
+          -24.547462850183138
+        ],
+        [
+          166.76258992805765,
+          -26.11881847945972
+        ],
+        [
+          171.15107913669067,
+          -27.793071597494645
+        ],
+        [
+          175.5395683453237,
+          -29.578880834574306
+        ],
+        [
+          179.92805755395693,
+          -31.48576568998044
+        ],
+        [
+          184.31654676258995,
+          -33.52419979767137
+        ],
+        [
+          188.70503597122297,
+          -35.70571381185209
+        ],
+        [
+          193.093525179856,
+          -38.043008433507566
+        ],
+        [
+          197.48201438848923,
+          -40.55007789706815
+        ],
+        [
+          201.87050359712225,
+          -43.242343908090106
+        ],
+        [
+          206.2589928057555,
+          -46.13679951572283
+        ],
+        [
+          210.64748201438852,
+          -49.25216164623282
+        ],
+        [
+          215.03597122302153,
+          -52.60902991902208
+        ],
+        [
+          219.42446043165455,
+          -56.23004778415691
+        ],
+        [
+          223.8129496402878,
+          -60.14005978717864
+        ],
+        [
+          228.20143884892082,
+          -64.3662556553071
+        ],
+        [
+          232.58992805755406,
+          -68.9382876148834
+        ],
+        [
+          236.97841726618708,
+          -73.88834152089885
+        ],
+        [
+          241.3669064748201,
+          -79.25113454905011
+        ],
+        [
+          245.75539568345312,
+          -85.06380183328031
+        ],
+        [
+          250.14388489208636,
+          -91.36562094311978
+        ],
+        [
+          254.53237410071938,
+          -98.1975059304524
+        ],
+        [
+          258.9208633093526,
+          -105.60118146851562
+        ],
+        [
+          263.30935251798564,
+          -113.6179224740323
+        ],
+        [
+          267.69784172661866,
+          -122.28671664862543
+        ],
+        [
+          272.0863309352517,
+          -131.64167948517377
+        ],
+        [
+          276.4748201438849,
+          -141.7085293112632
+        ],
+        [
+          280.86330935251794,
+          -152.49992428466396
+        ],
+        [
+          285.2517985611512,
+          -164.00949066832766
+        ],
+        [
+          289.6402877697842,
+          -176.20445674392488
+        ],
+        [
+          294.0287769784172,
+          -189.01698144675993
+        ],
+        [
+          298.41726618705025,
+          -202.3345663860291
+        ],
+        [
+          302.8057553956835,
+          -215.99039044919925
+        ],
+        [
+          307.1942446043165,
+          -229.7550011810082
+        ],
+        [
+          311.58273381294975,
+          -243.33146212709403
+        ],
+        [
+          315.9712230215828,
+          -256.35660956770016
+        ],
+        [
+          320.3597122302158,
+          -268.411212376098
+        ],
+        [
+          324.7482014388488,
+          -279.0411783624785
+        ],
+        [
+          329.13669064748206,
+          -287.79021338049654
+        ],
+        [
+          333.5251798561151,
+          -294.2415511501089
+        ],
+        [
+          337.9136690647483,
+          -298.0631318710732
+        ],
+        [
+          342.30215827338134,
+          -299.04807979904433
+        ],
+        [
+          346.69064748201436,
+          -297.1418304680436
+        ],
+        [
+          351.0791366906474,
+          -292.44952296553265
+        ],
+        [
+          355.4676258992806,
+          -285.2218437417839
+        ],
+        [
+          359.85611510791364,
+          -275.82276789450555
+        ],
+        [
+          364.24460431654666,
+          -264.6866072572949
+        ],
+        [
+          368.6330935251799,
+          -252.27314038835527
+        ],
+        [
+          373.0215827338129,
+          -239.02832720927802
+        ],
+        [
+          377.41007194244594,
+          -225.3552064495592
+        ],
+        [
+          381.7985611510792,
+          -211.59637500209408
+        ],
+        [
+          386.1870503597122,
+          -198.02696131108075
+        ],
+        [
+          390.57553956834545,
+          -184.8556331903377
+        ],
+        [
+          394.96402877697847,
+          -172.23082355748954
+        ],
+        [
+          399.3525179856115,
+          -160.24966980458794
+        ],
+        [
+          403.7410071942445,
+          -148.96777950255967
+        ],
+        [
+          408.12949640287775,
+          -138.4085916320031
+        ],
+        [
+          412.51798561151077,
+          -128.57165533494197
+        ],
+        [
+          416.9064748201438,
+          -119.43954894629314
+        ],
+        [
+          421.29496402877703,
+          -110.98341806271583
+        ],
+        [
+          425.68345323741005,
+          -103.16725359519523
+        ],
+        [
+          430.07194244604307,
+          -95.95109417843025
+        ],
+        [
+          434.4604316546763,
+          -89.29335186084666
+        ],
+        [
+          438.84892086330933,
+          -83.15244763821056
+        ],
+        [
+          443.2374100719426,
+          -77.48791864868963
+        ],
+        [
+          447.6258992805756,
+          -72.26113046959438
+        ],
+        [
+          452.0143884892086,
+          -67.43570069581779
+        ],
+        [
+          456.40287769784163,
+          -62.977716044256226
+        ],
+        [
+          460.7913669064749,
+          -58.855805333364856
+        ],
+        [
+          465.1798561151079,
+          -55.04111475190655
+        ],
+        [
+          469.56834532374114,
+          -51.50721940511687
+        ],
+        [
+          473.95683453237416,
+          -48.22999563312294
+        ],
+        [
+          478.3453237410072,
+          -45.18747146131591
+        ],
+        [
+          482.7338129496402,
+          -42.35966725327728
+        ],
+        [
+          487.12230215827344,
+          -39.72843476439732
+        ],
+        [
+          491.51079136690646,
+          -37.27729999232031
+        ],
+        [
+          495.8992805755397,
+          -34.9913132172901
+        ],
+        [
+          500.2877697841727,
+          -32.85690821245419
+        ],
+        [
+          504.67625899280574,
+          -30.86177162289289
+        ],
+        [
+          509.06474820143876,
+          -28.99472284395779
+        ],
+        [
+          513.4532374100718,
+          -27.24560428637153
+        ],
+        [
+          517.841726618705,
+          -25.605181632635777
+        ],
+        [
+          522.2302158273383,
+          -24.06505351920032
+        ],
+        [
+          526.6187050359713,
+          -22.61756998714077
+        ],
+        [
+          531.0071942446043,
+          -21.255759005922755
+        ],
+        [
+          535.3956834532373,
+          -19.973260372408845
+        ],
+        [
+          539.7841726618706,
+          -18.76426630793162
+        ],
+        [
+          544.1726618705036,
+          -17.623468111121156
+        ],
+        [
+          548.5611510791368,
+          -16.54600826702233
+        ],
+        [
+          552.9496402877699,
+          -15.52743745963869
+        ],
+        [
+          557.3381294964029,
+          -14.56367598252848
+        ],
+        [
+          561.7266187050359,
+          -13.650979088597978
+        ],
+        [
+          566.1151079136689,
+          -12.785905864630877
+        ],
+        [
+          570.5035971223022,
+          -11.965291257668014
+        ],
+        [
+          574.8920863309354,
+          -11.186220918786262
+        ],
+        [
+          579.2805755395684,
+          -10.446008564989143
+        ],
+        [
+          583.6690647482014,
+          -9.742175591859677
+        ],
+        [
+          588.0575539568345,
+          -9.072432698454577
+        ],
+        [
+          592.4460431654675,
+          -8.43466331183788
+        ],
+        [
+          596.8345323741007,
+          -7.826908621857569
+        ],
+        [
+          601.223021582734,
+          -7.247354057505049
+        ],
+        [
+          605.611510791367,
+          -6.6943170546767305
+        ],
+        [
+          610,
+          -6.1662359816047
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aV"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-032",
+      "type": "line",
+      "x": 930,
+      "y": 950,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 146198307,
+      "version": 2,
+      "versionNonce": 1609640199,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.388489208633132,
+          -2.784172661870457
+        ],
+        [
+          8.77697841726615,
+          -5.568345323741028
+        ],
+        [
+          13.165467625899282,
+          -8.352517985611485
+        ],
+        [
+          17.553956834532414,
+          -11.136690647482055
+        ],
+        [
+          21.942446043165432,
+          -13.920863309352512
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aW"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-033",
+      "type": "line",
+      "x": 970.5312803093183,
+      "y": 924.2858926562194,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 248005478,
+      "version": 2,
+      "versionNonce": 836177641,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.353611777012702,
+          -2.1276192749244274
+        ],
+        [
+          7.74210098564572,
+          -4.911791936794884
+        ],
+        [
+          12.130590194278852,
+          -7.695964598665455
+        ],
+        [
+          16.519079402911984,
+          -10.480137260535912
+        ],
+        [
+          20.907568611545003,
+          -13.264309922406483
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aX"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-034",
+      "type": "line",
+      "x": 1011.0625606186366,
+      "y": 898.5717853124388,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 159582549,
+      "version": 2,
+      "versionNonce": 1175744551,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.318734345392272,
+          -1.4710658879783978
+        ],
+        [
+          6.7072235540252905,
+          -4.255238549848855
+        ],
+        [
+          11.095712762658422,
+          -7.039411211719425
+        ],
+        [
+          15.48420197129144,
+          -9.823583873589882
+        ],
+        [
+          19.872691179924686,
+          -12.60775653546034
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aY"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-035",
+      "type": "line",
+      "x": 1051.5938409279547,
+      "y": 872.8576779686582,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 34474242,
+      "version": 2,
+      "versionNonce": 667371977,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.2838569137718423,
+          -0.8145125010323682
+        ],
+        [
+          5.672346122405088,
+          -3.598685162902825
+        ],
+        [
+          10.060835331038106,
+          -6.382857824773282
+        ],
+        [
+          14.449324539671125,
+          -9.167030486643853
+        ],
+        [
+          18.83781374830437,
+          -11.95120314851431
+        ],
+        [
+          23.22630295693739,
+          -14.735375810384767
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aZ"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-036",
+      "type": "line",
+      "x": 1092.1251212372729,
+      "y": 847.1435706248776,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 150131106,
+      "version": 2,
+      "versionNonce": 310498119,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.2489794821515261,
+          -0.15795911408622487
+        ],
+        [
+          4.637468690784772,
+          -2.9421317759567955
+        ],
+        [
+          9.02595789941779,
+          -5.7263044378272525
+        ],
+        [
+          13.414447108050808,
+          -8.51047709969771
+        ],
+        [
+          17.802936316684054,
+          -11.29464976156828
+        ],
+        [
+          22.191425525317072,
+          -14.078822423438737
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aa"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-037",
+      "type": "line",
+      "x": 1132.656401546591,
+      "y": 821.4294632810971,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 253710436,
+      "version": 2,
+      "versionNonce": 766322857,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6025912591644556,
+          -2.285578389010766
+        ],
+        [
+          7.991080467797474,
+          -5.069751050881337
+        ],
+        [
+          12.379569676430492,
+          -7.853923712751794
+        ],
+        [
+          16.76805888506351,
+          -10.63809637462225
+        ],
+        [
+          21.156548093696756,
+          -13.422269036492821
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ab"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-038",
+      "type": "line",
+      "x": 1173.1876818559092,
+      "y": 795.7153559373165,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 3223247,
+      "version": 2,
+      "versionNonce": 764793447,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.567713827543912,
+          -1.6290250020647363
+        ],
+        [
+          6.956203036177158,
+          -4.413197663935193
+        ],
+        [
+          11.344692244810176,
+          -7.197370325805764
+        ],
+        [
+          15.733181453443422,
+          -9.981542987676221
+        ],
+        [
+          20.12167066207644,
+          -12.765715649546678
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ac"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-039",
+      "type": "line",
+      "x": 1213.7189621652276,
+      "y": 770.001248593536,
+      "width": 23.64324684710232,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 143696873,
+      "version": 2,
+      "versionNonce": 2100571017,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.5328363959235958,
+          -0.9724716151188204
+        ],
+        [
+          5.921325604556614,
+          -3.7566442769892774
+        ],
+        [
+          10.309814813189632,
+          -6.540816938859734
+        ],
+        [
+          14.69830402182265,
+          -9.324989600730305
+        ],
+        [
+          19.086793230455896,
+          -12.109162262600762
+        ],
+        [
+          23.475282439088915,
+          -14.893334924471333
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ad"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-040",
+      "type": "line",
+      "x": 1254.2502424745458,
+      "y": 744.2871412497553,
+      "width": 23.64324684710232,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 88478522,
+      "version": 2,
+      "versionNonce": 1075637639,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.4979589643030522,
+          -0.31591822817256343
+        ],
+        [
+          4.886448172936298,
+          -3.100090890043134
+        ],
+        [
+          9.274937381569316,
+          -5.884263551913591
+        ],
+        [
+          13.663426590202562,
+          -8.668436213784048
+        ],
+        [
+          18.05191579883558,
+          -11.452608875654619
+        ],
+        [
+          22.4404050074686,
+          -14.23678153752519
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ae"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-041",
+      "type": "line",
+      "x": 1294.7815227838641,
+      "y": 718.5730339059747,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 126794388,
+      "version": 2,
+      "versionNonce": 244830825,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.8515707413157543,
+          -2.443537503096991
+        ],
+        [
+          8.240059949948773,
+          -5.2277101649675615
+        ],
+        [
+          12.62854915858179,
+          -8.011882826838018
+        ],
+        [
+          17.017038367215036,
+          -10.796055488708589
+        ],
+        [
+          21.405527575848055,
+          -13.580228150579046
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "af"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-042",
+      "type": "line",
+      "x": 1335.3128030931823,
+      "y": 692.8589265621941,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 216316469,
+      "version": 2,
+      "versionNonce": 626238631,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.816693309695438,
+          -1.7869841161509612
+        ],
+        [
+          7.205182518328456,
+          -4.571156778021532
+        ],
+        [
+          11.593671726961475,
+          -7.355329439891989
+        ],
+        [
+          15.98216093559472,
+          -10.13950210176256
+        ],
+        [
+          20.37065014422774,
+          -12.923674763632903
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ag"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-043",
+      "type": "line",
+      "x": 1375.8440834025007,
+      "y": 667.1448192184137,
+      "width": 23.64324684710232,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 117187905,
+      "version": 2,
+      "versionNonce": 1185127753,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7818158780748945,
+          -1.1304307292050453
+        ],
+        [
+          6.170305086707913,
+          -3.9146033910755023
+        ],
+        [
+          10.558794295340931,
+          -6.698776052945959
+        ],
+        [
+          14.947283503974177,
+          -9.48294871481653
+        ],
+        [
+          19.335772712607195,
+          -12.2671213766871
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ah"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-044",
+      "type": "line",
+      "x": 1416.3753637118189,
+      "y": 641.430711874633,
+      "width": 23.64324684710232,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 79932075,
+      "version": 2,
+      "versionNonce": 484865991,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.7469384464545783,
+          -0.4738773422587883
+        ],
+        [
+          5.135427655087597,
+          -3.258050004129359
+        ],
+        [
+          9.523916863720842,
+          -6.04222266599993
+        ],
+        [
+          13.91240607235386,
+          -8.826395327870387
+        ],
+        [
+          18.30089528098688,
+          -11.610567989740844
+        ],
+        [
+          22.689384489619897,
+          -14.394740651611414
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ai"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-045",
+      "type": "line",
+      "x": 1456.9066440211373,
+      "y": 615.7166045308524,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 18234463,
+      "version": 2,
+      "versionNonce": 1689455657,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.100550223467053,
+          -2.6014966171833294
+        ],
+        [
+          8.489039432100071,
+          -5.385669279053786
+        ],
+        [
+          12.877528640733317,
+          -8.169841940924357
+        ],
+        [
+          17.266017849366335,
+          -10.954014602794814
+        ],
+        [
+          21.65450705799958,
+          -13.738187264665271
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "aj"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-046",
+      "type": "line",
+      "x": 1497.4379243304554,
+      "y": 590.0024971870716,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 251771554,
+      "version": 2,
+      "versionNonce": 1022486247,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.065672791846737,
+          -1.944943230237186
+        ],
+        [
+          7.4541620004799825,
+          -4.729115892107529
+        ],
+        [
+          11.842651209113,
+          -7.5132885539781
+        ],
+        [
+          16.23114041774602,
+          -10.29746121584867
+        ],
+        [
+          20.619629626379037,
+          -13.081633877719128
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ak"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-047",
+      "type": "line",
+      "x": 1537.9692046397738,
+      "y": 564.2883898432912,
+      "width": 2.0307953602261932,
+      "height": 1.2883898432911565,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-32"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 60370274,
+      "version": 2,
+      "versionNonce": 816946953,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0307953602261932,
+          -1.2883898432911565
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "al"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-048",
+      "type": "arrow",
+      "x": 949.7321517931609,
+      "y": 1080,
+      "width": 42.700000000000045,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 27823528,
+      "version": 2,
+      "versionNonce": 604140039,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          42.700000000000045,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "am"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-049",
+      "type": "arrow",
+      "x": 1127.1256463719767,
+      "y": 1080,
+      "width": 42.700000000000045,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 108977257,
+      "version": 2,
+      "versionNonce": 1763366377,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -42.700000000000045,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "an"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-050",
+      "type": "arrow",
+      "x": 1236.0353211009174,
+      "y": 1080,
+      "width": 42.700000000000045,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 218799849,
+      "version": 2,
+      "versionNonce": 1796512039,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          42.700000000000045,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "ao"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-051",
+      "type": "arrow",
+      "x": 1449.041826522102,
+      "y": 1080,
+      "width": 42.70000000000027,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 149281915,
+      "version": 2,
+      "versionNonce": 1895444681,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -42.70000000000027,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "ap"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-052",
+      "type": "ellipse",
+      "x": 1002.1643035863219,
+      "y": 887.8137436572491,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 234503198,
+      "version": 2,
+      "versionNonce": 1469373511,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "index": "aq"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-053",
+      "type": "line",
+      "x": 1012.1643035863219,
+      "y": 919.8137436572491,
+      "width": 0,
+      "height": 10.18625634275088,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 73701705,
+      "version": 2,
+      "versionNonce": 1038823337,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          10.18625634275088
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "ar"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-054",
+      "type": "ellipse",
+      "x": 1189.3869891576314,
+      "y": 769.2806632958844,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 193829046,
+      "version": 2,
+      "versionNonce": 1298119527,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "index": "as"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-055",
+      "type": "line",
+      "x": 1199.3869891576314,
+      "y": 801.2806632958844,
+      "width": 0,
+      "height": 128.71933670411556,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 70780805,
+      "version": 2,
+      "versionNonce": 102322825,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          128.71933670411556
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "at"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-056",
+      "type": "ellipse",
+      "x": 1305.3836530442036,
+      "y": 694.5986475905332,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 21570335,
+      "version": 2,
+      "versionNonce": 12695175,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "index": "au"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-057",
+      "type": "line",
+      "x": 1315.3836530442036,
+      "y": 726.5986475905332,
+      "width": 0,
+      "height": 203.40135240946677,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 177989644,
+      "version": 2,
+      "versionNonce": 775952745,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          203.40135240946677
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "av"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-058",
+      "type": "text",
+      "x": 930,
+      "y": 1170,
+      "width": 630,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 208279017,
+      "version": 2,
+      "versionNonce": 1752649127,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "arrows show temperature motion",
+      "originalText": "arrows show temperature motion",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "aw"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-059",
+      "type": "text",
+      "x": 1700,
+      "y": 370,
+      "width": 399,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 102657423,
+      "version": 2,
+      "versionNonce": 2007696457,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "one hot equilibrium",
+      "originalText": "one hot equilibrium",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "ax"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-060",
+      "type": "arrow",
+      "x": 1700,
+      "y": 950,
+      "width": 610,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 92960489,
+      "version": 2,
+      "versionNonce": 1873608903,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          610,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "ay"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-061",
+      "type": "arrow",
+      "x": 1700,
+      "y": 950,
+      "width": 0,
+      "height": 430,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 116767703,
+      "version": 2,
+      "versionNonce": 1849004841,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -430
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "az"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-062",
+      "type": "text",
+      "x": 1700,
+      "y": 435,
+      "width": 105,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 22462289,
+      "version": 2,
+      "versionNonce": 1744785383,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "power",
+      "originalText": "power",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b00"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-063",
+      "type": "text",
+      "x": 1889.5,
+      "y": 990,
+      "width": 231,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 247728433,
+      "version": 2,
+      "versionNonce": 374031881,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "temperature",
+      "originalText": "temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b01"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-064",
+      "type": "line",
+      "x": 1700,
+      "y": 905.0852830188679,
+      "width": 610,
+      "height": 299.04807979904433,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 45754774,
+      "version": 2,
+      "versionNonce": 997899015,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.388489208633018,
+          -0.2658672838692837
+        ],
+        [
+          8.776978417266264,
+          -0.5418198363885267
+        ],
+        [
+          13.165467625899282,
+          -0.8283674134810326
+        ],
+        [
+          17.5539568345323,
+          -1.1260519206302888
+        ],
+        [
+          21.942446043165546,
+          -1.4354498379827874
+        ],
+        [
+          26.330935251798564,
+          -1.7571748577140625
+        ],
+        [
+          30.719424460431583,
+          -2.091880754711724
+        ],
+        [
+          35.10791366906483,
+          -2.440264513948705
+        ],
+        [
+          39.49640287769785,
+          -2.803069740523597
+        ],
+        [
+          43.884892086330865,
+          -3.181090381249305
+        ],
+        [
+          48.27338129496411,
+          -3.5751747899463453
+        ],
+        [
+          52.66187050359713,
+          -3.9862301722600932
+        ],
+        [
+          57.05035971223015,
+          -4.415227449944609
+        ],
+        [
+          61.43884892086339,
+          -4.863206589185552
+        ],
+        [
+          65.82733812949641,
+          -5.331282442745987
+        ],
+        [
+          70.21582733812943,
+          -5.820651161581395
+        ],
+        [
+          74.60431654676267,
+          -6.332597238170138
+        ],
+        [
+          78.9928057553957,
+          -6.868501251241128
+        ],
+        [
+          83.38129496402871,
+          -7.429848389957101
+        ],
+        [
+          87.76978417266196,
+          -8.018237845045974
+        ],
+        [
+          92.15827338129498,
+          -8.635393165012033
+        ],
+        [
+          96.546762589928,
+          -9.2831736875346
+        ],
+        [
+          100.93525179856124,
+          -9.96358716965608
+        ],
+        [
+          105.32374100719426,
+          -10.67880375554762
+        ],
+        [
+          109.71223021582728,
+          -11.431171437714738
+        ],
+        [
+          114.10071942446052,
+          -12.22323318668316
+        ],
+        [
+          118.48920863309354,
+          -13.057745945706074
+        ],
+        [
+          122.87769784172656,
+          -13.93770171108497
+        ],
+        [
+          127.2661870503598,
+          -14.866350945521845
+        ],
+        [
+          131.65467625899282,
+          -15.847228601728034
+        ],
+        [
+          136.04316546762584,
+          -16.884183066473838
+        ],
+        [
+          140.4316546762591,
+          -17.981408371475595
+        ],
+        [
+          144.8201438848921,
+          -19.14348005697832
+        ],
+        [
+          149.20863309352512,
+          -20.375395116421032
+        ],
+        [
+          153.59712230215837,
+          -21.682616495736397
+        ],
+        [
+          157.9856115107914,
+          -23.07112266782383
+        ],
+        [
+          162.3741007194244,
+          -24.547462850183138
+        ],
+        [
+          166.76258992805765,
+          -26.11881847945972
+        ],
+        [
+          171.15107913669067,
+          -27.793071597494645
+        ],
+        [
+          175.5395683453237,
+          -29.578880834574306
+        ],
+        [
+          179.92805755395693,
+          -31.48576568998044
+        ],
+        [
+          184.31654676258995,
+          -33.52419979767137
+        ],
+        [
+          188.70503597122297,
+          -35.70571381185209
+        ],
+        [
+          193.093525179856,
+          -38.043008433507566
+        ],
+        [
+          197.48201438848923,
+          -40.55007789706815
+        ],
+        [
+          201.87050359712225,
+          -43.242343908090106
+        ],
+        [
+          206.2589928057555,
+          -46.13679951572283
+        ],
+        [
+          210.64748201438852,
+          -49.25216164623282
+        ],
+        [
+          215.03597122302153,
+          -52.60902991902208
+        ],
+        [
+          219.42446043165455,
+          -56.23004778415691
+        ],
+        [
+          223.8129496402878,
+          -60.14005978717864
+        ],
+        [
+          228.20143884892082,
+          -64.3662556553071
+        ],
+        [
+          232.58992805755406,
+          -68.9382876148834
+        ],
+        [
+          236.97841726618708,
+          -73.88834152089885
+        ],
+        [
+          241.3669064748201,
+          -79.25113454905011
+        ],
+        [
+          245.75539568345312,
+          -85.06380183328031
+        ],
+        [
+          250.14388489208636,
+          -91.36562094311978
+        ],
+        [
+          254.53237410071938,
+          -98.1975059304524
+        ],
+        [
+          258.9208633093526,
+          -105.60118146851562
+        ],
+        [
+          263.30935251798564,
+          -113.6179224740323
+        ],
+        [
+          267.69784172661866,
+          -122.28671664862543
+        ],
+        [
+          272.0863309352517,
+          -131.64167948517377
+        ],
+        [
+          276.4748201438849,
+          -141.7085293112632
+        ],
+        [
+          280.86330935251794,
+          -152.49992428466396
+        ],
+        [
+          285.2517985611512,
+          -164.00949066832766
+        ],
+        [
+          289.6402877697842,
+          -176.20445674392488
+        ],
+        [
+          294.0287769784172,
+          -189.01698144675993
+        ],
+        [
+          298.41726618705025,
+          -202.3345663860291
+        ],
+        [
+          302.8057553956835,
+          -215.99039044919925
+        ],
+        [
+          307.1942446043165,
+          -229.7550011810082
+        ],
+        [
+          311.58273381294975,
+          -243.33146212709403
+        ],
+        [
+          315.9712230215828,
+          -256.35660956770016
+        ],
+        [
+          320.3597122302158,
+          -268.411212376098
+        ],
+        [
+          324.7482014388488,
+          -279.0411783624785
+        ],
+        [
+          329.13669064748206,
+          -287.79021338049654
+        ],
+        [
+          333.5251798561151,
+          -294.2415511501089
+        ],
+        [
+          337.9136690647483,
+          -298.0631318710732
+        ],
+        [
+          342.30215827338134,
+          -299.04807979904433
+        ],
+        [
+          346.69064748201436,
+          -297.1418304680436
+        ],
+        [
+          351.0791366906474,
+          -292.44952296553265
+        ],
+        [
+          355.4676258992804,
+          -285.2218437417839
+        ],
+        [
+          359.85611510791387,
+          -275.82276789450555
+        ],
+        [
+          364.2446043165469,
+          -264.6866072572949
+        ],
+        [
+          368.6330935251799,
+          -252.27314038835527
+        ],
+        [
+          373.0215827338129,
+          -239.02832720927802
+        ],
+        [
+          377.41007194244594,
+          -225.3552064495592
+        ],
+        [
+          381.79856115107896,
+          -211.59637500209408
+        ],
+        [
+          386.187050359712,
+          -198.02696131108075
+        ],
+        [
+          390.57553956834545,
+          -184.8556331903377
+        ],
+        [
+          394.96402877697847,
+          -172.23082355748954
+        ],
+        [
+          399.3525179856115,
+          -160.24966980458794
+        ],
+        [
+          403.7410071942445,
+          -148.96777950255967
+        ],
+        [
+          408.1294964028775,
+          -138.4085916320031
+        ],
+        [
+          412.517985611511,
+          -128.57165533494197
+        ],
+        [
+          416.906474820144,
+          -119.43954894629314
+        ],
+        [
+          421.29496402877703,
+          -110.98341806271583
+        ],
+        [
+          425.68345323741005,
+          -103.16725359519523
+        ],
+        [
+          430.07194244604307,
+          -95.95109417843025
+        ],
+        [
+          434.4604316546761,
+          -89.29335186084666
+        ],
+        [
+          438.8489208633091,
+          -83.15244763821056
+        ],
+        [
+          443.2374100719426,
+          -77.48791864868963
+        ],
+        [
+          447.6258992805756,
+          -72.26113046959438
+        ],
+        [
+          452.0143884892086,
+          -67.43570069581779
+        ],
+        [
+          456.40287769784163,
+          -62.977716044256226
+        ],
+        [
+          460.79136690647465,
+          -58.855805333364856
+        ],
+        [
+          465.1798561151081,
+          -55.04111475190655
+        ],
+        [
+          469.56834532374114,
+          -51.50721940511687
+        ],
+        [
+          473.95683453237416,
+          -48.22999563312294
+        ],
+        [
+          478.3453237410072,
+          -45.18747146131591
+        ],
+        [
+          482.7338129496402,
+          -42.35966725327728
+        ],
+        [
+          487.1223021582732,
+          -39.72843476439732
+        ],
+        [
+          491.51079136690623,
+          -37.27729999232031
+        ],
+        [
+          495.8992805755397,
+          -34.9913132172901
+        ],
+        [
+          500.2877697841727,
+          -32.85690821245419
+        ],
+        [
+          504.67625899280574,
+          -30.86177162289289
+        ],
+        [
+          509.06474820143876,
+          -28.99472284395779
+        ],
+        [
+          513.4532374100718,
+          -27.24560428637153
+        ],
+        [
+          517.8417266187053,
+          -25.605181632635777
+        ],
+        [
+          522.2302158273383,
+          -24.06505351920032
+        ],
+        [
+          526.6187050359713,
+          -22.61756998714077
+        ],
+        [
+          531.0071942446043,
+          -21.255759005922755
+        ],
+        [
+          535.3956834532373,
+          -19.973260372408845
+        ],
+        [
+          539.7841726618708,
+          -18.76426630793162
+        ],
+        [
+          544.1726618705034,
+          -17.623468111121156
+        ],
+        [
+          548.5611510791368,
+          -16.54600826702233
+        ],
+        [
+          552.9496402877699,
+          -15.52743745963869
+        ],
+        [
+          557.3381294964029,
+          -14.56367598252848
+        ],
+        [
+          561.7266187050359,
+          -13.650979088597978
+        ],
+        [
+          566.1151079136689,
+          -12.785905864630877
+        ],
+        [
+          570.5035971223024,
+          -11.965291257668014
+        ],
+        [
+          574.8920863309354,
+          -11.186220918786262
+        ],
+        [
+          579.2805755395684,
+          -10.446008564989143
+        ],
+        [
+          583.6690647482014,
+          -9.742175591859677
+        ],
+        [
+          588.0575539568345,
+          -9.072432698454577
+        ],
+        [
+          592.4460431654675,
+          -8.43466331183788
+        ],
+        [
+          596.8345323741005,
+          -7.826908621857569
+        ],
+        [
+          601.223021582734,
+          -7.247354057505049
+        ],
+        [
+          605.611510791367,
+          -6.6943170546767305
+        ],
+        [
+          610,
+          -6.1662359816047
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b02"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-065",
+      "type": "line",
+      "x": 1941.36690647482,
+      "y": 947.3705035971223,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 234059525,
+      "version": 2,
+      "versionNonce": 1525128425,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          4.388489208633018,
+          -2.784172661870457
+        ],
+        [
+          8.776978417266264,
+          -5.568345323741028
+        ],
+        [
+          13.165467625899282,
+          -8.352517985611485
+        ],
+        [
+          17.553956834532528,
+          -11.136690647481942
+        ],
+        [
+          21.942446043165546,
+          -13.920863309352512
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b03"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-066",
+      "type": "line",
+      "x": 1981.8981867841383,
+      "y": 921.6563962533418,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 196630277,
+      "version": 2,
+      "versionNonce": 1587266087,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.3536117770129295,
+          -2.127619274924541
+        ],
+        [
+          7.742100985645948,
+          -4.911791936794998
+        ],
+        [
+          12.130590194278966,
+          -7.695964598665569
+        ],
+        [
+          16.519079402911984,
+          -10.480137260536026
+        ],
+        [
+          20.90756861154523,
+          -13.264309922406483
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b04"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-067",
+      "type": "line",
+      "x": 2022.4294670934564,
+      "y": 895.9422889095612,
+      "width": 23.64324684710232,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 247923640,
+      "version": 2,
+      "versionNonce": 999692233,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.318734345392386,
+          -1.4710658879785115
+        ],
+        [
+          6.7072235540256315,
+          -4.255238549848968
+        ],
+        [
+          11.09571276265865,
+          -7.039411211719425
+        ],
+        [
+          15.484201971291895,
+          -9.823583873589996
+        ],
+        [
+          19.872691179924914,
+          -12.607756535460453
+        ],
+        [
+          23.64324684710232,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b05"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-068",
+      "type": "line",
+      "x": 2062.960747402775,
+      "y": 870.2281815657807,
+      "width": 23.64324684710209,
+      "height": 14.999895950538871,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 3968950,
+      "version": 2,
+      "versionNonce": 38724935,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.2838569137720697,
+          -0.8145125010324819
+        ],
+        [
+          5.672346122405088,
+          -3.5986851629030525
+        ],
+        [
+          10.060835331038106,
+          -6.3828578247735095
+        ],
+        [
+          14.449324539671125,
+          -9.16703048664408
+        ],
+        [
+          18.837813748304143,
+          -11.951203148514537
+        ],
+        [
+          23.22630295693716,
+          -14.735375810384994
+        ],
+        [
+          23.64324684710209,
+          -14.999895950538871
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b06"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-069",
+      "type": "line",
+      "x": 2103.4920277120927,
+      "y": 844.514074222,
+      "width": 23.643246847102546,
+      "height": 14.99989595053853,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 189339166,
+      "version": 2,
+      "versionNonce": 980563625,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.24897948215175347,
+          -0.15795911408633856
+        ],
+        [
+          4.637468690784772,
+          -2.9421317759567955
+        ],
+        [
+          9.025957899418245,
+          -5.726304437827366
+        ],
+        [
+          13.414447108051263,
+          -8.510477099697823
+        ],
+        [
+          17.80293631668428,
+          -11.294649761568394
+        ],
+        [
+          22.1914255253173,
+          -14.07882242343885
+        ],
+        [
+          23.643246847102546,
+          -14.99989595053853
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b07"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-070",
+      "type": "line",
+      "x": 2144.023308021411,
+      "y": 818.7999668782195,
+      "width": 23.643246847102546,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 106391,
+      "version": 2,
+      "versionNonce": 99656807,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6025912591644556,
+          -2.2855783890108796
+        ],
+        [
+          7.991080467797474,
+          -5.069751050881337
+        ],
+        [
+          12.379569676430492,
+          -7.853923712751907
+        ],
+        [
+          16.76805888506351,
+          -10.638096374622364
+        ],
+        [
+          21.156548093696983,
+          -13.422269036492935
+        ],
+        [
+          23.643246847102546,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b08"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-071",
+      "type": "line",
+      "x": 2184.5545883307295,
+      "y": 793.0858595344388,
+      "width": 23.64324684710209,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 266523719,
+      "version": 2,
+      "versionNonce": 170359177,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2.5677138275436846,
+          -1.6290250020647363
+        ],
+        [
+          6.956203036176703,
+          -4.413197663935193
+        ],
+        [
+          11.344692244810176,
+          -7.197370325805764
+        ],
+        [
+          15.733181453443194,
+          -9.981542987676221
+        ],
+        [
+          20.121670662076212,
+          -12.765715649546678
+        ],
+        [
+          23.64324684710209,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b09"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-072",
+      "type": "line",
+      "x": 2225.085868640048,
+      "y": 767.3717521906583,
+      "width": 23.64324684710209,
+      "height": 14.999895950538757,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 44379741,
+      "version": 2,
+      "versionNonce": 692944775,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1.5328363959233684,
+          -0.9724716151187067
+        ],
+        [
+          5.921325604556387,
+          -3.7566442769892774
+        ],
+        [
+          10.309814813189405,
+          -6.540816938859734
+        ],
+        [
+          14.698304021822878,
+          -9.324989600730305
+        ],
+        [
+          19.08679323045544,
+          -12.109162262600762
+        ],
+        [
+          23.475282439088915,
+          -14.893334924471219
+        ],
+        [
+          23.64324684710209,
+          -14.999895950538757
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b0A"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-073",
+      "type": "line",
+      "x": 2265.617148949366,
+      "y": 741.6576448468776,
+      "width": 23.643246847102546,
+      "height": 14.999895950538644,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 178197009,
+      "version": 2,
+      "versionNonce": 2079416425,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.4979589643030522,
+          -0.31591822817256343
+        ],
+        [
+          4.886448172936525,
+          -3.1000908900430204
+        ],
+        [
+          9.274937381569544,
+          -5.884263551913591
+        ],
+        [
+          13.663426590202562,
+          -8.668436213784048
+        ],
+        [
+          18.05191579883558,
+          -11.452608875654619
+        ],
+        [
+          22.4404050074686,
+          -14.236781537525076
+        ],
+        [
+          23.643246847102546,
+          -14.999895950538644
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b0B"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-074",
+      "type": "line",
+      "x": 2306.1484292586842,
+      "y": 715.943537503097,
+      "width": 3.8515707413157543,
+      "height": 2.443537503096991,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [
+        "13-heating-cooling-vector-fields-dash-group-65"
+      ],
+      "frameId": null,
+      "roundness": null,
+      "seed": 4371172,
+      "version": 2,
+      "versionNonce": 2124543655,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          3.8515707413157543,
+          -2.443537503096991
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b0C"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-075",
+      "type": "arrow",
+      "x": 1898.0515846538783,
+      "y": 1080,
+      "width": 42.700000000000045,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 130098583,
+      "version": 2,
+      "versionNonce": 765160265,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          42.700000000000045,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "b0D"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-076",
+      "type": "arrow",
+      "x": 2245.751584653878,
+      "y": 1080,
+      "width": 42.69999999999982,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 202900078,
+      "version": 2,
+      "versionNonce": 479889863,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -42.69999999999982,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false,
+      "index": "b0E"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-077",
+      "type": "ellipse",
+      "x": 2128.8031693077564,
+      "y": 811.8713404890841,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 51027097,
+      "version": 2,
+      "versionNonce": 2004949545,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "index": "b0F"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-078",
+      "type": "line",
+      "x": 2138.8031693077564,
+      "y": 843.8713404890841,
+      "width": 0,
+      "height": 86.1286595109159,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 112379030,
+      "version": 2,
+      "versionNonce": 273922279,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          86.1286595109159
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false,
+      "index": "b0G"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-079",
+      "type": "text",
+      "x": 1700,
+      "y": 1170,
+      "width": 630,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 212323907,
+      "version": 2,
+      "versionNonce": 445508873,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "arrows show temperature motion",
+      "originalText": "arrows show temperature motion",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b0H"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-080",
+      "type": "text",
+      "x": 160,
+      "y": 1330,
+      "width": 1365,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 61527046,
+      "version": 2,
+      "versionNonce": 257557511,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "heating above cooling - warmer     heating below cooling - cooler",
+      "originalText": "heating above cooling - warmer     heating below cooling - cooler",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b0I"
+    },
+    {
+      "id": "13-heating-cooling-vector-fields-081",
+      "type": "text",
+      "x": 160,
+      "y": 1400,
+      "width": 1701,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 65442496,
+      "version": 2,
+      "versionNonce": 775775209,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793234861042,
+      "link": null,
+      "locked": false,
+      "text": "arrows toward a crossing - stable     arrows away - unstable     schematic curves",
+      "originalText": "arrows toward a crossing - stable     arrows away - unstable     schematic curves",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "index": "b0J"
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}
