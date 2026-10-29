@@ -1,15 +1,16 @@
-"""In-context breakdown of one plant tick with the CPU's virtual counter (docs/handoff/perf.md).
+"""Break one plant tick down into the sections of the kernel source, timed with the CPU's virtual counter.
 
     .venv/bin/python tools/perf_tick_prof.py [--locked] [--n 20000] [--set key=value]
 
-Runs mrm.sim.kernel._world_block (open loop, the plant's substep policy) on the g26 B = 1 plant of
-tools/perf_bench.py and accumulates the time of every section with the arm64 virtual counter cntvct_el0 (24 MHz on
-Apple silicon: 41.7 ns resolution; averaged over many ticks the quantization averages out). The sections are the
-kernel's own source: _world_block and its tick loop _world_loop are re-compiled from mrm/sim/kernel.py (with the
-kernel's own runtime flag) with a counter read inserted at every comment line that starts with ``# ---`` (so the
-breakdown follows the kernel as it changes). arm64 only; the
-instrumented copy is compiled on every run (~1-2 min), the kernel itself comes from its cache. The instrumented
-functions receive the accumulator as an extra argument named ``acc``: they must not use a local of that name.
+Read this first. The tool runs mrm.sim.kernel._world_block (open loop, the plant's substep policy) on the g26
+B = 1 plant of tools/perf_bench.py. It adds up the time of every section of the kernel with the arm64 virtual
+counter cntvct_el0 (24 MHz on Apple silicon: 41.7 ns resolution; over many ticks the quantization averages out).
+
+The sections are the kernel's own source. _world_block and its tick loop _world_loop are compiled again from
+mrm/sim/kernel.py (with the kernel's own runtime flag), with a counter read inserted at every comment line that
+starts with ``# ---``. So the breakdown follows the kernel as it changes. arm64 only. The instrumented copy is
+compiled on every run (about 1-2 min); the kernel itself comes from its cache. The instrumented functions receive
+the accumulator as an extra argument named ``acc``: the kernel functions must not use a local of that name.
 """
 from __future__ import annotations
 
@@ -34,12 +35,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from mrm.sim import kernel as K  # noqa: E402
+from mrm.sim import kernel  # noqa: E402
 import perf_bench  # noqa: E402
 
 
 @intrinsic
 def cntvct(typingctx):
+    """Read the arm64 virtual counter register cntvct_el0 (int64 counts; hw.tbfrequency counts per second)."""
     sig = types.int64()
 
     def codegen(context, builder, signature, args):
@@ -51,6 +53,7 @@ def cntvct(typingctx):
     return sig, codegen
 
 
+#: section labels; LABELS[i] names the accumulator slot acc[i] (filled by instrument, in compile order)
 LABELS: list[str] = []
 
 
@@ -82,7 +85,7 @@ def instrument(name: str, ns: dict, callees=()):
     loops and branches are attributed correctly. ``callees``: (kernel name, instrumented function) pairs whose calls
     are redirected (their time is then itemized and not counted in the caller's section; the caller resumes its
     own clock after the call). Returns an njit function with an extra trailing ``acc`` argument."""
-    src = textwrap.dedent(inspect.getsource(getattr(K, name).py_func))
+    src = textwrap.dedent(inspect.getsource(getattr(kernel, name).py_func))
     nrt = "_nrt=False" not in src.split("def ", 1)[0]      # compile as the kernel does (with or without the runtime)
     ns = dict(ns)
     for cname, cfun in callees:
@@ -141,15 +144,18 @@ def instrument(name: str, ns: dict, callees=()):
 
 
 def build():
-    ns = dict(K.__dict__)
-    imp = instrument("_implicit_step_eng", ns)
-    tru = instrument("_truth_a", ns)
-    loop = instrument("_world_loop", ns, callees=(("_implicit_step_eng", imp), ("_truth_a", tru)))
-    wb = instrument("_world_block", ns, callees=(("_world_loop", loop),))
+    """The instrumented tick runner prof_ticks(P, S, b, k0, n, acc) -> next tick: n open-loop ticks of world b from
+    tick k0, with the section times (counter counts) added to ``acc``. The implicit self-heating step and the Truth
+    update are itemized separately from the tick loop."""
+    ns = dict(kernel.__dict__)
+    implicit_step = instrument("_implicit_step_eng", ns)
+    truth = instrument("_truth_a", ns)
+    loop = instrument("_world_loop", ns, callees=(("_implicit_step_eng", implicit_step), ("_truth_a", truth)))
+    world_block = instrument("_world_block", ns, callees=(("_world_loop", loop),))
 
     @njit
     def prof_ticks(P, S, b, k0, n, acc):
-        return k0 + wb(K.null_step, K.null_step, b, k0, n, K.MODE_OPEN, 0, P, S, acc)
+        return k0 + world_block(kernel.null_step, kernel.null_step, b, k0, n, kernel.MODE_OPEN, 0, P, S, acc)
     return prof_ticks
 
 
@@ -161,38 +167,41 @@ def main(argv=None):
     ap.add_argument("--n", type=int, default=20000)
     ap.add_argument("--reps", type=int, default=5)
     ap.add_argument("--set", action="append", default=[])
-    a = ap.parse_args(argv)
-    kw = {}
-    for s in a.set:
+    opts = ap.parse_args(argv)
+    plant_kw = {}
+    for s in opts.set:
         k, v = s.split("=", 1)
-        kw[k] = eval(v, {}, {})       # noqa: S307
+        plant_kw[k] = eval(v, {}, {})       # noqa: S307 (local tool, literal values)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        pl = perf_bench._plant(1, kw, locked=a.locked)
-    fn = pl._fn()
-    done = np.zeros(1, np.int64)
-    fn(K.null_step, K.null_step, pl.P, pl.S, np.int64(pl.tick), np.int64(300), np.int64(0), np.int64(0), done)
-    pl.tick += int(done[0])
+        plant = perf_bench.bench_plant(1, plant_kw, locked=opts.locked)
+    run_block = plant._fn()
+    done = np.zeros(1, np.int64)             # ticks advanced per world (written by the kernel)
+    run_block(kernel.null_step, kernel.null_step, plant.P, plant.S, np.int64(plant.tick), np.int64(300),
+              np.int64(kernel.MODE_OPEN), np.int64(0), done)        # 300 warm-up ticks with the real kernel
+    plant.tick += int(done[0])
     t_c = time.perf_counter()
     prof_ticks = build()
+    # counter frequency, counts per s
     freq = float(subprocess.run(["sysctl", "-n", "hw.tbfrequency"], capture_output=True, text=True).stdout)
+    # one short call compiles the instrumented copy (this is the slow part)
     acc = np.zeros(len(LABELS), np.int64)
-    k = prof_ticks(pl.P, pl.S, np.int64(0), np.int64(pl.tick), np.int64(10), acc)
+    k = prof_ticks(plant.P, plant.S, np.int64(0), np.int64(plant.tick), np.int64(10), acc)
     t_c = time.perf_counter() - t_c
-    res = []
+    res = []                                 # per repeat: us per tick of each section
     walls = []
     it = 0.0
-    for _ in range(a.reps):
+    for _ in range(opts.reps):
         acc[:] = 0
-        it0 = int(pl.S.wi[0, K.WI_SH_ITER])
+        it0 = int(plant.S.world_int[0, kernel.WI_SH_ITER])
         t = time.perf_counter()
-        k = prof_ticks(pl.P, pl.S, np.int64(0), np.int64(k), np.int64(a.n), acc)
-        walls.append((time.perf_counter() - t) / a.n * 1e6)
-        res.append(acc / freq / a.n * 1e6)
-        it = (int(pl.S.wi[0, K.WI_SH_ITER]) - it0) / (a.n * pl.N)
+        k = prof_ticks(plant.P, plant.S, np.int64(0), np.int64(k), np.int64(opts.n), acc)
+        walls.append((time.perf_counter() - t) / opts.n * 1e6)
+        res.append(acc / freq / opts.n * 1e6)
+        it = (int(plant.S.world_int[0, kernel.WI_SH_ITER]) - it0) / (opts.n * plant.N)
     res = np.median(np.array(res), axis=0)
     tot = res.sum()
-    print(f"[perf_tick_prof] locked={a.locked} n={a.n} reps={a.reps} load {os.getloadavg()[0]:.2f}; wall "
+    print(f"[perf_tick_prof] locked={opts.locked} n={opts.n} reps={opts.reps} load {os.getloadavg()[0]:.2f}; wall "
           f"{np.median(walls):.2f} us/tick, sections sum {tot:.2f} us, newton it/ring/tick {it:.3f} "
           f"(instrumented compile {t_c:.0f} s)")
     for name, v in zip(LABELS, res):

@@ -1,0 +1,9 @@
+{
+  "name": "mrm-katex-check",
+  "private": true,
+  "description": "KaTeX checks every symbol and formula of the variable map (tests/verification/test_variable_map.py); MathJax (tex2svg.js) typesets the box symbols for tools/gen_variable_map.py (npm ci here)",
+  "dependencies": {
+    "katex": "0.16.11",
+    "mathjax-full": "3.2.2"
+  }
+}

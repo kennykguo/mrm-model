@@ -1,19 +1,21 @@
 """Delete numba disk-cache files so that the next run recompiles from the current sources.
 
-numba keys a cached function on its OWN source file only (numba/core/caching.py, get_source_stamp: mtime and size
-of the defining .py file). An edit to an njit function in a leaf module (mrm/plant/*.py, mrm/sim/metrics.py,
-mrm/scenarios/generators.py, mrm/core/*.py) therefore does NOT invalidate the cached kernel in mrm/sim/kernel.py,
-which keeps running the old compiled code (docs/ENGINE.md section 1). Run this after every edit of njit code and
-before any timing or "exact" comparison.
-
 Usage:
-    .venv/bin/python tools/clear_numba_cache.py                 # the kernel + every mrm leaf module (default)
+    .venv/bin/python tools/clear_numba_cache.py                 # the default set (KERNEL_MODULES below)
     .venv/bin/python tools/clear_numba_cache.py kernel optics    # only these modules (by file stem)
     .venv/bin/python tools/clear_numba_cache.py --all            # every .nbi/.nbc under mrm/ and tests/
     .venv/bin/python tools/clear_numba_cache.py --dry-run ...    # list only
 
-The default set is the kernel and every module whose njit functions the kernel inlines or calls, so the next
-process recompiles the whole plant (5-8 min, ~2.3 GB peak RSS: run it through tools/memguard.py --heavy).
+Read this first. numba checks a cached function against its OWN source file only (numba/core/caching.py,
+get_source_stamp: the modification time and size of the .py file that defines it). So an edit to an njit function
+in a leaf module (mrm/plant/*.py, mrm/sim/metrics.py, mrm/scenarios/generators.py, mrm/core/*.py) does NOT
+invalidate the cached kernel in mrm/sim/kernel.py. The kernel then keeps running the old compiled code (see
+docs/ENGINE.md, "Clear the cache after editing compiled code"). Run this tool after every edit of njit code and
+before any timing or "exact" comparison.
+
+The default set is the kernel, every module whose njit functions the kernel inlines or calls, and
+tools/perf_profile.py. The next process then recompiles the whole plant (5-8 min, about 2.3 GB peak RSS: run it
+through tools/memguard.py --heavy).
 """
 from __future__ import annotations
 
@@ -21,8 +23,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-# every module the compiled kernel calls into (directly or through another leaf)
-DEFAULT = {
+#: package directory -> module stems whose njit code the compiled kernel calls (directly or through another leaf).
+#: The two tools are here because they compile their own copies of kernel components. perf_tick_prof compiles
+#: without a disk cache, so its entry only guards against a future cache=True.
+KERNEL_MODULES = {
     "mrm/sim": ["kernel", "metrics"],
     "mrm/plant": ["selfheat", "optics", "phase", "thermal", "electrical", "sensing", "datapath", "laser", "io"],
     "mrm/scenarios": ["generators"],
@@ -31,11 +35,12 @@ DEFAULT = {
 }
 
 
-def _caches(pkg_dir: Path, stem: str):
-    d = pkg_dir / "__pycache__"
-    if not d.is_dir():
+def _cache_files(pkg_dir: Path, stem: str):
+    """The numba cache files (index .nbi and data .nbc) of module ``stem`` in ``pkg_dir/__pycache__``."""
+    cache_dir = pkg_dir / "__pycache__"
+    if not cache_dir.is_dir():
         return []
-    return sorted(p for p in d.iterdir() if p.name.startswith(stem + ".") and p.suffix in (".nbi", ".nbc"))
+    return sorted(p for p in cache_dir.iterdir() if p.name.startswith(stem + ".") and p.suffix in (".nbi", ".nbc"))
 
 
 def main(argv: list[str]) -> int:
@@ -47,12 +52,13 @@ def main(argv: list[str]) -> int:
             files += sorted(p for p in (ROOT / base).rglob("*") if p.suffix in (".nbi", ".nbc"))
     else:
         stems = set(argv)
-        for pkg, mods in DEFAULT.items():
+        for pkg, mods in KERNEL_MODULES.items():
             for m in mods:
                 if not stems or m in stems:
-                    files += _caches(ROOT / pkg, m)
+                    files += _cache_files(ROOT / pkg, m)
         if stems:
-            known = {m for mods in DEFAULT.values() for m in mods}
+            # a named module outside the default set: search every package of mrm/ for it
+            known = {m for mods in KERNEL_MODULES.values() for m in mods}
             for s in stems - known:
                 for p in (ROOT / "mrm").rglob(f"__pycache__/{s}.*"):
                     if p.suffix in (".nbi", ".nbc"):
