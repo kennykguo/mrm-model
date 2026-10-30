@@ -1,0 +1,2 @@
+# optional dependency retained from the former rl extra.
+gymnasium

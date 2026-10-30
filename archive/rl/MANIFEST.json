@@ -1,0 +1,27 @@
+{
+  "archived_on": "2026-10-29",
+  "moves": {
+    "mrm/sim/gym_env.py": "archive/rl/gym_env.py",
+    "mrm/control/fxp_mlp.py": "archive/rl/fxp_mlp.py",
+    "tests/verification/test_gym_env.py": "archive/rl/tests/test_gym_env.py",
+    "tests/verification/test_gym_env_fxp.py": "archive/rl/tests/test_gym_env_fxp.py",
+    "tests/verification/test_gym_env_perf.py": "archive/rl/tests/test_gym_env_perf.py",
+    "docs/research/05_tools_smoke/t11_closed_loop_numba_gym.py": "archive/rl/research/t11_closed_loop_numba_gym.py",
+    "docs/research/05_tools_smoke/t14_sb3_ppo.py": "archive/rl/research/t14_sb3_ppo.py",
+    "docs/research/05_tools_smoke/out/t11_closed_loop_numba_gym.json": "archive/rl/research/out/t11_closed_loop_numba_gym.json",
+    "docs/handoff/rl.md": "archive/rl/docs/rl.md"
+  },
+  "preserved_full_tutorial": "archive/rl/examples/tutorial.ipynb",
+  "source_sha256": {
+    "mrm/sim/gym_env.py": "68a655e5ec927f482c892f2288b4dba3880332e1140b68ff6c4fed5259e296d8",
+    "mrm/control/fxp_mlp.py": "b6304f1d6fd4b8d0b83003335b3c46847d0d6d88fa90426f995da00d9a1e4ecc",
+    "tests/verification/test_gym_env.py": "339e6750ada269e1737ec4ca7e54bf193763cebe7aa26daa7fee95de3ce53797",
+    "tests/verification/test_gym_env_fxp.py": "13a63de04dc86ca513b4583564e957b8de622538cdbc5c2e56749a28caeeb9ec",
+    "tests/verification/test_gym_env_perf.py": "316a8bc7d591db976697173ca87734cec9dbfb0c062338eeed4d165d5725dd17",
+    "docs/research/05_tools_smoke/t11_closed_loop_numba_gym.py": "2d2cc001b8ec2f90ea5d55bb9687e3ed4ed71553e06ca96074f842493e37947f",
+    "docs/research/05_tools_smoke/t14_sb3_ppo.py": "8bb0880d811c7054fa14327311bea7bead9fcd706d374fd3f1f633e4e106e5dc",
+    "docs/research/05_tools_smoke/out/t11_closed_loop_numba_gym.json": "c5cb60e2969f68ae2a97c6baccf17c2c5218102f4b92f3b7b44763325c925323",
+    "docs/handoff/rl.md": "d1346ffad343890b4dd9d911946dd7b3c81e1f773646e1193b694601b9a51a08"
+  },
+  "original_full_tutorial_sha256": "3eb49d711898b1f29bdc46f11be2cd5c4ad51cf2d1abcc2a591742f8dcfe6e3d"
+}
