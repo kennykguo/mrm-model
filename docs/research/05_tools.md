@@ -1,3 +1,5 @@
+> the t11 Gymnasium and t14 PPO research smoke scripts now live in [archive/rl/research](../../archive/rl/research). commands below record their historical locations.
+
 # 05 - Open-source tool landscape, verified by installation
 
 Status: research note for the `mrm-model` plant. Written 2026-10-09 on Kenny's Apple M2 (8 cores, 16 GB, macOS

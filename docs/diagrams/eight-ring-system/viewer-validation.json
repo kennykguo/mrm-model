@@ -1,0 +1,18 @@
+{
+  "views": [
+    "full",
+    "controller",
+    "drive",
+    "bank",
+    "monitor",
+    "thermal",
+    "receiver",
+    "detail"
+  ],
+  "localFileLoads": true,
+  "zoomWorks": true,
+  "panWorks": true,
+  "fitWorks": true,
+  "mobileOverflow": false,
+  "pageErrors": []
+}

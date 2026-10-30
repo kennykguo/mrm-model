@@ -1,0 +1,22 @@
+{
+  "lanes": 8,
+  "nativeElements": 840,
+  "labels": 116,
+  "laserColors": [
+    "#2563eb",
+    "#00879a",
+    "#15803d",
+    "#779219",
+    "#af7a00",
+    "#d65a15",
+    "#c02670",
+    "#7c3aed"
+  ],
+  "matchedRingAndReceiverColors": true,
+  "electrical": "#475569",
+  "thermal": "#b45309",
+  "labelOverlaps": [],
+  "pathsThroughLabels": [],
+  "fullyEditable": true,
+  "equations": 0
+}

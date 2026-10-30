@@ -552,3 +552,69 @@ the normalized calculation AST matches the starting source in all three files.
 seven engine and self-heating integration checks pass.
 see docs/PHYSICS_READABILITY.md for the complete function inventory.
 work folder - the path in /tmp/mrm-physics-readability-workdir.
+
+## voltage-induced resonance shift - 29 october 2026
+
+covered evaluate_ring_resonance_shifts and evaluate_ring_resonance_shifts_with_workspace.
+explain reverse-bias depletion, junction table lookup, ring-length averaging, resonance condition, and additive shift before code.
+use q(V) for the junction table's dimensionless index change, f for junction fill fraction, and n_J(V)=f*q(V) for its ring average.
+linear interpolation uses voltage-position weight between table neighbors. out-of-range voltages hold endpoint values and set a flag.
+derive the first-order voltage wavelength shift from n_eff(lambda)*L=m*lambda with length fixed and n_g=n_eff-lambda*d n_eff/d lambda.
+Delta_lambda_V=(lambda_ref/n_g)*(n_J(V)-n_J(V_ref)). group index includes wavelength dispersion.
+helper also returns ring-averaged junction loss f*alpha_J, capacitance f*L*c_j, and resistance r_s/(f*L). define table units first and explain extensive versus parallel scaling.
+zero junction length produces infinite series resistance in the implementation.
+illustrative full voltage chain - q(0 V)=0, q(2 V)=4e-4, interpolate at 1 V, f=.5, V_ref=0 V, lambda_ref=1310 nm, n_g=4. wavelength shift is 32.75 pm.
+combined with the prior illustrative thermal shift of 1530 pm, total shift is 1562.75 pm.
+workspace wrapper differs only by allocation. body looks up junction values, loops over rings, obtains thermal shift, adds voltage shift, and writes outputs in place.
+this helper evaluates one bias vector; the later binary wrapper calls it for both levels.
+accuracy limits - piecewise-linear voltage tables, endpoint holding, fixed reference group index in the first-order index-to-wavelength conversion, and additive thermal/electrical shifts.
+existing test checks configured near-zero voltage efficiency and directions of resonance shift, attenuation, and capacitance change. no new tests run.
+next function - calculate_intrinsic_loss_temperature_factor, followed by write_ring_optical_inputs_for_data_level.
+
+## temperature-dependent optical loss - 29 october 2026
+
+covered calculate_intrinsic_loss_temperature_factor and the loss-budget portion of write_ring_optical_inputs_for_data_level before its laser-line loop.
+distinguish thermal movement of resonance from thermal changes in intrinsic attenuation and notch shape.
+derive the exponential multiplier from constant fractional loss sensitivities at fixed bias, using log(alpha/alpha_V) rather than a logarithm of a dimensional quantity.
+ring temperature and heater-resistor temperature are distinct modeled observers, with separate empirical coefficients and one reference temperature.
+base g26.yaml currently specifies both coefficients as zero. illustrative nonzero examples must not be presented as default device behavior.
+combine reference intrinsic loss plus the junction loss difference, multiply by the temperature factor, and clamp negative total loss.
+derive round-trip field retention as the square root of power retention, exp(-alpha*L/2).
+nonabsorptive coefficient stays fixed. absorbed coefficient is max(alpha-alpha_nonheat,0). eta is the absorbed share of intrinsic loss, not the absorbed fraction of bus input.
+explain zero-total-loss eta=0 and the upper eta clamp.
+example - alpha_ref=100/m, junction current/reference=50/m and 40/m, ring/heater rises=20/40 K, coefficients=.002/.001 per K. factor=exp(.08), alpha=119.161577/m. L=100 um gives a=.994059635. nonheat=30/m gives eta=.748240996.
+coefficient interpretation and fixed nonabsorptive loss are compact-model assumptions. constant slopes do not prove temperature dependence of the actual device.
+reference-state test checks configured attenuation and heat fraction at the baseline. no tests run for this explanation.
+next - the laser-line loop of write_ring_optical_inputs_for_data_level. derive the shifted cold wavelength coordinate, dispersion expansion, optical phase, and group delay before mapping code.
+
+## complete eight-ring overview - 29 october 2026
+
+create docs/diagrams/eight-ring-system as one detailed native Excalidraw drawing.
+show eight rings on one shared optical bus, independent NRZ drives, heater DACs and supply limits, drop photodiodes, AFE/ADC channels, and the PI heater loop.
+include thermal memory, neighbouring heat paths, aggressor and ambient sources, the die sensor, the receiver model, and diagnostics.
+route the die sensor and receiver metrics to diagnostics rather than implying the nominal PI consumes them.
+label the 70% peak fraction as a hyperparameter.
+use eight consistent laser colors across laser teeth, ring identities, and receiver lanes after the user's color request.
+use slate electrical paths and amber thermal paths. keep labels dark and keep the reference's handwritten appearance.
+use a ring-detail inset and short labels. add no equations or description blocks.
+check all eight electrical/readout lanes, matched colors, native editability, text overlaps, and paths crossing labels.
+provide a full SVG/PNG export and an offline pan/zoom viewer with section presets.
+no production simulation code changed.
+
+## shifted cold phase curve and dispersion - 29 october 2026
+
+covered the remaining laser-line loop in write_ring_optical_inputs_for_data_level.
+define the cold curve as the reference-state curve, not necessarily room temperature.
+model translates that phase curve by the total resonance shift. x=lambda_laser-shift is a reference-curve coordinate, not a changed physical laser wavelength.
+d=x-lambda_ref measures distance along the reference curve. at laser=lambda_ref+shift, x=lambda_ref and phase=2*pi*m by construction.
+derive effective-index Taylor coefficients from n_g=n-lambda*n_prime and n_g_prime=-lambda*n_second.
+index model is quadratic in d. coefficients are n_prime=(n0-ng0)/lambda_ref and n_second=-D/lambda_ref, where D is reference group-index wavelength derivative.
+phase is 2*pi*n(x)*L/x, with no additional coupler phase because the reference phase already incorporates it.
+group delay is the slope of propagation phase with angular frequency. use the first-order group-index expansion ng0+D*d, times L/c.
+phase uses a second-order effective-index expansion, while group delay retains first-order group-index dispersion. the latter is not the exact derivative of that finite polynomial away from reference.
+example - lambda_ref=1310 nm, n0=2.4, ng0=4.2, D=.001 per nm, longitudinal order100 gives L=54.583333 um. laser1311.5 nm and shift1 nm give x1310.5 nm, d.5 nm, n2.399312882, phase627.89898746 rad, residual-.41954326 rad from2*pi*100, delay.76478672 ps. shift1.5 nm puts this laser exactly at the modeled resonance.
+loop copies the previously covered amplitude retention and heat fraction to each line and writes delay only when requested.
+accuracy discussion distinguishes exact resonance placement within the translated model from independent physical accuracy.
+rigid translation misses temperature-dependent changes of resonance spacing. documented solver-table comparison gives about33 pm adjacent-order and66 pm second-order discrepancy for the stated g26 7.6 nm case.
+existing phase tests check moved resonance, baseline delay, FSR, and comparison with the fuller extracted-index calculation. no tests rerun for this explanation.
+next - evaluate_binary_ring_optical_inputs and its workspace body. skip duplicated allocation mechanics and connect zero/one outputs to already-covered bit averaging. then evaluate_coupler_power_fractions, which introduces the wavelength-dependent coupling law.

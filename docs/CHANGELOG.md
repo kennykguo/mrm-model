@@ -3,6 +3,7 @@
 Contract changes (ARCHITECTURE v2 and the normative sections of docs/research/07_design_critique.md) and the
 decisions that deviate from them. Newest first. Each entry names the reason and where the details are.
 
+- 2026-10-29 - archive the optional Gymnasium environment, fixed-point neural inference, learning tests, and toy training examples under archive/rl. retain the general controller tutorial and fixed-point PI path. remove the rl install extra.
 - 2026-10-28 - consolidate optical heating on one general two-direction field calculation; retire Airy selection, polynomial rotation, and far-line hold. Physical parameters and core field equations are unchanged.
 - golden: tests/golden/g26__a1_slide10_aggressor.npz updated (data sha256 d64aa451446a): consolidate all rings on the general two-direction field solver; equivalent zero-backscatter algebra changes floating-point rounding
 - golden: tests/golden/g26__static.npz updated (data sha256 b05d86be891d): consolidate all rings on the general two-direction field solver; equivalent zero-backscatter algebra changes floating-point rounding

@@ -7,7 +7,7 @@ The main calculation runs in a compiled Numba kernel.
 
 For a first run, start with section 1. Sections 2–6 explain inputs, startup, timing, controllers and
 results. Sections 7–10 cover implementation, extensions, performance and limitations. Sections 11–14
-cover experiment files, external controllers, reinforcement learning and calibration.
+cover experiment files, external controllers, the learning archive and calibration.
 
 Throughout this guide, **N** is the number of rings, **L** the number of laser lines, **B** the number
 of worlds and **S** the number of recorded samples. A *controller edge* is a tick when the controller
@@ -48,7 +48,7 @@ review records are in [handoff/engine.md](handoff/engine.md); contract changes a
 | leaf modules | `mrm/plant/{phase,optics,thermal,selfheat,electrical,sensing,datapath,laser}.py`, `mrm/scenarios` |
 | `mrm/sim/experiment.py`, `manifest.py`, `cli.py` | experiment files, run directories, `mrm run ...` (section 11) |
 | `mrm/sim/bridge.py`, `vectors.py`, `mrm/control/cli.py` | external controllers, golden vectors and traces (section 12) |
-| `mrm/sim/gym_env.py`, `mrm/control/fxp_mlp.py` | the RL environment and fixed-point policies (section 13) |
+| `archive/rl/` | optional learning tools, excluded from the installed package (section 13) |
 | `mrm/calibration/`, `mrm/validation/report.py` | the calibration fits, the calibrated presets and the generated validation report (section 14) |
 
 ### Explore the variable map
@@ -241,7 +241,7 @@ One issue remains: the view uses the run's own config, so a corner selected by `
 ### Exposed sensor channels
 
 `controller_interface.expose` lists the sensor channels a controller may read. By default, every
-channel is exposed. The restriction applies in the runner, `MRMEnv`, bridge and vectors.
+channel is exposed. The restriction applies in the runner, bridge and vectors.
 
 A hidden channel raises `UndeclaredChannelError` on the Python path and has `obs_offset = -1` in
 the compiled ABI. Exposing a sample block also exposes its count channel. An unknown channel name
@@ -494,8 +494,7 @@ always clipped and counted, even when `error` was requested.
 
 For every per-ring `(B, N)` actuator channel, only the active ring's command is applied. Others
 keep their held command, including through a controller reset. Channels shaped `(B, L)` or
-`(B, 1)` are applied whole. Both execution paths, the NumPy reference and `MRMEnv` follow this
-rule; the kernel applies it when the environment resumes.
+`(B, 1)` are applied whole. Both engine execution paths and the NumPy reference follow this rule.
 
 The Python path merges commands before validation (`mrm.control.api.merge_round_robin`), so only
 applied commands are range-checked and counted. Each ring updates at the controller rate divided
@@ -983,7 +982,7 @@ The remaining items are the controller telemetry metrics; `fidelity.data_modulat
 exists; see `docs/handoff/waveform.md` section 3); reference-tap and `datapath.bitstat_ones`
 channels; `DacFacts.law`; one shared knowledge-token vocabulary; `run_lock_request` for replicas
 (`docs/handoff/replicas.md` section 6); Verilator/cocotb closed-loop HDL co-simulation (section 12);
-an in-kernel bridge; per-world reset in the Gym environment; and the RL throughput target (section 13).
+an in-kernel bridge. the archived learning tools retain their separate reset and throughput limitations (section 13).
 
 Building a plant explicitly refuses `ring.monitor.reference_tap.present: true`.
 Bridged runs currently take the Python path.
@@ -1167,53 +1166,11 @@ Any changed engine number fails the golden checks. Update only with
 The files were produced on arm64 macOS with the `.venv` versions recorded in each file.
 Another platform can produce another valid closed-loop trajectory.
 
-## 13. The RL environment
+## 13. Archived learning tools
 
-`mrm.sim.gym_env.MRMEnv` is a Gymnasium `VectorEnv`: its B sub-environments are the B worlds of
-one `Plant`, with no subprocess workers. `MRMSingleEnv` provides the B = 1 view. Both
-`gymnasium.make("mrm/MRM-v0")` and
-`gymnasium.make_vec("mrm/MRM-v0", num_envs=..., vectorization_mode="vector_entry_point")` work.
-
-```python
-from mrm.sim.gym_env import MRMEnv
-env = MRMEnv("g26", num_envs=256)                     # warm start, sampled worlds, 1000-step episodes
-obs, info = env.reset(seed=0)
-obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
-info["truth"]["detuning_m"]                            # Truth only in info, never in obs
-policy = env.compiled_policy(mlp)                      # mlp = mrm.control.fxp_mlp.quantize_mlp(...): deploy in-kernel
-```
-
-### Observations, actions and reward
-
-One environment step is one controller period: 10 ticks in G26, using the Python-controller path.
-The observation contains the last K monitor sample blocks, applied heater codes, bias codes when
-used, and temperature codes. Each is scaled by a power of two, exactly representable in float32
-and Q0.15.
-
-Actions are bounded changes to heater codes, and to bias codes when bias is bound to the controller.
-Reward comes from kernel metric accumulators. `RewardSpec` uses lock error relative to the oracle
-point by default, with optional relOMA, heater-power and wrong-line terms. Truth appears only in
-`info`, never in observations.
-
-### Reset and deployment
-
-Every reset redraws worlds with new seeds; `options={'seeds': ...}` pins them. All worlds truncate
-together. A warm start (`start='warm'`) uses steady-state codes and flags rings without a code in
-`info['truth']['warm_start_no_code']`. Other choices are `'cold'` and `'cold_settled'`.
-
-`MRMEnv.compiled_policy(mlp)` turns a fixed-point MLP from `mrm.control.fxp_mlp` into a
-`CompiledController`. It runs in the kernel bit-identically to the environment's version.
-`fxp_mlp.error_bound` bounds `|fixed - float|`.
-
-### Throughput and limitations
-
-On an eight-core M2 at B = 256, throughput is 2.5–2.6e4 environment steps/s, below the 1e5 target
-of the design. The plant itself caps throughput near 4e4 at 2.3–2.5 µs per world-tick; Python
-per-call setup adds about 35% of the cost (`docs/handoff/rl.md` section 4).
-
-Resetting 256 worlds takes 3–5 s because `solve_locked_steady_state` loops over worlds in Python.
-`examples/tutorial.ipynb` demonstrates the API and quantize-and-deploy path. No RL library is
-installed, so the notebook does not train a policy.
+The Gymnasium environments and fixed-point neural-policy helper are archived outside the installed package.
+See [archive/rl](../archive/rl/README.md) for the preserved code, examples, optional dependencies, and opt-in tests.
+The physical plant, ordinary controllers, compiled-controller ABI, and fixed-point PI arithmetic remain active.
 
 ## 14. Calibration and the validation report
 
