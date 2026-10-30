@@ -7,7 +7,11 @@ would show it: monitor ADC codes in, heater DAC codes out. The default device is
 (preset `g26`). Most of its numbers come from public papers, talks and patents or from solver estimates, and every
 number in a preset records where it came from.
 
-![Block diagram of one plant tick](docs/architecture.svg)
+<a href="docs/architecture.svg">
+  <img src="docs/architecture.svg" alt="Block diagram of one plant tick" width="1800">
+</a>
+
+[open the full-size diagram](docs/architecture.svg)
 
 ## Install
 
@@ -16,8 +20,9 @@ python3.12 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 ```
 
-The optional extras are `extract` (the offline mode, coupler, junction and thermal solvers), `rl` (gymnasium) and
-`hdl` (cocotb).
+The optional extras are `extract` (the offline mode, coupler, junction and thermal solvers) and `hdl` (cocotb).
+
+The learning environment and neural-policy helpers are archived in [archive/rl](archive/rl/README.md).
 
 ## First run
 
