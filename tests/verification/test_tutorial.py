@@ -1,4 +1,4 @@
-"""Checks that the tutorial notebook examples/tutorial.ipynb runs end to end (also its RL environment section).
+"""Checks that the tutorial notebook examples/tutorial.ipynb runs end to end.
 
 Read this first
 ---------------
@@ -7,7 +7,7 @@ runs in order in one namespace of a fresh interpreter (a subprocess, as a notebo
 captured as stream outputs, and nothing else (no rich outputs; the notebook prints text only). Run it as a script to
 refresh the stored outputs::
 
-    .venv/bin/python tools/memguard.py -- .venv/bin/python tests/verification/test_gym_env_tutorial.py --write
+    .venv/bin/python tools/memguard.py -- .venv/bin/python tests/verification/test_tutorial.py --write
 
 The test checks that the notebook runs without an error in under 5 min (the requirement: "runs end to end in under
 ~5 min"), that its stored outputs are small, and that the stored outputs come from an execution (every code cell has
