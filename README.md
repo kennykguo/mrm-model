@@ -7,11 +7,11 @@ would show it: monitor ADC codes in, heater DAC codes out. The default device is
 (preset `g26`). Most of its numbers come from public papers, talks and patents or from solver estimates, and every
 number in a preset records where it came from.
 
-<a href="docs/architecture.svg">
+<a href="https://raw.githubusercontent.com/kennykguo/mrm-model/main/docs/architecture.png">
   <img src="docs/architecture.svg" alt="Block diagram of one plant tick" width="1800">
 </a>
 
-[open the full-size diagram](docs/architecture.svg)
+[open the full-size diagram — click the image to zoom](https://raw.githubusercontent.com/kennykguo/mrm-model/main/docs/architecture.png)
 
 ## Install
 
