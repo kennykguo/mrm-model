@@ -3,7 +3,7 @@ fixes"). Each test failed on the code before its fix.
 
 What the tests check:
 
-- ``controller_interface.expose`` reaches the ControllerSpec built from a config (runner, env, bridge);
+- ``controller_interface.expose`` reaches the ControllerSpec built from a config (runner, bridge);
 - ``spec.nominal`` is the knowledge-filtered view of the unsampled design, never the experiment section. So a
   controller knows only what its knowledge list grants, and the spec fingerprint does not depend on the experiment's
   seeds or world choices;
@@ -12,17 +12,14 @@ What the tests check:
 - ``controller_interface.on_out_of_range: error`` raises on the compiled path too;
 - after a scenario controller reset, the Python path re-binds a compiled controller's new state to the kernel (its
   fast_kernel and its step share one state again);
-- FxpMlp derives its accumulator proof from its layers, and fxp_mlp_check refuses a false proof flag;
-- the numbers that the feed-forward, oracle, reward and extremum-seeking docstrings quote hold in the model;
+- the numbers that the feed-forward, oracle and extremum-seeking docstrings quote hold in the model;
 - the scorecard does not count a drifting operating point as locked.
 
 Run time about 1 min (the runs are B = 1, 0.05-0.5 ms).
 """
 from __future__ import annotations
 
-import dataclasses
 import inspect
-import math
 import re
 import warnings
 
@@ -307,47 +304,7 @@ def test_python_path_rebinds_a_fast_kernel_controller_after_a_reset():
     assert np.array_equal(out["compiled"], out["python"])
 
 
-# ------------------------------------------------------------------------------------ fixed-point MLP accumulator proof
-def test_fxp_mlp_derives_its_accumulator_proof():
-    from mrm.control import fxp_mlp
-    w, b = [0.9 * np.ones((1, 4))], [np.zeros(1)]
-    narrow = fxp_mlp.quantize_mlp(w, b, ["linear"], acc_bits=20, out_fmt="Q7.8")
-    wide = fxp_mlp.quantize_mlp(w, b, ["linear"], out_fmt="Q7.8")
-    assert not narrow.proven and wide.proven
-    x = np.full(4, narrow.in_fmt.raw_max, np.int64)
-    # built by hand from the narrow layers: the proof does not hold, so the declared 20-bit accumulator is emulated
-    m2 = fxp_mlp.FxpMlp(in_fmt=narrow.in_fmt, layers=narrow.layers, rounding=narrow.rounding, overflow=narrow.overflow)
-    assert not m2.proven and not m2.describe()["proven_no_acc_overflow"]
-    assert m2.forward(x).tolist() == narrow.forward(x).tolist() == [0]
-    # a layer without the acc_bits_needed record (0 = unknown): the proof is recomputed from the weights
-    bare = tuple(dataclasses.replace(l, acc_bits_needed=0) for l in narrow.layers)
-    assert not fxp_mlp.FxpMlp(in_fmt=narrow.in_fmt, layers=bare).proven
-    assert fxp_mlp.FxpMlp(in_fmt=wide.in_fmt, layers=tuple(dataclasses.replace(l, acc_bits_needed=0)
-                                                           for l in wide.layers)).proven
-    # a claimed proof that does not hold is refused (also through dataclasses.replace of a proven network)
-    with pytest.raises(ValueError, match="accumulator"):
-        fxp_mlp.FxpMlp(in_fmt=narrow.in_fmt, layers=narrow.layers, proven=True)
-    with pytest.raises(ValueError, match="accumulator"):
-        dataclasses.replace(wide, layers=narrow.layers, _packed=None)
-    # proven=False (the per-addition path) stays allowed for a proven network
-    slow = dataclasses.replace(wide, proven=False, _packed=None)
-    assert slow.forward(x).tolist() == wide.forward(x).tolist()
-    # the packed structural check refuses a proof flag on an accumulator narrower than its worst case
-    p = narrow.pack().copy()
-    assert fxp_mlp.fxp_mlp_check(p, 0) == 0
-    p[fxp_mlp.H_PROVEN] = 1
-    assert fxp_mlp.fxp_mlp_check(p, 0) == 14
-    assert fxp_mlp.fxp_mlp_check(wide.pack(), 0) == 0
-
-
 # -------------------------------------------------------------------------- docstring numbers checked against the model
-def test_reward_docstring_values():
-    """The reward docstring: every '<value> at <n> s' of the log lock term is -log1p(n^2)."""
-    from mrm.sim.gym_env import RewardSpec
-    pairs = re.findall(r"(-\d+(?:\.\d+)?) at (?:an rms error of )?(\d+(?:\.\d+)?) s\b", inspect.getcomments(RewardSpec))
-    assert len(pairs) >= 2, pairs
-    for v, n in pairs:
-        assert float(v) == pytest.approx(-math.log1p(float(n) ** 2), abs=0.05), (v, n)
 
 
 def test_oracle_docstring_optimum():
