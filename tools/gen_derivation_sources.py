@@ -114,6 +114,7 @@ def function_contracts(lines, node, comments):
     if node.returns is None:
         return contracts(comments)
     args = (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
+    args += tuple(arg for arg in (node.args.vararg, node.args.kwarg) if arg is not None)
     last_parameter_line = max((arg.end_lineno for arg in args), default=node.lineno)
     annotations = []
     for line_number in range(node.lineno, node.returns.end_lineno + 1):

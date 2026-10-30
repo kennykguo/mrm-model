@@ -161,7 +161,6 @@ mrm/
     models.py              linearize(nominal_cfg, op, Ts) -> (A,B,C,D,delay) for model-based controllers
     calibration.py         simulated factory calibration (warm/cold start)
     fxp.py lfsr.py         fixed-point toolkit and the reference fixed-point PI FxpPi
-    fxp_mlp.py             fixed-point MLP inference helper: quantize, packed int64 form, numba eval
     cli.py                 `mrm golden | bridge | vectors`: golden traces, bridge and vector utilities
     baselines/             one file per controller family (section 6)
   sim/
@@ -180,7 +179,6 @@ mrm/
     manifest.py            runs/<UTC>_<hash8>/: experiment.resolved.yaml, manifest.json, metrics.json, trace.h5,
                            inputs/, report.txt (convergence.json); compare_runs for `mrm rerun`
     cli.py                 `mrm run | sweep | mc | compare | robust | acceptance | rerun`
-    gym_env.py             vectorized gymnasium env, registered as mrm/MRM-v0
     bridge.py              binary lockstep bridge for external controllers, C header and C reference PI
     vectors.py             golden vectors (record, .npz/.hex/.layout.vh, replay through the protocol or the ABI)
   waveform/                short time-domain TCMT + driver + junction RC runs; normalized-coordinate LUT
@@ -401,7 +399,7 @@ them.
   paths; the coupling, phase, junction, data-activity heat and monitor models; converters and sensors as
   hardware, with faults; actuator limits from hardware; WDM acquisition; counter-based noise; provenance and a
   strict schema; variation by path; experiment files and run manifests; the NumPy reference; the controller API
-  and telemetry; the RL environment.
+  and telemetry. the learning environment is now archived under archive/rl.
 - Required from the fixed-point and HDL item: the fixed-point toolkit, golden vectors and the binary bridge. The Verilator
   HDL co-simulation is a documented stretch goal.
 - Required smaller items: an exclusion bound for TPA, FCA and Kerr; backscatter per order; optics in solver-independent
@@ -418,3 +416,5 @@ The evidence behind the parameters is in `docs/research/01..06`: 01 covers Light
 and the GF 45SPCLO platform; 02 covers materials, with `02_materials.json`; 03 covers compact-model
 equations; 04 covers thermal data and control literature; 05 covers tools; and 06 audits the textbook.
 The project brief is [research/00_capstone_brief.md](research/00_capstone_brief.md).
+
+The optional learning environment and fixed-point neural inference helper are preserved in [archive/rl](../archive/rl/README.md), outside the installed package.

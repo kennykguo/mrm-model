@@ -6,7 +6,7 @@ Read this first. The tool builds the g26 B = 1 plant of tools/perf_bench.py (``-
 steady-state lock codes) and advances it 300 ticks with the real kernel. It then times the full kernel tick, and
 after that each component on the evolving state, in its own compiled loop (n calls, median of 5 repeats):
 
-- the inputs of an interval: scenario, laser, data pattern (pattern_tick_row), phase.ring_optics_levels_row, the
+- the inputs of an interval: scenario, laser, data pattern (pattern_tick_row), phase.evaluate_binary_ring_optical_inputs, the
   substep constants (cache_refresh_engine_optics), the self-heating bounds, the swing capacitance and the data heat;
 - the implicit self-heating step of the bank, and eng_pabs on every ring (one ring evaluation each);
 - the sensors of a tick (monitor, errors, temperature, readback) and the monitor alone, truth_row, the oracle, the
@@ -82,7 +82,7 @@ def p_pattern(P, S, b, k0, n):
 
 @njit(cache=True)
 def p_optics_row(P, S, b, n):
-    v = optics.selfheat_views(S.selfheat_float[b], P.selfheat_int[b])
+    v = optics.unpack_self_heating_optical_state(S.selfheat_float[b], P.selfheat_int[b])
     rf = S.ring_float[b]
     r8 = S.ring_int8[b]
     lf = S.line_float[b]
@@ -90,7 +90,7 @@ def p_optics_row(P, S, b, n):
     tb = b if P.jt_dn.shape[0] > 1 else 0
     jx = S.junction[b]
     for i in range(n):
-        phase.ring_optics_levels_row(
+        phase.evaluate_binary_ring_optical_inputs(
             rp,
             lf[kernel.LF_LAM],
             rf[kernel.RF_T_RING],
@@ -137,7 +137,7 @@ def p_swing_heat(P, S, b, n):
     tb = b if P.jt_dn.shape[0] > 1 else 0
     for i in range(n):
         kernel.swing_capacitance_row(rf[kernel.RF_V_LO], rf[kernel.RF_V_HI], P.jt_grid, P.jt_c[tb], P.jt_cum[tb],
-                                     rp[:, phase.RP_FILL], rp[:, phase.RP_LEN], rf[kernel.RF_CJ])
+                                     rp[:, phase.RING_PARAMETER_COLUMN_JUNCTION_FILL_FRACTION], rp[:, phase.RING_PARAMETER_COLUMN_ROUND_TRIP_LENGTH], rf[kernel.RF_CJ])
         electrical.data_activity_heat_row(rf[kernel.RF_CJ], rf[kernel.RF_SWING_V], P.dp_bitrate[b], rf[kernel.RF_TD],
                                           rf[kernel.RF_EN], rf[kernel.RF_RS], P.drv_r_out[b:b + 1],
                                           P.drv_p_static[b:b + 1], P.drv_e_tr[b:b + 1], 0, rf[kernel.RF_PJ],
@@ -328,7 +328,7 @@ def main(argv=None):
         ("  scenario eval (k+1)", p_scen, (P, S, b, k0, n)),
         ("  laser_tick_row", p_laser, (P, S, b, k0, n)),
         ("  pattern_tick_row", p_pattern, (P, S, b, k0, n)),
-        ("  phase.ring_optics_levels_row", p_optics_row, (P, S, b, n)),
+        ("  phase.evaluate_binary_ring_optical_inputs", p_optics_row, (P, S, b, n)),
         ("  cache_refresh_engine_optics (substep constants)", p_precompute, (P, S, b, n)),
         ("  sh_bounds", p_bounds, (P, S, b, n)),
         ("  swing capacitance + data heat", p_swing_heat, (P, S, b, n)),

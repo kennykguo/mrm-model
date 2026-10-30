@@ -1,0 +1,18 @@
+[
+  {
+    "slug": "eight-ring-system",
+    "bounds": [
+      100,
+      70,
+      5630.580107422837,
+      3380
+    ],
+    "elements": 840,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  }
+]

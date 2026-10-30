@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>eight-ring system</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #1e1e1e; background: white; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    header { padding: 18px 24px; border-bottom: 1px solid #e5e5e5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+    h1 { font: inherit; font-weight: 600; margin: 0 auto 0 0; }
+    a { color: inherit; text-underline-offset: 4px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 24px; border-bottom: 1px solid #e5e5e5; }
+    button { font: inherit; color: inherit; background: white; border: 1px solid #ddd; padding: 7px 12px; cursor: pointer; }
+    button:hover, button[aria-pressed="true"] { background: #f3f3f3; }
+    :focus-visible { outline: 2px solid #1e1e1e; outline-offset: 3px; }
+    #stage { position: absolute; inset: 126px 0 0; overflow: hidden; cursor: grab; touch-action: none; background: #fff; }
+    #stage.dragging { cursor: grabbing; }
+    #drawing { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; user-select: none; pointer-events: none; }
+    @media(max-width: 900px) { header, nav { padding: 12px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>eight-ring system</h1>
+    <a href="drawings/eight-ring-system.excalidraw" download>Excalidraw</a>
+    <a href="previews/eight-ring-system.svg" target="_blank" rel="noopener">SVG</a>
+    <a href="previews/eight-ring-system.png" download>PNG</a>
+  </header>
+  <nav aria-label="diagram views">
+    <button data-view="full" aria-pressed="true">full system</button>
+    <button data-view="controller">controller</button>
+    <button data-view="drive">electrical drive</button>
+    <button data-view="bank">eight-ring bank</button>
+    <button data-view="monitor">monitor readout</button>
+    <button data-view="thermal">thermal paths</button>
+    <button data-view="receiver">receiver</button>
+    <button data-view="detail">ring detail</button>
+    <button id="minus" aria-label="zoom out">−</button>
+    <button id="plus" aria-label="zoom in">+</button>
+  </nav>
+  <div id="stage" role="img" aria-label="eight-ring system with optical bus, electrical drives, heater control, photodiode readout, thermal paths, and receiver">
+    <img id="drawing" src="previews/eight-ring-system.svg" alt="" draggable="false">
+  </div>
+  <script src="viewer.js"></script>
+</body>
+</html>
