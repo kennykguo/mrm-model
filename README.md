@@ -4,7 +4,7 @@
 > into mrm-model, so it can run closed loop on the 8-ring G26 plant and produce performance and locking
 > metrics for the ECE496 project.
 >
-> **Status: Phase 1 (walking skeleton) done; Phase 2 (faithful core) next. Decisions Q1–Q12 are settled in spec §6.**
+> **Status: Phases 0-3 done: the faithful ECE496 TLC runs closed loop on G26 (steady state). Phase 4 (scenario matrix) next. Decisions Q1–Q12 are settled in spec §6.**
 > ▶ Try it: `tools/tlc_run_all.sh` → [`docs/tlc/results.md`](docs/tlc/results.md) · How it works: [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md)
 > 📄 Spec & plan: [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) · 📋 Tracker: [`PLAN.md`](PLAN.md)
 
@@ -37,10 +37,14 @@
 - Full evidence: [`docs/tlc/REV1_REVIEW.md`](docs/tlc/REV1_REVIEW.md)
 - [ ] The rev 1 spec used a non-existent `obs["tx.monitor"]`, the wrong default rate (G26 is 100 kHz), and the wrong telemetry keys
 
-### Found while building Phase 1
-- [ ] The source tone plan has 4 tones; G26 has 8 rings, so an 8-ring collision-free tone plan is needed (Phase 3)
-- [ ] The source `warm_start(u0, delta_true)` reads the true detuning; on G26 the initial estimate must come from priors (Phase 3)
-- [ ] `monitor_valid` / `adc_overrange` are not yet passed to the core (Phase 2)
+### Found while building (Phases 1-3)
+- [x] 8-ring collision-free tone plan (4.0-13.5 kHz; the search rediscovers the source's 4-ring plan exactly)
+- [x] Warm start no longer reads the true detuning (initial estimate = the core's setpoint)
+- [x] Invalid monitor samples reach the core as missing (NaN)
+- [ ] **Owner to confirm:** G26 cannot meet the source's R13 ER floor (2.8-3.0 dB vs 3.5 dB at the inflection), so B6 has no setpoint; the G26 priors drop the floor to 0 dB (the only parameter change to the primary arm)
+- [ ] ζ = z2/z1 is weak on G26 (span ≈ 2x its noise; [`docs/tlc/lockin_diag.md`](docs/tlc/lockin_diag.md)), so the UKF leans on the DC channel
+- [ ] Faithful `tlc` steady state: 1.6-4.0 pm rms including its 1.7-2.9 pm dither; rings 0-1 exceed 5 pm. `tlc_pi`: 7-10 pm rms
+- [ ] Upstream at `ca3f8fe`, some `tests/verification/test_ctrl_c_*` fail with or without this branch (stale `mrm.plant.optics` names)
 
 ### G26 facts the port must handle
 - [ ] Heater is a 16-bit **voltage** DAC (power ∝ code²); the TLC assumes a power fraction, so the adapter converts
@@ -64,8 +68,8 @@
 |---|---|
 | 0 ✅ | Decisions above, env, rev 1 archived, source brought in |
 | 1 ✅ | **Walking skeleton:** `mrm run experiments/tlc/steady_tlc.yaml` works end to end with a stub TLC, and a report is generated |
-| 2 | Faithful TLC core; it reproduces ECE496's own results on the ECE496 plant |
-| 3 | TLC core on G26 (priors, open-loop lock-in diagnostic, warm closed loop) |
+| 2 ✅ | Faithful TLC core; it reproduces ECE496's own results on the ECE496 plant |
+| 3 ✅ | TLC core on G26 (priors, open-loop lock-in diagnostic, warm closed loop) |
 | 4 | Full scenario matrix: ECE496 D1–D6 / R-reqs mapped to mrm scenarios |
 | 5 | `docs/tlc/results.md`: R-table, ECE496-plant vs G26 side by side, scorecard rows |
 

@@ -171,20 +171,29 @@ performance on G26.
 - **Exit met:** `tools/tlc_run_all.sh` runs `steady_tlc` and `steady_pi_lock` and writes the report in about 6 s (after the one-off ~2 min kernel compile).
 
 Found in Phase 1, carried forward:
-- The source tone plan has **4 tones**; G26 has 8 rings. An 8-ring collision-free plan is needed before dither runs on G26 (Phase 3; the stub refuses dither on more rings than tones).
-- The source `warm_start(u0, delta_true)` reads the **true detuning**. On G26 the initial δ must come from priors or a short estimate (Phase 3).
-- `monitor_valid` / `adc_overrange` are not yet handed to the core (Phase 2, with B2's validity logic).
+- ~~The source tone plan has 4 tones~~ → resolved in Phase 3 (`tone_plan.py`, 8-ring plan 4.0-13.5 kHz).
+- ~~The source `warm_start(u0, delta_true)` reads the true detuning~~ → resolved in Phase 3 (initial estimate = the core's setpoint).
+- ~~`monitor_valid` not handed to the core~~ → invalid samples reach B2 as NaN; `adc_overrange` is left to B2's own saturation check.
 - The report's p99.9 / peak / rms come from the 10 µs-mean detuning trace; mrm's own columns are per tick.
 
-### Phase 2: faithful core + fidelity check on the source plant
-- [ ] Port the core (deviations 2.3-1, 2.3-2 only).
-- [ ] Fidelity test: the ported core on the **ECE496 plant** reproduces `results/metrics.json` for `steady` and `d2_common` within tolerance (plant imported from the sibling checkout; skipped if absent).
-- [ ] The ECE496 runner becomes the "4-ring reference" column of the report.
+### Phase 2: faithful core + fidelity check on the source plant — DONE 2026-10-31
+- [x] Core vendored into `mrm/control/tlc/core/` (Apache-2.0, `f98ce84`); every change is listed in its README. Deviation 2.3-1 done (`ControllerParams.n_rings`); 2.3-2 by construction (params are dataclass arguments).
+- [x] `tests/tlc/test_core_equivalence.py`: vendored core **bit-identical** to the original on the original plant (steady, common aggressor, cold start). A mutation check confirmed the test catches a one-constant change.
+- [x] `tests/tlc/test_core_fidelity.py` (slow): steady R1 and common-aggressor R3/R4 match `results/metrics.json` within 1.5e-3. The published numbers come from another numpy/scipy build (the original core here gives rms 0.249 where 0.25 is published).
+- [x] The report carries the published 4-ring results as its reference section.
+- Core step time here: 1.3 ms (N=4), 1.5 ms (N=8) per 100 µs step, about 15x slower than real time.
 
-### Phase 3: core on G26
-- [ ] Priors from `spec.nominal`; deviations 2.3-3, 2.3-4.
-- [ ] Open-loop diagnostic (formerly the go/no-go spike, now informational): dither on a warm ring, log B3 y1/y2/ζ against the true detuning. It documents the lock-in SNR on G26.
-- [ ] Closed loop, warm start, `tlc_pi` and `tlc`.
+### Phase 3: core on G26 — DONE 2026-10-31 (warm start, steady state)
+- [x] Priors from `spec.nominal` (`mrm/control/tlc/priors.py`, deviations 2.3-3 and 2.3-4); derivation numbers in `TlcPriors.derivation`, invariants in `tests/tlc/test_priors.py`.
+- [x] Open-loop diagnostic `tools/tlc_lockin_diag.py` → `docs/tlc/lockin_diag.md`.
+- [x] Closed loop, warm start: `experiments/tlc/steady_tlc_faithful.yaml` (`tlc`), `steady_tlc_pi.yaml` (`tlc_pi`); both in `tools/tlc_run_all.sh` and `docs/tlc/results.md`.
+
+Findings of Phase 3 (each is measured, none is fixed):
+- **R13 infeasible on G26.** With the G26 lineshape (HWHM ≈ 32 GHz) and NRZ swing (±33 pm, 5.7 GHz) the ER at the inflection point is 2.8-3.0 dB, below the source's 3.5 dB floor, so the source's B6 finds no setpoint at all (it raises). On G26 the priors drop the floor to 0 dB and keep B6's OMA balancing; this is the one parameter change to the primary arm and is disclosed here and in `TlcPriors.derivation["r13_er_floor"]`. **Owner to confirm.**
+- **ζ is weak on G26.** The slope channel z1 matches the source model (0.87x, SNR ≈ 53) but ζ = z2/z1 spans only about 2x its per-step noise over the red flank and is biased. The UKF's power-invariant measurement therefore carries little information on G26 (expected discrepancy 5, now confirmed).
+- **Steady state:** `tlc` holds TRACK on all rings with 1.6-4.0 pm rms error including its own 1.7-2.9 pm dither; rings 0-1 exceed the 5 pm budget. `tlc_pi` reaches 7-10 pm rms (22-35 pm peak). `pi_lock_c` reaches 0.01-0.02 pm.
+- The 8-ring tone plan tops out at 13.5 kHz (source 4.5 kHz): 3x the heater slew per unit dither amplitude.
+- B2 hardcodes a 12-bit LSB (1/4096) for its saturation margin; harmless on the 16-bit G26 ADC (it only flags samples within 0.05 % of full scale).
 
 ### Phase 4: scenario matrix
 - [ ] One YAML per mapped row of §3 under `experiments/tlc/`, with comparators.
