@@ -1,0 +1,22 @@
+# TLC scenario matrix, ECE496 D4 laser wavelength drift (R5) -> mrm laser_drift: the G26 laser's 24 h limit
+# wavelength (+0.02 nm, i.e. -3.49 GHz, linear) compressed into 0.2 s as the source does: the 24 h rate
+# scaled by 86400 / 0.2 (mrm's time_compression needs a slow-cycle plan this scenario lacks). Power drift is left out
+# (scaled the same way its log-linear law breaks); the power step R7 covers power changes.
+# Warm start; the source's initial per-ring offsets belong to its cold start (R8, cold_tlc.yaml).
+extends: g26
+meta: {name: tlc_laser_drift, kind: experiment, description: "24 h laser drift compressed into 0.2 s; TLC matrix"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: laser_drift, params: {drift_nm_per_24h: 8640.0, power_drift_pct_per_24h: 0.0}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.2
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

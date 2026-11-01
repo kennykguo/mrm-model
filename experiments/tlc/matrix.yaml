@@ -7,6 +7,7 @@ experiments:
   - experiments/tlc/steady_tlc_faithful.yaml      # R1 steady state
   - experiments/tlc/xpu_step_tlc.yaml             # R2 die-temperature ramp (D1)
   - experiments/tlc/a1_tlc.yaml                   # R3 / R6 local aggressor (D2 local)
+  - experiments/tlc/laser_drift_tlc.yaml          # R5 laser wavelength drift (D4)
   - experiments/tlc/power_step_tlc.yaml           # R7 laser power step (D5)
   - experiments/tlc/squelch_tlc.yaml              # R12 squelch (D6)
   - {path: experiments/tlc/fallback_tlc.yaml, controllers: [tlc]}   # R22 forced PI fallback
