@@ -90,7 +90,7 @@ from mrm.control.knowledge import KnowledgeError, NominalView
 __all__ = ["KNOWLEDGE_TOKEN", "KnowledgeError", "check_knowledge", "OperatingPoint", "Conditions", "StaticPoint",
            "LinearModel", "linearize", "linearize_bank", "nominal_plant_params", "conditions_from_config",
            "static_point", "oma_curve", "oma_optimal_detuning", "measurement_age_ticks", "discretize_zoh",
-           "delay_discretize", "resonance_detuning_m", "bank_optics", "ring_block_lags"]
+           "delay_discretize", "resonance_detuning_m", "nrz_resonance_shift_m", "bank_optics", "ring_block_lags"]
 
 #: knowledge token (controller_interface.knowledge) that lets a controller realize the nominal design as its model
 KNOWLEDGE_TOKEN = "model_nominal"
@@ -251,6 +251,17 @@ def resonance_detuning_m(pp, b: int, t_ring_k, cond: Conditions, line_of_ring=No
     """delta = lambda_res - lambda_line (N,) m for ring temperatures t_ring_k (N,): lambda_res is the mean of the two
     NRZ levels' resonances (mrm.plant.phase eq. 1), lambda_line the ring's assigned line (``layout.ring_to_line``)."""
     from mrm.plant import phase as ph
+    rp = _phase(pp).ring[b]
+    sh = nrz_resonance_shift_m(pp, b, t_ring_k, cond)
+    line = np.asarray(pp.layout.ring_to_line if line_of_ring is None else line_of_ring, np.int64).reshape(-1)
+    return rp[:, ph.RP_LAM_RES] + sh.mean(axis=0) - cond.lam_m[line]
+
+
+def nrz_resonance_shift_m(pp, b: int, t_ring_k, cond: Conditions) -> np.ndarray:
+    """Resonance shift (2, N) m at the two NRZ drive levels (cond.v_lo, cond.v_hi) and ring temperatures t_ring_k
+    (N,): thermal plus junction shift of mrm.plant.phase. Their half difference is the data modulation's resonance
+    swing, the 'mod_shift' of a two-level lineshape model."""
+    from mrm.plant import phase as ph
     P = _phase(pp)
     rp = P.ring[b]
     r = P.table_row(b)
@@ -261,8 +272,7 @@ def resonance_detuning_m(pp, b: int, t_ring_k, cond: Conditions, line_of_ring=No
         fal, cj, rs, fl = np.zeros(N), np.zeros(N), np.zeros(N), np.zeros(N, np.int8)
         ph.resonance_shift_row(rp, t, np.ascontiguousarray(v, dtype=float), P.grid, P.dneff[r], P.alpha_fca[r],
                                P.capacitance[r], P.r_series[r], sh[lv], fal, cj, rs, fl)
-    line = np.asarray(pp.layout.ring_to_line if line_of_ring is None else line_of_ring, np.int64).reshape(-1)
-    return rp[:, ph.RP_LAM_RES] + sh.mean(axis=0) - cond.lam_m[line]
+    return sh
 
 
 def _ring_temperature_for(pp, b, target_m, cond: Conditions, t0=None) -> np.ndarray:
