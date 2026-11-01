@@ -6,6 +6,8 @@ computed once per ControllerSpec. Differences from the source's own driver (``th
 - warm start: the source passes the TRUE detuning to ``TLC.warm_start``. A controller cannot know it, so the
   initial estimate is the core's own setpoint (B6 targets): mrm's warm start parks each ring at its lock point,
   and the UKF starts there with the source's variance and corrects within its first windows.
+- timing: each block starts at its first monitor sample's time (the adapter), and the heater DAC latency is
+  added to the dither delay the core assumes (``_add_dac_latency``);
 - the core's ``last`` telemetry only exists after its first step; before that the wrapper reports the start
   state (modes, command) with zero estimates.
 """
@@ -44,6 +46,7 @@ class FaithfulCore:
                              f"{int(round(pr.cp.ts * pr.cp.out_rate))}")
         self.priors = pr
         self.ctl = KINDS[kind](pr.pp, pr.cp)
+        self._add_dac_latency(spec.heater_dac.latency_ticks * spec.tick_s)
         self.n = pr.cp.n_rings
         self.last = self._start_last(np.zeros(self.n))
 
@@ -54,6 +57,15 @@ class FaithfulCore:
     def cold_start(self) -> None:
         self.ctl.cold_start()
         self.last = self._start_last(np.zeros(self.n))
+
+    def _add_dac_latency(self, latency_s: float) -> None:
+        """The source assumes its dither reaches the ring half an output sample late (ZOH); the G26 heater DAC adds
+        ``latency_s``. Both the lock-in reference and the dither-response model H use the delay, so H is rebuilt."""
+        if latency_s <= 0:
+            return
+        self.ctl.out_delay += latency_s
+        self.ctl.lockin.out_delay = self.ctl.out_delay
+        self.ctl._refresh_model()
 
     def force_fault(self) -> None:
         """R22: the supervisor's fault state, i.e. the PI fallback with a bumpless transfer (source B5)."""

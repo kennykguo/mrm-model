@@ -45,6 +45,11 @@ class HeaterLaw:
         u = np.asarray(u, dtype=np.float64)
         return (u < self.u_min) | (u > 1.0)
 
+    def at_rail(self, u: np.ndarray) -> np.ndarray:
+        """True where the command sits on (or beyond) a DAC rail: code_min or code_max."""
+        code = self.code_from_u(u)
+        return (code <= self.code_min) | (code >= self.code_max)
+
 
 def level_from_codes(codes: np.ndarray, full_scale_codes: int) -> np.ndarray:
     """Monitor ADC codes as a fraction of full scale (the core's normalised PD level)."""

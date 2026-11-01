@@ -42,6 +42,16 @@ START_MODES = ("warm", "cold")
 PD_FAULT_VALUES = {1: np.nan, 2: 0.31, 3: None}     # source PDFault kinds; 3 = one LSB below full scale
 
 
+def pad_to_common_count(samples: np.ndarray, count: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Top every ring up to the largest count of its world at this edge with NaN (missing, B2), so a withheld
+    sample (an ADC drop) keeps the ring's later samples on their true time slots instead of shifting them."""
+    count = np.asarray(count, dtype=np.int64)
+    top = count.max(axis=1, keepdims=True)
+    slot = np.arange(samples.shape[-1])[None, None, :]
+    missing = (slot >= count[..., None]) & (slot < top[..., None])
+    return np.where(missing, np.nan, np.asarray(samples, dtype=np.float64)), np.broadcast_to(top, count.shape).copy()
+
+
 class TlcController(BaseController):
     """The ECE496 TLC behind a multirate adapter. ``core``: stub | faithful | faithful_pi."""
     name = "tlc"
@@ -86,6 +96,7 @@ class TlcController(BaseController):
         self.edge = 0
         self.core_step_us = 0.0
         self.fault_forced = False
+        self.block_t0 = None
         self.telemetry_log = TelemetryLog()
 
     def step(self, obs: Observation) -> dict[str, np.ndarray]:
@@ -96,10 +107,13 @@ class TlcController(BaseController):
         if "monitor_valid" in obs.sensors:          # an invalid sample reaches the core as missing (B2: NaN)
             samples = np.where(np.asarray(obs.sensors["monitor_valid"], dtype=bool)[..., None], samples, np.nan)
         samples = self._inject_pd_fault(samples, obs.t_s)
-        self.buffer.push(samples, obs["tx.monitor.count"])
+        samples, count = pad_to_common_count(samples, obs["tx.monitor.count"])
+        self._note_block_start(obs, count)
+        self.buffer.push(samples, count)
         k = self.edge % self.n_out
         if self.edge == 0:
             self.buffer.drain()
+            self.block_t0 = None
             self.telemetry_log.record(obs.t_s, self.telemetry())
         elif k == 0:
             self._maybe_force_fault(obs.t_s)
@@ -123,7 +137,7 @@ class TlcController(BaseController):
             "locked": modes == MODE_TRACK,
             "detuning_est_pm": per("delta_hat") * self.pm_per_ghz,
             "integrator": u,
-            "integrator_saturated": self.heater_law.saturated(u) & (self.cores is not None),
+            "integrator_saturated": self.heater_law.at_rail(u) & (self.cores is not None),
             "rate_est_pm_per_ms": per("rate_hat") * self.pm_per_ghz * 1e-3,
             "sigma_pm": per("sigma") * self.pm_per_ghz,
             "dither_amp_pm": per("amp") * self.pm_per_ghz,
@@ -162,12 +176,26 @@ class TlcController(BaseController):
                 core.force_fault()
             self.fault_forced = True
 
+    def _note_block_start(self, obs: Observation, count: np.ndarray) -> None:
+        """Remember, per world, when the block's first monitor sample was taken (the centre of its integration
+        window, from tx.monitor.sample_ticks), so the core's sample times carry the ADC's age, not the edge's."""
+        if self.block_t0 is not None or not np.any(count > 0) or "tx.monitor.sample_ticks" not in obs.sensors:
+            return
+        spec = self._require_spec()
+        first = np.asarray(obs.sensors["tx.monitor.sample_ticks"])[..., 0].astype(np.float64)       # (B, N)
+        first = np.where(count > 0, first, np.inf).min(axis=1)
+        self.block_t0 = (first - 0.5 * spec.adc.integration_window_ticks) * spec.tick_s
+
     def _run_cores(self, t_block_start: float) -> None:
+        """``t_block_start``: the fallback block start (edge time minus one core period) when the sample ticks are
+        not exposed; otherwise each world's block starts at its first sample's time."""
         data, fill = self.buffer.drain()
+        starts = self.block_t0 if self.block_t0 is not None else np.full(len(self.cores), t_block_start)
+        self.block_t0 = None
         t0 = time.perf_counter()
         for b, core in enumerate(self.cores):
-            k = int(fill[b].min())                  # simultaneous schedule: every ring has the same count
-            seq = np.asarray(core.step(data[b, :, :k].T, t_block_start), dtype=np.float64)
+            k = int(fill[b].max())                  # rings padded to a common count (pad_to_common_count)
+            seq = np.asarray(core.step(data[b, :, :k].T, float(starts[b])), dtype=np.float64)
             self.plan[b] = seq.T
         self.core_step_us = (time.perf_counter() - t0) * 1e6 / len(self.cores)
 

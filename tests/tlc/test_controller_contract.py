@@ -243,3 +243,41 @@ def test_pd_fault_parameters_are_validated(spec):
         TlcController(pd_fault_ring=8).reset(spec)
     with pytest.raises(ValueError):
         TlcController(pd_fault_ring=1, pd_fault_kind=7).reset(spec)
+
+
+def test_withheld_sample_becomes_missing_and_keeps_the_others_on_their_slots():
+    samples = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, -1.0]]])        # ring 1 got 2 of the edge's 3 samples
+    out, count = tlc_controller.pad_to_common_count(samples, np.array([[3, 2]]))
+    assert count.tolist() == [[3, 3]]
+    assert out[0, 0].tolist() == [1.0, 2.0, 3.0]
+    assert out[0, 1, :2].tolist() == [4.0, 5.0] and np.isnan(out[0, 1, 2])
+
+
+def test_block_start_is_the_first_samples_time(spec, monkeypatch):
+    monkeypatch.setitem(tlc_controller.CORES, "recording", RecordingCore)
+    RecordingCore.calls = []
+    ctrl = TlcController(core="recording")
+    ctrl.reset(spec)
+    applied = np.zeros((B, spec.n_rings), dtype=np.int64)
+    for e in range(11):
+        obs = _obs(spec, e, applied)
+        sensors = {k: obs.sensors[k] for k in obs.sensors}
+        ticks = obs.tick - 3 - 4 * np.arange(spec.samples_per_step)[::-1]       # released samples, oldest first
+        sensors["tx.monitor.sample_ticks"] = np.broadcast_to(ticks, (B, spec.n_rings, spec.samples_per_step)).copy()
+        ctrl.step(Observation(tick=obs.tick, dt_s=obs.dt_s, sensors=sensors))
+    first_tick = (spec.phase_ticks + spec.period_ticks) - 3 - 4 * (spec.samples_per_step - 1)  # edge 1, slot 0
+    want = (first_tick - 0.5 * spec.adc.integration_window_ticks) * spec.tick_s
+    assert RecordingCore.calls[0][1] == pytest.approx(want)
+
+
+def test_rail_flag(spec):
+    ctrl = TlcController()
+    ctrl.reset(spec)
+    assert ctrl.heater_law.at_rail(np.array([0.0, 0.3, 1.0])).tolist() == [True, False, True]
+
+
+def test_faithful_core_adds_the_heater_dac_latency(nominal_spec):
+    from mrm.control.tlc.faithful_core import FaithfulCore
+    core = FaithfulCore(nominal_spec, ts=1e-4, n_out=10)
+    want = 0.5 / core.priors.cp.out_rate + nominal_spec.heater_dac.latency_ticks * nominal_spec.tick_s
+    assert core.ctl.out_delay == pytest.approx(want) and core.ctl.lockin.out_delay == pytest.approx(want)
