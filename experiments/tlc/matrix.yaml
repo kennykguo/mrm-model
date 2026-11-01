@@ -1,7 +1,8 @@
 # TLC scenario matrix (docs/TLC_PORT_SPEC_AND_PLAN.md 3): every experiment runs with every controller.
 # tools/tlc_matrix.py runs it and writes docs/tlc/results.md. Each experiment file names the TLC as its own
 # controller; the matrix overrides controller.name and controller.params per run. An entry {path, controllers}
-# runs only the named controllers, with the experiment's own params for the TLC.
+# runs only the named controllers, with the experiment's own params for the TLC. A controller marked
+# restricted_only runs only where an entry names it.
 experiments:
   - experiments/tlc/steady_tlc_faithful.yaml      # R1 steady state
   - experiments/tlc/xpu_step_tlc.yaml             # R2 die-temperature ramp (D1)
@@ -18,4 +19,4 @@ controllers:                                      # spec 6, Q2
   - {name: dither_lockin_c, params: {}}
   - {name: kalman_lqg_c, params: {}}
   - {name: mpc_c, params: {}}
-  - {name: wdm_supervisor, params: {}}            # cold start only (restricted entries)
+  - {name: wdm_supervisor, params: {}, restricted_only: true}   # cold start only

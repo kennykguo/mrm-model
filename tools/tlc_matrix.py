@@ -30,6 +30,20 @@ def overrides_for(ctrl: dict) -> list[str]:
     return [f"controller.name={ctrl['name']}", f"controller.params={json.dumps(ctrl.get('params') or {})}"]
 
 
+def expand(matrix: dict, only: set | None = None) -> list[tuple[str, dict, list[str]]]:
+    """(experiment path, controller entry, overrides) for every run of the matrix."""
+    out = []
+    for entry in matrix["experiments"]:
+        exp, names = (entry, None) if isinstance(entry, str) else (entry["path"], set(entry["controllers"]))
+        for ctrl in matrix["controllers"]:
+            if only and ctrl["name"] not in only:
+                continue
+            if (names is None and ctrl.get("restricted_only")) or (names is not None and ctrl["name"] not in names):
+                continue
+            out.append((exp, ctrl, overrides_for(ctrl) if names is None else []))   # restricted: own controller
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("matrix", nargs="?", default="experiments/tlc/matrix.yaml")
@@ -41,14 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     only = {s for s in args.only.split(",") if s}
     run_tool, report = _tool("tlc_run"), _tool("tlc_report")
     runs = []
-    for entry in matrix["experiments"]:
-        exp, names = (entry, None) if isinstance(entry, str) else (entry["path"], set(entry["controllers"]))
-        for ctrl in matrix["controllers"]:
-            if (only and ctrl["name"] not in only) or (names is not None and ctrl["name"] not in names):
-                continue
-            print(f"== {exp} :: {ctrl['name']}", file=sys.stderr, flush=True)
-            ov = overrides_for(ctrl) if names is None else []      # restricted entries keep their own controller
-            runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, ov)))
+    for exp, ctrl, ov in expand(matrix, only):
+        print(f"== {exp} :: {ctrl['name']}", file=sys.stderr, flush=True)
+        runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, ov)))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     Path(f"{out}.runs.txt").write_text("\n".join(runs) + "\n")
