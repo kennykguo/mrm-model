@@ -1,17 +1,17 @@
 # Acceptance A7 (textbook Ch17 group A, scenario a7): the relOMA plane, bias 1.0-3.75 V x junction 0-105 degC with
-# the loop closed (LM26-S slide 9; HC slide 16), here as the 07 P0-10 quasi-static experiment: the locked steady
-# state of every ring at every (ambient, bias) point with the oracle operating point.
+# the loop closed (LM26-S slide 9; HC slide 16), here as a locked_steady_state experiment: the locked
+# steady state of every ring at every (ambient, bias) point with the oracle operating point.
 # Criteria and sources:
 #   coverage  every ring reachable by its heater at every point (LM26-S slide 9: locked over 0-105 degC)
 #   hop       no point needs an FSR hop (BND-2)
 #   bnd4      oracle relOMA variation over 0-105 degC below 1 dB at every bias (BND-4)
-# The criteria judge the nominal world; the 12 named corners of 07 4.8 are surveyed and reported (a corner that
-# violates BND-4 or the coverage is a hypothesis the working G26 link argues against, 07 4.5).
+# The criteria judge the nominal world; the 12 named corners of the uncertainty set are surveyed and reported (a corner that
+# violates BND-4 or the coverage is a hypothesis the working G26 link argues against).
 # The absolute relOMA level (CAL-14: -2.1 dB at ~1.05 V; VAL-4: -3.0 dB near 3.15-3.4 V) is reported, not judged.
 extends: g26
-meta: {name: acc_a7_reloma_plane, kind: experiment, description: "A7 relOMA plane (quasi-static)"}
+meta: {name: acc_a7_reloma_plane, kind: experiment, description: "A7 relOMA plane (locked steady state)"}
 experiment:
-  kind: quasi_static
+  kind: locked_steady_state
   seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
   uncertainty: nominal
   variation: "off"
@@ -21,8 +21,8 @@ experiment:
   corners: [g26_slow_thermal, g26_fast_thermal, g26_undercut, g26_h86, g26_h86_sensor, g26_overcoupled,
             g26_heater_loss, g26_hot_selfheat, g26_low_eta, g26_fsr_window_a, g26_fsr_edge, g26_textbook_thermal]
   acceptance:
-    - {id: A7-coverage, metric: code_range_coverage, op: ">=", value: 1.0, cases: [quasi_static],
+    - {id: A7-coverage, metric: code_range_coverage, op: ">=", value: 1.0, cases: [locked_steady_state],
        source: "LM26-S slide 9"}
-    - {id: A7-hop, metric: fsr_hop_risk_points, op: "==", value: 0, cases: [quasi_static], source: "BND-2"}
-    - {id: A7-bnd4, metric: bnd4_reloma_variation_db, reduce: none, op: "<", value: 1.0, cases: [quasi_static],
+    - {id: A7-hop, metric: fsr_hop_risk_points, op: "==", value: 0, cases: [locked_steady_state], source: "BND-2"}
+    - {id: A7-bnd4, metric: bnd4_reloma_variation_db, reduce: none, op: "<", value: 1.0, cases: [locked_steady_state],
        source: "BND-4"}

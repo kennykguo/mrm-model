@@ -43,7 +43,7 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `ring.monitor.adc_ref_site` | package_base |
 | `ring.monitor.afe_type` | integrate_dump |
 | `ring.optics.backscatter_orders` | 5 |
-| `ring.optics.tcmt_orders` | 3 |
+| `ring.optics.tcmt_orders` | 3 - reserved legacy setting, unused by exact optics |
 | `ring.thermal.crosstalk_dynamics` | imec |
 | `ring.thermal.family` | inring_noundercut |
 | `ring.thermal.scaling_hypothesis` | resistance |
@@ -198,7 +198,7 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `ring.thermal.z_ratio_opt_heater` | 1.76 |  | solver(assumed-geometry) | none | X-THERMAL | [1, 2] |  | Z_opt->ring/Z_heater->ring of the FEM ROM for the in-ring family, 160 nm film (thermal_rom_inring_noundercut_160.json summary.z_ratio_opt_heater = 1.762); 07 4.8 interval 1-2 |
 | `temp_sensors` | <1 items> |  | assumed | none | R04 |  |  | one on-die diode: ms conversion, a few K uncalibrated offset (07 P1-10); no Lightmatter sensor is published |
 
-## Derived (nominal world, relations of 07 P0-3)
+## Derived (nominal world, relations R1-R5)
 
 | quantity | value | unit | provenance (weakest input) | relation | formula |
 |---|---|---|---|---|---|
@@ -213,7 +213,7 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `derived.optics.kappa2_drop` | [0.00145022, 0.00145278, 0.00145535, 0.00145791, 0.00146047, 0.00146304, 0.0014656, 0.00146817] | SI | solver(assumed-geometry) | R4_q | K_d^2 = 1 - exp(-omega T_rt/Q_d) |
 | `derived.optics.kappa2_through` | [0.0940229, 0.0943529, 0.0946828, 0.0950126, 0.0953422, 0.0956718, 0.0960012, 0.0963306] | SI | assumed | R4_q | K_t^2 = 1 - exp(-omega T_rt/Q_t) |
 | `derived.optics.lambda_line_m` | [1.319e-06, 1.316e-06, 1.314e-06, 1.312e-06, 1.309e-06, 1.307e-06, 1.305e-06, 1.303e-06] | SI | inferred | channel_plan | lambda_line = c/f of the ring's line (channel_plan.ring_to_line); f = center + (k - (L - 1)/2) spacing, or the channel_plan.lines table |
-| `derived.optics.lambda_res_cold_m` | [1.311e-06, 1.309e-06, 1.306e-06, 1.304e-06, 1.302e-06, 1.3e-06, 1.297e-06, 1.295e-06] | SI | inferred | channel_plan | lambda_res = lambda_line - resonance_offset (the cold resonance, 07 P1-6) |
+| `derived.optics.lambda_res_cold_m` | [1.311e-06, 1.309e-06, 1.306e-06, 1.304e-06, 1.302e-06, 1.3e-06, 1.297e-06, 1.295e-06] | SI | inferred | channel_plan | lambda_res = lambda_line - resonance_offset (the cold resonance) |
 | `derived.optics.length_m` | 4.227e-05 (x8) | SI | solver(assumed-geometry) | R3_geometry | L = 2 pi R |
 | `derived.optics.lock_offset_m` | 7.6e-09 (x8) | SI | inferred | R2_heater_z | resonance_offset mod FSR_lambda (heater-reachable order) |
 | `derived.optics.n_eff_correction` | [0.0105193, 0.00619056, 0.00187702, -0.00242143, -0.00670485, -0.0109733, -0.015227, 0.011173] | SI | solver(assumed-geometry) | R3_geometry | n_eff_phase - n_eff |
@@ -224,9 +224,9 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `derived.thermal.dt_fsr_k` | 145.173 (x8) | SI | solver(assumed-geometry) | R2_heater_z | int_{T_meas}^{T_meas+dT} s dT = FSR_lambda of the P_FSR measurement |
 | `derived.thermal.s_lock_m_per_k` | 7.389e-11 (x8) | SI | solver(assumed-geometry) | R2_heater_z | s(T_lock) |
 | `ring.geometry.radius_um` | 6.72696 (x8) | um | solver(assumed-geometry) | R3_geometry | R = c/(2 pi n_g FSR) |
-| `ring.heater.efficiency_nm_per_mw` | 0.404553 (x8) | nm_per_mw | inferred | R2_heater_efficiency | efficiency = FSR_lambda / P_FSR (07 D16; FSR_lambda of the P_FSR measurement) |
+| `ring.heater.efficiency_nm_per_mw` | 0.404553 (x8) | nm_per_mw | inferred | R2_heater_efficiency | efficiency = FSR_lambda / P_FSR (P_FSR is the anchor; FSR_lambda of the P_FSR measurement) |
 | `ring.optics.dn_eff_dt_per_k` | [0.0001882, 0.0001886, 0.0001889, 0.0001893, 0.0001896, 0.00019, 0.0001903, 0.0001906] | per_k | solver(assumed-geometry) | R1_thermo_optic | dn_eff/dT(T0) = s0 n_g/lambda - n_eff alpha_L(T0) |
-| `ring.optics.heat_fraction` | 0.848029 (x8) |  | assumed | R4_loss_budget | eta = (alpha_fca + alpha_other_abs)/alpha_i (07 P0-2) |
+| `ring.optics.heat_fraction` | 0.848029 (x8) |  | assumed | R4_loss_budget | eta = (alpha_fca + alpha_other_abs)/alpha_i (the heat fraction comes from the loss budget) |
 | `ring.optics.order` | [79, 79, 79, 79, 79, 79, 79, 80] |  | solver(assumed-geometry) | R3_geometry | m = round(n_eff L / lambda_res) |
 | `ring.optics.q_drop` | 5.5e+05 (x8) |  | inferred | R4_q | Q_d = Q_L / x_d |
 | `ring.optics.q_intrinsic` | [7450.63, 7463.81, 7477, 7490.18, 7503.37, 7516.55, 7529.74, 7542.93] |  | assumed | R4_loss_budget | Q_i = 2 pi n_g/(lambda_res alpha_i), alpha_i = sum |
@@ -234,7 +234,7 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `ring.thermal.t_ring_lock_c` | 134.384 (x8) | c | assumed | R2_heater_z | int_{T_ref}^{T_lock} s(T) dT = resonance_offset mod FSR_lambda |
 | `ring.thermal.z_heater_ring_k_per_mw` | 5.70423 (x8) | k_per_mw | solver(assumed-geometry) | R2_heater_z | Z_heater->ring(0) = dT_FSR / P_FSR |
 
-## Diagnostics (07 P0-1, P0-3, P1-6, P1-9)
+## Diagnostics (mrm.params.derive)
 
 | diagnostic | value | unit | provenance |
 |---|---|---|---|
@@ -249,7 +249,7 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 | `t_amb_order_hop_c` | [113.084, 113.099, 113.114, 113.13, 113.145, 113.16, 113.176, 113.192] | degC | assumed |
 | `next_order_distance_ghz` | [176.802, 176.775, 176.747, 176.719, 181.692, 181.647, 181.602, 181.557] | GHz | solver(assumed-geometry) |
 | `next_order_distance_fwhm` | [3.00953, 3.00336, 2.99721, 2.99108, 2.8084, 2.80284, 2.79729, 2.79177] | FWHM | solver(assumed-geometry) |
-| `monitor_codes_per_uw_at_drop` | 1556.48 (x8) | codes/uW | assumed |
+| `monitor_codes_per_uw_at_drop` | 1556.46 (x8) | codes/uW | assumed |
 | `heater_code_grid` | [1, 16384, 32768, 49152, 65535] | code |  |
 | `heater_pm_per_code` | [1.106e-05, 1.106e-05, 1.106e-05, 1.106e-05, 1.106e-05, 1.106e-05, 1.106e-05, 1.106e-05, 0.181279, 0.181279, ...] | pm/code | assumed |
 | `fwhm_pm` | [340.531, 339.929, 339.33, 338.733, 338.137, 337.544, 336.953, 336.364] | pm | inferred |
@@ -263,9 +263,9 @@ Provenance ranks, strongest first: printed > private > read-off > calibrated > i
 
 Warnings:
 
-- bistability_ratio up to 5.98 > 1: the ring is thermally bistable at this power (07 P0-1); acquisition must approach from the correct side
+- bistability_ratio up to 5.98 > 1: the ring is thermally bistable at this power; acquisition must approach from the correct side
 
-## Uncertainty (one draw per world, 07 P0-4, 4.8)
+## Uncertainty (one draw per world)
 
 | entry | kind | target / choices | values | nominal | provenance | source |
 |---|---|---|---|---|---|---|
@@ -295,7 +295,7 @@ Warnings:
 | `thermo_optic` | hypothesis | H86, H86_sensor, H_solver, bench, imec, ocp, textbook_derived | weights H_solver: 2, H86: 1, H86_sensor: 1, bench: 0, imec: 0, ocp: 0, textbook_derived: 0 | H_solver | assumed | D07 |
 | `timing.latency_scale` | interval | (world variable) | [0.5, 2.0] loguniform absolute | 1.0 | assumed | D07 |
 
-## Variation (per device, 07 P1-16)
+## Variation (per device)
 
 | path | level | dist | sigmas | provenance | source |
 |---|---|---|---|---|---|
@@ -367,7 +367,7 @@ Materials model `materials/1` at 1310 nm (sha256 c87c67dbe863).
 | Ge PD responsivity limit (eta = 1) | R_max | A/W | 1.0566 | 1.0566 | G25 measured 0.88-1.04 | - | derived / printed | `ge_pd_responsivity_limit_a_per_w` |
 | Ge PD dark current, ratio to 25 C (Ea 0.37 eV) | I_d/I_d0 | 1 | 1.0929 | 19.13 | Ea 0.35-0.38 eV (stress 0.5) | 25-85 C data | inferred | `ge_pd_dark_current_a` |
 
-## Generation mix (07 4.9 item 6)
+## Generation mix
 
 G26 (LM26-P, LM26-S, QDSOA): channel plan, laser power at the module, 8 rings per bus, drop-port monitor topology, 16-bit heater DAC, bias axis 1.0-3.75 V, 50 Gb/s NRZ, 2 s BER interval, the ~15 GHz/degC aside (H86). G25 (LM-P, LM-T via the textbook): Q_L, notch depths, blue offset 7.6 nm, heater P_FSR/R/V, droop fit, junction efficiency ladder, responsivity, +4 dBm at the ring, 1.3 Vpp driver. GF 45SPCLO (GF-IMAPS, GF-BIAN, GF-ECIO): 160 nm film, 2 um BOX, passive loss, Ge PD dark current. Literature (imec CO22/CO24): thermal poles and crosstalk. Solver (mrm/data/extracted, assumed geometry): bent-mode indices, dlambda/dT(T), Jacobian, bend radiation, coupler dispersion. PAT-2: integrating ADC and DAC+PWM heater drive. Everything else is assumed and says so.
 
@@ -508,7 +508,7 @@ Every item of the prior-notes checklist is a key, excluded with a reason, or unk
 | I | common-bus loss and phase | key | `optical_path.bus_loss_db_per_mm`, `optical_path.ring_spacing_on_bus_um` | loss modelled; the bus phase between rings matters only with reflections (07 P2-10 netlist, deferred) |
 | I | inter-ring thermal and optical coupling | key | `ring.thermal.xt_nearest_frac`, `fidelity.optics_model` |  |
 | I | wavelength-dependent couplers | key | `ring.optics.dln_kappa2_through_dlambda_per_nm`, `ring.optics.dln_kappa2_drop_dlambda_per_nm` |  |
-| I | reflections between components | excluded |  | single-pass bus (plant_optics bound L_BOUND < 1e-3 in normal operation); multi-element reflections need the 07 P2-10 S-matrix netlist, deferred |
+| I | reflections between components | excluded |  | single-pass bus (plant_optics bound LASER_LINE_OUTPUT_ROW_FORWARD_POWER_RELATIVE_ERROR_BOUND < 1e-3 in normal operation); multi-element reflections need the 07 P2-10 S-matrix netlist, deferred |
 | I | RX add-drop filters | excluded |  | the plant is the TX bank; the RX path has no controller-relevant loop in this model |
 | I | interleaver transfer functions | excluded |  | no interleaver element yet (07 P2-10 deferred); its leakage onto the TX bus is not modelled |
 | I | TX/RX grid offsets | key | `channel_plan.lines`, `channel_plan.center_thz` | the 200 GHz-offset RX comb can be added as lines with direction rx; the TX set centre is 100 GHz below the composite centre |

@@ -1,10 +1,16 @@
-"""WDM bank supervisor: cold-start map, line labels, assignment, sequential acquisition (07 P1-12), closed loop on the
-g26 reference plant, plus fast unit tests of the planning logic.
+"""Checks the WDM bank supervisor (mrm/control/baselines/wdm_supervisor.py), closed loop on the g26 reference plant,
+and the planning logic in fast unit tests.
 
-The cold-ring hazard of docs/handoff/integrator.md section 4 is present in the run (Truth at turn-on: most rings sit
-on a foreign line); the supervisor must end with every ring on its declared line, flag the captured rings, and keep
-the die supply within its limit. Slower variants (barrel shift under a tight supply, warm start from the factory
-table, a sampled world) are in test_ctrl_b_wdm_slow.py.
+Read this first
+---------------
+The supervisor handles WDM acquisition and arbitration for the whole bank: it maps every ring's resonances on a cold
+start, labels which laser line each resonance is, assigns a line to every ring and then acquires the rings one by
+one. The g26 cold-ring hazard is present in the run: at turn-on, Truth shows most rings sitting on a foreign line.
+The supervisor must end with every ring on its declared line, flag the captured rings and keep the die supply within
+its limit.
+
+The slower variants (barrel shift under a tight supply, warm start from the factory table, a sampled world) are in
+test_ctrl_b_wdm_slow.py.
 """
 from __future__ import annotations
 
@@ -19,7 +25,7 @@ from mrm.control.api import validate_telemetry
 from mrm.control.baselines.ramp_acquire import ST_LOCK
 from mrm.control.baselines.wdm_supervisor import PH_TRACK, WdmSupervisor
 from mrm.control.calibration import code_of_w, heater_current_a
-from mrm.plant import electrical as el
+from mrm.plant import electrical
 
 from test_ctrl_b_plant import CtrlBPlant, load_g26, make_spec, realize, run_closed_loop
 from test_ctrl_b_ramp import steady_metrics
@@ -45,7 +51,7 @@ def cold_run():
 
     def tick(k, cmd=None):
         out = orig_tick(k, cmd)
-        flags.append(int(np.any(out["heater"].flags & el.FLAG_SUPPLY)))
+        flags.append(int(np.any(out["heater"].flags & electrical.FLAG_SUPPLY)))
         return out
     plant.tick = tick
     rec, val = run_closed_loop(plant, ctrl, N_TICKS, record_every=5)
@@ -83,7 +89,7 @@ def test_cold_start_locks_every_ring_on_its_line(cold_run):
     np.testing.assert_array_equal(ctrl.assigned[0], want)
     np.testing.assert_array_equal(t["nearest_line"][0], want)
     assert not np.any(ctrl.wrong[0]) and not np.any(ctrl.supply_limited[0])
-    # the plant's supply limit was never hit (07 P1-12: the plant clips and flags)
+    # the plant's supply limit was never hit (at its limit the plant clips and flags)
     assert flags.sum() == 0
     # the nominal heater model (heater_nominal knowledge) predicts the real heater power within 3 %
     p_est = rec.telemetry[-1]["p_est_mw"][0]
@@ -107,11 +113,9 @@ def test_cold_start_locks_every_ring_on_its_line(cold_run):
               f"{m['rms_pm']:.3f} pm, max {m['max_pm']:.2f} pm, OMA penalty {pen[0, n]:.2f} dB")
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# planning logic (fast, synthetic maps)
-# ---------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------- planning logic (fast, synthetic maps)
 
-def _synthetic(spec, policy, supply_a=None, bound=True, w0=0.06):
+def _supervisor_with_maps(spec, policy, supply_a=None, bound=True, w0=0.06):
     """A supervisor whose maps are set by hand: ring n meets line (n + 3 + j) mod 8 at w = w0 + 0.04 j (w0 above the
     supervisor's headroom floor w_min_target unless a test asks otherwise)."""
     ctrl = WdmSupervisor(policy=policy)
@@ -134,15 +138,15 @@ def test_plan_fixed_cyclic_any():
     cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
     spec = make_spec(cfg, 1)
     # fixed: the declared identity, whatever it costs
-    c = _synthetic(spec, "fixed")
+    c = _supervisor_with_maps(spec, "fixed")
     c._plan_assignment(0)
     np.testing.assert_array_equal(c.target_line[0], np.arange(8))
     # cyclic with plenty of supply: the declared map (shift 0) is kept
-    c = _synthetic(spec, "cyclic")
+    c = _supervisor_with_maps(spec, "cyclic")
     c._plan_assignment(0)
     assert c.shift[0] == 0
-    # cyclic with a tight supply: a barrel shift (PAT-1) that fits; every ring moves by the same number of channels
-    c = _synthetic(spec, "cyclic", supply_a=0.08)
+    # cyclic with a tight supply: a barrel shift (patent PAT-1) that fits; every ring moves by the same channel count
+    c = _supervisor_with_maps(spec, "cyclic", supply_a=0.08)
     c._plan_assignment(0)
     s = int(c.shift[0])
     assert s != 0
@@ -151,12 +155,12 @@ def test_plan_fixed_cyclic_any():
     codes = code_of_w(w + 2 * c.dw_acq, c.fsm.code_max, c.fsm.q)
     assert heater_current_a(codes, c.d).sum() <= 0.95 * 0.08
     # any: minimum total drive (here every ring takes its first resonance, line n + 3)
-    c = _synthetic(spec, "any")
+    c = _supervisor_with_maps(spec, "any")
     c._plan_assignment(0)
     np.testing.assert_array_equal(c.target_line[0], (np.arange(8) + 3) % 8)
     # optional headroom floor (PAT-1 [0050]): a resonance below w_min_target is never a target; with one resonance
     # per line in these maps, a first resonance at w = 0.02 leaves line n + 3 without a target, so 'any' takes n + 4
-    c = _synthetic(spec, "any", w0=0.02)
+    c = _supervisor_with_maps(spec, "any", w0=0.02)
     assert c.w_min_target == 0.0                    # off by default: under a tight supply w ~ 0 is the cheapest map
     c.params.w_min_target = c.w_min_target = 0.045
     c._plan_assignment(0)
@@ -165,10 +169,10 @@ def test_plan_fixed_cyclic_any():
 
 
 def test_online_barrel_shift_logic():
-    """PAT-1 online step in TRACK (synthetic map, no plant): when the locked bank's estimated supply stays above the
-    budget for excess_steps steps, the cyclic policy moves every ring to the next bluer line (line + 1, the
-    resonance just below its present drive in map coordinates) and re-acquires ring by ring, each window shifted by
-    that ring's own drift since its acquisition."""
+    """The online step of Lightmatter patent PAT-1 in TRACK (synthetic map, no plant). When the locked bank's
+    estimated supply stays above the budget for excess_steps steps, the cyclic policy moves every ring to the next
+    bluer line (line + 1, the resonance just below its present drive in map coordinates). It then re-acquires ring
+    by ring, each window shifted by that ring's own drift since its acquisition."""
     from mrm.control.baselines.wdm_supervisor import PH_ACQUIRE
     cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
     spec = make_spec(cfg, 1)
@@ -210,7 +214,7 @@ def test_online_barrel_shift_logic():
 
 
 def test_policy_falls_back_to_fixed_without_the_binding():
-    """g26 binds tx.assignment to the scenario: the supervisor may not remap (07 P1-12), whatever its params."""
+    """g26 binds tx.assignment to the scenario: the supervisor may not remap, whatever its params."""
     cfg = load_g26(knowledge=KNOW)
     spec = make_spec(cfg, 1)
     c = WdmSupervisor(policy="cyclic")
@@ -222,8 +226,8 @@ def test_policy_falls_back_to_fixed_without_the_binding():
 
 
 def test_controllers_b_do_not_import_truth():
-    """07 P1-1 test_control_does_not_import_truth for the files of this owner: no import of the plant, realize,
-    the simulation engine or the validation oracle."""
+    """Truth isolation for the group-B controller files: no import of the plant, realize, the simulation engine or the
+    validation oracle."""
     root = Path(__file__).resolve().parents[2] / "mrm" / "control"
     files = [root / "calibration.py"] + [root / "baselines" / f for f in
                                          ("ramp_acquire.py", "wdm_supervisor.py", "bitstat_lock.py")]
@@ -240,9 +244,7 @@ def test_controllers_b_do_not_import_truth():
                 assert not any(m == b or m.startswith(b + ".") for b in bad), (f.name, m)
 
 
-# ---------------------------------------------------------------------------------------------------------------
-# review additions: per-world state, reset, lock verification, target headroom
-# ---------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------- per-world state, reset, lock verification, target headroom
 
 def _cyclic_spec(batch):
     cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
@@ -291,7 +293,7 @@ def test_state_is_per_world_and_reset_clears_it():
 
 
 def test_verify_lock_flags_a_displaced_comb():
-    """07 P1-20: a lock is vouched for only if the found resonance and the last resonance the up-search passed
+    """Telemetry rule: a lock is vouched for only if the found resonance and the last resonance the up-search passed
     sit where the map put them (common drift within 0.3 of the local spacing). A comb shifted by half a spacing (the
     ring warmer than during its map) is flagged; a 6 mdrive drift (one map step, typical) is not."""
     spec = _cyclic_spec(1)
@@ -323,7 +325,7 @@ def test_planner_without_a_feasible_shift_takes_the_least_drive():
     in these synthetic maps: line n is the last of ring n's lines)."""
     cfg = load_g26(overrides=["controller_interface.bind.tx.assignment=controller"], knowledge=KNOW)
     spec = make_spec(cfg, 1)
-    c = _synthetic(spec, "cyclic", supply_a=0.01)
+    c = _supervisor_with_maps(spec, "cyclic", supply_a=0.01)
     c._plan_assignment(0)
     assert c.shift[0] == 3                          # every ring on its first resonance, line n + 3
     np.testing.assert_array_equal(c.target_line[0], (np.arange(8) + 3) % 8)
@@ -331,8 +333,8 @@ def test_planner_without_a_feasible_shift_takes_the_least_drive():
 
 def test_track_rearms_assigned_rings_in_fail():
     """In TRACK a ring whose lock was lost and whose re-search FAILed (its line dark for a while) is re-armed after
-    fail_rearm_s, in its own window; a ring that never got a line (assigned -1) stays parked. Before the review a
-    FAIL in TRACK was final."""
+    fail_rearm_s, in its own window; a ring that never got a line (assigned -1) stays parked. Before a fix a FAIL in
+    TRACK was final."""
     from mrm.control.baselines.ramp_acquire import ST_FAIL, ST_UP
     spec = make_spec(load_g26(knowledge=KNOW), 1)
     c = WdmSupervisor(policy="fixed")
@@ -353,3 +355,55 @@ def test_track_rearms_assigned_rings_in_fail():
     c._track_step(0)
     assert f.state[0, 2] == ST_UP and f.w[0, 2] == pytest.approx(0.2) and f.w_lo[0, 2] == 0.25
     assert f.state[0, 5] == ST_FAIL
+
+
+def test_warm_start_with_a_ring_without_table_entries():
+    """A factory table in which ring 3 recorded no resonance (every drive NaN): the warm start leaves that ring
+    without a target and plans the others as usual. Before the fix _ring_events raised IndexError: it set the floor
+    drive of the first event even when there was none."""
+    from mrm.control.calibration import FactoryCalTable
+    spec = make_spec(load_g26(knowledge=KNOW), 1)
+    N, L, E = spec.n_rings, spec.n_lines, 10            # E: event slots per ring
+    w = np.full((1, N, E), np.nan)
+    line = np.full((1, N, E), -1, np.int64)
+    for n in range(N):
+        if n != 3:
+            w[0, n, :L] = 0.06 + 0.04 * np.arange(L)
+            line[0, n, :L] = [(n + 3 + j) % L for j in range(L)]
+    table = FactoryCalTable(code=np.full((1, N, E), -1), w=w, line=line, order=np.zeros((1, N, E), np.int64),
+                            height=np.full((1, N, E), 30000.0), floor=np.full((1, N, E), 1000.0),
+                            ok=np.ones((1, N), bool), fsr_hz=np.full((1, N), 1.8e12), scale=np.ones((1, N)),
+                            t_cal_c=np.full(1, np.nan), q=2, code_max=65535, ambient_c=25.0)
+    c = WdmSupervisor(policy="fixed", factory_table=table)
+    c.reset(spec)
+    assert all(a.size == 0 for a in c._ring_events(0, 3))
+    c._plan_assignment(0)
+    assert c.target_ev[0, 3] == -1
+    others = np.arange(N) != 3
+    assert np.all(c.target_ev[0, others] >= 0)
+
+
+def test_any_policy_gives_no_target_to_a_ring_without_a_line():
+    """Policy 'any' with more rings than lines (8 rings, 7 lines): the linear assignment leaves one ring without a
+    line (target_line -1). That ring must get no target resonance either. Before the fix it got the resonance of
+    line 0, which another ring holds, and a warm start would have acquired it there. The cold-start path asks
+    _target_index for line -1 after the ring's fresh map, where -1 is also the label of a resonance whose line is
+    unknown: it must find nothing."""
+    from mrm.control.api import ControllerSpec
+    spec = ControllerSpec.build(n_batch=1, n_rings=8, n_lines=7, tick_s=1e-6, update_rate_hz=1e5,
+                                bind={"tx.assignment": "controller"})
+    c = WdmSupervisor(policy="any")
+    c.reset(spec)
+    assert c.policy == "any"
+    for n in range(8):                                  # ring n meets line (n + j) mod 7 at w = 0.06 + 0.04 j
+        c.events[0][n] = 0.06 + 0.04 * np.arange(7)
+        c.labels[0][n] = np.array([(n + j) % 7 for j in range(7)])
+        c.ev_floor_w[0][n] = c.events[0][n] - 0.02
+        c.ev_height[0][n] = np.full(7, 30000.0)
+    c._plan_assignment(0)
+    lines = c.target_line[0]
+    free = np.flatnonzero(lines < 0)
+    assert free.size == 1 and sorted(lines[lines >= 0].tolist()) == list(range(7))
+    assert c.target_ev[0, free[0]] == -1
+    c.labels[0][free[0]] = np.full(7, -1)               # a map whose labels are all unknown
+    assert c._target_index(0, int(free[0]), -1) == -1

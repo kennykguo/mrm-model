@@ -14,7 +14,7 @@ experiment:
   score_from_s: 0.005
   self_reference: {duration_s: 0.02, window_s: 0.005}
   acceptance:
-    - {id: B2-relock, metric: locked_final, reduce: all, op: "==", value: 1, source: "07 P1-12 (re-lock on the line)"}
-    - {id: B2-line, metric: wrong_line_rings, op: "==", value: 0, source: "07 P1-12"}
+    - {id: B2-relock, metric: locked_final, reduce: all, op: "==", value: 1, source: "re-lock on the line (wrong-line rule)"}
+    - {id: B2-line, metric: wrong_line_rings, op: "==", value: 0, source: "wrong-line rule"}
     - {id: B2-hop, metric: fsr_hop_events, reduce: sum, op: "==", value: 0, source: "BND-2"}
     - {id: B2-ber, metric: ber_mean, op: "<=", value: 1.0e-9, source: "LM26-P (BER < 1e-9)"}

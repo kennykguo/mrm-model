@@ -1,6 +1,7 @@
-# Corner (07 P1-6, BND-1): the "G25 cluster" stress FSR 1.53 THz (8.7-8.8 nm from the wafer maps and the 15 um
-# diameter), whose next order sits 1.0-1.3 FWHM from another lane. pdk_size (1.60 THz, next order on a line) is the
-# other stress choice: --alt uncertainty.fsr=pdk_size.
+# stress FSR corner — select the G25-cluster hypothesis at 1.53 THz.
+# the next order is only about 1.0-1.3 FWHM from another lane.
+# BND-1 checks all adjacent orders. the 1.60 THz pdk_size alternative
+# places another order directly on a line and can be selected with --alt.
 extends: g26
 meta:
   name: g26_fsr_edge

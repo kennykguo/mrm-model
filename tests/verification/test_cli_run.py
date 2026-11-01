@@ -1,5 +1,9 @@
-"""``mrm run | sweep | mc | compare | robust | acceptance | rerun`` (mrm.sim.cli; 07 P1-17, P2-12, P0-10
-``--dry-run``)."""
+"""Checks the experiment commands of the ``mrm`` CLI (mrm.sim.cli).
+
+The commands are ``mrm run | sweep | mc | compare | robust | acceptance | rerun``. The tests run a short g26 experiment
+file and check the registration, the ``--dry-run`` cost estimate, a run followed by a bit-identical rerun, the exit
+codes (0 pass, 1 failure or error, 2 usage error) and the acceptance table.
+"""
 from __future__ import annotations
 
 import json
@@ -38,8 +42,8 @@ def test_commands_are_registered():
     cli._load_providers()
     for name in ("run", "sweep", "mc", "compare", "robust", "acceptance", "rerun"):
         assert name in cli.COMMANDS
-    from mrm.sim import cli as scli
-    scli.register_cli(cli.register)                 # registering again with the same functions is allowed
+    from mrm.sim import cli as sim_cli
+    sim_cli.register_cli(cli.register)                 # registering again with the same functions is allowed
 
 
 def test_dry_run_prints_the_estimate(exp_file, capsys):
@@ -47,7 +51,7 @@ def test_dry_run_prints_the_estimate(exp_file, capsys):
     out = capsys.readouterr().out
     assert "dry run: cli_exp" in out and "| main | 1 | 3000 |" in out
     assert "estimated wall time" in out and "estimated peak RAM" in out
-    assert "docs/handoff/perf.md section 8" in out
+    assert "docs/handoff/perf.md section 8" in out          # the estimate names the speed measurement it scales
 
 
 def test_run_then_rerun_is_bit_identical(exp_file, tmp_path, capsys):

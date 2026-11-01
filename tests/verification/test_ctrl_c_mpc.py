@@ -1,10 +1,11 @@
-"""Linear MPC with heater code limits and slew limits (mrm/control/baselines/mpc.py).
+"""Checks the linear MPC with heater code limits and slew limits (mrm/control/baselines/mpc.py).
 
-1. The ADMM box-QP solver against scipy.optimize.minimize (SLSQP) on random problems with active constraints.
-2. The unconstrained MPC (+ Kalman filter) is a linear law; its closed loop is stable on the nominal model with the
-   heater gain scaled 0.3-6x and on linearizations of sampled worlds (model mismatch, 07 4.8).
-3. Closed loop on the ReferencePlant (Truth only in the test): steady lock, the A2 808 degC/s window, and a slew
-   limit (whole codes) that binds (every command respects |du| <= slew and the code range; the error grows, as it must).
+1. The ADMM box-QP solver against scipy.optimize.minimize (trust-constr) on random problems with active constraints.
+2. The unconstrained MPC (+ Kalman filter) is a linear law. Its closed loop is stable on the nominal model with the
+   heater gain scaled 0.3-6x, and on linearizations of sampled worlds (model mismatch).
+3. Closed loop on the ReferencePlant (Truth only in the test): a steady lock, the A2 808 degC/s window, and a slew
+   limit (whole codes) that binds. Every command respects |du| <= slew and the code range; the error grows, as it
+   must.
 """
 from __future__ import annotations
 
@@ -12,11 +13,10 @@ import numpy as np
 import pytest
 from scipy.optimize import LinearConstraint, minimize
 
-from mrm.control import models as M
+from mrm.control import models as control_models
 from mrm.control import registry
-from mrm.control.baselines import kalman_lqg as K
-from mrm.control.baselines import mpc as MP
-from mrm.scenarios import registry as sreg
+from mrm.control.baselines import kalman_lqg, mpc
+from mrm.scenarios import registry as scenario_registry
 
 from test_ctrl_c_harness import build_rig, hold, load_cfg, lock_metrics, realize, run_loop
 
@@ -28,12 +28,12 @@ def cfg():
 
 @pytest.fixture(scope="module")
 def models(cfg):
-    return M.linearize_bank(cfg, M.OperatingPoint(), 1e-5, latency_ticks=1)
+    return control_models.linearize_bank(cfg, control_models.OperatingPoint(), 1e-5, latency_ticks=1)
 
 
 def test_registered(cfg):
-    assert registry.resolve("mpc") is MP.LinearMPC
-    assert registry.resolve("mpc_c") is MP.CompiledMpc
+    assert registry.resolve("mpc") is mpc.LinearMPC
+    assert registry.resolve("mpc_c") is mpc.CompiledMpc
     c = registry.create("mpc", {"horizon_steps": 12, "control_moves": 3})
     assert c.params.horizon_steps == 12 and c.params.control_moves == 3
 
@@ -48,13 +48,13 @@ def test_admm_matches_slsqp_with_active_constraints(seed):
     G = rng.normal(size=(n, n))
     P = G @ G.T + 0.5 * np.eye(n)
     q = rng.normal(size=n) * 5.0
-    D = MP._diff_matrix(n)
+    D = mpc._diff_matrix(n)
     A = np.concatenate([np.eye(n), D])
     lo = np.concatenate([np.full(n, -1.0), np.full(n, -0.4)])
     hi = np.concatenate([np.full(n, 1.5), np.full(n, 0.4)])
     rho = 0.1 * np.mean(np.diag(P))
     Minv = np.linalg.inv(P + 1e-9 * np.eye(n) + rho * A.T @ A)
-    x, z, y, it, rp, rd = MP.admm_box_qp(P, q, A, lo, hi, Minv, rho, max_iter=20000, tol=1e-9)
+    x, z, y, it, rp, rd = mpc.admm_box_qp(P, q, A, lo, hi, Minv, rho, max_iter=20000, tol=1e-9)
     assert rp < 1e-8 and rd < 1e-8, (it, rp, rd)
 
     def f(v):
@@ -72,24 +72,24 @@ def test_admm_matches_slsqp_with_active_constraints(seed):
     assert np.all(A @ x >= lo - 1e-7) and np.all(A @ x <= hi + 1e-7)
     # batched solve = one at a time (per-problem stopping rule)
     qb = np.stack([q, -q, 0.3 * q])
-    xb, *_ = MP.admm_box_qp(P[None], qb, A, lo, hi, Minv[None], np.full(3, rho), max_iter=500, tol=1e-6)
+    xb, *_ = mpc.admm_box_qp(P[None], qb, A, lo, hi, Minv[None], np.full(3, rho), max_iter=500, tol=1e-6)
     for i in range(3):
-        xi, *_ = MP.admm_box_qp(P, qb[i], A, lo, hi, Minv, rho, max_iter=500, tol=1e-6)
+        xi, *_ = mpc.admm_box_qp(P, qb[i], A, lo, hi, Minv, rho, max_iter=500, tol=1e-6)
         np.testing.assert_array_equal(xb[i], xi)
 
 
 def test_unconstrained_mpc_is_stable_nominal_and_sampled(cfg, models):
-    lqg = K.design_lqg(models)
-    md = MP.design_mpc(lqg)
+    lqg = kalman_lqg.design_lqg(models)
+    md = mpc.design_mpc(lqg)
     for g in (0.3, 1.0, 3.0, 6.0):
-        assert MP.mpc_closed_loop_spectral_radius(md, 0, models[0], g) < 0.9999
+        assert mpc.mpc_closed_loop_spectral_radius(md, 0, models[0], g) < 0.9999
     pp = realize(cfg, 16, uncertainty="lhs", variation="sample", seeds=3)
     rhos = []
     for b in range(pp.batch):
-        lm_b = M.linearize_bank(cfg, M.OperatingPoint(), 1e-5, latency_ticks=1, pp=pp, b=b)[0]
+        lm_b = control_models.linearize_bank(cfg, control_models.OperatingPoint(), 1e-5, latency_ticks=1, pp=pp, b=b)[0]
         if lm_b.op.heater_power_w[0] <= 5e-4:
             continue
-        rhos.append(MP.mpc_closed_loop_spectral_radius(md, 0, lm_b))
+        rhos.append(mpc.mpc_closed_loop_spectral_radius(md, 0, lm_b))
     print("\nMPC spectral radius over feasible LHS worlds:", np.round(rhos, 5))
     assert len(rhos) >= 10 and max(rhos) < 1.0
 
@@ -100,9 +100,9 @@ def test_fractional_slew_limit_is_whole_codes(cfg):
     past it (the compiled step stored the un-rounded clipped command before this was fixed)."""
     from mrm.control.api import ControllerSpec
     spec = ControllerSpec.from_config(cfg, n_batch=1, nominal=cfg)
-    assert MP.LinearMPC(slew_codes_per_step=2.5).build_mpc(spec).slew == 2.0
-    assert MP.LinearMPC(slew_codes_per_step=0.3).build_mpc(spec).slew == 1.0
-    cc = MP.CompiledMpc(slew_codes_per_step=2.5)
+    assert mpc.LinearMPC(slew_codes_per_step=2.5).build_mpc(spec).slew == 2.0
+    assert mpc.LinearMPC(slew_codes_per_step=0.3).build_mpc(spec).slew == 1.0
+    cc = mpc.CompiledMpc(slew_codes_per_step=2.5)
     cc.reset(spec)
     assert cc.mpc.slew == 2.0 and float(cc.params_f64[10]) == 2.0
 
@@ -110,7 +110,7 @@ def test_fractional_slew_limit_is_whole_codes(cfg):
 def test_mpc_steady_lock_nominal(cfg):
     rig = build_rig(cfg)
     hold(rig, 30)
-    tr = run_loop(rig, MP.LinearMPC(), 1500)
+    tr = run_loop(rig, mpc.LinearMPC(), 1500)
     m = lock_metrics(tr.detuning_m, rig.targets_m, oma_w=tr.oma_w, oracle_oma_w=rig.oracle_oma_w, settle_ticks=200)
     print("\n[mpc steady]", m)
     assert m["excursions"] == 0 and abs(m["mean_pm"]) < 0.5 and m["oma_penalty_db"] < 0.01
@@ -124,10 +124,10 @@ def test_mpc_a2_window_and_binding_slew(cfg):
     within the limit, slew_active is reported, and the lag grows instead of the loop going unstable."""
     out = {}
     for slew in (500.0, 2.0):
-        sc = sreg.create("a2")
+        sc = scenario_registry.create("a2")
         rig = build_rig(cfg, scenario=sc, k0=20000, aggressor_presettle_ticks=6000)
         hold(rig, 30)
-        ctrl = MP.LinearMPC(slew_codes_per_step=slew)
+        ctrl = mpc.LinearMPC(slew_codes_per_step=slew)
         tr = run_loop(rig, ctrl, 2500)
         dyn = lock_metrics(tr.detuning_m, tr.ref_m, settle_ticks=600)
         du = np.abs(np.diff(tr.heater_codes.astype(np.int64), axis=0))
@@ -151,12 +151,12 @@ def test_mpc_code_limit_binds(cfg):
     from mrm.scenarios.generators import Scenario, step
     from mrm.control.api import ControllerSpec
     spec = ControllerSpec.from_config(cfg, n_batch=1, nominal=cfg)
-    u0 = MP.LinearMPC().build_mpc(spec).lqg.u0
+    u0 = mpc.LinearMPC().build_mpc(spec).lqg.u0
     margin = int(65535 - np.ceil(u0.max()) - 30)
     sc = Scenario(name="pstep", components=(step("laser.power_delta_db", 4e-4, 0.5),))
     rig = build_rig(cfg, scenario=sc)
     hold(rig, 30)
-    ctrl = MP.LinearMPC(code_margin=margin)
+    ctrl = mpc.LinearMPC(code_margin=margin)
     tr = run_loop(rig, ctrl, 1400)
     hi = 65535 - margin
     assert np.all(tr.heater_codes <= hi) and np.all(tr.heater_codes >= margin)

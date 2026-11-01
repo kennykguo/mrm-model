@@ -1,6 +1,13 @@
-"""Temperature-sensor feed-forward + PI (mrm/control/baselines/feedforward.py) on the g26 nominal plant: a die-wide base
-ramp (the sensor sees it) and the knowledge gate (CTRL_A_METRIC lines; run with -s); the gain schedule that cannot run
-away and the bumpless exit from LOCK (toy rings with the quadratic heater law; on the engine under A1, slow)."""
+"""Checks the temperature-sensor feed-forward + PI controller (mrm/control/baselines/feedforward.py).
+
+Read this first
+---------------
+FeedForwardPI is the PI lock plus a feed-forward term from the die temperature sensor. The feed-forward needs
+knowledge (heater law, heater efficiency, dlambda/dT nominal) or a calibration constant. The tests check, on the g26
+nominal plant, a die-wide base ramp (the sensor sees it) and the knowledge gate (CTRL_A_METRIC lines; run with -s).
+On toy rings with the quadratic heater law, and on the engine under A1 (slow), they check that the gain schedule
+cannot run away and that the controller leaves LOCK without a bump.
+"""
 from __future__ import annotations
 
 import warnings
@@ -8,34 +15,34 @@ import warnings
 import numpy as np
 import pytest
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control import registry
 from mrm.control.baselines.feedforward import FeedForwardPI
 from mrm.control.baselines.pi_lock import PiLock
-from mrm.scenarios import generators as g
-from mrm.scenarios import library as lib
+from mrm.scenarios import generators, library
 from mrm.sim import runner
 
 KNOW = ["controller_interface.knowledge=[line_grid, ring_to_line, heater_law, heater_efficiency, dlambda_dt_nominal]"]
 
 
-def report(tag, m: H.LockMetrics, **extra):
+def report(tag, m: harness.LockMetrics, **extra):
     s = m.summary()
     s.update(extra)
     print("CTRL_A_METRIC", tag, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()})
 
 
 def run_ramp(ctrl, rate_k_per_s=1000.0, dur_s=0.006):
-    cfg, pp, _, plant = H.placed()
-    spec = H.make_spec(H.load_cfg(KNOW), 1)           # knowledge changes the spec, not the plant
-    loop = H.ClosedLoop(plant, spec, ctrl)
+    cfg, pp, _, plant = harness.placed()
+    spec = harness.make_spec(harness.load_cfg(KNOW), 1)           # knowledge changes the spec, not the plant
+    loop = harness.ClosedLoop(plant, spec, ctrl)
     loop.run(6000)                                    # MAP + lock (locked by ~3.9 ms) + 2 ms
     t0 = (plant.k_next + 1000) * plant.dt
-    ramp = g.Scenario(name="base_ramp", components=(g.pwl("thermal.t_base_k", [0.0, dur_s], [0.0, rate_k_per_s * dur_s],
-                                                          t0_s=t0, label="ramp", provenance="assumed"),))
-    plant.set_scenario(H.stacked(cfg, ramp))
+    base_ramp = generators.pwl("thermal.t_base_k", [0.0, dur_s], [0.0, rate_k_per_s * dur_s], t0_s=t0, label="ramp",
+                               provenance="assumed")
+    ramp = generators.Scenario(name="base_ramp", components=(base_ramp,))
+    plant.set_scenario(harness.stacked(cfg, ramp))
     rec = loop.run(int(dur_s / plant.dt) + 3000)       # the ramp plus 2 ms after it
-    return rec, H.lock_metrics(rec, slice(0, 900), slice(1000, None))
+    return rec, harness.lock_metrics(rec, slice(0, 900), slice(1000, None))
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +79,7 @@ def test_staircase_feedforward_is_worse_than_none():
 
 
 def test_without_knowledge_the_feedforward_is_off():
-    spec = H.make_spec(H.load_cfg(), 1)              # g26: knowledge = [line_grid, ring_to_line]
+    spec = harness.make_spec(harness.load_cfg(), 1)              # g26: knowledge = [line_grid, ring_to_line]
     c = FeedForwardPI()
     c.reset(spec)
     assert not c.ff_active
@@ -84,7 +91,7 @@ def test_without_knowledge_the_feedforward_is_off():
     assert isinstance(registry.create("feedforward_pi", {"ff_scale": 0.9}), FeedForwardPI)
 
 
-class _ToyWithDie(H.ToyRings):
+class _ToyWithDie(harness.ToyRings):
     """Toy rings plus a die-sensor reading that ramps from ``t0_tick`` to ``t1_tick`` (delivered every sensor period,
     held between)."""
 
@@ -113,7 +120,7 @@ def test_feedforward_starts_per_ring():
     """The feed-forward reference temperature is taken per ring at its first lock. It used to be taken per world once
     EVERY ring had locked, so one ring that never locks (here ring 1 starts on the cold side and its MAP faults)
     switched the feed-forward off for the whole bank."""
-    spec = H.toy_spec(1, 2)
+    spec = harness.toy_spec(1, 2)
     u0 = np.array([[30000.0, 31000.0]])
     init = [31400, 28000]
     toy = _ToyWithDie(spec, u0=u0, g=0.8, u_init=init, x0=np.array([[3.0, -3.0]]), rate_k_per_tick=2e-4,
@@ -154,7 +161,7 @@ def _quad_run(n_steps, *, die_k, t1_tick, ring_sq_per_tick=0.0, jump_step=None, 
     """One quadratic-law toy ring locked at ~20000 codes; from tick 10000 to ``t1_tick`` the die sensor rises by
     ``die_k`` and the ring's resonance power falls by ``ring_sq_per_tick`` (code^2/tick); from ``jump_step`` on it
     needs ``jump_sq`` more. Returns the controller and per step (state, ff, u, heater command) after that step."""
-    spec = H.toy_spec(1, 1)
+    spec = harness.toy_spec(1, 1)
     t0 = 10000
     toy = _QuadToyWithDie(spec, u0=20000.0, c_ref=20000.0, g=0.8, u_init=[21400], x0=3.0,
                           rate_k_per_tick=die_k / (t1_tick - t0), t0_tick=t0, t1_tick=t1_tick)
@@ -217,9 +224,10 @@ def test_feedforward_holds_every_ring_under_a1_on_the_engine():
     c = FeedForwardPI()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = runner.run(H.load_cfg(KNOW), controller=c, scenario=lib.a1_slide10_aggressor(phase_s=lib.A1_PERIOD_S / 2),
+        a1 = library.a1_slide10_aggressor(phase_s=library.A1_PERIOD_S / 2)          # A1 from its minimum
+        res = runner.run(harness.load_cfg(KNOW), controller=c, scenario=a1,
                          duration_s=80e-3, batch=1, uncertainty="nominal", variation="off", seeds=0, settle=True,
-                         heater_code="quasi_static", reset_protocol="branch_high")
+                         heater_code="locked_steady_state", reset_protocol="branch_high")
     tel = c.telemetry()
     u = tel["integrator"]
     assert np.all(tel["state"] == 3), tel["state"]                   # every ring locked (ring 0 was FAULT)

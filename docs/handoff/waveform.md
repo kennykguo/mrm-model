@@ -142,10 +142,10 @@ The inputs come from `ring_optics_row`, at the previous ring temperature like th
 density and `td` is the scenario's `data.transition_density`.
 
 Apply the outputs to the static NRZ-averaged numbers of that (ring, line):
-- RL_DROP, RL_LOSS, RL_ABS and RL_UCW are multiplied by `out[OUT_C_MEAN]`, and so are their contributions to
-  R_DROP_SUM and R_ABS_SUM.
-- RL_THRU decreases by `(c_mean - 1) * (RL_DROP + RL_LOSS)`. This is energy conservation (exact in the TCMT).
-- For the bus-output OMA, use the additive form `|POUT1 - POUT0| + out[OUT_D_OMA_THRU] * RL_PIN` where the static
+- RING_LINE_OUTPUT_ROW_CLOCKWISE_DROP_POWER, RING_LINE_OUTPUT_ROW_INTRINSIC_LOSS_POWER, RING_LINE_OUTPUT_ROW_ABSORBED_POWER and RING_LINE_OUTPUT_ROW_CLOCKWISE_STORED_ENERGY are multiplied by `out[OUT_C_MEAN]`, and so are their contributions to
+  RING_OUTPUT_ROW_TOTAL_CLOCKWISE_DROP_POWER and RING_OUTPUT_ROW_TOTAL_ABSORBED_POWER.
+- RING_LINE_OUTPUT_ROW_THROUGH_POWER decreases by `(c_mean - 1) * (RING_LINE_OUTPUT_ROW_CLOCKWISE_DROP_POWER + RING_LINE_OUTPUT_ROW_INTRINSIC_LOSS_POWER)`. This is energy conservation (exact in the TCMT).
+- For the bus-output OMA, use the additive form `|POUT1 - POUT0| + out[OUT_D_OMA_THRU] * RING_LINE_OUTPUT_ROW_INPUT_POWER` where the static
   OMA is small (x_c near 0), and `x out[OUT_C_OMA_THRU]` elsewhere.
 - The drop-level OMA (bit statistics) has the matching pair OUT_C_OMA_DROP and OUT_D_OMA_DROP. The latter is in
   units of the drop peak 4 kappa_e kappa_d P_in / kappa^2.

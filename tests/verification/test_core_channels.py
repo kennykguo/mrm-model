@@ -1,9 +1,18 @@
-"""Verification of mrm.core.channels (07 P0-7, D4): the v1 channel list, ChannelSpec checks, binding rules and the
-flat int64 ABI layout."""
+"""Checks the named I/O channels of mrm.core.channels: the v1 channel list, ChannelSpec checks, binding rules and the
+flat int64 ABI layout.
+
+Read this first
+---------------
+Every actuator and sensor a controller can use is a named channel (``tx.heater``, ``tx.monitor.samples``, ...) with a
+shape over the dimensions B (batch), N (rings), L (lines), M (samples per step) and S (temperature sensors), an
+integer dtype and a code range. An actuator is driven by the controller or by the scenario, never both. A scenario
+may still add an offset (ripple, droop) to an actuator that the controller owns. The compiled path packs all
+channels into flat int64 vectors; the ABI layout gives each channel a fixed id and offset.
+"""
 import numpy as np
 import pytest
 
-from mrm.core import channels as ch
+from mrm.core import channels
 from mrm.core.channels import BindingError, ChannelError, ChannelHardware, ChannelSpec, TempSensorHw
 
 V1_ACTUATORS = {"tx.heater", "tx.bias", "tx.assignment", "datapath.bitstat_threshold", "monitor.pga_select"}
@@ -13,7 +22,7 @@ V1_SENSORS = {"tx.monitor.samples", "tx.monitor.sample_ticks", "tx.monitor.count
 
 
 def test_v1_channel_list_defaults():
-    c = ch.build_v1_channels(n_lines=8)
+    c = channels.build_v1_channels(n_lines=8)
     assert {n for n, s in c.items() if s.kind == "actuator"} == V1_ACTUATORS
     assert {n for n, s in c.items() if s.kind == "sensor"} == V1_SENSORS
     h = c["tx.heater"]
@@ -33,7 +42,7 @@ def test_v1_channel_list_defaults():
 def test_optional_channels_and_temp_sensors():
     hw = ChannelHardware(heater_readback_present=True, laser_tune=True,
                          temp_sensors=(TempSensorHw("bank"), TempSensorHw("die", bits=10)))
-    c = ch.build_v1_channels(hw, n_lines=4)
+    c = channels.build_v1_channels(hw, n_lines=4)
     assert {"heater.readback_v", "heater.readback_i", "laser.tune", "temp.bank", "temp.die"} <= set(c)
     assert c["laser.tune"].shape == ("B", "L") and c["laser.tune"].min == -32768 and c["laser.tune"].optional
     assert c["temp.die"].max == 1023
@@ -49,7 +58,7 @@ def test_hardware_from_config_mapping():
     assert hw.heater_dac_bits == 14 and hw.adc_rate_hz == 250e3 and hw.pga_gains == (1.0, 4.0, 16.0)
     assert abs(hw.adc_full_scale_a - 20e-6) < 1e-15 and hw.heater_readback_present
     assert hw.temp_sensors[0].name == "edge" and hw.temp_sensors[0].lsb_k == 0.1
-    c = ch.build_v1_channels(hw)
+    c = channels.build_v1_channels(hw)
     assert c["tx.heater"].max == 2**14 - 1 and c["monitor.pga_select"].max == 2
     assert abs(c["tx.monitor.latest"].scale * 65535 - 20e-6) < 1e-15
 
@@ -74,7 +83,7 @@ def test_channelspec_validation(kw, match):
 
 
 def test_shapes_resolve():
-    c = ch.build_v1_channels()
+    c = channels.build_v1_channels()
     dims = {"B": 3, "N": 8, "L": 8, "M": 5, "S": 1}
     assert c["tx.monitor.samples"].resolve_shape(dims) == (3, 8, 5)
     assert c["tx.monitor.samples"].element_shape(dims) == (8, 5)
@@ -90,29 +99,30 @@ def test_samples_per_step_is_exact():
         for a in range(1, 12):
             grid = np.arange(0, 400, a)
             most = max(int(np.sum((grid > k) & (grid <= k + p))) for k in range(0, 100))
-            assert most == ch.samples_per_step(p, a) == max(1, -(-p // a))       # tight, for any phase
+            assert most == channels.samples_per_step(p, a) == max(1, -(-p // a))       # tight, for any phase
     with pytest.raises(ChannelError):
-        ch.samples_per_step(0, 2)
+        channels.samples_per_step(0, 2)
 
 
-# ---- binding ----------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------- binding
 
 def test_default_bindings():
-    b = ch.resolve_bindings(ch.build_v1_channels())
+    b = channels.resolve_bindings(channels.build_v1_channels())
     assert b == {"tx.heater": "controller", "tx.bias": "scenario", "tx.assignment": "scenario",
                  "datapath.bitstat_threshold": "controller", "monitor.pga_select": "controller"}
 
 
 def test_bias_bound_to_controller_and_scenario_fails():
-    """07 P0-7: a config that binds the bias to both the controller and the scenario fails to load."""
-    c = ch.build_v1_channels()
+    """A config that binds the bias to both the controller and the scenario fails to load: each actuator has one
+    owner."""
+    c = channels.build_v1_channels()
     with pytest.raises(BindingError, match="tx.bias is bound to the controller"):
-        ch.resolve_bindings(c, {"tx.bias": "controller"}, scenario_drives=["tx.bias"])
+        channels.resolve_bindings(c, {"tx.bias": "controller"}, scenario_drives=["tx.bias"])
     # an additive scenario offset (ripple, droop) stays allowed
-    b = ch.resolve_bindings(c, {"tx.bias": "controller"}, scenario_offsets=["tx.bias"])
+    b = channels.resolve_bindings(c, {"tx.bias": "controller"}, scenario_offsets=["tx.bias"])
     assert b["tx.bias"] == "controller"
     # the scenario may drive it when it owns it
-    assert ch.resolve_bindings(c, None, scenario_drives=["tx.bias"])["tx.bias"] == "scenario"
+    assert channels.resolve_bindings(c, None, scenario_drives=["tx.bias"])["tx.bias"] == "scenario"
 
 
 @pytest.mark.parametrize("bind, drives, match", [
@@ -123,21 +133,21 @@ def test_bias_bound_to_controller_and_scenario_fails():
 ])
 def test_binding_errors(bind, drives, match):
     with pytest.raises(BindingError, match=match):
-        ch.resolve_bindings(ch.build_v1_channels(), bind, scenario_drives=drives)
+        channels.resolve_bindings(channels.build_v1_channels(), bind, scenario_drives=drives)
 
 
-# ---- ABI layout --------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------- ABI layout
 
 def _layout(B=2, N=8, L=8, M=5, bind=None, hw=None):
-    c = ch.build_v1_channels(hw, n_lines=L)
-    b = ch.resolve_bindings(c, bind)
+    c = channels.build_v1_channels(hw, n_lines=L)
+    b = channels.resolve_bindings(c, bind)
     dims = {"B": B, "N": N, "L": L, "M": M, "S": len((hw or ChannelHardware()).temp_sensors)}
-    return c, b, dims, ch.make_abi_layout(c, dims, b)
+    return c, b, dims, channels.make_abi_layout(c, dims, b)
 
 
 def test_layout_offsets_are_contiguous_and_disjoint():
     c, b, dims, lay = _layout()
-    spans = [(0, ch.OBS_HEADER)] + [(f.offset, f.offset + f.size) for f in lay.obs + lay.new]
+    spans = [(0, channels.OBS_HEADER)] + [(f.offset, f.offset + f.size) for f in lay.obs + lay.new]
     spans.sort()
     for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
         assert a1 == b0
@@ -154,13 +164,13 @@ def test_layout_offsets_are_contiguous_and_disjoint():
 def test_layout_ids_and_tables():
     c, b, dims, lay = _layout(bind={"tx.bias": "controller"})
     t = lay.obs_table()
-    assert t[ch.ObsId.TX_MONITOR_LATEST] == lay.obs_field("tx.monitor.latest").offset
-    assert t[ch.TEMP_ID_BASE] == lay.obs_field("temp.die").offset
-    assert lay.new_table()[ch.ObsId.TX_MONITOR_COUNT] == lay.new_field("tx.monitor.count").offset
+    assert t[channels.ObsId.TX_MONITOR_LATEST] == lay.obs_field("tx.monitor.latest").offset
+    assert t[channels.TEMP_ID_BASE] == lay.obs_field("temp.die").offset
+    assert lay.new_table()[channels.ObsId.TX_MONITOR_COUNT] == lay.new_field("tx.monitor.count").offset
     at = lay.act_table()
-    assert at[ch.ActId.TX_BIAS] == lay.act_field("tx.bias").offset
-    assert at[ch.ActId.TX_ASSIGNMENT] == -1
-    assert int(ch.ObsId.TX_MONITOR_SAMPLES) == 0 and int(ch.ActId.TX_HEATER) == 0     # frozen ids
+    assert at[channels.ActId.TX_BIAS] == lay.act_field("tx.bias").offset
+    assert at[channels.ActId.TX_ASSIGNMENT] == -1
+    assert int(channels.ObsId.TX_MONITOR_SAMPLES) == 0 and int(channels.ActId.TX_HEATER) == 0     # frozen ids
 
 
 def test_layout_fingerprint_tracks_shape():
@@ -199,34 +209,34 @@ def test_pack_unpack_round_trip():
     assert rows[0]["name"] == "tick" and any(rw["vector"] == "act" for rw in rows)
 
 
-# ---- review additions -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------- channel ids, code dtypes and casts
 
 def test_ids_of_a_subset_follow_the_full_set():
     """Hiding a channel (controller_interface.expose) must not renumber another: temp.die stays TEMP_ID_BASE + 1
     when temp.bank is hidden, so a compiled controller never reads the wrong sensor."""
     hw = ChannelHardware(temp_sensors=(TempSensorHw("bank"), TempSensorHw("die")))
-    full = ch.build_v1_channels(hw)
-    b = ch.resolve_bindings(full)
-    obs_ids, act_ids = ch.assign_channel_ids(full)
-    assert obs_ids["temp.bank"] == ch.TEMP_ID_BASE and obs_ids["temp.die"] == ch.TEMP_ID_BASE + 1
+    full = channels.build_v1_channels(hw)
+    b = channels.resolve_bindings(full)
+    obs_ids, act_ids = channels.assign_channel_ids(full)
+    assert obs_ids["temp.bank"] == channels.TEMP_ID_BASE and obs_ids["temp.die"] == channels.TEMP_ID_BASE + 1
     sub = {n: c for n, c in full.items() if n != "temp.bank"}
     dims = {"B": 1, "N": 2, "L": 2, "M": 3, "S": 2}
-    lay = ch.make_abi_layout(sub, dims, b, obs_ids=obs_ids, act_ids=act_ids)
+    lay = channels.make_abi_layout(sub, dims, b, obs_ids=obs_ids, act_ids=act_ids)
     t = lay.obs_table()
-    assert t[ch.TEMP_ID_BASE] == -1 and t[ch.TEMP_ID_BASE + 1] == lay.obs_field("temp.die").offset
+    assert t[channels.TEMP_ID_BASE] == -1 and t[channels.TEMP_ID_BASE + 1] == lay.obs_field("temp.die").offset
     with pytest.raises(ChannelError, match="no channel id"):
-        ch.make_abi_layout(sub, dims, b, obs_ids={"tx.monitor.latest": 3}, act_ids=act_ids)
-    dup = dict(obs_ids, **{"temp.die": int(ch.ObsId.TX_BITS)})
+        channels.make_abi_layout(sub, dims, b, obs_ids={"tx.monitor.latest": 3}, act_ids=act_ids)
+    dup = dict(obs_ids, **{"temp.die": int(channels.ObsId.TX_BITS)})
     with pytest.raises(ChannelError, match="share an id"):
-        ch.make_abi_layout(sub, dims, b, obs_ids=dup, act_ids=act_ids)
+        channels.make_abi_layout(sub, dims, b, obs_ids=dup, act_ids=act_ids)
 
 
 def test_signed_and_unsigned_code_dtypes():
     """A signed w-bit code fits int32 up to w = 32; an unsigned one up to w = 31 (int32 has 31 value bits)."""
-    c = ch.build_v1_channels(ChannelHardware(laser_tune=True, laser_tune_bits=32, adc_bits=31))
+    c = channels.build_v1_channels(ChannelHardware(laser_tune=True, laser_tune_bits=32, adc_bits=31))
     assert c["laser.tune"].dtype == "int32" and c["laser.tune"].min == -2**31
     assert c["tx.monitor.samples"].dtype == "int32" and c["tx.monitor.samples"].max == 2**31 - 1
-    c = ch.build_v1_channels(ChannelHardware(adc_bits=32))
+    c = channels.build_v1_channels(ChannelHardware(adc_bits=32))
     assert c["tx.monitor.samples"].dtype == "int64" and c["tx.monitor.samples"].max == 2**32 - 1
     assert c["datapath.bitstat_threshold"].dtype == "uint32"
 

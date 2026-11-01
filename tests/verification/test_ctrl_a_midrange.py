@@ -1,17 +1,23 @@
-"""Dual-actuator mid-ranging (mrm/control/baselines/midranging.py): toy ring where the bias tunes the detuning, and the
-g26 nominal plant (CTRL_A_METRIC lines; run with -s)."""
+"""Checks the dual-actuator mid-ranging controller (mrm/control/baselines/midranging.py).
+
+Read this first
+---------------
+MidRanging uses the junction bias as the fast inner actuator (small range) and the heater as the slow outer actuator
+(large range). The heater drives the bias back to the middle of its range. The tests run a toy ring where the bias
+tunes the detuning, and the g26 nominal plant (CTRL_A_METRIC lines; run with -s).
+"""
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-import test_ctrl_a_harness as H
+import test_ctrl_a_harness as harness
 from mrm.control import registry
 from mrm.control.baselines.midranging import M_RUN, MidRanging
 from mrm.control.baselines.pi_lock import ST_LOCK
 
 
-def report(tag, m: H.LockMetrics, **extra):
+def report(tag, m: harness.LockMetrics, **extra):
     s = m.summary()
     s.update(extra)
     print("CTRL_A_METRIC", tag, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()})
@@ -21,10 +27,10 @@ def test_toy_bias_holds_fast_heater_recentres():
     """Toy ring, bias tunes the detuning (0.5 heater codes per bias code): after MAP and the bias identification the
     inner loop holds y = f M_pk, a fast disturbance is taken by the bias, and the heater drives the bias back to
     mid-range."""
-    spec = H.toy_spec(1, 2, bias=True)
+    spec = harness.toy_spec(1, 2, bias=True)
     u0 = np.array([[30000.0, 31000.0]])
-    toy = H.ToyRings(spec, u0=u0, g=np.array([[0.5, 2.0]]), W=450.0, noise=1.0, bias_gain=0.5,
-                     u_init=u0[0] + 450.0, bias_init=873, x0=3.0)
+    toy = harness.ToyRings(spec, u0=u0, g=np.array([[0.5, 2.0]]), W=450.0, noise=1.0, bias_gain=0.5,
+                           u_init=u0[0] + 450.0, bias_init=873, x0=3.0)
     c = MidRanging(init_codes=u0[0] + 450.0, id_steps=20, id_bias_codes=200.0)
     c.reset(spec)
     offs = []
@@ -48,22 +54,23 @@ def test_g26_midranging_steady():
     response is loss-dominated there (s_b > 0 on the stable side: a higher reverse bias lowers the FCA loss and
     raises the drop power more than its ~0.1-0.5 pm shift lowers it), so the inner loop holds the monitor partly
     through the loss; measured here."""
-    cfg, pp, spec, plant = H.placed(bias_v=1.6)
+    cfg, pp, spec, plant = harness.placed(bias_v=1.6)
     c = MidRanging()
-    loop = H.ClosedLoop(plant, spec, c)
+    loop = harness.ClosedLoop(plant, spec, c)
     rec = loop.run(7000)
     tel = c.telemetry()
     assert np.all(tel["state"] == ST_LOCK) and np.all(tel["mid_state"] == M_RUN)
-    m = H.lock_metrics(rec, slice(-1500, -1000), slice(-1000, None))
+    m = harness.lock_metrics(rec, slice(-1500, -1000), slice(-1000, None))
     assert np.all(m.max_err_pm < 3.0), m.max_err_pm
-    report("midranging g26 nominal steady (1.6 V mid)", m, bias_slope_per_code=float(np.mean(tel["bias_slope_per_code"])),
+    report("midranging g26 nominal steady (1.6 V mid)", m,
+           bias_slope_per_code=float(np.mean(tel["bias_slope_per_code"])),
            bias_offset_codes=float(np.mean(np.abs(tel["bias_offset_codes"]))),
            lock_delta_pm=float(np.mean(np.median(rec["delta_pm"][-500:], axis=0))))
 
 
 def test_checks():
     with pytest.raises(ValueError, match="bind.tx.bias"):
-        MidRanging().reset(H.toy_spec(1, 2))
+        MidRanging().reset(harness.toy_spec(1, 2))
     assert isinstance(registry.create("midranging", {"outer_gain": 0.01}), MidRanging)
 
 
@@ -72,10 +79,10 @@ def test_toy_fall_in_run_resettles_the_pi_before_midranging():
     recaptures, and the heater PI settles at the set-point again (bias held at mid-range) before the inner bias loop
     takes over; it used to hand straight back to the bias at the end of the recapture (just red of the peak, far from
     the set-point, which the small bias range of g26 cannot bridge)."""
-    spec = H.toy_spec(1, 2, bias=True)
+    spec = harness.toy_spec(1, 2, bias=True)
     u0 = np.array([[30000.0, 31000.0]])
-    toy = H.ToyRings(spec, u0=u0, g=np.array([[4.0, 4.0]]), W=450.0, noise=1.0, bias_gain=0.5,
-                     u_init=u0[0] + 1400.0, bias_init=873, x0=3.0)
+    toy = harness.ToyRings(spec, u0=u0, g=np.array([[4.0, 4.0]]), W=450.0, noise=1.0, bias_gain=0.5,
+                           u_init=u0[0] + 1400.0, bias_init=873, x0=3.0)
     c = MidRanging(init_codes=u0[0] + 1400.0, id_steps=20, id_bias_codes=200.0)
     c.reset(spec)
     log = []
@@ -98,13 +105,13 @@ def test_toy_fall_in_run_resettles_the_pi_before_midranging():
 
 
 def test_toy_locked_telemetry_follows_the_bias_loop():
-    """07 P1-20: 'locked' must report the loop that runs. In RUN the PI is bypassed, and its lock count used to stay
-    frozen at the hand-off: a red step larger than the bias range (the bias saturates and the slow heater loop has
+    """Telemetry rule: 'locked' must report the loop that runs. In RUN the PI is bypassed, and its lock count used to
+    stay frozen at the hand-off: a red step larger than the bias range (the bias saturates and the slow heater loop has
     to catch up) kept reporting lock while the monitor sat far from the set-point. Now the count follows the
     mid-ranging loop."""
-    spec = H.toy_spec(1, 1, bias=True)
-    toy = H.ToyRings(spec, u0=[[30000.0]], g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=[30450], bias_init=873,
-                     x0=3.0)
+    spec = harness.toy_spec(1, 1, bias=True)
+    toy = harness.ToyRings(spec, u0=[[30000.0]], g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=[30450],
+                           bias_init=873, x0=3.0)
     c = MidRanging(init_codes=[30450], id_steps=20, id_bias_codes=200.0)
     c.reset(spec)
     seen = []
@@ -122,14 +129,15 @@ def test_toy_locked_telemetry_follows_the_bias_loop():
 
 
 def test_toy_bias_saturation_falls_back_to_the_heater_pi():
-    """04 C13 failure mode "limited bias range": a red move faster than the heater re-centring saturates the bias.
+    """Failure mode "limited bias range" of dual-actuator mid-ranging: a red move faster than the heater re-centring
+    saturates the bias.
     Without the fallback the heater moves only k_o |s_b/s_h| b_range per step (the g26 A1 run lost lock: 470 pm);
     with it the heater runs the PI on the error while the bias sits at a rail (g26 A1 rate: 9.7 pm max)."""
-    spec = H.toy_spec(1, 1, bias=True)
+    spec = harness.toy_spec(1, 1, bias=True)
     err = {}
     for fb in (False, True):
-        toy = H.ToyRings(spec, u0=[[30000.0]], g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=[30450],
-                         bias_init=873, x0=3.0)
+        toy = harness.ToyRings(spec, u0=[[30000.0]], g=0.5, W=450.0, noise=1.0, bias_gain=0.5, u_init=[30450],
+                               bias_init=873, x0=3.0)
         c = MidRanging(init_codes=[30450], id_steps=20, id_bias_codes=200.0, saturation_fallback=fb)
         c.reset(spec)
         xs = []

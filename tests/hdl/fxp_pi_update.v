@@ -1,4 +1,4 @@
-// Verilog twin of mrm.control.fxp.fx_pi_update (07 P1-21): one positional PI update in declared formats.
+// Verilog twin of mrm.control.fxp.fx_pi_update: one positional PI update in declared fixed-point formats.
 // Combinational and synthesizable. Bit-exact against the Python/numba and C twins for RND = 0 (floor) and
 // RND = 1 (half_up, the FxpPi default); the other rounding modes exist only in the Python and C twins.
 //
@@ -7,7 +7,8 @@
 //   v      = (u0 << FRAC) + kp * e + integ'
 //   u      = clamp(round_FRAC(v), lo, hi)
 //
-// Signedness (05 C12: "a {...} concatenation is unsigned in Verilog, which turned >>> into a logical shift"):
+// Signedness (tools check C12 of docs/research/05_tools.md: "a {...} concatenation is unsigned in Verilog, which
+// turned >>> into a logical shift"):
 // every operand is widened into a SIGNED 64-bit wire first; the unsigned codes go through $signed({zeros, x}).
 module fxp_pi_update #(
     parameter integer FRAC = 20,       // fraction bits of kp, ki and the integrator

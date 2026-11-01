@@ -1,6 +1,18 @@
-"""Verification of mrm.control.api and mrm.control.registry (07 P1-1, P1-19, P1-20, P2-7, P0-7, P0-9): the
-ControllerSpec, strict observations, the adapters, action validation, composition, the registry and the
-compiled-controller ABI with a trivial compiled controller."""
+"""Checks the controller API (mrm.control.api) and the controller registry (mrm.control.registry).
+
+Read this first
+---------------
+A controller sees the plant only through a ControllerSpec (channels, timing, what it may know) and an Observation
+(the sensor values of one controller step). It returns a dict of actuator codes. This file checks, in order:
+
+- ControllerSpec: defaults, timing errors, the fingerprint and the knowledge filter;
+- Observation: strict (undeclared channels raise) and read-only;
+- the adapters BaseController, PerRing and PerDie give the same commands as a vectorized controller;
+- ActionValidator: clipping, saturation counts, casts and errors; telemetry validation;
+- CompositeController: several children at different rates, round-robin scheduling and tick jitter;
+- the registry, and that the controller core imports nothing from the plant or the simulator (Truth isolation);
+- the compiled-controller ABI (CompiledController) with a trivial integer integrator, also inside a numba loop.
+"""
 import ast
 import dataclasses
 import pathlib
@@ -47,7 +59,7 @@ def rand_obs(spec, tick, r, *, count=None):
     return Observation(tick, spec.tick_s, sensors, new)
 
 
-# ---- ControllerSpec ---------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------- ControllerSpec
 
 def test_spec_build_defaults():
     s = make_spec()
@@ -95,9 +107,9 @@ def test_spec_fingerprint_and_knowledge_filter():
     assert a.line_grid_hz is None                                   # line_grid not in knowledge
     c = make_spec(line_grid_hz=grid, knowledge=("line_grid",), nominal={"dlambda_dt_nominal_pm_per_k": 70.0})
     assert c.line_grid_hz == tuple(grid) and c.fingerprint() != a.fingerprint()
-    # the nominal design enters the fingerprint through what the knowledge releases (07 D13, controllers review
-    # 2026-10-16): a released key that differs changes it, a withheld one does not (the spec is the same in every
-    # world and for every seed)
+    # The nominal design enters the fingerprint only through what the knowledge list releases. A released key that
+    # differs changes the fingerprint; a withheld key does not. So the spec is the same in every world and for every
+    # seed.
     d = make_spec(line_grid_hz=grid, knowledge=("ring_to_line",), nominal={"dlambda_dt_nominal_pm_per_k": 86.0})
     assert d.fingerprint() == a.fingerprint()
     e1, e2 = (make_spec(line_grid_hz=grid, knowledge=("ring_to_line",), nominal={"channel_plan.ring_to_line": r2l})
@@ -124,7 +136,7 @@ def test_spec_from_config_mapping():
     assert s.ring_to_line == tuple(range(8)) and s.on_out_of_range == "error"
 
 
-# ---- Observation -------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------- Observation
 
 def test_observation_is_strict_and_read_only():
     s = make_spec()
@@ -148,7 +160,7 @@ def test_spec_without_exposed_sensor_hides_it():
     assert api.obs_offset(si, TEMP_ID_BASE) == -1
 
 
-# ---- BaseController, PerRing, PerDie -----------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------- BaseController, PerRing, PerDie
 
 class VecI(BaseController):
     """Vectorized integrator on the mean of the valid samples."""
@@ -269,7 +281,7 @@ def test_per_ring_rejects_bad_writes():
             c.step(rand_obs(s, 0, np.random.default_rng(0)))
 
 
-# ---- action validation, telemetry -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------- action validation, telemetry
 
 def test_validator_clip_counts_and_casts():
     s = make_spec()
@@ -318,7 +330,7 @@ def test_validate_telemetry():
     assert api.controller_telemetry(object()) == {} and api.controller_fast_kernel(object()) is None
 
 
-# ---- CompositeController --------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------- CompositeController
 
 class Recorder(BaseController):
     """Writes a constant per ring and records every observation it receives."""
@@ -423,7 +435,7 @@ def test_composite_from_registry():
         registry.unregister("test_recorder")
 
 
-# ---- registry ---------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------- registry
 
 def test_registry_register_resolve_create():
     registry.register("test_vec_i", VecI)
@@ -457,7 +469,8 @@ def test_registry_refuses_truth_fed_controllers():
 
 
 def test_control_core_modules_do_not_import_truth():
-    """07 P1-1 (scoped to this task's files): no import of the plant, the simulator or the validation oracle."""
+    """Truth isolation: the controller core modules import nothing from the plant, the simulator or the validation
+    oracle, so a controller cannot read the true plant state."""
     files = ["mrm/control/api.py", "mrm/control/registry.py", "mrm/control/fxp.py", "mrm/control/lfsr.py",
              "mrm/control/knowledge.py", "mrm/core/channels.py", "mrm/core/timing.py", "mrm/core/rng.py"]
     for f in files:
@@ -473,41 +486,56 @@ def test_control_core_modules_do_not_import_truth():
                 assert "truth" not in n.lower(), (f, n)
 
 
-# ---- compiled-controller ABI --------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------- compiled-controller ABI
 
 LATEST = int(ObsId.TX_MONITOR_LATEST)
 HEATER = int(ActId.TX_HEATER)
 
+# Integer params p of the toy integrator, as integrator_init fills them
+_P_N_RINGS = 0          # number of rings
+_P_LATEST_OFF = 1       # offset of tx.monitor.latest in the observation vector
+_P_HEATER_OFF = 2       # offset of tx.heater in the action vector
+_P_SETPOINT = 3         # set-point, ADC codes
+_P_KI = 4               # integral gain, integer
+_P_SHIFT = 5            # right shift from the integrator to the heater code
+_P_CODE_MIN = 6         # heater code range, codes
+_P_CODE_MAX = 7
+
 
 @nb.njit
-def ic_init(spec_i64, spec_f64):
-    """Trivial compiled integer-integrator: code = clamp((sum ki * (setpoint - latest)) >> shift)."""
+def integrator_init(spec_i64, spec_f64):
+    """Trivial compiled integer integrator: code = clamp((sum ki * (setpoint - latest)) >> shift).
+
+    User integers: [setpoint, ki, shift]. User float 0 is added to sf[0] each step (it checks the float path).
+    State s: [step count, integrator of ring 0 .. N-1].
+    """
     n = spec_i64[api.SPEC_I_N_RINGS]
     p = np.zeros(8, dtype=np.int64)
-    p[0] = n
-    p[1] = api.obs_offset(spec_i64, LATEST)
-    p[2] = api.act_offset(spec_i64, HEATER)
-    p[3] = api.user_i64(spec_i64, 0)                 # setpoint, ADC codes
-    p[4] = api.user_i64(spec_i64, 1)                 # ki
-    p[5] = api.user_i64(spec_i64, 2)                 # shift
-    p[6] = spec_i64[api.SPEC_I_HEATER_MIN]
-    p[7] = spec_i64[api.SPEC_I_HEATER_MAX]
+    p[_P_N_RINGS] = n
+    p[_P_LATEST_OFF] = api.obs_offset(spec_i64, LATEST)
+    p[_P_HEATER_OFF] = api.act_offset(spec_i64, HEATER)
+    p[_P_SETPOINT] = api.user_i64(spec_i64, 0)
+    p[_P_KI] = api.user_i64(spec_i64, 1)
+    p[_P_SHIFT] = api.user_i64(spec_i64, 2)
+    p[_P_CODE_MIN] = spec_i64[api.SPEC_I_HEATER_MIN]
+    p[_P_CODE_MAX] = spec_i64[api.SPEC_I_HEATER_MAX]
     pf = np.zeros(1)
     pf[0] = api.user_f64(spec_f64, 0)
     return p, pf, np.zeros(1 + n, dtype=np.int64), np.zeros(1)
 
 
 @nb.njit
-def ic_step(p, pf, s, sf, obs, act):
+def integrator_step(p, pf, s, sf, obs, act):
     s[0] += 1
-    for i in range(p[0]):
-        s[1 + i] += p[4] * (p[3] - obs[p[1] + i])
-        code = s[1 + i] >> p[5]
-        act[p[2] + i] = min(max(code, p[6]), p[7])
+    for i in range(p[_P_N_RINGS]):
+        s[1 + i] += p[_P_KI] * (p[_P_SETPOINT] - obs[p[_P_LATEST_OFF] + i])
+        code = s[1 + i] >> p[_P_SHIFT]
+        act[p[_P_HEATER_OFF] + i] = min(max(code, p[_P_CODE_MIN]), p[_P_CODE_MAX])
     sf[0] += pf[0]
 
 
-def ic_reference(latest_seq, setpoint, ki, shift):
+def integrator_reference(latest_seq, setpoint, ki, shift):
+    """Plain NumPy version of integrator_step: the heater codes after each observation."""
     acc = np.zeros_like(latest_seq[0], dtype=np.int64)
     outs = []
     for lat in latest_seq:
@@ -531,14 +559,15 @@ def test_spec_arrays_tables():
 
 def test_compiled_controller_python_path_matches_reference():
     s = make_spec()
-    cc = CompiledController("ic", ic_init, ic_step, params_i64=[30000, 3, 4], params_f64=[0.25], latency_ticks=1)
+    cc = CompiledController("ic", integrator_init, integrator_step, params_i64=[30000, 3, 4], params_f64=[0.25],
+                            latency_ticks=1)
     assert isinstance(cc, Controller) and cc.fast_kernel is None
     cc.reset(s)
     assert cc.state[0].shape == (2, 8) and cc.state[2].shape == (2, 5)
     r = np.random.default_rng(6)
     obs_seq = [rand_obs(s, 10 * k, r) for k in range(20)]
     outs = [cc.step(o)["tx.heater"].copy() for o in obs_seq]
-    ref = ic_reference([o["tx.monitor.latest"] for o in obs_seq], 30000, 3, 4)
+    ref = integrator_reference([o["tx.monitor.latest"] for o in obs_seq], 30000, 3, 4)
     for a, b in zip(outs, ref):
         assert np.array_equal(a, b)
     assert np.all(cc.state[2][:, 0] == 20) and np.allclose(cc.state[3][:, 0], 5.0)
@@ -551,13 +580,13 @@ def hold_step(p, pf, s, sf, obs, act):
     """Writes the heater only on even steps: act must hold the previous command in between."""
     s[0] += 1
     if s[0] % 2 == 0:
-        for i in range(p[0]):
-            act[p[2] + i] = act[p[2] + i] + 10
+        for i in range(p[_P_N_RINGS]):
+            act[p[_P_HEATER_OFF] + i] = act[p[_P_HEATER_OFF] + i] + 10
 
 
 def test_compiled_act_holds_previous_command():
     s = make_spec()
-    cc = CompiledController("hold", ic_init, hold_step, params_i64=[0, 0, 0], params_f64=[0.0])
+    cc = CompiledController("hold", integrator_init, hold_step, params_i64=[0, 0, 0], params_f64=[0.0])
     cc.reset(s)
     r = np.random.default_rng(7)
     obs = [rand_obs(s, 10 * k, r) for k in range(6)]
@@ -568,7 +597,7 @@ def test_compiled_act_holds_previous_command():
 
 def test_compiled_act_starts_from_applied_readback():
     s = make_spec()
-    cc = CompiledController("hold", ic_init, hold_step, params_i64=[0, 0, 0], params_f64=[0.0])
+    cc = CompiledController("hold", integrator_init, hold_step, params_i64=[0, 0, 0], params_f64=[0.0])
     cc.reset(s)
     obs = rand_obs(s, 0, np.random.default_rng(8))
     warm = np.array(obs["tx.heater.applied"])
@@ -577,7 +606,7 @@ def test_compiled_act_starts_from_applied_readback():
 
 @nb.njit
 def toy_loop(init_fn, step_fn, spec_i64, spec_f64, n_steps, latest_off, heater_off, n):
-    """A closed loop inside numba with the controller passed as first-class functions (07 P0-9)."""
+    """A closed loop inside numba with the controller passed as first-class functions (as in the compiled kernel)."""
     p_i, p_f, s_i, s_f = init_fn(spec_i64, spec_f64)
     obs = np.zeros(spec_i64[api.SPEC_I_OBS_SIZE], dtype=np.int64)
     act = np.zeros(spec_i64[api.SPEC_I_ACT_SIZE], dtype=np.int64)
@@ -591,10 +620,10 @@ def toy_loop(init_fn, step_fn, spec_i64, spec_f64, n_steps, latest_off, heater_o
 
 def test_compiled_controller_in_numba_loop():
     s = make_spec(n_batch=1)
-    cc = CompiledController("ic", ic_init, ic_step, params_i64=[30000, 1, 3], params_f64=[0.0])
+    cc = CompiledController("ic", integrator_init, integrator_step, params_i64=[30000, 1, 3], params_f64=[0.0])
     cc.reset(s)
     lo, ho = s.layout.obs_field("tx.monitor.latest").offset, s.layout.act_field("tx.heater").offset
-    final = toy_loop(ic_init, ic_step, cc.spec_i64, cc.spec_f64, 400, lo, ho, 4)
+    final = toy_loop(integrator_init, integrator_step, cc.spec_i64, cc.spec_f64, 400, lo, ho, 4)
     # Python reference of the same loop
     acc = np.zeros(4, dtype=np.int64)
     heat = np.zeros(4, dtype=np.int64)
@@ -608,13 +637,13 @@ def test_compiled_controller_in_numba_loop():
 
 def test_call_step_batch_matches_rows():
     s = make_spec()
-    cc = CompiledController("ic", ic_init, ic_step, params_i64=[100, 1, 0], params_f64=[0.0])
+    cc = CompiledController("ic", integrator_init, integrator_step, params_i64=[100, 1, 0], params_f64=[0.0])
     cc.reset(s)
     obs = np.zeros((2, s.layout.obs_size), dtype=np.int64)
     obs[1, s.layout.obs_field("tx.monitor.latest").offset] = 40
     act = cc.initial_act(s)
     p_i, p_f, s_i, s_f = (x.copy() for x in cc.state)
-    api.call_step_batch(ic_step, p_i, p_f, s_i, s_f, obs, act)
+    api.call_step_batch(integrator_step, p_i, p_f, s_i, s_f, obs, act)
     ho = s.layout.act_field("tx.heater").offset
     assert act[0, ho] == 100 and act[1, ho] == 60
 
@@ -633,12 +662,12 @@ def test_compiled_init_must_return_flat_arrays():
     def bad_init(si, sf):
         return np.zeros(2), np.zeros(2), np.zeros(2, dtype=np.int64), np.zeros(1)
 
-    cc = CompiledController("bad", bad_init, ic_step)
+    cc = CompiledController("bad", bad_init, integrator_step)
     with pytest.raises(TypeError, match="p_i64"):
         cc.reset(make_spec())
 
 
-# ---- review additions -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------- more spec, ABI and registry checks
 
 MINI = ROOT / "tests" / "data" / "mini.yaml"
 
@@ -651,8 +680,8 @@ def _zero_obs(spec, tick=0):
 
 def test_from_config_with_the_mini_preset():
     """ControllerSpec.from_config on a real mrm.params Config (not only a mapping): the nominal grid follows realize's
-    rule (centre/spacing preset), ring_to_line defaults to the identity, and the spec reads no physical leaf, so a
-    different physics alternative leaves its fingerprint unchanged (07 D13)."""
+    rule (centre/spacing preset), ring_to_line defaults to the identity, and the spec reads no physical leaf. So a
+    different physics alternative leaves its fingerprint unchanged: a controller knows the same in every world."""
     from mrm import params
     from mrm.params.realize import line_frequencies_hz
     know = ["controller_interface.knowledge=[line_grid, ring_to_line]"]
@@ -711,8 +740,9 @@ def test_compiled_out_of_range_command_is_clipped_not_wrapped():
 
 
 def test_tick_jitter_spec_and_composite():
-    """07 P2-7 tick jitter: whole ticks, below the period, M covers period + jitter, spec_arrays carries it, and a
-    composite called late (within the jitter) still steps its children on their nominal edges."""
+    """Tick jitter of the controller schedule: it is a whole number of ticks and below the period. M (samples per
+    step) covers period + jitter, and spec_arrays carries it. A composite called late (within the jitter) still
+    steps its children on their nominal edges."""
     with pytest.raises(TimingError, match="tick_jitter_s"):
         make_spec(tick_jitter_s=1.5e-6)
     with pytest.raises(TimingError, match="below the controller period"):
@@ -744,7 +774,7 @@ def test_rc_afe_needs_no_whole_tick_window():
 
 
 def test_composite_refuses_child_fast_kernel():
-    cc = CompiledController("ic", ic_init, ic_step, fast_fn=ic_step)
+    cc = CompiledController("ic", integrator_init, integrator_step, fast_fn=integrator_step)
     with pytest.raises(TypeError, match="fast_kernel"):
         CompositeController([(cc, 100e3)])
 

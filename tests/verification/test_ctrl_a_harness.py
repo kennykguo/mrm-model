@@ -1,19 +1,34 @@
-"""Closed-loop test harness of the controllers_a baselines (and its own checks).
+"""Closed-loop test harness for the group-A baseline controllers, and the checks of the harness itself.
 
-:class:`LoopPlant` extends ``test_plant_wiring.ReferencePlant`` (the integrator's Python plant tick, docs/handoff/
-ENGINE_BRIEF.md) with what a closed loop needs: latched heater and bias registers written by the controller,
-fast-kernel offsets added to them before the DAC FIFO (07 P0-7), the bias actuator under controller binding, a
-serial bias-noise draw (the library's ``rng.fill_normal`` is a parallel kernel whose thread start-up costs ~0.3 ms
-per call; the serial loop gives the same numbers), and Truth recorded per tick for the TESTS only: the detuning of
-every ring to its assigned line (pm) and the OMA at the bus output.
+Read this first
+---------------
+The group-A controller tests import this file as ``harness``. The usual pattern is::
 
-:class:`ClosedLoop` runs a controller through the controller API exactly as the engine will (07 P0-6 event order:
-release at the edge, ``step``, ``ActionValidator``, latch after ``latency_ticks``; the ``fast_kernel`` once per
-released monitor sample, before ``step``). The controller never sees Truth: it gets an :class:`Observation` built
-from the released sensor dictionaries only.
+    cfg, pp, spec, plant = harness.placed()          # g26 plant with every ring parked on the stable red branch
+    loop = harness.ClosedLoop(plant, spec, MyController())
+    rec = loop.run(5000)                             # 5000 plant ticks; per-tick Truth records
+    m = harness.lock_metrics(rec, ref=slice(0, 900), win=slice(1000, None))
 
-Cost: ~0.6-1 ms per plant tick (B = 1, N = L = 8) on the shared machine; runs are kept to a few thousand ticks
-unless marked slow.
+:class:`LoopPlant` extends ``test_plant_wiring.ReferencePlant`` (a Python version of the engine's plant tick) with
+what a closed loop needs:
+
+- latched heater and bias registers that the controller writes;
+- fast-kernel offsets, added to those registers before the DAC FIFO;
+- the bias actuator when it is bound to the controller;
+- a serial bias-noise draw. The library's ``rng.fill_normal`` is a parallel kernel whose thread start-up costs
+  ~0.3 ms per call; the serial loop gives the same numbers;
+- Truth recorded per tick, for the TESTS only: the detuning of every ring to its assigned line (pm) and the OMA at
+  the bus output.
+
+:class:`ClosedLoop` runs a controller through the controller API in the same event order as the engine: release the
+sensors at the controller edge, call ``step``, validate the action (``ActionValidator``), latch it after
+``latency_ticks``. A ``fast_kernel`` runs once per released monitor sample, before ``step``. The controller never sees
+Truth: it gets an :class:`Observation` built from the released sensor dictionaries only.
+
+:class:`ToyRings` is a plant-free hysteretic ring for fast parity and logic tests.
+
+Cost: ~0.6-1 ms per plant tick (B = 1, N = L = 8) on the shared machine. Runs are kept to a few thousand ticks unless
+they are marked slow.
 """
 from __future__ import annotations
 
@@ -32,13 +47,9 @@ from mrm.control.api import ActionValidator, ControllerSpec, Observation, contro
     controller_telemetry, fast_act_size, fast_obs_size, validate_telemetry
 from mrm.core import rng
 from mrm.core.timing import is_edge
-from mrm.plant import electrical as el
-from mrm.plant import optics as op
-from mrm.plant import phase as ph
-from mrm.plant import selfheat as shm
-from mrm.plant import thermal as th
+from mrm.plant import electrical, optics, phase, selfheat, thermal
 from mrm.plant.sensing import MonitorBank, fault_mask
-from mrm.scenarios import registry as scen_registry
+from mrm.scenarios import registry as scenario_registry
 from mrm.units import C0
 from test_plant_wiring import ReferencePlant
 
@@ -72,7 +83,7 @@ def realize(cfg, batch: int = 1, *, nominal: bool = True, seeds: int = 0):
 
 
 def make_spec(cfg, batch: int, scenario=None) -> ControllerSpec:
-    sc = scen_registry.from_config(cfg) if scenario is None else scenario
+    sc = scenario_registry.from_config(cfg) if scenario is None else scenario
     return ControllerSpec.from_config(cfg, n_batch=batch, nominal=cfg, scenario_drives=sc.drives,
                                       scenario_offsets=sc.offsets)
 
@@ -90,7 +101,7 @@ class LoopPlant(ReferencePlant):
         self.fast_monitor = fast_monitor
         self.bias_owner = bias_owner
         self.scenario_seed = scenario_seed
-        self.views = [op.selfheat_views(self.args_f[b], self.args_i[b]) for b in range(B)]
+        self.views = [optics.selfheat_views(self.packed_f[b], self.packed_i[b]) for b in range(B)]
         self.lat_heater = np.zeros((B, N), np.int64)
         self.lat_bias = np.zeros((B, N), np.int64)
         self.off_heater = np.zeros((B, N), np.int64)
@@ -100,8 +111,8 @@ class LoopPlant(ReferencePlant):
         self.sid_bias = np.int64(rng.stream_id("dac_bias"))
         self.line = np.asarray(pp.layout.ring_to_line)
         rp = self.phase.ring
-        self.lam_res = rp[:, :, ph.RP_LAM_RES]
-        self.fsr_m = rp[:, :, ph.RP_LAM_RES] ** 2 / (rp[:, :, ph.RP_N_G] * rp[:, :, ph.RP_LEN])
+        self.lam_res = rp[:, :, phase.RP_LAM_RES]
+        self.fsr_m = rp[:, :, phase.RP_LAM_RES] ** 2 / (rp[:, :, phase.RP_N_G] * rp[:, :, phase.RP_LEN])
         self.k_next = 0
         self._ev_cache = {}
         self.delta_pm = np.zeros((B, N))
@@ -109,7 +120,7 @@ class LoopPlant(ReferencePlant):
         self.p_line_w = np.zeros((B, N))
         self.force_hot = False
 
-    # -- scenario switch (tests change the disturbance on a locked snapshot) --
+    # Tests change the disturbance on a locked snapshot with this scenario switch.
     def set_scenario(self, sc, *, seed: int | None = None):
         sysm = self.sys
         agg_names = tuple(sysm.src_names[i] for i in sysm.aggressor_src)
@@ -129,11 +140,18 @@ class LoopPlant(ReferencePlant):
     def tick(self, k: int, heater_cmd=None):
         """Plant interval [k, k+1) with the latched registers plus offsets (heater_cmd is ignored: use lat_heater)."""
         pp, sysm, B, N = self.pp, self.sys, self.B, self.N
-        ev0 = self._eval(k)
+        ev0 = self._eval(k)  # scenario signals at the start and the end of the interval
         ev1 = self._eval(k + 1)
-        f_hz, p_w = self.laser.tick(k, enable=ev0["laser.line_enable"], f_offset_hz=ev0["laser.dfreq_hz"],
-                                    p_scale=10.0 ** (ev0["laser.power_delta_db"] / 10.0))
-        p_chip = p_w * np.asarray(pp.laser.input_transmission) * 10.0 ** (-ev0["optical.input_loss_delta_db"] / 10.0)
+        # ---- laser lines, data pattern and bias DAC
+        f_hz, p_w = self.laser.tick(
+            k,
+            enable=ev0["laser.line_enable"],
+            f_offset_hz=ev0["laser.dfreq_hz"],
+            p_scale=10.0 ** (ev0["laser.power_delta_db"] / 10.0),
+        )
+        p_chip = (
+            p_w * np.asarray(pp.laser.input_transmission) * 10.0 ** (-ev0["optical.input_loss_delta_db"] / 10.0)
+        )
         lam = C0 / f_hz
         rho = self.dp.pattern(k, density=ev0["data.ones_density"], traffic_on=ev0["data.driver_enable"])
         z = np.zeros((B, N))
@@ -145,17 +163,47 @@ class LoopPlant(ReferencePlant):
             cmd_b = self.bias_p.code_for_voltage(np.where(np.isfinite(v_set), v_set, self.bias_p.v_min_v))
             cmd_b = np.clip(cmd_b + self.off_bias, 0, self.b_hi)
         bout = self.bias.step(k, cmd=cmd_b, z=z, v_offset=ev0["tx.bias_offset_v"])
+        # ---- optics inputs of every ring: NRZ levels, phase rows and the junction capacitance
         swing = np.asarray(pp.datapath.swing_pp_v) * ev0["data.swing_scale"]
         v_lo, v_hi, fl = np.zeros((B, N)), np.zeros((B, N)), np.zeros((B, N), np.int8)
         cj_eff = np.zeros((B, N))
         r_s = np.zeros((B, N))
         for b in range(B):
-            el.nrz_levels_row(bout.v_avg[b], swing[b], int(pp.datapath.level_convention[b, 0]),
-                              el.JUNCTION_GRID_V_MIN, el.JUNCTION_GRID_V_MAX, v_lo[b], v_hi[b], fl[b])
+            electrical.nrz_levels_row(
+                bout.v_avg[b],
+                swing[b],
+                int(pp.datapath.level_convention[b, 0]),
+                electrical.JUNCTION_GRID_V_MIN,
+                electrical.JUNCTION_GRID_V_MAX,
+                v_lo[b],
+                v_hi[b],
+                fl[b],
+            )
             o = self._optics_inputs(b, lam[b], v_lo[b], v_hi[b])
             r_s[b] = 0.5 * (o["rs"][:, 0] + o["rs"][:, 1])
-            (p_in, t2, t2o, p1, phi0r, phi1r, _, _, a0, a1, e0, e1, psi, k2t, k2d, trt, dpl, tref, s0, beta,
-             *_rest) = self.views[b]
+            (
+                p_in,
+                t2,
+                t2o,
+                p1,
+                phi0r,
+                phi1r,
+                _,
+                _,
+                a0,
+                a1,
+                e0,
+                e1,
+                psi,
+                k2t,
+                k2d,
+                trt,
+                dpl,
+                tref,
+                s0,
+                beta,
+                *_rest,
+            ) = self.views[b]
             p_in[:] = p_chip[b]
             p1[:] = rho[b]
             phi0r[:], phi1r[:] = o["phi0"], o["phi1"]
@@ -164,27 +212,45 @@ class LoopPlant(ReferencePlant):
             dpl[:] = 2.0 * math.pi * C0 * o["trt"] / (lam[b][None, :] ** 2)
             rp = self.phase.ring[b]
             tref[:] = self.t_ring[b]
-            g = 1.0 + rp[:, ph.RP_BETA] * (self.t_ring[b] - rp[:, ph.RP_T0])        # phase.local_thermo_optic
-            s0[:] = rp[:, ph.RP_S0] * g
-            beta[:] = rp[:, ph.RP_BETA] / g
+            g = 1.0 + rp[:, phase.RP_BETA] * (self.t_ring[b] - rp[:, phase.RP_T0])  # phase.local_thermo_optic
+            s0[:] = rp[:, phase.RP_S0] * g
+            beta[:] = rp[:, phase.RP_BETA] / g
             r = self.phase.table_row(b)
-            el.junction_swing_capacitance_row(v_lo[b], v_hi[b], self.phase.grid, self.phase.capacitance[r],
-                                              rp[:, ph.RP_FILL], rp[:, ph.RP_LEN], cj_eff[b])
-            op.selfheat_bounds(self.args_f[b], self.args_i[b], 50.0, self.p_max[b], self.d2p_max[b],
-                               self.dpdt_max[b])
+            electrical.junction_swing_capacitance_row(
+                v_lo[b],
+                v_hi[b],
+                self.phase.grid,
+                self.phase.capacitance[r],
+                rp[:, phase.RP_FILL],
+                rp[:, phase.RP_LEN],
+                cj_eff[b],
+            )
+            optics.selfheat_bounds(
+                self.packed_f[b], self.packed_i[b], 50.0, self.p_max[b], self.d2p_max[b], self.dpdt_max[b]
+            )
+        # ---- thermal source powers (W) at the start (u0) and the end (u1) of the interval
         u0 = np.zeros((B, sysm.n_src))
         pj, pd = np.zeros((B, N)), np.zeros((B, N))
         d = pp.datapath
         for b in range(B):
             en = (ev0["data.driver_enable"][b] >= 0.5).astype(float)
-            el.data_activity_heat_row(cj_eff[b], v_hi[b] - v_lo[b], float(d.bitrate_hz[b, 0]),
-                                      ev0["data.transition_density"][b], en, r_s[b],
-                                      np.asarray(d.driver_output_resistance_ohm[b]),
-                                      np.asarray(d.driver_static_power_w[b]),
-                                      np.asarray(d.driver_energy_per_transition_j[b]), 0, pj[b], pd[b])
+            electrical.data_activity_heat_row(
+                cj_eff[b],
+                v_hi[b] - v_lo[b],
+                float(d.bitrate_hz[b, 0]),
+                ev0["data.transition_density"][b],
+                en,
+                r_s[b],
+                np.asarray(d.driver_output_resistance_ohm[b]),
+                np.asarray(d.driver_static_power_w[b]),
+                np.asarray(d.driver_energy_per_transition_j[b]),
+                0,
+                pj[b],
+                pd[b],
+            )
         u0[:, sysm.junction_src] = pj
         if sysm.driver_src.size:
-            u0[:, sysm.driver_src] = pd[:, :sysm.driver_src.size]
+            u0[:, sysm.driver_src] = pd[:, : sysm.driver_src.size]
         u0[:, sysm.heater_src] = self.u_heater
         u0[:, sysm.wg_src] = self.p_prev
         u1 = u0.copy()
@@ -192,40 +258,98 @@ class LoopPlant(ReferencePlant):
             u0[:, sysm.aggressor_src] = ev0["thermal.aggressor_w"]
             u1[:, sysm.aggressor_src] = ev1["thermal.aggressor_w"]
         t_base_end = ev1["thermal.t_base_k"][:, 0] + ev1["thermal.xpu_rise_k"][:, 0]
+        # ---- heater DAC and driver: heater resistor temperature = t_base_end + pre + gg * P_heater
+        #      (t_base_end and pre in K, gg in K/W, P_heater in W)
         a, c0, c1 = self.coef
         pre = np.zeros((B, N))
         gg = np.zeros((B, N))
         for b in range(B):
             for n in range(N):
-                pre[b, n], gg[b, n] = th.observer_split_b(self.x[b], a[b], c0[b], c1[b], sysm.lag_src, sysm.obs_ptr,
-                                                          int(sysm.heater_obs[n]), int(sysm.heater_src[n]), u0[b],
-                                                          u1[b], self.src_scale[0])
+                pre[b, n], gg[b, n] = thermal.observer_split_b(
+                    self.x[b],
+                    a[b],
+                    c0[b],
+                    c1[b],
+                    sysm.lag_src,
+                    sysm.obs_ptr,
+                    int(sysm.heater_obs[n]),
+                    int(sysm.heater_src[n]),
+                    u0[b],
+                    u1[b],
+                    self.src_scale[0],
+                )
         cmd_h = np.clip(self.lat_heater + self.off_heater, self.h_lo, self.h_hi)
         hout = self.heater.step(k, cmd_h, None, t_base_end[:, None] + pre, gg)
         self.u_heater = hout.p_w.copy()
         u0[:, sysm.heater_src] = self.u_heater
         u1[:, sysm.heater_src] = self.u_heater
+        # ---- implicit self-heating step of the ring temperatures (force_hot: start on the hot branch)
         if self.force_hot:
             self.t_branch[:] = np.inf
             self.force_hot = False
-        n_fail = shm.implicit_step(self.x, a, c0, c1, sysm.lag_src, sysm.lag_obs, sysm.lag_kind, sysm.opt_lags,
-                                   sysm.obs_ptr, sysm.src_ring, sysm.ring_obs, np.asarray(pp.layout.bus_order), u0,
-                                   u1, self.src_scale, t_base_end, self.p_prev, self.t_branch, op.selfheat_pabs,
-                                   op.selfheat_commit, self.args_f, self.args_i, self.p_max, self.d2p_max, 10, 1e-9,
-                                   1, self.g_work, self.t_obs, self.p_new, self.t_new, self.n_iter)
+        n_fail = selfheat.implicit_step(
+            self.x,
+            a,
+            c0,
+            c1,
+            sysm.lag_src,
+            sysm.lag_obs,
+            sysm.lag_kind,
+            sysm.opt_lags,
+            sysm.obs_ptr,
+            sysm.src_ring,
+            sysm.ring_obs,
+            np.asarray(pp.layout.bus_order),
+            u0,
+            u1,
+            self.src_scale,
+            t_base_end,
+            self.p_prev,
+            self.t_branch,
+            optics.selfheat_pabs,
+            optics.selfheat_commit,
+            self.packed_f,
+            self.packed_i,
+            self.p_max,
+            self.d2p_max,
+            10,
+            1e-9,
+            1,
+            self.g_work,
+            self.t_obs,
+            self.p_new,
+            self.t_new,
+            self.n_iter,
+        )
         self.p_prev[:] = self.p_new
         self.t_branch[:] = self.t_new
         self.t_ring[:] = self.t_new
         self.t_heater[:] = self.t_obs[:, sysm.heater_obs]
-        out_r = np.stack([self.views[b][23] for b in range(B)])
-        out_rl = np.stack([self.views[b][22] for b in range(B)])
-        fault = fault_mask(B, N, adc_drop=ev0["fault.adc_drop"], adc_stuck=ev0["fault.adc_stuck"],
-                           adc_saturate=ev0["fault.adc_saturate"], dac_glitch_codes=ev0["fault.dac_glitch_codes"])
-        p_bus = out_rl[:, op.RL_PIN].sum(axis=2)
-        self.mon.tick(k, p_pd_w=out_r[:, op.R_DROP_SUM], p_bg_w=p_bus, t_pd_k=self.t_obs[:, sysm.pd_obs],
-                      fault=fault, t_base_k=t_base_end)
+        out_r = np.stack([self.views[b][optics.SELF_HEATING_VIEW_INDEX_RING_OUTPUTS] for b in range(B)])
+        out_rl = np.stack([self.views[b][optics.SELF_HEATING_VIEW_INDEX_RING_LINE_OUTPUTS] for b in range(B)])
+        # ---- sensors: monitor PDs, data-path error counter, temperature sensors
+        fault = fault_mask(
+            B,
+            N,
+            adc_drop=ev0["fault.adc_drop"],
+            adc_stuck=ev0["fault.adc_stuck"],
+            adc_saturate=ev0["fault.adc_saturate"],
+            dac_glitch_codes=ev0["fault.dac_glitch_codes"],
+        )
+        p_bus = out_rl[:, optics.RING_LINE_OUTPUT_ROW_INPUT_POWER].sum(axis=2)
+        self.mon.tick(
+            k,
+            p_pd_w=out_r[:, optics.RING_OUTPUT_ROW_TOTAL_CLOCKWISE_DROP_POWER],
+            p_bg_w=p_bus,
+            t_pd_k=self.t_obs[:, sysm.pd_obs],
+            fault=fault,
+            t_base_k=t_base_end,
+        )
         ar = np.arange(N)
-        oma = out_rl[:, op.RL_POUT1, ar, self.line] - out_rl[:, op.RL_POUT0, ar, self.line]
+        oma = (
+            out_rl[:, optics.RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER, ar, self.line]
+            - out_rl[:, optics.RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER, ar, self.line]
+        )
         self.dp.errors(k, np.abs(oma))
         self.temps.tick(k, self.t_obs[:, sysm.temp_obs])
         # ---- Truth (tests only): detuning of each ring to its own line at the end of the interval, and OMA
@@ -234,13 +358,37 @@ class LoopPlant(ReferencePlant):
             r = self.phase.table_row(b)
             sh_lv = np.zeros(N)
             fal, cj, rs, flg = np.zeros(N), np.zeros(N), np.zeros(N), np.zeros(N, np.int8)
-            ph.resonance_shift_row(self.phase.ring[b], self.t_ring[b], v_lo[b], self.phase.grid, self.phase.dneff[r],
-                                   self.phase.alpha_fca[r], self.phase.capacitance[r], self.phase.r_series[r], sh_lv,
-                                   fal, cj, rs, flg)
+            phase.resonance_shift_row(
+                self.phase.ring[b],
+                self.t_ring[b],
+                v_lo[b],
+                self.phase.grid,
+                self.phase.dneff[r],
+                self.phase.alpha_fca[r],
+                self.phase.capacitance[r],
+                self.phase.r_series[r],
+                sh_lv,
+                fal,
+                cj,
+                rs,
+                flg,
+            )
             sh_hi = np.zeros(N)
-            ph.resonance_shift_row(self.phase.ring[b], self.t_ring[b], v_hi[b], self.phase.grid, self.phase.dneff[r],
-                                   self.phase.alpha_fca[r], self.phase.capacitance[r], self.phase.r_series[r], sh_hi,
-                                   fal, cj, rs, flg)
+            phase.resonance_shift_row(
+                self.phase.ring[b],
+                self.t_ring[b],
+                v_hi[b],
+                self.phase.grid,
+                self.phase.dneff[r],
+                self.phase.alpha_fca[r],
+                self.phase.capacitance[r],
+                self.phase.r_series[r],
+                sh_hi,
+                fal,
+                cj,
+                rs,
+                flg,
+            )
             shift[b] = (1.0 - rho[b]) * sh_lv + rho[b] * sh_hi
         lam_line = lam[:, self.line]
         dlt = self.lam_res + shift - lam_line
@@ -250,8 +398,20 @@ class LoopPlant(ReferencePlant):
         self.p_line_w = p_chip[:, self.line]
         u_ss = u1.copy()
         u_ss[:, sysm.wg_src] = self.p_new
-        self.last = dict(p_chip=p_chip, lam=lam, rho=rho, dens=ev0["data.ones_density"], bias=bout, heater=hout,
-                         n_fail=n_fail, out_r=out_r, out_rl=out_rl, v_lo=v_lo, v_hi=v_hi, u_ss=u_ss)
+        self.last = dict(
+            p_chip=p_chip,
+            lam=lam,
+            rho=rho,
+            dens=ev0["data.ones_density"],
+            bias=bout,
+            heater=hout,
+            n_fail=n_fail,
+            out_r=out_r,
+            out_rl=out_rl,
+            v_lo=v_lo,
+            v_hi=v_hi,
+            u_ss=u_ss,
+        )
         self.k_next = k + 1
         return self.last
 
@@ -262,29 +422,30 @@ class LoopPlant(ReferencePlant):
         return sensors, new
 
 
-# ---- scenarios used by the controller tests --------------------------------------------------------------------------
+# ------------------------------------------------------------------------------- scenarios used by the controller tests
 
 def stacked(cfg, *extra, t_base_c: float | None = None):
     """The config's own scenario (bias default, ambient) stacked with ``extra`` scenarios; optional base temperature
     default (degC)."""
-    from mrm.scenarios import generators as g
-    sc = scen_registry.from_config(cfg)
+    from mrm.scenarios import generators
+    sc = scenario_registry.from_config(cfg)
     if extra:
-        sc = g.stack([sc, *extra], name="+".join([sc.name or "base"] + [e.name for e in extra]))
+        sc = generators.stack([sc, *extra], name="+".join([sc.name or "base"] + [e.name for e in extra]))
     if t_base_c is not None:
         sc = sc.with_defaults(**{"thermal__t_base_k": t_base_c + 273.15})
     return sc
 
 
 def calibrated(pp, sc):
-    """Calibrate every pending aggressor of ``sc`` on the plant's own thermal system (Truth-side, as the engine does:
-    docs/handoff/ENGINE_BRIEF.md section 1, ring_t0 = the ring lock temperature, scenarios handoff section 8)."""
+    """Calibrate every pending aggressor of ``sc`` on the plant's own thermal system, on the Truth side as the engine
+    does. The calibration model takes ring_t0 = the ring lock temperature."""
     from mrm.scenarios.calibrate import calibrate_scenario, foster_from_system
     if not sc.pending_aggressors:
         return sc
     t = pp.thermal
-    model = {a.site: {"s0_m_per_k": t.dlambda_dt_s0_m_per_k[:, a.victim_ring], "beta_per_k": t.dlambda_dt_beta_per_k[:, 0],
-                      "t_ref_k": t.dlambda_dt_t0_k[:, 0], "ring_t0_k": t.t_ring_lock_k[:, a.victim_ring]}
+    model = {a.site: {"s0_m_per_k": t.dlambda_dt_s0_m_per_k[:, a.victim_ring],
+                      "beta_per_k": t.dlambda_dt_beta_per_k[:, 0], "t_ref_k": t.dlambda_dt_t0_k[:, 0],
+                      "ring_t0_k": t.t_ring_lock_k[:, a.victim_ring]}
              for a in sc.aggressors}
     resp = {a.site: foster_from_system(t.system, victim_ring=a.victim_ring, site=a.site) for a in sc.aggressors}
     with warnings.catch_warnings():
@@ -299,15 +460,15 @@ def a1_rate_scenario(cfg, pp, t_min_s: float, *, delta_t_k: float = 20.0, t_base
     ``full=False``: the A1 peak rate (pi dT/P = 2127 degC/s, 183 pm/ms of resonance target) with a reduced swing
     ``delta_t_k`` (period pi dT / 2127 s) so the cusp arrives within ~15 ms; ``full=True``: the printed 88.5 K /
     130.7 ms trajectory on the base ``t_base_c``. ``site``: the layout site of the aggressor (default the g26
-    default site; ``lib.AGGRESSOR_PD_ADJACENT_SITE`` is the stress site 5 um from ring 0's monitor PD)."""
-    from mrm.scenarios import library as lib
+    default site; ``library.AGGRESSOR_PD_ADJACENT_SITE`` is the stress site 5 um from ring 0's monitor PD)."""
+    from mrm.scenarios import library
     if full:
-        period, dT = lib.A1_PERIOD_S, lib.A1_DELTA_T_K
+        period, dT = library.A1_PERIOD_S, library.A1_DELTA_T_K
     else:
         dT = float(delta_t_k)
-        period = math.pi * dT / (math.pi * lib.A1_DELTA_T_K / lib.A1_PERIOD_S)
-    agg = lib.a1_slide10_aggressor(site=site, victim_ring=victim_ring, t_max_c=t_base_c + dT + 0.1, delta_t_k=dT,
-                                   period_s=period, t_base_c=t_base_c, phase_s=period / 2.0 - t_min_s)
+        period = math.pi * dT / (math.pi * library.A1_DELTA_T_K / library.A1_PERIOD_S)
+    agg = library.a1_slide10_aggressor(site=site, victim_ring=victim_ring, t_max_c=t_base_c + dT + 0.1, delta_t_k=dT,
+                                       period_s=period, t_base_c=t_base_c, phase_s=period / 2.0 - t_min_s)
     return calibrated(pp, stacked(cfg, agg, t_base_c=t_base_c)), period
 
 
@@ -316,12 +477,12 @@ def a2_rate_scenario(cfg, pp, t_min_s: float, *, delta_t_k: float = 20.0, t_base
     """The 808 degC/s run (A2, symmetric triangle reading: 1616 degC/s edges) with its minimum at ``t_min_s``.
     ``full=False``: same edge rate, swing ``delta_t_k`` (period 2 dT / 1616 s); ``full=True``: 80.8 K / 100 ms.
     ``site``: as in :func:`a1_rate_scenario`."""
-    from mrm.scenarios import library as lib
-    rate = 2.0 * lib.A2_RATE_K_PER_S          # edge rate of the symmetric-triangle reading
-    dT = lib.A2_RATE_K_PER_S * lib.A2_PERIOD_S if full else float(delta_t_k)
+    from mrm.scenarios import library
+    rate = 2.0 * library.A2_RATE_K_PER_S          # edge rate of the symmetric-triangle reading
+    dT = library.A2_RATE_K_PER_S * library.A2_PERIOD_S if full else float(delta_t_k)
     period = 2.0 * dT / rate
-    agg = lib.a2_808_aggressor(site=site, victim_ring=victim_ring, reading="symmetric_triangle", t_low_c=t_base_c,
-                               t_high_c=t_base_c + dT, period_s=period, t_base_c=t_base_c)
+    agg = library.a2_808_aggressor(site=site, victim_ring=victim_ring, reading="symmetric_triangle", t_low_c=t_base_c,
+                                   t_high_c=t_base_c + dT, period_s=period, t_base_c=t_base_c)
     # the triangle starts at its minimum at t = 0; shift it so the minimum falls at t_min_s
     tgt = agg.aggressors[0].target
     import dataclasses
@@ -331,14 +492,15 @@ def a2_rate_scenario(cfg, pp, t_min_s: float, *, delta_t_k: float = 20.0, t_base
 
 
 def laser_power_step_scenario(cfg, t_s: float, delta_db: float):
-    """Every line's power steps by ``delta_db`` at ``t_s`` (07 4.8 power_at_ring, 04 C3 failure mode)."""
-    from mrm.scenarios import generators as g
-    st = g.Scenario(name="laser_power_step", components=(g.step("laser.power_delta_db", t_s, delta_db,
-                                                                 label="power_step", provenance="assumed"),))
+    """Every line's power steps by ``delta_db`` at ``t_s``. The power at the ring is one axis of the uncertainty set,
+    and a power step is the known failure mode of a side-of-fringe lock (it looks like a detuning change)."""
+    from mrm.scenarios import generators
+    power_step = generators.step("laser.power_delta_db", t_s, delta_db, label="power_step", provenance="assumed")
+    st = generators.Scenario(name="laser_power_step", components=(power_step,))
     return stacked(cfg, st)
 
 
-# ---- test-side placement (Truth-guided; stands in for an acquisition / factory warm start) ------------------------
+# ----------------------------- test-side placement (Truth-guided; stands in for an acquisition or a factory warm start)
 
 def settle_slow_states(plant: LoopPlant) -> None:
     """Set every thermal lag to its steady state for the current source powers (heater, absorbed, junction, driver,
@@ -359,7 +521,7 @@ def place_on_hot_branch(plant: LoopPlant, delta_pm: float = 170.0, n_ticks: int 
     lam_line = C0 / np.asarray(pp.laser.line_freq_hz, float)[:, plant.line]
     s0 = pp.thermal.dlambda_dt_s0_m_per_k * np.ones((B, N))
     t_base = plant._eval(plant.k_next)["thermal.t_base_k"][:, :1]                  # (B, 1) K
-    need_m = lam_line - plant.lam_res - s0 * (t_base - plant.phase.ring[:, :, ph.RP_T_REF])
+    need_m = lam_line - plant.lam_res - s0 * (t_base - plant.phase.ring[:, :, phase.RP_T_REF])
     p_w = need_m / s0 / (pp.thermal.z_heater_ring_k_per_w * np.ones((B, N)))
     h = pp.heater
     full = float((1 << int(h.dac_bits)) - 1)
@@ -381,7 +543,7 @@ def place_on_hot_branch(plant: LoopPlant, delta_pm: float = 170.0, n_ticks: int 
     return plant.delta_pm.copy()
 
 
-_CACHE: dict = {}
+_PLACED_CACHE: dict = {}
 
 
 BIAS_CONTROLLER = ("controller_interface.bind.tx.bias=controller", "scenario.bias_v=null")
@@ -395,28 +557,29 @@ def placed(overrides=(), *, batch: int = 1, nominal: bool = True, seeds: int = 0
     which pytest imports once). ``bias_v``: the controller owns tx.bias (BIAS_CONTROLLER overrides added) and the
     latched bias register holds this voltage during the placement. ``power_delta_db``: every line's power offset by a
     constant scenario component (laser.power_per_line_dbm has a printed range of 8-11 dBm, so a low-power plant is
-    made by the scenario). ``preset``: a corner preset of the uncertainty set (07 4.8), e.g. g26_slow_thermal;
+    made by the scenario). ``preset``: a named corner preset of the uncertainty set, e.g. g26_slow_thermal;
     ``alts``: pinned alternatives, e.g. {"uncertainty.timing.latency_scale": "high"}."""
     if bias_v is not None:
         overrides = tuple(overrides) + BIAS_CONTROLLER
     key = (tuple(overrides), batch, nominal, seeds, delta_pm, n_ticks, bias_v, power_delta_db, preset,
            tuple(sorted((alts or {}).items())))
-    if key not in _CACHE:
+    if key not in _PLACED_CACHE:
         cfg = load_cfg(overrides, preset, alts)
         pp = realize(cfg, batch, nominal=nominal, seeds=seeds)
         spec = make_spec(cfg, batch)
         plant = LoopPlant(pp, cfg, period_ticks=spec.period_ticks)
         if power_delta_db:
-            from mrm.scenarios import generators as g
-            low = g.Scenario(name="power_offset", components=(g.const("laser.power_delta_db", float(power_delta_db),
-                                                                      label="power_offset", provenance="assumed"),))
+            from mrm.scenarios import generators
+            offset = generators.const("laser.power_delta_db", float(power_delta_db), label="power_offset",
+                                      provenance="assumed")
+            low = generators.Scenario(name="power_offset", components=(offset,))
             plant.set_scenario(stacked(cfg, low))
         if bias_v is not None:
             plant.bias_owner = "controller"
             plant.lat_bias[:] = plant.bias_p.code_for_voltage(np.full((batch, pp.n_rings), bias_v))
         place_on_hot_branch(plant, delta_pm=delta_pm, n_ticks=n_ticks)
-        _CACHE[key] = (cfg, pp, spec, plant)
-    cfg, pp, spec, plant = _CACHE[key]
+        _PLACED_CACHE[key] = (cfg, pp, spec, plant)
+    cfg, pp, spec, plant = _PLACED_CACHE[key]
     return cfg, pp, spec, snapshot(plant)
 
 
@@ -428,10 +591,11 @@ def use_fast_monitor(plant: LoopPlant) -> None:
         plant.fast_monitor = True
 
 
-# ---- closed loop ----------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------- closed loop
 
 class ClosedLoop:
-    """Runs a controller on a LoopPlant through the controller API (07 P0-6 order; fast kernel per sample)."""
+    """Runs a controller on a LoopPlant through the controller API, in the engine's event order (fast kernel per
+    released sample, then ``step`` at the controller edge, then the latch after ``latency_ticks``)."""
 
     def __init__(self, plant: LoopPlant, spec: ControllerSpec, ctrl, *, check_telemetry: bool = True):
         self.plant, self.spec, self.ctrl = plant, spec, ctrl
@@ -469,7 +633,9 @@ class ClosedLoop:
             for n in range(N):
                 for j in range(int(cnt[b, n])):
                     c = int(blk["count"][b, n])
-                    if c == M:              # keep the newest M (core_control_api handoff)
+                    # a sample block keeps the newest M samples (the same rule as the plant's monitor release,
+                    # mrm.plant.sensing)
+                    if c == M:
                         blk["samples"][b, n, :-1] = blk["samples"][b, n, 1:]
                         blk["ticks"][b, n, :-1] = blk["ticks"][b, n, 1:]
                         c = M - 1
@@ -480,7 +646,7 @@ class ClosedLoop:
         blk["valid"] &= rel.valid
         blk["over"] |= rel.overrange
         p_i, p_f, s_i, s_f = self.ctrl.state
-        for b in range(B):
+        for b in range(B):                      # fast-kernel observation: see api.fast_obs_size
             fo = self.fobs[b]
             fo[0] = k
             fo[1] = N
@@ -488,28 +654,43 @@ class ClosedLoop:
             fo[2 + N:2 + 2 * N] = rel.latest[b]
             fo[2 + 2 * N:2 + 3 * N] = np.where(cnt[b] > 0, rel.sample_ticks[b, :, 0], 0)
             self.fast_fn(p_i[b], p_f[b], s_i[b], s_f[b], fo, self.fact[b])
-        plant.off_heater[:] = self.fact[:, :N]
+        plant.off_heater[:] = self.fact[:, :N]              # fast action: [heater offset[N], bias offset[N]]
         plant.off_bias[:] = self.fact[:, N:]
 
     def _edge_obs(self, k: int):
         plant = self.plant
         if plant.fast_monitor:
             blk = self.blk
-            sensors = {"tx.monitor.samples": blk["samples"].astype(np.int32),
-                       "tx.monitor.sample_ticks": blk["ticks"].copy(), "tx.monitor.count": blk["count"].astype(np.int32),
-                       "tx.monitor.latest": blk["latest"].astype(np.int32), "monitor_valid": blk["valid"].copy(),
-                       "adc_overrange": blk["over"].copy()}
+            sensors = {
+                "tx.monitor.samples": blk["samples"].astype(np.int32),
+                "tx.monitor.sample_ticks": blk["ticks"].copy(),
+                "tx.monitor.count": blk["count"].astype(np.int32),
+                "tx.monitor.latest": blk["latest"].astype(np.int32),
+                "monitor_valid": blk["valid"].copy(),
+                "adc_overrange": blk["over"].copy(),
+            }
             has = blk["count"] > 0
-            new = {"tx.monitor.samples": has, "tx.monitor.sample_ticks": has, "tx.monitor.count": np.ones_like(has),
-                   "tx.monitor.latest": has, "monitor_valid": np.ones_like(has), "adc_overrange": np.ones_like(has)}
+            new = {
+                "tx.monitor.samples": has,
+                "tx.monitor.sample_ticks": has,
+                "tx.monitor.count": np.ones_like(has),
+                "tx.monitor.latest": has,
+                "monitor_valid": np.ones_like(has),
+                "adc_overrange": np.ones_like(has),
+            }
             s2, n2 = plant.temps.release(k)
             sensors.update(s2)
             new.update(n2)
             last = plant.last
-            plant.dp.bitstat_from_monitor(k, plant.mon, last["out_r"][:, op.R_DROP_SUM1],
-                                          last["out_r"][:, op.R_DROP_SUM0], np.zeros((plant.B, plant.N), np.int64),
-                                          density=last["dens"],
-                                          rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1))
+            plant.dp.bitstat_from_monitor(
+                k,
+                plant.mon,
+                last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER],
+                last["out_r"][:, optics.RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER],
+                np.zeros((plant.B, plant.N), np.int64),
+                density=last["dens"],
+                rin_per_hz=np.asarray(plant.pp.laser.rin_per_hz).reshape(-1),
+            )
             s3, n3 = plant.dp.release(k)
             sensors.update(s3)
             new.update(n3)
@@ -596,7 +777,7 @@ class ClosedLoop:
             self.fast_fn = fn
 
 
-# ---- a toy hysteretic ring for fast, plant-free parity and logic tests ----------------------------------------------
+# ---------------------------------------------------- a toy hysteretic ring for fast, plant-free parity and logic tests
 
 class ToyRings:
     """Per (b, n): x = delta/w solves x = (u - u0)/W + g/(1 + x^2) (u = applied heater code, W = half width in codes,
@@ -656,7 +837,7 @@ class ToyRings:
                 for n in range(N):
                     smp[b, n, j] = y[b, n] + self.noise * self._rand()
         smp = np.clip(np.rint(smp), 0, 65535)
-        if "adc_overrange" in sensors:                      # a sample at the ADC rail (07 P1-10)
+        if "adc_overrange" in sensors:                      # a sample at the ADC rail sets the overrange flag
             sensors["adc_overrange"][...] = (smp[..., :self.m] >= 65535).any(axis=-1)
         sensors["tx.monitor.samples"][..., :self.m] = smp[..., :self.m]
         sensors["tx.monitor.count"][...] = self.m
@@ -695,7 +876,7 @@ def toy_spec(n_batch: int = 2, n_rings: int = 3, *, bias: bool = False, **kw) ->
                                 bind=bind, **kw)
 
 
-# ---- Truth metrics (tests only; 07 P0-8 definitions, simplified) -----------------------------------------------------
+# ---------------------------------------------- Truth metrics (tests only; the engine's metric definitions, simplified)
 
 @dataclass
 class LockMetrics:
@@ -762,11 +943,11 @@ def snapshot(plant: LoopPlant) -> LoopPlant:
     """Deep copy of a plant (state included), to start several tests from one locked state. The optics views alias
     the packed self-heating rows, so they are rebuilt on the copy (deepcopy would turn them into separate arrays)."""
     cp = copy.deepcopy(plant)
-    cp.views = [op.selfheat_views(cp.args_f[b], cp.args_i[b]) for b in range(cp.B)]
+    cp.views = [optics.selfheat_views(cp.packed_f[b], cp.packed_i[b]) for b in range(cp.B)]
     return cp
 
 
-# ---- checks of the harness itself -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------- checks of the harness itself
 
 @pytest.fixture(scope="module")
 def nominal_plant():
@@ -816,9 +997,9 @@ def test_truth_detuning_tracks_heater(nominal_plant):
 
 
 def test_loop_delay_through_the_harness(nominal_plant):
-    """07 P0-6 test_loop_delay_impulse through the harness: a one-step heater impulse first shows in the monitor
-    samples released at timing.first_response_tick (heater DAC latency + thermal transport ticks, ADC phase,
-    window and latency)."""
+    """The loop-delay impulse test through the harness: a one-step heater impulse first shows in the monitor samples
+    released at timing.first_response_tick (heater DAC latency + thermal transport ticks, ADC phase, window and
+    latency)."""
     from mrm.core.timing import first_response_tick
     cfg, pp, spec = nominal_plant
     lp = LoopPlant(pp, cfg, period_ticks=spec.period_ticks)

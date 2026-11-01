@@ -1,15 +1,20 @@
-"""Robustness of the controllers-B locks on the engine (mrm.sim.runner, Python controller path): model mismatch
-from the uncertainty set (sampled worlds, the named corner presets), a data-swing loss for the bit-statistics
-ratio lock. Truth is read in the TEST only: the engine reports the detuning to the DECLARED line, so each case runs
-twice, the second time declaring (tx.assignment) the line the first run ended on; the controllers are
-deterministic, so the second run reproduces the first and its Truth is exact.
+"""Checks the robustness of the group-B locks on the engine (mrm.sim.runner, Python controller path).
+
+Read this first
+---------------
+The cases are model mismatch from the uncertainty set (sampled worlds, the named corner presets) and a data-swing
+loss for the bit-statistics ratio lock. Only the TEST reads Truth. The engine reports the detuning to the DECLARED
+line, so each case runs twice: the second run declares (tx.assignment) the line that the first run ended on. The
+controllers are deterministic, so the second run reproduces the first, and its Truth is exact.
 
 What is asserted is what the controller claims: a ring in LOCK sits on the red (self-heating-stable) side of a line,
-steadily. Which line the ramp acquisition takes is not asserted (the first resonance met from blue, a different
-line in each world: the WDM supervisor exists for the assignment). Printed (pytest -s): per world the line, the
-detuning, the jitter, and the cases the controller handles in a degraded way (``partial``: the peak lies below
-w = 0, the set-point is a fraction of a lower bound; ``clipped``: the monitor ADC saturated at the peak, so the
-set-point is a fraction of the clipped amplitude). Both put the lock further red, with a larger OMA penalty.
+steadily. Which line the ramp acquisition takes is not asserted: it is the first resonance met from blue, a different
+line in each world (the WDM supervisor exists for the assignment).
+
+Printed (pytest -s): per world the line, the detuning, the jitter, and the cases that the controller handles in a
+degraded way. ``partial``: the peak lies below w = 0, so the set-point is a fraction of a lower bound. ``clipped``: the
+monitor ADC saturated at the peak, so the set-point is a fraction of the clipped amplitude. Both put the lock further
+red, with a larger OMA penalty.
 """
 from __future__ import annotations
 
@@ -22,16 +27,15 @@ runner = pytest.importorskip("mrm.sim.runner")
 
 from mrm.control.baselines.bitstat_lock import BitStatLock
 from mrm.control.baselines.ramp_acquire import RampAcquire, ST_LOCK
-from mrm.scenarios import generators as g
-from mrm.scenarios import library as lib
+from mrm.scenarios import generators, library
 from mrm.units import C0
 
 
 KNOW = ["line_grid", "ring_to_line", "heater_nominal", "optics_nominal", "dlambda_dt_nominal"]
-BIND = "controller_interface.bind.tx.assignment=controller"
+BIND_ASSIGNMENT = "controller_interface.bind.tx.assignment=controller"
 
 
-class Declare:
+class DeclareAssignment:
     """Adapter (tests only): forwards a controller and writes a fixed per-world ``tx.assignment`` (B, N), so the
     engine's Truth detuning refers to those lines."""
 
@@ -61,13 +65,13 @@ def _load(preset, ov):
 
 
 def _run(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None, seeds=7, assignment=None):
-    cfg = _load(preset, [BIND] if assignment is not None else [])
+    cfg = _load(preset, [BIND_ASSIGNMENT] if assignment is not None else [])
     ctrl = make_ctrl()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        res = runner.run(cfg, controller=ctrl if assignment is None else Declare(ctrl, assignment),
-                         scenario=lib.static() if scenario is None else scenario, duration_s=duration_s, batch=batch,
-                         seeds=seeds, uncertainty="sample" if sampled else "nominal",
+        res = runner.run(cfg, controller=ctrl if assignment is None else DeclareAssignment(ctrl, assignment),
+                         scenario=library.static() if scenario is None else scenario, duration_s=duration_s,
+                         batch=batch, seeds=seeds, uncertainty="sample" if sampled else "nominal",
                          variation="sample" if sampled else "off", reset_protocol="branch_low",
                          record=[("lam_res_m", 50, "max"), ("lam_res_m", 50, "min")])
     return ctrl, res
@@ -88,9 +92,11 @@ def _nearest_line(res, ring):
     return np.argmin(np.abs(d), axis=1)
 
 
-def _exact(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None, ring=0, seeds=7):
-    """(controller of the second run, result, line (B,), detuning to that line (B,) pm, p-p of lam_res over the last
-    quarter (B,) pm)."""
+def _run_declared(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None, ring=0, seeds=7):
+    """Run twice: the second run declares the line the first run ended on, so its Truth detuning is exact.
+
+    Returns (controller of the second run, result, line (B,), detuning to that line (B,) pm, p-p of lam_res over the
+    last quarter (B,) pm)."""
     _, res1 = _run(make_ctrl, preset, duration_s, batch, sampled, scenario, seeds=seeds)
     line = _nearest_line(res1, ring)
     asg = np.repeat(np.arange(8)[None, :], batch, axis=0)
@@ -105,10 +111,10 @@ def _exact(make_ctrl, preset, duration_s, batch=1, sampled=False, scenario=None,
 
 
 def test_ramp_acquire_in_sampled_worlds():
-    """Eight worlds of the g26 uncertainty set (07 4.8: FSR window, driver law, coupling regime, self-heating eta,
+    """Eight worlds of the g26 uncertainty set (FSR window, driver law, coupling regime, self-heating eta,
     thermal family, monitor gain, ...): ring 0 ends in LOCK on the red side of a line, steady (p-p < 1 pm)."""
     B = 8
-    ctrl, res, line, det, pp_pm = _exact(lambda: RampAcquire(rings=[0]), "g26", 5e-3, batch=B, sampled=True)
+    ctrl, res, line, det, pp_pm = _run_declared(lambda: RampAcquire(rings=[0]), "g26", 5e-3, batch=B, sampled=True)
     f = ctrl.fsm
     for b in range(B):
         print(f"\nworld {b}: line {line[b]}, detuning {det[b]:.1f} pm (red > 0), p-p {pp_pm[b]:.2f} pm, partial "
@@ -122,10 +128,10 @@ def test_ramp_acquire_in_sampled_worlds():
 @pytest.mark.parametrize("preset", ["g26_hot_selfheat", "g26_low_eta", "g26_undercut", "g26_fsr_window_a",
                                     "g26_textbook_thermal", "g26_slow_thermal", "g26_overcoupled"])
 def test_ramp_acquire_on_the_corner_presets(preset):
-    """The named corners of 07 4.8: LOCK on the red side of a line, steady. hot_selfheat, low_eta and
-    textbook_thermal end ``partial`` (the first line met has its peak below w = 0: a ring captured at turn-on), so
+    """The named corner presets of the uncertainty set: LOCK on the red side of a line, steady. hot_selfheat, low_eta
+    and textbook_thermal end ``partial`` (the first line met has its peak below w = 0: a ring captured at turn-on), so
     their set-point is half of a lower bound of the peak (lock further red, reported)."""
-    ctrl, res, line, det, pp_pm = _exact(lambda: RampAcquire(rings=[0]), preset, 4e-3)
+    ctrl, res, line, det, pp_pm = _run_declared(lambda: RampAcquire(rings=[0]), preset, 4e-3)
     f = ctrl.fsm
     print(f"\n{preset}: line {line[0]}, detuning {det[0]:.1f} pm, p-p {pp_pm[0]:.2f} pm, partial "
           f"{bool(f.partial[0, 0])}, retries {f.retries[0, 0]}")
@@ -139,7 +145,7 @@ def test_bitstat_lock_in_sampled_worlds():
     ~2.5 pm p-p; a world whose monitor clips at the peak computes the eye ratio on a clipped amplitude (y_bg near
     full scale, R meaningless) and wanders ~6 pm p-p; reported, the clipped ones not bounded here."""
     B = 8
-    ctrl, res, line, det, pp_pm = _exact(lambda: BitStatLock(rings=[0]), "g26", 6e-3, batch=B, sampled=True)
+    ctrl, res, line, det, pp_pm = _run_declared(lambda: BitStatLock(rings=[0]), "g26", 6e-3, batch=B, sampled=True)
     f = ctrl.fsm
     for b in range(B):
         print(f"\nworld {b}: line {line[b]}, detuning {det[b]:.1f} pm, p-p {pp_pm[b]:.2f} pm, alpha "
@@ -157,18 +163,17 @@ def test_bitstat_ratio_lock_under_a_swing_loss():
     is 1/0.866 of its value at alpha 3/4): the ratio loop lowers alpha to its floor 0.55 (the R maximum is at
     alpha 1/2; below it the law would run away). The inner lock holds; the lock point moves red (reported).
 
-    The p-p of the last quarter (2.25 ms after the step) measures the wander of the ratio loop: alpha is still
-    falling and the eye statistic is noisy, so one noise seed draws one sample of a wide distribution. It is judged as
-    the median over eight noise seeds (bound 4 pm, as before), every seed in LOCK on the red side. Measured
-    (physics_optics review, 2026-10-16), seeds 1-8: 3.03 0.88 2.77 3.75 2.99 6.52 5.76 3.22 pm (median 3.1); on the
-    engine before the bus segment loss was applied: 2.92 3.10 2.36 6.21 2.80 3.14 2.98 1.92 pm (median 2.95). The
-    former single-seed check (seed 7: 1.97 pm with the pre-modes_rib160 loss budget, 2.98 pm after the g26 budget was
-    re-solved, 5.76 pm with the bus loss, a 0.6 % change of the bus-output power) sat inside that tail, which reaches
-    6.2-6.5 pm on either engine."""
-    sc = g.Scenario(name="swing", components=(g.step("data.swing_scale", 3.5e-3, -0.2),))
+    The p-p of the last quarter (2.25 ms after the step) measures the wander of the ratio loop. Alpha is still
+    falling and the eye statistic is noisy, so one noise seed draws one sample of a wide distribution. So the test
+    judges the median over eight noise seeds (bound 4 pm), with every seed in LOCK on the red side. Measured, seeds
+    1-8: 3.03 0.88 2.77 3.75 2.99 6.52 5.76 3.22 pm (median 3.1). The tail of that distribution reaches 6.2-6.5 pm,
+    and a small model change (for example a 0.6 % change of the bus-output power) moves a single seed within it."""
+    swing_loss = generators.step("data.swing_scale", 3.5e-3, -0.2)          # swing 1 -> 0.8 at 3.5 ms
+    sc = generators.Scenario(name="swing", components=(swing_loss,))
     pps = []
     for seed in range(1, 9):
-        ctrl, res, line, det, pp_pm = _exact(lambda: BitStatLock(rings=[0]), "g26", 9e-3, scenario=sc, seeds=seed)
+        ctrl, res, line, det, pp_pm = _run_declared(lambda: BitStatLock(rings=[0]), "g26", 9e-3, scenario=sc,
+                                                    seeds=seed)
         mx = [v for k, v in res.trace.items() if k.startswith("lam_res_m") and k.endswith("max")][0]
         t = mx["t_s"]
         lam = mx["value"][:, 0, 0]

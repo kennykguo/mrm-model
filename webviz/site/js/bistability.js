@@ -1,7 +1,7 @@
 // "Why is the ring bistable?" Ring 0 swept open loop, heater code up then down: the engine run (two legs)
 // over the static S-curve of the model's laws, with the fold points where a stable branch ends.
 
-import { plotBase, axis, PLOT_CONFIG, token } from './theme.js';
+import { plotBase, axis, PLOT_CONFIG, token, renderPlot } from './theme.js';
 
 const YS = {
   drop: { key: 'p_drop_uw', title: 'drop power to the monitor (µW)', unit: 'µW', fmt: '.2f' },
@@ -46,6 +46,7 @@ export class BistabilityView {
   render() {
     const p = this.data.powers[this.idx];
     const Y = YS[this.y];
+    this.card.querySelector('[data-role=plot-explanation]').textContent = 'Read left to right by heater code, not time. ' + (this.y === 'drop' ? 'Height is optical power sent to the monitor. ' : 'Height is resonance-minus-laser detuning. ') + 'Compare rising-code and falling-code sweeps: different paths at the same code show dependence on thermal history. Gray solid branches are stable equilibria; the dotted branch is unstable. Diamonds mark folds, where a stable branch ends and the state must jump.';
     const b = plotBase();
     const muted = token('--text-muted');
     const ink2 = token('--text-secondary');
@@ -87,7 +88,7 @@ export class BistabilityView {
     const pad = (hi - lo) * 0.04;
     const layout = {
       paper_bgcolor: b.paper_bgcolor, plot_bgcolor: b.plot_bgcolor, font: b.font, hoverlabel: b.hoverlabel,
-      height: 420,
+      height: 500,
       margin: { l: 62, r: 16, t: 10, b: 96 },
       hovermode: 'closest',
       legend: { ...b.legend, orientation: 'h', x: 0, y: -0.2, yanchor: 'top' },
@@ -95,7 +96,7 @@ export class BistabilityView {
       yaxis: axis(b, { title: { text: Y.title } }),
       annotations: ann,
     };
-    Plotly.react(this.gd, data, layout, PLOT_CONFIG);
+    renderPlot(this.gd, data, layout, PLOT_CONFIG);
     const sub = this.card.querySelector('.readout');
     const w = Math.abs(st.folds[0].code - st.folds[1].code);
     sub.textContent = `ring 0 · ${powerLabel(p)} at the ring · loop width ${w.toFixed(0)} codes · ` +

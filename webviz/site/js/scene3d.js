@@ -10,9 +10,9 @@ import { token } from './theme.js';
 import { mixHex } from './scales.js';
 
 export const WG_DRAW_UM = 1.2;   // drawn waveguide width; the rib is 0.4 um (drawn 3x so it shows at full view)
-export const COL_MAX_UM = 30;    // heater-power column height at the top of its scale
+export const COL_MAX_UM = 30;    // heater-power gauge height at the top of its scale
 const FIELD_DEPTH = 40;          // the height field spans this depth below the die surface
-const PD_SIZE = 7;               // drawn PD marker (the model has no PD size)
+const PD_SIZE = 6;               // fallback PD marker diameter (meta.geometry.site_sizes_um gives the extraction's radius)
 
 export class Scene3D {
   constructor(host, meta, { onPick, onHover }) {
@@ -77,7 +77,7 @@ export class Scene3D {
       this.down = null;
       if (moved > 4) return;
       const hit = this.pick(e);
-      if (hit && hit.kind === 'ring') this.onPick(hit.idx);
+      if (hit && ['ring', 'heater', 'pd', 'driver'].includes(hit.kind)) this.onPick(hit.idx);
     });
 
     new ResizeObserver(() => this.resize()).observe(host);
@@ -228,7 +228,14 @@ export class Scene3D {
     this.columns = [];
     this.ringLabels = [];
     this.outlineMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    const heaterMat = new THREE.MeshBasicMaterial({ color: 0xc8834f });
+    // the heater body of the preset's heater family, to scale (geometry.heater_structure: annuli r0..r1, z0..z1)
+    const hs = g.heater_structure;
+    const heaterGeos = (hs ? hs.rects : [{ r_inner_um: ha.inner, r_outer_um: ha.outer, z_bottom_um: 0, z_top_um: 0.16 }]).map((q) => {
+      const pts = [[q.r_inner_um, q.z_bottom_um], [q.r_outer_um, q.z_bottom_um], [q.r_outer_um, q.z_top_um], [q.r_inner_um, q.z_top_um], [q.r_inner_um, q.z_bottom_um]]
+        .map(([rr, zz]) => new THREE.Vector2(rr, zz));
+      return new THREE.LatheGeometry(pts, 72);
+    });
+    this.heaterMats = [];
     const colMat = new THREE.MeshStandardMaterial({ color: 0xc8834f, roughness: 0.45, metalness: 0.25, transparent: true, opacity: 0.9 });
     g.ring_centers_um.forEach(([x, y], r) => {
       const outline = new THREE.Mesh(this.flat(new THREE.RingGeometry(R - WG_DRAW_UM * 1.1, R + WG_DRAW_UM * 1.1, 80)), this.outlineMat);
@@ -240,9 +247,20 @@ export class Scene3D {
       torus.position.set(this.X(x), WG_DRAW_UM / 2 + 0.1, this.Z(y));
       S.add(torus);
       this.ringMats.push(mat);
-      const heater = new THREE.Mesh(this.flat(new THREE.RingGeometry(ha.inner, ha.outer, 56)), heaterMat);
-      heater.position.set(this.X(x), 0.12, this.Z(y));
-      S.add(heater);
+      const hm = new THREE.MeshBasicMaterial({ color: 0xc8834f, side: THREE.DoubleSide });
+      this.heaterMats.push(hm);
+      for (const geo of heaterGeos) {
+        const heater = new THREE.Mesh(geo, hm);
+        heater.position.set(this.X(x), 0.02, this.Z(y));
+        heater.userData = { kind: 'heater', idx: r };
+        S.add(heater);
+        this.pickables.push(heater);
+        const hh = new THREE.Mesh(this.flat(new THREE.RingGeometry(geo.parameters.points[0].x, geo.parameters.points[1].x, 48)), new THREE.MeshBasicMaterial({ visible: false }));
+        hh.position.set(this.X(x), 0.5, this.Z(y));
+        hh.userData = { kind: 'heater', idx: r };
+        S.add(hh);
+        this.pickables.push(hh);
+      }
       const col = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 1, 24).translate(0, 0.5, 0), colMat);
       col.position.set(this.X(x), 0.15, this.Z(y));
       col.userData = { kind: 'heater', idx: r };
@@ -263,12 +281,13 @@ export class Scene3D {
     // monitor PDs (colour = PD temperature) and drivers
     this.pdMats = [];
     this.edgeMats = [];
-    const pdGeo = new THREE.BoxGeometry(PD_SIZE, 1.6, PD_SIZE);
+    const sz = g.site_sizes_um || { monitor_pd_radius: PD_SIZE / 2, driver_radius: 4, aggressor_radius: 4 };
+    const pdGeo = new THREE.CylinderGeometry(sz.monitor_pd_radius, sz.monitor_pd_radius, 1.0, 40);
     const pdEdges = new THREE.EdgesGeometry(pdGeo);
     g.monitor_pd_um.forEach(([x, y], r) => {
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const pd = new THREE.Mesh(pdGeo, mat);
-      pd.position.set(this.X(x), 0.8, this.Z(y));
+      pd.position.set(this.X(x), 0.5, this.Z(y));
       pd.userData = { kind: 'pd', idx: r };
       const em = new THREE.LineBasicMaterial({ color: 0x111111 });
       pd.add(new THREE.LineSegments(pdEdges, em));
@@ -277,12 +296,12 @@ export class Scene3D {
       this.pdMats.push(mat);
       this.pickables.push(pd);
     });
-    const drvGeo = new THREE.BoxGeometry(8, 1.0, 5);
+    const drvGeo = new THREE.CylinderGeometry(sz.driver_radius, sz.driver_radius, 0.6, 40);
     const drvMat = new THREE.MeshStandardMaterial({ color: 0x8d8b85, roughness: 0.8 });
     const drvEdges = new THREE.EdgesGeometry(drvGeo);
     g.driver_um.forEach(([x, y], r) => {
       const d = new THREE.Mesh(drvGeo, drvMat);
-      d.position.set(this.X(x), 0.5, this.Z(y));
+      d.position.set(this.X(x), 0.3, this.Z(y));
       d.userData = { kind: 'driver', idx: r };
       const em = new THREE.LineBasicMaterial({ color: 0x111111 });
       d.add(new THREE.LineSegments(drvEdges, em));
@@ -296,16 +315,21 @@ export class Scene3D {
     glowTex.colorSpace = THREE.SRGBColorSpace;
     this.agg = {};
     for (const [site, [x, y]] of Object.entries(g.aggressor_sites_um)) {
-      const marker = new THREE.Mesh(this.flat(new THREE.RingGeometry(2.4, 4.0, 40)), new THREE.MeshBasicMaterial({ color: 0xd03b3b }));
+      const ar = sz.aggressor_radius;
+      const marker = new THREE.Mesh(this.flat(new THREE.RingGeometry(ar - 1.0, ar, 64)), new THREE.MeshBasicMaterial({ color: 0xd03b3b }));
+      const disc = new THREE.Mesh(this.flat(new THREE.CircleGeometry(ar - 1.0, 64)), new THREE.MeshBasicMaterial({ color: 0xd03b3b, transparent: true, opacity: 0.18, depthWrite: false }));
+      disc.position.set(this.X(x), 1.2, this.Z(y));
+      marker.add(disc);
+      disc.position.set(0, -0.05, 0);
       marker.position.set(this.X(x), 1.25, this.Z(y));
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, opacity: 0 }));
       glow.position.set(this.X(x), 3, this.Z(y));
-      const hit = new THREE.Mesh(this.flat(new THREE.CircleGeometry(6, 24)), new THREE.MeshBasicMaterial({ visible: false }));
+      const hit = new THREE.Mesh(this.flat(new THREE.CircleGeometry(ar, 32)), new THREE.MeshBasicMaterial({ visible: false }));
       hit.position.set(this.X(x), 1.4, this.Z(y));
       hit.userData = { kind: 'aggressor', idx: site };
       S.add(marker, glow, hit);
       this.pickables.push(hit);
-      const lab = this.label(site === 'aggressor' ? 'aggressor' : 'stress site', x, y - 11, 0.5, 'minor');
+      const lab = this.label(site === 'aggressor' ? 'aggressor' : 'stress site', x, y - ar - 5, 0.5, 'minor');
       this.agg[site] = { marker, glow, hit, lab };
     }
 
@@ -314,12 +338,20 @@ export class Scene3D {
     this.label('light in →', busX0 + 22, busY - 7, 0.5, 'minor');
     this.label('monitor PDs', -32, g.monitor_pd_um[0][1], 0.5, 'minor');
     this.label('drivers', -32, g.driver_um[0][1], 0.5, 'minor');
+    // scale bars: 50 um and 10 um (to scale, like every structure here)
     const sbY = this.y0 + 6;
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(50, 0.5, 1.2), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    bar.position.set(this.X(this.x1 - 35), 0.3, this.Z(sbY));
-    S.add(bar);
-    this.barMat = bar.material;
-    this.label('50 µm', this.x1 - 35, sbY + 6, 0.5, 'minor');
+    this.barMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    for (const [len, x0] of [[50, this.x1 - 60], [10, this.x1 - 100]]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(len, 0.5, 1.2), this.barMat);
+      bar.position.set(this.X(x0 + len / 2), 0.3, this.Z(sbY));
+      S.add(bar);
+      for (const e of [x0, x0 + len]) {
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 4), this.barMat);
+        tick.position.set(this.X(e), 0.3, this.Z(sbY));
+        S.add(tick);
+      }
+      this.label(`${len} µm`, x0 + len / 2, sbY + 6, 0.5, 'minor');
+    }
   }
 
   // distance at which the whole die fits the width of the view (with a margin)
@@ -427,6 +459,8 @@ export class Scene3D {
       this.ringMats[r].color.setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
       const p = sc.temp.rgb(R.t_pd_k[f][r] - K0);
       this.pdMats[r].color.setRGB(p[0] / 255, p[1] / 255, p[2] / 255, THREE.SRGBColorSpace);
+      const hc = sc.temp.rgb(R.t_heater_k[f][r] - K0);
+      this.heaterMats[r].color.setRGB(hc[0] / 255, hc[1] / 255, hc[2] / 255, THREE.SRGBColorSpace);
       const h = Math.max(0.05, COL_MAX_UM * (R.p_heater_mw[f][r] || 0) / S.pHeatMax);
       this.columns[r].scale.y = h;
       const lo = R.line_on[f][r];
@@ -498,7 +532,8 @@ export class Scene3D {
     const hits = this.raycaster.intersectObjects(live, false);
     if (!hits.length) return null;
     // a ring wins over the heater column and bus that sit inside or beside it
-    const order = { ring: 0, aggressor: 1, pd: 2, heater: 3, driver: 4, bus: 5 };
+    // the heater annulus (inside the ring) wins over the ring's own pick disc; the ring over the bus beside it
+    const order = { heater: 0, ring: 1, aggressor: 2, pd: 3, driver: 4, bus: 5 };
     hits.sort((a, b) => (order[a.object.userData.kind] - order[b.object.userData.kind]) || (a.distance - b.distance));
     return hits[0].object.userData;
   }

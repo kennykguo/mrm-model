@@ -1,12 +1,16 @@
-"""Unit tests of the acquisition FSM (mrm.control.baselines.ramp_acquire.RampFSM) on a toy plant: a comb of Lorentzian
-drop peaks in drive units with one controller period of lag and ADC noise. No thermal model and no bistability: these
-tests check the state machine's bookkeeping (terminating searches, retries, FAIL and re-arm, the lock-loss search)
-in cases that are slow or rare on the reference plant. Closed-loop physics is in test_ctrl_b_ramp.py and on the
-engine (test_ctrl_b_engine.py, test_ctrl_b_robust.py).
+"""Unit tests of the acquisition state machine (mrm.control.baselines.ramp_acquire.RampFSM) on a toy plant.
 
-Toy plant: y(w) = bg + sum_k A / (1 + (2 (w - c_k) / fwhm_w)^2) at the drive applied one period earlier, times the
-light level (0 = laser off); the comb moves by ``drift`` (drive units, negative = the chip warmed, every resonance needs
-less heater).
+Read this first
+---------------
+The toy plant is a comb of Lorentzian drop peaks in drive units, with one controller period of lag and ADC noise.
+It has no thermal model and no bistability. So these tests check only the state machine's bookkeeping: searches
+that end, retries, FAIL and re-arm, and the search after a lock loss, in cases that are slow or rare on the
+reference plant. The closed-loop physics is in test_ctrl_b_ramp.py and on the engine (test_ctrl_b_engine.py,
+test_ctrl_b_robust.py).
+
+Toy plant: y(w) = bg + sum_k A / (1 + (2 (w - c_k) / fwhm_w)^2), at the drive w applied one period earlier, times
+the light level (0 = laser off). The comb moves by ``drift`` (drive units; negative = the chip warmed, so every
+resonance needs less heater).
 """
 from __future__ import annotations
 
@@ -54,7 +58,7 @@ class Toy:
         sensors = {"tx.monitor.samples": y[..., None].astype(np.int64), "tx.monitor.count": np.ones((B, N), np.int32),
                    "tx.monitor.latest": y.astype(np.int64), "tx.heater.applied": self.code.astype(np.uint16)}
         return Observation(k * self.spec.period_ticks, self.spec.tick_s, sensors, {c: np.ones((B, N), bool)
-                                                                                     for c in sensors})
+                                                                                   for c in sensors})
 
 
 def run(toy: Toy, ctrl, n: int, k0: int = 0, events=None):
@@ -78,8 +82,8 @@ def peak_w_of_lock(ctrl, toy) -> float:
 
 
 def test_dark_search_ends_in_fail_and_parks_the_heater(spec):
-    """No light: the search climbs to full scale, retries, FAILs and parks at the window's low edge. Before the
-    review the default window (w_hi = 1) never ended: the heater stayed at full scale for ever (w was clipped to 1, the
+    """No light: the search climbs to full scale, retries, FAILs and parks at the window's low edge. Before a fix
+    the default window (w_hi = 1) never ended: the heater stayed at full scale for ever (w was clipped to 1, the
     end-of-window test w > w_hi + 3 dw_up never became true)."""
     f = RampFSM(spec, RampParams(rings=[0], fail_rearm_s=None))
     mask = np.zeros((1, spec.n_rings), bool)
@@ -96,7 +100,7 @@ def test_dark_search_ends_in_fail_and_parks_the_heater(spec):
 
 def test_standalone_reacquires_after_a_laser_outage_at_start(spec):
     """Laser off for the first 12 ms, then on: the standalone controller FAILs in the dark and its re-arm
-    (fail_rearm_s) takes the first resonance once the light is back. Before the review FAIL was final."""
+    (fail_rearm_s) takes the first resonance once the light is back. Before a fix FAIL was final."""
     toy = Toy(spec)
     toy.light = 0.0
     ctrl = RampAcquire(rings=[0], start_delay_s=0.0)
@@ -179,3 +183,17 @@ def test_bitstat_lock_rearms_too(spec):
     f.fail_steps[0, 0] = f.rearm_steps
     f.auto_rearm()
     assert f.state[0, 0] == ST_UP and f.retries[0, 0] == 0
+
+
+@pytest.mark.parametrize("name", ["ramp_acquire", "acquire_then_lock", "bitstat_lock", "wdm_supervisor"])
+def test_fsm_controllers_refuse_round_robin(name):
+    """Under controller_interface.schedule = round_robin the engine applies only ring j % N at edge j. The FSM moves
+    every ring's heater at every edge, so its sweeps and lock loop run on drives the rings do not have (g26 nominal
+    on the engine, ramp_acquire ring 0, 3 ms: 148 pm and locked with simultaneous; 1551 pm, std 544 pm, still
+    reported LOCK with round_robin). These controllers accepted the setting silently; now reset refuses it, as
+    kalman_lqg and mpc do."""
+    from mrm.control import registry
+    sp = make_spec(load_g26(overrides=["controller_interface.schedule=round_robin"], knowledge=KNOW), 1)
+    assert sp.schedule == "round_robin"
+    with pytest.raises(ValueError, match="schedule"):
+        registry.create(name, {}).reset(sp)

@@ -9,15 +9,16 @@ P1-8, P1-9, P1-13, P2-1.
 ## 1. Public API
 
 ```python
-from mrm.sim.runner import run, RunResult, quasi_static, QuasiStaticResult
+from mrm.sim.runner import run, RunResult, solve_locked_steady_state, LockedSteadyStateResult
 run(cfg_or_params, controller=None, scenario=None, duration_s=1e-3, batch=1, seeds=None, record=None, metrics=None,
     **options) -> RunResult            # options: substep_policy, uncertainty, variation, reset_protocol, heater_code,
                                        # path, n_threads, oracle, histogram, chunk_ticks, controller_params, cfg,
                                        # auto_max_ticks, oracle_period_ticks
 RunResult(metrics: dict, trace: dict | None, truth_final: Truth, manifest_inputs: dict, diagnostics: dict,
           wall_s: float, plant: Plant)
-quasi_static(cfg_or_params, *, ambient_c=None, bias_v=None, batch=1, seeds=None, p_in_w=None, n_scan=301,
-             iterations=4, cfg=None, uncertainty=None, variation=None) -> QuasiStaticResult
+solve_locked_steady_state(cfg_or_params, *, ambient_c=None, bias_v=None, batch=1, seeds=None, p_in_w=None,
+                          n_scan=301, iterations=4, cfg=None, uncertainty=None, variation=None, order="heater_up",
+                          data_state=None) -> LockedSteadyStateResult
 
 from mrm.plant.plant import Plant, Truth, prepare_scenario
 Plant(pp, scenario=None, spec=None, *, cfg=None, controller_latency_ticks=0, noise_seed=0, scenario_seed=0,
@@ -292,8 +293,8 @@ at load ~20 (66 s at load ~12); every test under 25 s at that load, no slow mark
 included): 8 passed. Whole suite without `slow`: 1343 passed, 10 failed, none in engine code or engine tests
 (closure presets eta / G25 notch / corner pins, VAL-8 thermal replication, replicas other-lines, PARAMETERS.md
 current; the failing tests do not call the engine; probably the extraction agents' changing artefacts, not investigated).
-test_replicas_static::test_bank_lock_matches_the_engine_quasi_static (an independent static bank solve against
-`quasi_static`) passes.
+test_replicas_static::test_bank_lock_matches_the_engine_locked_steady_state (an independent static bank solve against
+`solve_locked_steady_state`) passes.
 
 - `test_kernel_parity.py`: kernel vs the NumPy reference, bit for bit on every Truth field, every obs vector and the
   metrics: open loop, a Python controller (slow path, latency 2) and a compiled controller (kernel path, clipping);
@@ -382,7 +383,7 @@ Every item below was reproduced first (a probe or a test that failed), then fixe
 
 | # | severity | where | defect | fix |
 |---|---|---|---|---|
-| 1 | major | kernel `_prepare_interval`, `truth_row`, `_oracle`; kernel_ref; runner `quasi_static` | d phi / d lambda_res used the line wavelength (2 pi c t_rt / lambda^2) instead of the shifted coordinate of the phase model: every Truth detuning 1.2 % too large after a 7.6 nm heater shift (-3069 vs -3040 pm; 3.6 pm at +300 pm), same factor in the in-tick thermo-optic phase, the oracle scan and the survey | `dphi_dlamres` at x = lambda - shift; the declared line's detuning exact (`resonance_detuning`, Newton on the cold curve) |
+| 1 | major | kernel `_prepare_interval`, `truth_row`, `_oracle`; kernel_ref; runner `solve_locked_steady_state` | d phi / d lambda_res used the line wavelength (2 pi c t_rt / lambda^2) instead of the shifted coordinate of the phase model: every Truth detuning 1.2 % too large after a 7.6 nm heater shift (-3069 vs -3040 pm; 3.6 pm at +300 pm), same factor in the in-tick thermo-optic phase, the oracle scan and the survey | `dphi_dlamres` at x = lambda - shift; the declared line's detuning exact (`resonance_detuning`, Newton on the cold curve) |
 | 2 | major | kernel `_auto_h` | the 07 P0-10 auto rules look only backward: the first substep after a laser, traffic, bias or fault step was up to 64 ticks and the controller's monitor samples showed a linear ramp instead of the step (2300 codes wrong) | forced tick at scenario events (held change, FOH kink), step doubling limit, BER-window, bias-noise-period and finished-record handling |
 | 3 | major | plant `_build` | PRBS period overwritten by the controller period (shadowed variable): `pattern_noise: prbs<k>` ran a wrong pattern | renamed; parity test variant |
 | 4 | major | plant pipeline capacity | sized with the nominal period: with tick jitter 5 and latency 9, 65-71 of 200 commands silently dropped | capacity from period - jitter |
@@ -390,7 +391,7 @@ Every item below was reproduced first (a probe or a test that failed), then fixe
 | 6 | minor | `Plant.reset` | overwrote the compiled controller's saved post-init state with the end state (second episode and fault.controller_reset wrong); non-DAC registers not set to channel init | restore from the post-init copy; registers from init |
 | 7 | minor | runner `_make_controller` | `registry.create(name, **params)`, but create takes a mapping: any `controller_params` raised TypeError | `create(name, params)` |
 | 8 | minor | kernel_ref oracle | exact ring even when the plant runs TCMT (parity failed under `optics_model: tcmt`) | the plant's model |
-| 9 | minor | quasi_static | exact ring under TCMT; optimum quantized to the 3 pm grid with P_abs at the grid point | plant's model; parabola-refined optimum, ring re-evaluated there |
+| 9 | minor | solve_locked_steady_state | exact ring under TCMT; optimum quantized to the 3 pm grid with P_abs at the grid point | plant's model; parabola-refined optimum, ring re-evaluated there |
 | 10 | feature | metrics | lock state about the LINE only: every side-of-fringe / OMA lock reads "never locked" (controllers_b request) | `lock_reference` line / oracle / target, lock-error metrics |
 | 11 | feature | Truth | the Truth-fed oracle could not run on the engine (no lag states, no conditions; controllers_c request) | `Truth.x`, `heater_applied`, `conditions` |
 

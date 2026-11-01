@@ -1,337 +1,233 @@
-# The mrm model, explained
+# The MRM model, explained
 
-For Kenny. What the model is, how to run your own controller on it, what each mechanism does, where it disagrees with
-your textbook, and what is still wrong. Depth lives in docs/ENGINE.md (the engine), docs/PARAMETERS.md (every number)
-and docs/ARCHITECTURE.md (the contracts).
+This project is a **virtual test bench for a controller that keeps optical rings tuned**.
+It simulates eight microring modulators in a Lightmatter G26 transmit bank: how they respond to light,
+heat, electrical drive and your controller's commands.
 
-## 1. Overview
+The question it helps answer is: **can your controller keep every ring at a useful operating point,
+on the right laser wavelength, while conditions change?**
 
-**What it is.** A plant model: a simulator of the device that your lock controller will drive. The device is the
-transmit bank of Lightmatter's G26 link (OFC 2026): 8 microring modulators (MRMs) on one bus waveguide. Each ring has a
-heater inside it, a PN junction for the data and a monitor photodiode (PD) on its drop port (the second waveguide that
-takes light out of the ring). 8 laser lines on a 400 GHz grid near 1310 nm, 50 Gb/s NRZ (two-level) data. The plant
-steps in 1 us ticks. Your controller runs every 10 us (100 kHz): it reads ADC codes and writes heater DAC codes, as
-firmware would.
+## Picture the device
 
-**Where the numbers come from.** G26 papers and slides; the G25 test vehicle on the same GlobalFoundries 45SPCLO
-platform; the foundry; other groups' papers; and our own solvers for an assumed cross-section. Many numbers are assumed.
-Every number carries a provenance word: *printed* (stated in a paper), *read-off* (digitized from a figure), *inferred*
-(arithmetic on printed numbers), *solver* (our mode or heat solver, assumed geometry), *literature* (other groups'
-devices), *assumed* (no source). Your real device values will replace them.
+Eight laser wavelengths travel along one shared waveguide. Beside it sit eight tiny silicon rings,
+each assigned to one wavelength. A ring interacts strongly with light near its **resonance**—its
+preferred wavelength. An electrical data signal shifts that resonance rapidly, changing how much
+light continues along the waveguide. That is how the ring puts data onto light.
 
-**Worlds.** Where a number is unknown, the preset gives a range or a set of hypotheses. A *world* is one draw of all of
-them. A run uses the nominal world, the named corners (hand-picked hard worlds, each a small preset such as `g26_h86`),
-or many sampled worlds.
+Temperature also shifts the resonance. Left alone, a ring drifts away from the operating point that
+makes modulation work well. Each ring therefore has a heater for tuning and a photodiode that measures
+light leaving its drop port, a separate output from the ring.
 
-**The parts** (folders of `mrm/`):
+Your lock controller closes this loop:
 
-- `params/`: loads a preset (a YAML file of device numbers), checks units and provenance, draws worlds.
-- `plant/`: the physics of one tick: optics, heat, self-heating, heater and bias electronics, monitor and ADC, laser,
-  data path.
-- `scenarios/`: the disturbances: the on-die aggressor, ambient soak, laser drift, power steps, traffic changes, faults.
-- `control/`: the controller interface and the shipped controllers (`baselines/`).
-- `sim/`: the engine (a compiled numba kernel), the runner, the metrics, experiment files and the `mrm` command.
-- `extraction/` and `data/extracted/`: offline mode, coupler, heat and junction solvers and their saved results.
-- `validation/`: the published measurements as targets, and the generator of the validation report.
-- `calibration/`: fits the model to the calibration targets and writes `g26_calibrated` (stale now, section 4).
-- `waveform/`: short picosecond runs of one modulator (eye shapes), not used in a lock run.
+```text
+heater command → heater power → ring temperature → resonance → monitor reading
+      ↑                                                               │
+      └──────────────── controller adjusts the heater ────────────────┘
+```
 
-**The four files you need.**
+The fast data signal carries the bits; the slower heater loop keeps the ring tuned. The default link
+uses 50 Gb/s two-level data. The simulator advances in 1 µs ticks, and the controller updates every
+10 µs (100 kHz).
 
-1. `mrm/params/presets/g26.yaml`: the device. Every number has a value, a provenance, a source and often a note. Read it
-   as a table in docs/PARAMETERS.md, or ask for one number (command below).
-2. `examples/controllers/template_python_controller.py`: copy it to write your controller. It is a plain integral lock
-   on the monitor. The same folder has a one-ring template and a compiled (numba) template;
-   `examples/controllers/README.md` explains them.
-3. `experiments/examples/steady_pi_lock.yaml` (40 ms at 25 °C) and `experiments/examples/a1_pi_lock.yaml` (one 130.7 ms
-   period of the A1 aggressor): an experiment file names the preset, the controller, the scenario, the run length and
-   how to score it.
-4. docs/KNOWN_ISSUES.md: what is still wrong or stale.
+## What “locked” means
 
-**Rules for your controller.** Read only the observation (ADC codes, sample ticks, temperature-sensor codes, the heater
-code now applied) and the spec. Return integer heater codes (0 to 65535). The controller gets device numbers only
-through `spec.nominal`, and g26 releases only the line grid and the ring-to-line map; everything else it must measure.
-At the start (`start: warm` in the files above) each ring sits locked on the stable side of its line, with a settled
-thermal state.
+A good operating point is usually on the **side of the resonance**, rather than at its peak.
+The monitor reading changes with position along that slope, giving the controller a signal to follow.
+The shipped PI controller measures the monitor peak and adjusts heater power to hold a fraction of
+that reading on the stable side. That fraction is a **tunable hyperparameter**,
+`controller.params.fraction`, with a default of 0.7 (70% of the measured drop-monitor peak).
+It is an operating-point choice, not a physical constant or a guarantee of maximum slope or modulation amplitude.
 
-**Commands.** Run them from the repo, in this order. `tools/memguard.py` stops a job that uses more than 3 GB, so a run
-cannot freeze the 16 GB Mac. After a change to numba code, the first run compiles for about 2 minutes.
+Two distinctions matter:
+
+- **Lock error is movement away from the intended operating point.** A ring can be correctly locked
+while its resonance is offset from the laser. In the example experiments, error is measured against
+that ring's own steady operating point.
+- **A steady monitor reading does not prove the ring is on the right wavelength.** Rings have repeated
+resonances and can capture another laser line. Check wavelength assignment as well as lock error.
+
+The model defines **detuning = ring resonance wavelength − laser wavelength**. Positive detuning means
+that the ring resonance is at a longer wavelength (“red” of the laser). This is the stable side used by
+the shipped PI lock. The textbook uses the opposite sign for its δ.
+
+## Why the controller has a difficult job
+
+
+
+### Light heats the ring too
+
+Some of the circulating light is absorbed and becomes heat. That heat shifts the resonance, changing
+how much light is absorbed. The ring's temperature and its optical response therefore affect each other.
+
+On the stable side, this feedback softens both heater adjustments and disturbances: in the nominal
+model, their effect on resonance is reduced by roughly 3–7 times. Near the end of that stable branch,
+the ring can suddenly jump to a much colder state and lose lock. The same heater command can support
+two stable temperatures; this is **thermal bistability**.
+
+This is why simply seeking the largest monitor reading can fail. It is also why laser power changes
+can move the lock point even when the laser wavelength stays fixed.
+
+### The heater has limits
+
+The default heater is driven by a 16-bit voltage DAC, with commands from 0 to 65,535. Power roughly
+follows V²/R, and resistance rises as the heater warms. A change of 100 codes therefore has a different
+effect at low and high drive. All eight heaters also share supply limits.
+
+Most importantly, a heater can only add heat. Reducing its command helps only until it reaches zero.
+With the present model parameters, the full A1 heat disturbance pushes ring 0 beyond that limit:
+its heater stays at zero for about 15 ms, and lock error reaches roughly 455–473 pm. That particular
+failure needs more cooling or tuning range; changing controller gain cannot remove it.
+
+### Heat spreads through the bank
+
+A ring feels heat from its own heater, absorbed light, the data driver, neighbouring rings and an
+external heat source called the **aggressor**. Each path has its own strength and delay. Adjusting one
+ring can therefore disturb another later.
+
+The default model has fast heater responses around 3 and 13 µs, a small 3 ms tail, and slower crosstalk
+between rings. The nearest neighbour receives about 3% of the heater's own-ring temperature response.
+These dynamics come from other devices and assumptions; they have not been measured for G26.
+
+A1 represents the published on-die heating experiment. The simulator applies heat at an aggressor site,
+so rings, monitor photodiodes and temperature sensors all feel it through their respective thermal paths.
+Other scenarios include ambient warming, laser drift, power steps, traffic changes and faults.
+
+### The measurement is imperfect
+
+The controller sees photodiode readings converted into ADC codes, with integration time, delay, noise,
+uncertain gain and possible clipping. The photodiode also produces **dark current**, a background signal
+that grows as it warms. A higher reading can therefore mean something other than a resonance shift.
+
+The default monitor integrates for 2 µs, adds 2 µs of ADC latency, and samples at 250 kHz. Heater commands
+have another 1 µs of latency. These delays matter when choosing how aggressively to correct an error.
+
+### Bias and traffic also change the ring
+
+The PN junction carries the fast data signal. Its DC bias changes resonance and optical loss; the data
+and nearby driver also generate heat. Starting or stopping traffic can move the ring's temperature.
+
+Bias can be a second actuator, but it is unexpectedly weak near the default model's lock point:
+changes in absorbed heat cancel much of its direct wavelength shift. This remains an open physics
+check. By default, bias stays at 1.05 V and the controller drives only the heaters.
+
+## Which numbers should you believe?
+
+The default preset is [`g26.yaml`](../mrm/params/presets/g26.yaml). It combines G26 publications, earlier
+G25 measurements, foundry information, other groups' devices, simulations of assumed geometry and
+explicit assumptions. **It is a working hypothesis of the device.**
+
+A few useful scales, for the nominal preset:
+
+
+| Quantity                          | Approximate value                             | Why it matters                                               |
+| --------------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
+| Laser grid                        | 8 lines, 400 GHz apart, near 1310 nm          | Each ring must stay with its assigned line.                  |
+| Optical power at the first ring   | +4 dBm per line                               | Sets monitor signal and optical self-heating.                |
+| Resonance linewidth               | 338 pm, loaded Q ≈ 3850                       | Sets the width and slope of the optical response.            |
+| Wavelength shift with temperature | 65 pm/K at 25 °C, rising to 74 pm/K near lock | Converts heating into wavelength drift.                      |
+| Cold resonance offset             | 7.6 nm below its assigned line                | Requires substantial heating; nominal lock is around 134 °C. |
+
+
+Every parameter records where it came from: directly published, read from a figure, inferred by
+arithmetic, computed by a solver, taken from other literature, or assumed. See
+[PARAMETERS.md](PARAMETERS.md) for the full table and sources.
+
+When a value is unknown, the model can try several plausible choices. A **world** is one complete
+choice of those uncertain values. The **nominal world** uses the defaults; **corners** are selected
+challenging combinations; **sampled worlds** explore more combinations. Passing the nominal world
+shows that the controller works for that choice. A robustness claim needs all tested worlds to pass.
+
+### Why some values differ from the textbook
+
+The largest differences are:
+
+
+| Topic                                  | Textbook              | Default model                                            |
+| -------------------------------------- | --------------------- | -------------------------------------------------------- |
+| Temperature sensitivity                | Constant 86 pm/K      | About 65–74 pm/K over the nominal heating range          |
+| Fraction of optical loss becoming heat | 0.3                   | About 0.85, with stronger heating per mW than the heater |
+| Main heater response times             | 10 and 300 µs         | 3.18 and 13 µs, plus a small 3 ms tail                   |
+| Nearest-neighbour thermal crosstalk    | 10%, arriving quickly | 3%, arriving over milliseconds                           |
+| Monitor background                     | No dark current       | Dark current grows with photodiode temperature           |
+
+
+These choices materially change controller behaviour. Neither set has been verified against your
+actual device. Several textbook choices remain available as alternative worlds. For the evidence
+behind each disagreement, see the comparison in [PARAMETERS.md](PARAMETERS.md) and the
+[textbook audit](research/06_textbook_audit.md).
+
+## Try it
+
+Run these commands from the repository. The memory guard stops a job above 3 GB; initial compilation
+can take a few minutes.
 
 ```sh
-cd ~/mrm-model
+cd /Users/kenny/mrm-model
 
-# a shipped controller (pi_lock_c) on g26, 40 ms; it prints a report and writes runs/<UTC time>_<hash>/
+# First: the shipped controller at constant ambient temperature, for 40 ms.
 .venv/bin/python tools/memguard.py -- .venv/bin/mrm run experiments/examples/steady_pi_lock.yaml
 
-# copy the template, then edit step() in my_lock.py
-cp examples/controllers/template_python_controller.py examples/controllers/my_lock.py
+# Next: the same controller under the A1 heat disturbance.
+.venv/bin/python tools/memguard.py -- .venv/bin/mrm run experiments/examples/a1_pi_lock.yaml
 
-# your controller: steady, then under the A1 aggressor (with a controller parameter changed)
-.venv/bin/python tools/memguard.py -- .venv/bin/python -m mrm.cli run experiments/examples/steady_pi_lock.yaml --set controller.name=examples.controllers.my_lock:MyIntegralLock
-.venv/bin/python tools/memguard.py -- .venv/bin/python -m mrm.cli run experiments/examples/a1_pi_lock.yaml --set controller.name=examples.controllers.my_lock:MyIntegralLock --set controller.params.k_i_codes=800
-
-# your controller over the uncertainty: nominal world, named corners, 128 sampled worlds (about 3 minutes)
-.venv/bin/python tools/memguard.py -- .venv/bin/python -m mrm.cli run experiments/examples/robust_pi_lock.yaml --set controller.name=examples.controllers.my_lock:MyIntegralLock
-
-# one number of the device, with its source and the textbook's value
-.venv/bin/mrm params explain g26 ring.thermal.tau_fast_s
+# Finally: nominal, corner and 128 sampled worlds under A1.
+.venv/bin/python tools/memguard.py -- .venv/bin/mrm run experiments/examples/robust_pi_lock.yaml
 ```
 
-Notes on these commands:
+These examples use a **warm start**: the simulator supplies a settled initial tuning state. They test
+maintaining lock; startup and finding the right laser line require separate testing. The robust run
+prints `FAIL` and exits with code 1 if a criterion fails. That can be an experiment result, not a crash.
+Add `--dry-run` to estimate a run's cost before executing it.
 
-- `python -m mrm.cli` is the same `mrm` command; started this way, Python can import `examples/...`. If you rename the
-  class in `my_lock.py`, change it after the colon. Also change the name in `@register(...)`, so the copy and the
-  template never share one name.
-- `--set PATH=VALUE` changes any number for one run, for example `--set ring.thermal.tau_fast_s=1e-5`. `--alt PATH=NAME`
-  picks a stored alternative, for example `--alt uncertainty.thermo_optic=H86`.
-- The robust run ends with a table of criteria. It prints FAIL and exits with code 1 when any world breaks one. That is
-  a result, not a crash.
+### Use your own controller
 
-**Reading the results.** The report is printed and saved as `report.txt` in the run directory. The columns you will use
-most: `max_abs_lock_error_pm` (largest distance of a ring from its own steady lock point, pm), `unlocked_rings`,
-`wrong_line_rings` (rings that ended on another laser line) and `oma_penalty_db_worst` (modulation amplitude lost
-against the best possible point, dB). Per ring, with a plot of the detuning, for the newest run of kind `run` (a robust
-run stores its results in another layout):
+Copy [`template_python_controller.py`](../examples/controllers/template_python_controller.py) to
+`examples/controllers/my_lock.py`. Give its `@register(...)` entry and `name` attribute a unique name,
+then edit `step()`. The template uses an assumed peak reading; supply a measured or calibrated peak
+for serious use. The shipped PI controller includes its own peak-mapping procedure.
+
+Your controller reads the observation and interface specification, then returns integer heater codes.
+The default interface gives it the laser grid and ring assignments; other device properties must be
+learned from measurements. Internal simulator “Truth” is for evaluating the controller.
 
 ```sh
-.venv/bin/python - <<'EOF'
-import glob, json, os
-import matplotlib.pyplot as plt
-from mrm.sim.manifest import read_run
-
-def kind(d):
-    f = os.path.join(d, "metrics.json")
-    return json.load(open(f))["kind"] if os.path.exists(f) else None
-
-run = read_run([d for d in sorted(glob.glob("runs/2*")) if kind(d) == "run"][-1])   # newest run of kind "run"
-m = run["trace"]["metrics"]["main"]                    # per-ring metrics, shape (worlds, rings)
-print(run["dir"])
-print("max |lock error| pm:", m["max_abs_lock_error_pm"][0].round(1))
-print("rms lock error pm:  ", m["rms_lock_error_pm"][0].round(2))
-print("locked at the end:  ", m["locked_final"][0])
-print("OMA penalty dB:     ", m["oma_penalty_db"][0].round(2))
-
-d = run["trace"]["trace"]["main"]["detuning_m@10:mean"]
-plt.plot(d["t_s"] * 1e3, d["value"][:, 0, :] * 1e12)
-plt.xlabel("time (ms)"); plt.ylabel("detuning from the line (pm)")
-plt.savefig(run["dir"] / "detuning.png")
-EOF
+.venv/bin/python tools/memguard.py -- .venv/bin/python -m mrm.cli run experiments/examples/steady_pi_lock.yaml \
+  --set controller.name=examples.controllers.my_lock:MyIntegralLock
 ```
 
-The plot goes into the run directory as `detuning.png`. Every run directory also holds the full resolved config
-(`experiment.resolved.yaml`) and the exact arrays (`trace.h5`). `.venv/bin/python -m mrm.cli rerun runs/<dir>` runs it
-again and checks that every array is bit-for-bit the same.
+Change the class name after the colon if you rename it. `python -m mrm.cli` lets Python import your controller from the repository. Use `--set PATH=VALUE` for a one-run override, or `--alt PATH=NAME` for a stored alternative. The [controller guide](../examples/controllers/README.md) covers the other templates and bias control. Use experiment files for comparisons: calling a scenario by name through the Python runner currently uses different signal defaults, including 1.0 V bias instead of 1.05 V.
 
-## 2. The mechanisms
+### Read the result
 
-The order follows the light and the heat through the device. It is not a ranking. Each section says what the mechanism
-is, why a lock controller cares, the main setting in g26.yaml with its g26 value, and where your textbook
-(`~/interactive-textbooks/lightmatter-capstone`) differs. Neither the textbook's numbers nor the model's have been
-checked against your device yet; where they differ, the section names the model's source.
+Each run saves a directory under `runs/`, including `report.txt`, the resolved configuration and
+`trace.h5` with recorded traces. Start with these report fields:
 
-Sign convention: in the model, **detuning = resonance wavelength minus laser line**. Positive means the ring is red of
-its line. The textbook's δ is the opposite (laser minus resonance), so the model's positive detuning is a negative δ in
-the textbook, its "blue flank".
 
-### 2.1 The laser
+| Field                   | Meaning                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `max_abs_lock_error_pm` | Largest departure from the ring's lock reference; lower is better.                      |
+| `unlocked_rings`        | How many rings are unlocked at the end.                                                 |
+| `wrong_line_rings`      | How many rings finish on the wrong laser line.                                          |
+| `oma_penalty_db_worst`  | Worst loss of optical modulation amplitude relative to the best point; lower is better. |
 
-- **What.** 8 lines, 1302.6 to 1318.6 nm, 400 GHz apart. Each line has a power, a small frequency error, intensity noise
-  (RIN) and slow drift. At power-up the lines ramp on over 3 ms.
-- **Why it matters.** The power sets how hard each ring heats itself and how much current the monitor sees. A power step
-  moves a lock that targets a fraction of the monitor peak. A line's frequency error moves the target. Drift is a slow
-  disturbance. The ramp decides which branch, and which line, a cold ring lands on.
-- **Main setting.** `laser.power_per_line_dbm` 10 dBm at the laser module (printed, G26), less
-  `optical_path.chip_input_loss_db` 6 dB (inferred), so +4 dBm per line at the first ring. Worlds span 0 to +8 dBm at
-  the ring. Line errors: 0 nominal, spread 4 GHz per die and 6 GHz per line (inferred); ±20 GHz is the printed
-  requirement. Drift (0.02 nm and 2.5 % per 24 h) is a scenario.
-- **Textbook.** It quotes 14 dBm per line at the laser (M1000). The model uses the G26 budget's 10 dBm. Both put +4 dBm
-  (the G25 value) at the ring.
 
-### 2.2 The ring optics and coupling
+Check both lock quality and modulation quality: a steady ring can still transmit poorly. The
+[engine guide](ENGINE.md) explains trace access and reproducible reruns.
 
-- **What.** Each ring is an exact add-drop ring: light couples in from the bus, circulates, and leaves through the bus
-  (through port) or the drop port. The model solves it for every laser line and several resonance orders, with the loss
-  of the bus between rings. Each ring is built 7.6 nm blue of its own line, so it must warm by about 109 K to reach the
-  line (lock at about 134 °C at 25 °C ambient).
-- **Why it matters.** The line shape sets the monitor signal against detuning: its slope is your loop gain, its width
-  your capture range. The free spectral range (FSR, the spacing of a ring's resonance orders) and the grid decide which
-  foreign lines a ring can grab. A cold ring sits about 2 linewidths blue of the line three channels up, so a bank needs
-  a supervisor to assign lines at start-up.
-- **Main setting.** `ring.optics.q_loaded` 3850 (Q, the sharpness of the resonance: linewidth about 338 pm; inferred,
-  G25; worlds 3500 to 4200). `ring.optics.fsr_thz` 1.8 THz, about 10.3 nm (printed G25 design target).
-  `ring.optics.resonance_offset_nm` 7.6 nm (inferred, G25). `ring.optics.kappa_d_over_kappa` 0.007 sets the drop
-  coupling (inferred from the G26 monitor current). The ring is under-coupled (it loses more per round trip than it
-  couples to the bus), with a 27.9 dB notch (the dip at the through port) at 0 V (G25).
-- **Textbook.** Q: textbook 3500 (G25 talk); model 3850, the middle of the interval from 3500 (talk) to 4200 (linewidth
-  read-off). FSR: the textbook keeps a measured bound above 14.1 nm; the model treats that bound as unsupported (the G25
-  traces are about 1 nm wide) and uses the 1.8 THz design value, with other FSRs as worlds. Notch depth: the textbook
-  reads it against heater voltage (G25 sweep); the model computes it from the coupler's wavelength dependence at each
-  line and the loss against temperature, so under lock the depth does not follow the heater code.
+## What the model can tell you today
 
-### 2.3 The junction, bias and data
+It is useful for studying feedback, comparing controller ideas and finding failure modes under stated
+assumptions. Its present results have several limits:
 
-- **What.** A PN junction around most of the ring (80 %, assumed). Reverse bias removes carriers. That shifts the
-  resonance red (the electro-optic effect) and lowers the loss (less light absorbed by free carriers). The 50 Gb/s data
-  swings the junction. Data also heats the ring: junction charging plus the CMOS driver beside it.
-- **Why it matters.** Bias is a fast second actuator. In the model at the g26 lock it tunes weakly: a 0.2 V step moves
-  the resonance only 0.1 to 0.5 pm, because the loss change alters the absorbed heat and cancels most of the
-  electro-optic shift (about 10 pm by the electro-optic law alone). This is an open physics check (KNOWN_ISSUES,
-  controllers). Data heat lifts each ring about 2 K, so traffic start, stop and squelch move rings by that much.
-- **Main setting.** `ring.junction.eff_at_0v_pm_per_v` 72.5 pm/V, falling to about 32 pm/V at 3.75 V (inferred: a
-  depletion law, the shift growing as the square root of the voltage plus the 0.9 V built-in voltage, fitted to the G25
-  bias ladder). Bias DAC 12 bits, 1.0 to 3.75 V (printed axis, G26); g26 holds it at 1.05 V (`scenario.bias_v`) unless
-  you bind it to your controller (`controller_interface.bind.tx.bias: controller`). `driver.swing_pp_v` 1.3 V (printed,
-  G25 simulation). Driver heat: 2 mW plus 100 fJ per transition (assumed).
-- **Textbook.** Efficiency: it interpolates the G25 bias ladder up to 1.6 V (and lists a flat 50 pm/V from the talk);
-  the model uses the depletion law over the whole 1.0 to 3.75 V axis. Swing: the textbook lists 0.9 V as driven on the
-  bench; the model reads that as the pattern generator's swing into the driver, and uses 1.3 V. The textbook takes the
-  bias shift from the G25 ladder alone, with no term for the change of absorbed heat at the operating power.
+- **Calibration and validation reports are stale.** Use the `g26` preset for these examples; the presets
+named `*_calibrated` need refitting. Do not quote the old validation reports as current evidence.
+- **Several published measurements are still missed**, including heater behaviour and modulation
+amplitude. Some physics, especially bias tuning and thermal dynamics, needs further checking.
+- **Some scenarios exceed the hardware limits assumed by the model.** A1 exhausts ring 0's ability to
+reduce heater power. Assumed shared-supply limits also prevent lock in some sampled worlds.
+- **Startup and robustness remain open.** The supplied wavelength supervisor can accept a wrong line
+in some worlds, and even warm-start runs can lose rings when uncertain parameters are sampled.
 
-### 2.4 Self-heating
-
-- **What.** Part of the light the ring loses becomes heat in the ring. Heat moves the resonance red, which changes how
-  much light it absorbs. This feedback makes the ring bistable: two stable temperatures for one heater code.
-- **Why it matters.** It decides where you can lock. With the ring red of the laser (positive detuning), the feedback is
-  negative and stable. Past the fold (the end of the stable branch), about 9 pm blue of the drop peak, the ring jumps
-  about 1.5 nm blue. So a lock on the peak falls off, and a cold ring can heat itself onto a foreign line at power-up.
-  On the stable side the feedback divides the heater's effect on the resonance by 3 to 7, and every disturbance by the
-  same factor. The absorbed-light path is faster than the heater: about 43 % of it arrives with a 0.4 us pole.
-- **Main setting.** Heat fraction η = `ring.optics.heat_fraction` 0.85 (derived from the loss budget; its parts are
-  inferred or assumed), worlds 0.5 to 0.95 (`uncertainty.self_heating.eta`). Light heats the ring 1.76 times more per mW
-  than the heater does (`ring.thermal.z_ratio_opt_heater`, solver), worlds 1 to 2. Bistability ratio about 6 at +4 dBm
-  (above 1 means bistable; `mrm params explain g26 bistability_ratio`).
-- **Textbook.** It assumes η = 0.3 and heats the ring with one thermal resistance for heater and light (ratio 1, Ch17
-  eq. 17.9a). With those it finds that self-heating about halves the heater gain (Ch10). The model uses 0.85 and 1.76,
-  so the reduction is 3 to 7 times. The textbook's 0.3 is a stored stress world:
-  `--alt uncertainty.self_heating.eta=stress_0p3`.
-
-### 2.5 The thermo-optic coefficient
-
-- **What.** How far the resonance moves per kelvin of ring temperature (dλ/dT). It grows with temperature, because
-  silicon's index changes faster when hot.
-- **Why it matters.** It converts every temperature disturbance (ambient, aggressor, neighbours) into pm of detuning. It
-  sets a feed-forward gain from a temperature sensor, and the lock temperature.
-- **Main setting.** `ring.thermal.dlambda_dt_pm_per_k` 65.1 pm/K at 25 °C, about 73.9 pm/K at the 134 °C lock (solver,
-  assumed cross-section, `ring.thermal.dlambda_dt_beta_per_k`). Worlds choose between this solver value and 86 pm/K
-  (`uncertainty.thermo_optic`; corner preset `g26_h86`). These are worlds, not devices: one world uses one value for
-  every ring.
-- **Textbook.** It designs at 86 pm/K, the "~15 GHz/°C" in the G26 introduction, held constant. The model's research
-  reads that number as a general remark, not a measurement, and above the materials ceiling (about 71 pm/K at 300 K), so
-  the model uses the solver value and keeps 86 as a hypothesis. The textbook also uses dn_Si/dT at 1.86e-4 /K (a C-band
-  value); the model's solver uses the 1310 nm value, rising with temperature. To run 86:
-  `--alt uncertainty.thermo_optic=H86`.
-
-### 2.6 The heater driver
-
-- **What.** A 16-bit DAC drives each heater. In g26 it is a voltage DAC: power is V²/R, so the gain per code grows with
-  the code. The heater resistance rises with the heater's temperature (its temperature coefficient of resistance, TCR),
-  which makes the tuning droop at high drive. The DAC has a 1 us latency. One heater can only heat. All heaters share
-  one supply limit.
-- **Why it matters.** The loop gain changes with the code (about 0.18 pm per code at a quarter of full scale, 0.54 at
-  three quarters, before the self-heating reduction), so a fixed-gain loop is over- or under-tuned somewhere. At code 0
-  the heater cannot cool further: under A1 ring 0's heater sits at code 0 for about 15 ms and the ring leaves its point
-  by 454 to 473 pm, with every controller tried. The supply limit can cut every heater of a die at once.
-- **Main setting.** `ring.heater.driver_mode` voltage (worlds also draw current, power and DAC+PWM laws).
-  `ring.heater.full_scale_v` 1.6 V (assumed). `ring.heater.p_fsr_mw` 25.45 mW per FSR (printed, G25 wafer median), about
-  0.405 nm/mW. `ring.heater.r_cold_ohm` 45.4 Ω (inferred), `ring.heater.tcr_per_k` 1.4e-3 /K (literature, doped
-  silicon). Supply limit `array.heater_total_power_max_w` 0.2 W and `array.heater_supply_current_max_a` 0.15 A
-  (assumed). No slew limit. At the lock ring 0's heater gives about 14 mW, about 81 K of the ring's 109 K rise; light,
-  data heat and neighbours give the rest.
-- **Textbook.** TCR: textbook 1e-3 /K (assumed); model 1.4e-3 /K. Both fit the same G25 droop (0.00904 /mW). In the
-  textbook the resistance follows only the heater's own heat (Ch11 eq. 11.14). In the model it follows the heater's
-  whole temperature, so on a die 80 K hotter the same code gives about 10 % less power. The 19,500 to 49,300 codes the
-  textbook quotes are what one G26 test used; the model's DAC spans 0 to 65,535.
-
-### 2.7 The thermal paths and crosstalk
-
-- **What.** Heat flows from each heater, each ring's absorbed light, each driver and the aggressor to every ring,
-  monitor PD and temperature sensor, each path with its own delays. In g26 each path is a few poles taken from imec's
-  published measurements and fits (the "interim" model). A model reduced from our own finite-element heat simulation
-  also exists (`fidelity.thermal_model: rom`), but g26 does not use it yet: it misses the imec targets (section 4).
-- **Why it matters.** The heater-to-ring poles set your loop's bandwidth and phase margin. Crosstalk couples the 8
-  loops: a neighbour's heater moves your ring, slowly. The die sensor sees the heaters and the aggressor through a slow,
-  weak path.
-- **Main setting.** Heater to own ring: 5.70 K/mW (derived from P_FSR and dλ/dT), poles 3.18 us (41 %) and
-  13.0 us (54 %) (literature, imec), plus a 3 ms package tail (5 %, assumed). `ring.thermal.tau_fast_s`, `ring.thermal.tau_slow_s`,
-  `ring.thermal.share_fast_frac`. Worlds scale the time constants 0.5 to 2 times. Crosstalk
-  `ring.thermal.xt_nearest_frac` 3 % to the nearest ring with a 1.52 ms pole, 1.5 % to the others (literature, imec, a
-  package cooled by natural convection). A package held at a set temperature by a thermoelectric cooler (TEC) would give
-  1.0 % arriving in 0.12 ms (corner `g26_tec_package`, from our heat simulation); which package G26 has is unknown. Die
-  sensor `die0`: 1 mm away, 1 kHz, 0.0625 K steps, a few K offset (assumed).
-- **Textbook.** Poles: textbook 10 us (75 %) and 300 us (25 %), assumed; model 3.18 us and 13.0 us with a 3 ms tail,
-  from imec. Crosstalk: textbook 10 % nearest and 3 % next, arriving as fast as the ring's own heater; model 3 % and
-  1.5 % arriving over milliseconds. Heater thermal resistance: textbook 4.7 K/mW (0.405 nm/mW ÷ 86 pm/K); model 5.70 K/mW
-  (the same P_FSR with its own dλ/dT). Both give the same 0.405 nm/mW from the heater. To run the textbook's network:
-  `--alt uncertainty.thermal.family=textbook --alt uncertainty.thermal.package_tail_share_frac=textbook` (corner preset
-  `g26_textbook_thermal`).
-
-### 2.8 The aggressor
-
-- **What.** An on-die resistive heater beside ring 0 (G26 paper), driven so that ring 0 follows the published
-  temperature swing. Scenario A1 (G26 slide 10): T = 113.6 − 88.5 |sin(π t / 130.7 ms)| °C, a sharp hot cusp, 2127 °C/s
-  at the steepest (a fit to the read-off trace). A2: the paper's 808 °C/s (its waveform is not published, so four
-  readings exist). Other scenarios: ambient soak, processor power steps, laser drift and sweeps, connector re-mates,
-  traffic changes (`mrm/scenarios/library.py`).
-- **Why it matters.** It is G26's own design-case disturbance for the lock. It enters as heat through the thermal paths:
-  ring 0 gets the most, the other rings less and later, and the monitor PDs and the die sensor warm too.
-- **Main setting.** Site `aggressor` in `layout.sites`: 30 um from ring 0 and 55 um from its PD (position assumed). The
-  scenario's power is solved before the run so that ring 0 follows the published trajectory. By default the published °C
-  become pm through Lightmatter's 15 GHz/°C (`referencing: resonance`); the other choice matches it in kelvin. A stress
-  site 5 um from ring 0's PD (`a1_pd_adjacent`) tests monitor dark-current runaway; it is not a real layout.
-- **Textbook.** It injects the swing as a temperature straight at the ring's thermal node (Ch18; Ch17 eq. 17.2 adds
-  ambient with no lag), so nothing else on the die feels it. The model injects power at a site, so each ring, PD and
-  sensor sees it through its own path. Its rate: textbook −2300 to +2200 °C/s (read-off); model 2127 °C/s at the cusp (a
-  fit of the temperature trace).
-
-### 2.9 The monitor PD, front end and ADC
-
-- **What.** A germanium PD on each drop port. Its current is integrated for 2 us, then converted by a 16-bit ADC (an
-  integrating converter, as in patent PAT-2). The PD adds shot noise and a dark current (current with no light) that
-  grows with its own temperature. The front end adds noise. The ADC has a full scale, offsets and nonlinearity.
-- **Why it matters.** It is how the controller sees each ring's detuning. Its gain is uncertain, so the shipped locks
-  set their target as a fraction of a peak they measure, not as a fixed code. Dark current that rises with PD
-  temperature moves the lock point. A peak above full scale clips. The timing adds delay to your loop: 2 us window, 2 us
-  ADC latency, 1 us heater latency, 10 us control period.
-- **Main setting.** `ring.monitor.responsivity_a_per_w` 0.95 A/W (printed, G25). `ring.monitor.dark_i0_na` 5 nA at 25 °C
-  (assumed, foundry limit < 30 nA), ×1.6 per 10 K (literature). `ring.monitor.adc_full_scale_ua` 40 uA (assumed): the
-  drop peak is about 32 uA and a half-peak lock about 16 uA. `ring.monitor.adc_rate_hz` 250 kHz (inferred, patent).
-  `ring.monitor.input_noise_pa_per_rt_hz` 1 pA/√Hz (assumed). Worlds scale the monitor gain 0.5 to 2 times
-  (`uncertainty.monitor.gain_scale`).
-- **Textbook.** It has no PD dark current; the model adds it. Front-end noise: textbook 6.4 pA/√Hz (the data receiver's
-  amplifier); model 1 pA/√Hz for a slower monitor amplifier (assumed). Full scale: the textbook sizes it at 15 to 20 uA;
-  the model uses 40 uA so that a peak search does not clip. Timing: textbook 10 us for sample period, window and delay
-  (assumed); model as above.
-
-## 3. Where else to look for textbook differences
-
-The section 2 entries are the differences that matter for controller work. The full list: the "Textbook comparison"
-table at the end of docs/PARAMETERS.md (one row per key), `mrm params explain g26 <key>` (its `disagrees:` line) and
-docs/research/06_textbook_audit.md (the audit, with evidence).
-
-## 4. Known issues that matter most
-
-The full list is [docs/KNOWN_ISSUES.md](KNOWN_ISSUES.md). The ones to know first:
-
-1. **The calibration is stale.** `g26_calibrated`, `g25_test_vehicle_calibrated` and `mrm/calibration/latest_fit.json`
-   were fitted before the final review's fixes and were not fitted again. They stay stale until your real device
-   parameters arrive and the fit is run again. Some calibration tests are expected to fail until then. Everything in
-   this document runs on `g26`, the default.
-2. **The validation reports are stale.** docs/VALIDATION.md and docs/VALIDATION_g26_calibrated.md carry a STALE banner.
-   Do not quote their numbers. They are generated again after the new fit.
-3. **The model misses several published measurements** (as last computed): the heater tuning law, the notch depth
-   against heater voltage, the heater code map, the modulation amplitude (relOMA) targets, and the imec targets of the
-   finite-element heat model. Nine confirmed validation findings are recorded and not fixed. See KNOWN_ISSUES sections 2
-   to 4.
-4. **The heat dynamics come from imec devices and assumptions, not from G26.** The time constants, the crosstalk and the
-   package (natural convection or TEC-held) are unknown for G26. Every controller result is conditional on them; the
-   first line of every report says so.
-5. **Ring 0 runs out of heater at the hot end of A1 and A2.** Under A1 its heater sits at code 0 and the ring leaves its
-   point by 454 to 473 pm with every controller tried. This is a limit of the plant with the present numbers, not of a
-   controller.
-6. **Start-up can capture the wrong line.** Cold rings can heat themselves onto a foreign line, and the WDM supervisor
-   (the shipped controller that assigns lines) can still declare a ring good on a wrong line in some sampled worlds.
-7. **Sampled worlds lose rings** even with `pi_lock_c` from a good warm start, and the assumed heater supply limit binds
-   in about a third of the sampled worlds. A claim over the uncertainty needs every world to pass.
-8. **A scenario given by name runs at 1.0 V bias, the config at 1.05 V.** A scenario passed to `runner.run` by name (for
-   example `"static"`) and the same scenario in an experiment file give results that are not comparable number for
-   number.
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md) records the details. For implementation contracts see
+[ARCHITECTURE.md](ARCHITECTURE.md); for engine behaviour see [ENGINE.md](ENGINE.md).

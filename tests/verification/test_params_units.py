@@ -1,10 +1,15 @@
-"""Unit-suffix grammar and the single SI conversion (07 P1-15; ARCHITECTURE section 1)."""
+"""Checks the unit-suffix grammar of config keys and the single SI conversion (mrm.params.units).
+
+A key ends with its unit (``dlambda_dt_pm_per_k``: pm/K). parse_key splits the name from the unit, to_si converts a
+value once at load (dB to a natural-log power ratio, dBm to W, degC to K) and from_si inverts it. The token list
+follows docs/ARCHITECTURE.md, "Use SI inside the code".
+"""
 import math
 
 import numpy as np
 import pytest
 
-from mrm.params import schema as sch
+from mrm.params import schema
 from mrm.params.units import TOKENS, UnitError, from_si, parse_key, to_si, unit_of
 
 
@@ -84,7 +89,7 @@ def test_affine_and_log_misuse_rejected():
 
 
 def test_every_schema_key_parses():
-    assert sch.check_units() == []
+    assert schema.check_units() == []
 
 
 def test_token_table_matches_architecture():

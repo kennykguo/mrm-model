@@ -8,3 +8,5 @@ runs/
 .DS_Store
 /tmp/
 .agents/
+tools/katex/node_modules/
+archive/

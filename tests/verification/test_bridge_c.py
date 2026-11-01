@@ -1,14 +1,19 @@
-"""The C reference external controller (mrm.sim.bridge.C_FXP_PI_SOURCE, the twin of mrm.control.fxp.FxpPi) over
-the binary bridge, compiled against the header that mrm.sim.bridge.c_header generates from the ChannelSpecs.
+"""Checks the C reference controller that talks to the plant over the binary bridge.
 
-- closed loop over pipes, bit-identical to FxpPi in the kernel (both profiles);
-- the committed golden vectors replayed through the C program: every heater action bit-exact;
-- a synthetic stress stream (random monitor codes, missing samples, invalid samples, large gains, a 26-bit
-  accumulator, every rounding mode) through the C program and FxpPi's compiled ABI: bit-exact, with the
-  accumulator saturation, the integrator clamp and the output clamp all exercised;
-- the round-trip cost of the binary protocol (C peer over pipes), printed.
+Read this first
+---------------
+mrm.sim.bridge.C_FXP_PI_SOURCE is a C twin of mrm.control.fxp.FxpPi. The tests compile it against the header that
+mrm.sim.bridge.c_header generates from the ChannelSpecs, and then check:
 
-Skipped when no C compiler (``cc``) is on the PATH.
+- a closed loop over pipes is bit-identical to FxpPi in the kernel (both frame profiles);
+- the committed golden vectors, replayed through the C program, give every heater action bit-exact;
+- a synthetic stress stream gives bit-exact actions in the C program and in FxpPi's compiled ABI. The stream has
+  random monitor codes, missing and invalid samples, large gains, a 26-bit accumulator and every rounding mode. It
+  drives the accumulator saturation, the integrator clamp and the output clamp;
+- the C side refuses a header for another frame layout or another ControllerSpec.
+
+The round-trip cost of the binary protocol (C peer over pipes) is printed. The file is skipped when no C compiler
+(``cc``) is on the PATH.
 """
 from __future__ import annotations
 
@@ -23,7 +28,7 @@ import pytest
 from mrm import params
 from mrm.control import api, fxp
 from mrm.control.fxp import FxpPi, Rounding
-from mrm.scenarios import library as lib
+from mrm.scenarios import library
 from mrm.sim import bridge, runner, vectors
 from mrm.sim.metrics import RecordSpec
 
@@ -31,12 +36,12 @@ CC = shutil.which("cc") or shutil.which("clang") or shutil.which("gcc")
 pytestmark = pytest.mark.skipif(CC is None, reason="no C compiler on the PATH")
 ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_VEC = ROOT / "tests" / "golden" / "vectors" / "fxp_pi__g26__aggressor_square.npz"
-RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="quasi_static", settle=True)
+RUN = dict(uncertainty="nominal", variation="off", seeds=0, heater_code="locked_steady_state", settle=True)
 REC = [RecordSpec("detuning_m", 1, "last"), RecordSpec("heater_code", 10, "last")]
 
 
 def scenario():
-    return lib.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
+    return library.aggressor_direct(waveform="square", power_w=0.05, period_s=2e-3, duty=0.5, phase_s=1e-3)
 
 
 @pytest.fixture(scope="module")
@@ -58,7 +63,7 @@ def build(tmp_path_factory, spec):
     for profile in ("full", "minimal"):
         d = tmp_path_factory.mktemp(f"c_{profile}")
         (d / "mrm_bridge.h").write_text(bridge.c_header(bridge.FrameLayout.from_spec(spec, profile),
-                                                         spec_fingerprint=spec.fingerprint()))
+                                                        spec_fingerprint=spec.fingerprint()))
         (d / "fxp_pi.c").write_text(bridge.C_FXP_PI_SOURCE)
         exe = d / "fxp_pi"
         r = subprocess.run([CC, "-O2", "-std=c99", "-Wall", "-Wextra", "-Werror", "-o", str(exe),
@@ -69,6 +74,7 @@ def build(tmp_path_factory, spec):
 
 
 def c_args(c: FxpPi, setpoint=None):
+    """Command-line arguments of the C program for the same gains, formats and rounding as ``c``."""
     a = [str(c.kp_raw), str(c.ki_raw), str(c.frac_bits), str(c.acc_format.bits), str(int(c.rounding))]
     return a + ([str(setpoint)] if setpoint is not None else [])
 
@@ -123,7 +129,7 @@ def test_golden_vectors_replay_through_c(build, spec):
           f"decode {1e6 * bc.stats['decode_s'] / bc.stats['steps']:.1f} us per edge on the plant side)")
 
 
-def _synthetic(spec, K, rng):
+def _synthetic_obs(spec, K, rng):
     """obs_i64 records with random monitor codes (sometimes extreme), ~20 % missing and ~5 % invalid samples, and
     the latched heater register at a random start code."""
     lay = spec.layout
@@ -148,36 +154,38 @@ def _synthetic(spec, K, rng):
 @pytest.mark.parametrize("rnd", list(Rounding))
 def test_synthetic_stress_stream_c_equals_python(build, spec, rnd):
     rng = np.random.default_rng(int(rnd) + 11)
-    obs, ticks = _synthetic(spec, 1500, rng)
+    obs, ticks = _synthetic_obs(spec, 1500, rng)
     c = FxpPi(kp=3.7, ki=1.9, gain_format="Q3.20", acc_format="Q5.20", rounding=rnd.name.lower())
     c.reset(spec)
     p, pf, s, sf = fxp.fxp_pi_init(c.spec_i64, c.spec_f64)
     act = c.initial_act(spec)[0].copy()
     f_act = spec.layout.act_field("tx.heater")
     exp = np.zeros((obs.shape[0], 1, 8), dtype=np.int64)
+    # FxpPi's state array: a start flag, then blocks of one value per ring (8 rings); one block holds the integrators
+    integrators = slice(fxp._S_BLOCKS + fxp._S_INTEGRATOR * 8, fxp._S_BLOCKS + (fxp._S_INTEGRATOR + 1) * 8)
     integ_seen = []
     for k in range(obs.shape[0]):
         fxp.fxp_pi_step(p, pf, s, sf, np.ascontiguousarray(obs[k, 0]), act)
         exp[k, 0] = act[f_act.offset:f_act.offset + 8]
-        integ_seen.append(s[1 + 3 * 8:1 + 4 * 8].copy())
+        integ_seen.append(s[integrators].copy())
     integ_seen = np.array(integ_seen)
     got, _ = _drive([str(build["full"]), *c_args(c)], spec, obs, ticks)
     assert np.array_equal(got, exp), int((got != exp).sum())
     # the paths were exercised: output clamps, the 26-bit accumulator saturation and the integrator clamp
     assert (exp == 0).any() and (exp == 65535).any()
-    acc_hi = (1 << 25) - 1
-    mid = integ_seen[:, 4:]
+    acc_hi = (1 << 25) - 1                             # largest value of the 26-bit signed accumulator
+    mid = integ_seen[:, 4:]                            # rings 4-7 start at random codes: the accumulator limit binds
     assert (mid == acc_hi).any() and (mid == -acc_hi - 1).any()
     u0 = obs[0, 0, spec.layout.obs_field("tx.heater.applied").offset:][:4]
-    lim_lo, lim_hi = (0 - u0) << 20, (65535 - u0) << 20
-    edge = integ_seen[:, :4]
+    lim_lo, lim_hi = (0 - u0) << 20, (65535 - u0) << 20     # integrator clamp: output range, 20 fraction bits
+    edge = integ_seen[:, :4]                           # rings 0-3 start within 3 codes of a rail: the clamp binds
     assert ((edge == lim_lo) | (edge == lim_hi)).any(axis=0).all()
 
 
 def test_c_setpoint_argument(build, spec):
     """A given set-point (no capture) behaves like FxpPi(setpoint_codes=...)."""
     rng = np.random.default_rng(3)
-    obs, ticks = _synthetic(spec, 300, rng)
+    obs, ticks = _synthetic_obs(spec, 300, rng)
     c = FxpPi(setpoint_codes=31000)
     c.reset(spec)
     p, pf, s, sf = fxp.fxp_pi_init(c.spec_i64, c.spec_f64)

@@ -80,7 +80,7 @@ ring's absorbed heat and ~8 % to its drop at the lock, mostly through the ring's
 (BND-1); ignoring them biased the codes by ~300 (1 %) and CAL-8 by ~1 uA.
 
 Independent cross-checks (tests): the static state is a fixed point of `ReferencePlant` (0.05 K, 0.5 % heater power,
-300 us); the bank locks equal `mrm.sim.runner.quasi_static` (the engine's own static survey: 0.02 K, 20 uW, 1 % codes,
+300 us); the bank locks equal `mrm.sim.runner.solve_locked_steady_state` (the engine's own static survey: 0.02 K, 20 uW, 1 % codes,
 0.02 dB relOMA; compared with `lines="own", bus_filter=False`, see 6); the line powers, absorbed heat and oracle codes
 equal `mrm.control.models.static_point` (1 %, 0.5 %); the EO response equals a direct TCMT ODE (1 %) and
 `mrm.waveform.eo_bandwidth` (0.5 % with the loss modulation off).
@@ -214,7 +214,7 @@ BND-4. A NaN prediction is written as null with `predicted_nonfinite: true` (VAL
   for the PLANT only, never the controller), honour `options["max_update_rate_hz"]` / `["min_total_latency_s"]`
   (BND-3), record at `record_every_s` (= max(dt, duration/2e5)); return "setpoint_a" when the controller sets its own.
   `ReferenceLockRunner` in tests/validation/test_replicas_static.py is a working N = 1 example on ReferencePlant. Until
-  then `default_run_fn` raises ReplicaBlocked and BND-3a/b stay blocked. (b) **`quasi_static` bus filtering**: its
+  then `default_run_fn` raises ReplicaBlocked and BND-3a/b stay blocked. (b) **`solve_locked_steady_state` bus filtering**: its
   docstring says each ring gets "the chip power times the through transmission of the rings before it", but the loop
   multiplies only `p_ring[l]` of the ring's OWN line after that ring, so no ring ever sees upstream filtering, and each
   ring absorbs its own line only. In g26 that misses ~1 % of heater power on the downstream rings and ~9 % of the
@@ -253,7 +253,7 @@ the shared machine). With `tests/closure/test_targets_schema.py` and `tests/veri
 146 passed. Checks: Q vs realized Q_L (2 %), P_FSR vs R2 (1.5 %), offset vs R3 (2 pm), low-power bias ladder = junction
 table (0.3 pm), driver-law ordering and the H86_sensor 1/0.8 ratio, lock definitions, bistability vs power, EO response
 vs a TCMT ODE (1 %) and vs mrm.waveform (0.5 %), static state = reference-plant fixed point (0.05 K), bank locks vs the
-engine's quasi_static, line powers / absorption / codes vs mrm.control.models, dynamic lock through the adapter =
+engine's solve_locked_steady_state, line powers / absorption / codes vs mrm.control.models, dynamic lock through the adapter =
 quasi-static (1.5 %), per-ring set-points of the dynamic request, ambient code excursion dynamic vs quasi-static (5 %,
 slow), VAL-5 hysteresis reporting, the p_in convention and the PD temperature of the dark current, the driver
 compliance, the VAL-8e artefact keys, non-finite predictions marked, feasibility plumbing (limits passed, best by miss).

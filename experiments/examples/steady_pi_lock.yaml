@@ -13,6 +13,6 @@ experiment:
   seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
   uncertainty: nominal
   variation: "off"
-  start: warm                 # quasi-static lock codes, settled thermal state
+  start: warm                 # locked-steady-state lock codes, settled thermal state
   score_from_s: 0.005         # pi_lock maps its peak through the resonance in the first ~3 ms
   self_reference: {duration_s: 0.02, window_s: 0.005}

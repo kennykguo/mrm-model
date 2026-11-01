@@ -1,12 +1,23 @@
-"""Verification of mrm/waveform (07 P2-6; docs/research/03 sections 2.2-2.5, 5.5, 5.6, 9.3).
+"""Checks the bit-rate waveform package mrm/waveform against analytic limits and independent solvers.
 
-Checks the code against analytic limits and independent solvers: the TCMT steady state against the closed forms and
-the plant's TCMT, the exponential integrator against exact solutions and scipy DOP853, the small-signal response
-against the Sacher & Poon / Karimelahi closed form and the 03 bandwidth table, the junction network against exact
-and DOP853 solutions and against the plant's P1-8 transition energy, the eye metrics on synthetic waveforms, the
-normalized LUT model against the physical TCMT, the 07 P2-6 PRBS test, and the LUT artefact (node exactness,
-interpolation error, domain errors, agreement with full driver + nonlinear-junction runs on g26).
-Runs under NUMBA_DISABLE_JIT=1 with reduced sizes.
+Read this first
+---------------
+mrm/waveform simulates the ring at the data rate (20 ps bits): a driver with Gaussian edges, the junction RC network
+with a voltage-dependent C_j(V), and the time-domain TCMT of the ring (clockwise and counter-clockwise modes with
+backscatter). Its main use is a lookup table (LUT) of corrections to the two-level static average, keyed in
+normalized coordinates (detuning and swing in half-widths, mark and transition density, edge time, photon lifetime
+over the bit time, kappa_e / kappa), with a validity domain. The equations are in the compact-model notes,
+docs/research/03_mrm_compact_models.md, sections 2.2-2.5, 5.5, 5.6 and 9.3.
+
+The tests check: the TCMT steady state against the closed forms and the archived steady-state TCMT; the exponential integrator
+against exact solutions and scipy DOP853; the small-signal response against the Sacher & Poon / Karimelahi closed
+form and the bandwidth table of the notes; the junction network against exact and DOP853 solutions and against the
+plant's data-activity transition energy; the eye metrics on synthetic waveforms; the normalized LUT model against
+the physical TCMT; the PRBS mean-drop test of the design review; and the LUT artefact (node exactness, interpolation
+error, domain errors, agreement with full driver + nonlinear-junction runs on g26). Runs under NUMBA_DISABLE_JIT=1
+with reduced sizes.
+
+"The design review" below means docs/research/07_design_critique.md.
 """
 from __future__ import annotations
 
@@ -18,48 +29,52 @@ import pytest
 from numba import config as numba_config
 from scipy.integrate import solve_ivp
 
-from mrm.plant import datapath as dp
-from mrm.plant import electrical as el
-from mrm.plant import optics as op
-from mrm.plant import phase as ph
+from mrm.plant import datapath
+from mrm.plant import electrical
+from archive.optics import tcmt as archived_tcmt
+from mrm.plant import optics
+from mrm.plant import phase
 from mrm.units import C0
-from mrm.waveform import driver as drv_mod
-from mrm.waveform import lut as L
-from mrm.waveform import tcmt_time as tt
+from mrm.waveform import driver
+from mrm.waveform import lut
+from mrm.waveform import tcmt_time
 from mrm.waveform.driver import DriverJunction, markov_bits, pattern_stats, prbs
 from mrm.waveform.eye import eo_bandwidth, eye_metrics, simulate
 from mrm.waveform.tcmt_time import RingTCMT
 
 NOJIT = bool(numba_config.DISABLE_JIT)
-W0 = 2 * math.pi * C0 / 1310e-9          # 03 section 1 reference ring
-KAP = W0 / 3500.0
+W0 = 2 * math.pi * C0 / 1310e-9          # rad/s, optical angular frequency of the reference ring (compact-model notes)
+KAP = W0 / 3500.0                        # 1/s, total energy decay rate kappa at Q_L = 3500
 
 
 def _rates(ki_frac=0.5, ke_frac=0.49, kd_frac=0.01):
+    """(kappa_i, kappa_e, kappa_d) in 1/s as fractions of KAP."""
     return ki_frac * KAP, ke_frac * KAP, kd_frac * KAP
 
 
-# ============================================================================================ TCMT core
+# ------------------------------------------------------------------------------------------------------------ TCMT core
+
 def test_steady_state_matches_closed_forms_and_plant_tcmt():
-    """03 section 2.5 closed forms (with g) and mrm.plant.optics.ring_tcmt (one order) for the same rates."""
+    """The closed forms of the compact-model notes, section 2.5 (with g), and archive.optics.tcmt.ring_tcmt (one order) for
+    the same rates."""
     ki, ke, kd = _rates(0.45, 0.5, 0.05)
     t_rt = 0.5555e-12
     rng = np.random.default_rng(1)
     for _ in range(20):
         delta = rng.uniform(-3, 3) * KAP / 2
         g = complex(rng.normal(), rng.normal()) * 0.2 * KAP
-        a1, a2 = tt.tcmt_steady_nb(delta, ki, ke, kd, g, 1.0 + 0j)
+        a1, a2 = tcmt_time.tcmt_steady_nb(delta, ki, ke, kd, g, 1.0 + 0j)
         d = 0.5 * KAP + 1j * delta
         den = d * d + abs(g) ** 2
         assert abs((1 - 1j * math.sqrt(ke) * a1) - (1 - ke * d / den)) < 1e-12
         assert abs(-1j * math.sqrt(kd) * a1 - (-math.sqrt(ke * kd) * d / den)) < 1e-12
         assert abs(-1j * math.sqrt(ke) * a2 - (1j * ke * np.conj(g) / den)) < 1e-12
         # plant TCMT, single order, same rates via the inverse logarithmic mapping
-        k2t, k2d, a_rt = op.tcmt_to_exact(ki, ke, kd, t_rt)
+        k2t, k2d, a_rt = optics.tcmt_to_exact(ki, ke, kd, t_rt)
         phi = 2 * math.pi * 77 + delta * t_rt
         rb = np.array([g * t_rt])
-        r = op.ring_tcmt(phi, k2t, k2d, a_rt, t_rt, rb=np.repeat(rb, 1), m_orders=1)
-        pw = tt.port_powers(np.array([a1]), np.array([a2]), 1.0, ki, ke, kd)
+        r = archived_tcmt.ring_tcmt(phi, k2t, k2d, a_rt, t_rt, rb=np.repeat(rb, 1), m_orders=1)
+        pw = tcmt_time.port_powers(np.array([a1]), np.array([a2]), 1.0, ki, ke, kd)
         assert abs(r.p_thru - pw["thru"][0]) < 1e-12
         assert abs(r.p_drop - pw["drop"][0]) < 1e-12
         assert abs(r.p_refl - pw["refl"][0]) < 1e-12
@@ -78,8 +93,8 @@ def test_integrator_exact_for_constant_rates():
     k = 7
     out1 = np.empty(k + 1, complex)
     out2 = np.empty(k + 1, complex)
-    tt.tcmt_run_nb(h, 1.0 + 0j, ke, kd, g, np.full(2 * k + 1, delta), np.full(2 * k + 1, ki), a0[0], a0[1],
-                   out1, out2)
+    tcmt_time.tcmt_run_nb(h, 1.0 + 0j, ke, kd, g, np.full(2 * k + 1, delta), np.full(2 * k + 1, ki), a0[0], a0[1],
+                          out1, out2)
     ass = -np.linalg.solve(m, bvec)
     for j in range(k + 1):
         ref = expm(m * j * h) @ (a0 - ass) + ass
@@ -87,7 +102,10 @@ def test_integrator_exact_for_constant_rates():
         assert abs(out2[j] - ref[1]) < 1e-12 * abs(ass[0])
 
 
-def _ivp_reference(delta_fn, ki_fn, ke, kd, g, t_end, a0):
+def _tcmt_rhs(delta_fn, ki_fn, ke, kd, g, t_end, a0):
+    """Right-hand side of the CW/CCW TCMT equations for scipy solve_ivp, state (Re a1, Im a1, Re a2, Im a2), unit
+    input field; delta_fn(t) and ki_fn(t) give the detuning (rad/s) and the intrinsic loss rate (1/s) at time t (s).
+    t_end and a0 are not used."""
     def rhs(t, y):
         a1 = y[0] + 1j * y[1]
         a2 = y[2] + 1j * y[3]
@@ -111,8 +129,8 @@ def test_integrator_against_dop853_time_varying():
     def ki_fn(t):
         return ki * (1.0 - 0.05 * math.tanh((t - 20e-12) / 2e-12))
 
-    a1s, a2s = tt.tcmt_steady_nb(delta_fn(0.0), ki_fn(0.0), ke, kd, g, 1.0 + 0j)
-    sol = solve_ivp(_ivp_reference(delta_fn, ki_fn, ke, kd, g, t_end, None), (0, t_end),
+    a1s, a2s = tcmt_time.tcmt_steady_nb(delta_fn(0.0), ki_fn(0.0), ke, kd, g, 1.0 + 0j)
+    sol = solve_ivp(_tcmt_rhs(delta_fn, ki_fn, ke, kd, g, t_end, None), (0, t_end),
                     [a1s.real, a1s.imag, a2s.real, a2s.imag], method="DOP853", rtol=1e-11, atol=1e-18,
                     dense_output=True)
     errs = []
@@ -121,8 +139,8 @@ def test_integrator_against_dop853_time_varying():
         th = np.arange(2 * k + 1) * h / 2
         out1 = np.empty(k + 1, complex)
         out2 = np.empty(k + 1, complex)
-        tt.tcmt_run_nb(h, 1.0 + 0j, ke, kd, g, np.array([delta_fn(t) for t in th]),
-                       np.array([ki_fn(t) for t in th]), a1s, a2s, out1, out2)
+        tcmt_time.tcmt_run_nb(h, 1.0 + 0j, ke, kd, g, np.array([delta_fn(t) for t in th]),
+                              np.array([ki_fn(t) for t in th]), a1s, a2s, out1, out2)
         y = sol.sol(np.arange(k + 1) * h)
         err = max(np.max(np.abs(out1 - (y[0] + 1j * y[1]))), np.max(np.abs(out2 - (y[2] + 1j * y[3]))))
         errs.append(err / np.max(np.abs(y[0] + 1j * y[1])))
@@ -131,7 +149,8 @@ def test_integrator_against_dop853_time_varying():
 
 
 def test_energy_balance_over_a_period():
-    """Over one period of a cyclic pattern the stored energy returns, so P_in = sum of outputs + loss (03 2.4)."""
+    """Over one period of a cyclic pattern the stored energy returns, so P_in = sum of outputs + loss (notes, section
+    2.4)."""
     ring = RingTCMT.from_rates(*_rates(), 0.3 * KAP, v_bias=1.0, ddelta_dv=0.4 * KAP, dkappa_i_dv=-0.02 * KAP,
                                g=0.1j * KAP)
     dj = DriverJunction(np.linspace(-0.5, 4, 46), 10e-15, 100.0, 50.0, rise_time_s=6e-12)
@@ -140,21 +159,23 @@ def test_energy_balance_over_a_period():
     assert abs(out / w.p_in_w - 1.0) < 2e-5
 
 
-# ============================================================================================ small signal
+# --------------------------------------------------------------------------------------------------------- small signal
+
 def test_small_signal_matches_sacher_poon_closed_form():
-    """Exact linearization (g = 0, no loss modulation) = 03 section 5.6 closed form, zero at -(ki + kd)."""
+    """Exact linearization (g = 0, no loss modulation) = the closed form of the notes, section 5.6, zero at
+    -(ki + kd)."""
     rng = np.random.default_rng(3)
     f = np.array([1e8, 5e9, 30e9, 70e9, 150e9])
     for _ in range(30):
         fr = rng.dirichlet([1, 1, 0.3])
         ki, ke, kd = fr * KAP
         delta = rng.uniform(-3, 3) * KAP / 2
-        h = tt.optical_response_rates(ki, ke, kd, delta, f, ddelta=-1.0)
-        hc = tt.h_opt_closed_form(2j * np.pi * f, ki, ke, kd, delta)
+        h = tcmt_time.optical_response_rates(ki, ke, kd, delta, f, ddelta=-1.0)
+        hc = tcmt_time.h_opt_closed_form(2j * np.pi * f, ki, ke, kd, delta)
         assert np.max(np.abs(h - hc)) < 1e-10 * np.max(np.abs(hc))
     # the transfer function vanishes at the zero s = -(ki + kd) (analytic continuation of the closed form)
     ki, ke, kd = _rates()
-    assert abs(tt.h_opt_closed_form(-(ki + kd) + 0j, ki, ke, kd, 0.3 * KAP)) < 1e-30
+    assert abs(tcmt_time.h_opt_closed_form(-(ki + kd) + 0j, ki, ke, kd, 0.3 * KAP)) < 1e-30
 
 
 @pytest.mark.parametrize("x, coupling, q, f3, pk, pk_dec", [
@@ -163,8 +184,8 @@ def test_small_signal_matches_sacher_poon_closed_form():
     (2.0, "critical", 0.0, 246.0, 8.8, 1), (0.813, "over", 0.0, 152.0, 5.1, 1), (0.813, "under", 0.0, 54.4, 0.1, 1),
     (1 / math.sqrt(3), "critical", 0.13, 51.3, 0.02, 2), (1 / math.sqrt(3), "critical", -0.1, 58.7, 0.21, 2)])
 def test_bandwidth_table_of_03(x, coupling, q, f3, pk, pk_dec):
-    """The optical-only bandwidth/peaking table of 03 section 5.6 (Q_L 3500, 1310 nm; all-pass, kappa_d -> 0;
-    loss modulation q = delta(kappa_i/2)/delta w_r), to its printed digits."""
+    """The optical-only bandwidth/peaking table of the compact-model notes, section 5.6 (Q_L 3500, 1310 nm; all-pass,
+    kappa_d -> 0; loss modulation q = delta(kappa_i/2)/delta w_r), to its printed digits."""
     kap = KAP
     ke = {"critical": 0.5, "over": 0.75, "under": 0.25}[coupling] * kap
     ki = kap - ke
@@ -178,7 +199,7 @@ def test_bandwidth_table_of_03(x, coupling, q, f3, pk, pk_dec):
 
 @pytest.mark.parametrize("x, f_rc", [(1 / math.sqrt(3), 34.8), (0.813, 25.1)])
 def test_cal10_inversion_of_03(x, f_rc):
-    """03 section 5.6 (verified there): a 30.9 GHz total EO bandwidth at Q_L 3500, critical coupling, implies a
+    """The notes, section 5.6 (verified there): a 30.9 GHz total EO bandwidth at Q_L 3500, critical coupling, implies a
     single-pole RC of 34.8 GHz at x = 1/sqrt(3) and 25.1 GHz at x = 0.813. The H_E x H_opt composition of
     eo_bandwidth (DriverJunction with R_drv = 0, constant C_j) inverts to the same poles."""
     from scipy.optimize import brentq
@@ -193,9 +214,9 @@ def test_cal10_inversion_of_03(x, f_rc):
 
 
 def test_loss_modulation_on_resonance_and_vanishing_dc_gain():
-    """03 section 5.6: on resonance pure index modulation gives no first-order intensity modulation (eo_bandwidth
-    then reports nan), and loss modulation alone gives a single real pole at kappa/2: f_3dB = FWHM/2 exactly
-    (away from critical coupling, where the through port is first-order insensitive to kappa_i as well)."""
+    """The notes, section 5.6: on resonance pure index modulation gives no first-order intensity modulation
+    (eo_bandwidth then reports nan), and loss modulation alone gives a single real pole at kappa/2: f_3dB = FWHM/2
+    exactly (away from critical coupling, where the through port is first-order insensitive to kappa_i as well)."""
     ki, ke, kd = _rates(0.5, 0.45, 0.05)
     ring = RingTCMT.from_rates(ki, ke, kd, 0.0, ddelta_dv=0.3 * KAP, dkappa_i_dv=-0.02 * KAP)
     r = eo_bandwidth(ring, None, 0.0, loss_modulation=False)
@@ -226,10 +247,11 @@ def test_time_domain_lockin_matches_linearization():
         assert abs(lock - lin) < 3e-3 * abs(lin)
 
 
-# ============================================================================================ patterns, driver
+# ----------------------------------------------------------------------------------------------------- patterns, driver
+
 def test_prbs_is_the_datapath_prbs():
     for k in (7, 9, 15):
-        assert np.array_equal(prbs(k), dp.prbs_bits(k, dp.PRBS_TAPS[k]))
+        assert np.array_equal(prbs(k), datapath.prbs_bits(k, datapath.PRBS_TAPS[k]))
         m, t = pattern_stats(prbs(k))
         assert m == pytest.approx(2 ** (k - 1) / (2 ** k - 1))
         assert t == pytest.approx(2 ** (k - 1) / (2 ** k - 1))
@@ -248,14 +270,14 @@ def test_markov_bits_statistics():
 
 def test_gaussian_edge_rise_time():
     tr_s = 7e-12
-    sig = drv_mod.rise_to_sigma(tr_s)
+    sig = driver.rise_to_sigma(tr_s)
     bits = np.array([0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0], np.uint8)
     t = np.linspace(10e-12, 30e-12, 20001)
-    v = np.array([drv_mod.nrz_source_nb(x, bits, 20e-12, sig, 0.0, 1.0) for x in t])
+    v = np.array([driver.nrz_source_nb(x, bits, 20e-12, sig, 0.0, 1.0) for x in t])
     t10 = np.interp(0.1, v, t)
     t90 = np.interp(0.9, v, t)
     assert t90 - t10 == pytest.approx(tr_s, rel=1e-5)
-    assert drv_mod.nrz_source_nb(100e-12, bits, 20e-12, sig, 0.2, 1.7) == pytest.approx(1.7, abs=1e-12)
+    assert driver.nrz_source_nb(100e-12, bits, 20e-12, sig, 0.2, 1.7) == pytest.approx(1.7, abs=1e-12)
 
 
 def test_junction_rc_linear_step_is_exponential():
@@ -277,9 +299,9 @@ def test_junction_rc_linear_step_is_exponential():
 
 def test_junction_rc_nonlinear_two_node_against_dop853():
     """C_j(V) of the analytic depletion table, R_s(V), C_pad two-node network, Gaussian edges vs DOP853."""
-    tab = el.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
-                                     c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
-                                     r_series_ohm_m=100.0 * 33e-6)
+    tab = electrical.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
+                                             c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
+                                             r_series_ohm_m=100.0 * 33e-6)
     cj = tab.capacitance_f_per_m[0] * 33e-6
     rs = tab.r_series_ohm_m[0] / 33e-6 * (1 + 0.1 * tab.v_reverse_v)       # a V-dependent R_s
     dj = DriverJunction(tab.v_reverse_v, cj, rs, 50.0, c_pad_f=5e-15, rise_time_s=6e-12)
@@ -289,13 +311,13 @@ def test_junction_rc_nonlinear_two_node_against_dop853():
     sig = dj.sigma_s
 
     def rhs(t, y):
-        vs = drv_mod.nrz_source_nb(t, bits, tb, sig, 0.35, 1.65)
+        vs = driver.nrz_source_nb(t, bits, tb, sig, 0.35, 1.65)
         vp, vj = y
         c = np.interp(vj, tab.v_reverse_v, cj)
         r = np.interp(vj, tab.v_reverse_v, rs)
         return [((vs - vp) / 50.0 - (vp - vj) / r) / 5e-15, (vp - vj) / (r * c)]
     t0 = run.t_s[0]
-    v0 = drv_mod.nrz_source_nb(t0, bits, tb, sig, 0.35, 1.65)
+    v0 = driver.nrz_source_nb(t0, bits, tb, sig, 0.35, 1.65)
     sol = solve_ivp(rhs, (t0, run.t_s[-1]), [v0, v0], method="DOP853", rtol=1e-10, atol=1e-13,
                     t_eval=run.t_s[::16], max_step=0.5e-12)
     assert np.max(np.abs(sol.y[1] - run.v_j[::16])) < 2e-6
@@ -331,9 +353,9 @@ def test_simulate_end_to_end_against_dop853():
     together) solved by scipy DOP853 from the same DC start: checks the half-step alignment of V_j and the optics,
     which the per-block tests cannot see (a half-step shift would cost ~1e-2 of P_in here)."""
     ki, ke, kd = _rates(0.5, 0.45, 0.05)
-    tab = el.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
-                                     c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
-                                     r_series_ohm_m=100.0 * 33e-6)
+    tab = electrical.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
+                                             c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
+                                             r_series_ohm_m=100.0 * 33e-6)
     v = tab.v_reverse_v
     cj = tab.capacitance_f_per_m[0] * 33e-6
     rs = tab.r_series_ohm_m[0] / 33e-6 * (1 + 0.1 * v)
@@ -350,7 +372,7 @@ def test_simulate_end_to_end_against_dop853():
     sig = dj.sigma_s
 
     def rhs(t, y):
-        vs = drv_mod.nrz_source_nb(t, bits, tb, sig, lo, hi)
+        vs = driver.nrz_source_nb(t, bits, tb, sig, lo, hi)
         vp, vj = y[0], y[1]
         c, r = np.interp(vj, v, cj), np.interp(vj, v, rs)
         a1, a2 = y[2] + 1j * y[3], y[4] + 1j * y[5]
@@ -359,9 +381,9 @@ def test_simulate_end_to_end_against_dop853():
         d2 = lam * a2 - 1j * np.conj(g) * a1
         return [((vs - vp) / 50.0 - (vp - vj) / r) / 4e-15, (vp - vj) / (r * c), d1.real, d1.imag, d2.real, d2.imag]
     t0 = -nwarm * tb
-    vs0 = drv_mod.nrz_source_nb(t0, bits, tb, sig, lo, hi)
-    a1, a2 = tt.tcmt_steady_nb(float(np.interp(vs0, v, delta_tab)), float(np.interp(vs0, v, ki_tab)), ke, kd, g,
-                               1.0 + 0j)
+    vs0 = driver.nrz_source_nb(t0, bits, tb, sig, lo, hi)
+    a1, a2 = tcmt_time.tcmt_steady_nb(float(np.interp(vs0, v, delta_tab)), float(np.interp(vs0, v, ki_tab)), ke, kd, g,
+                                      1.0 + 0j)
     sol = solve_ivp(rhs, (t0, w.t_s[-1]), [vs0, vs0, a1.real, a1.imag, a2.real, a2.imag], method="DOP853",
                     rtol=1e-10, atol=1e-12, t_eval=w.t_s, max_step=0.2e-12)
     a1r = sol.y[2] + 1j * sol.y[3]
@@ -395,10 +417,10 @@ def test_simulate_input_guards():
 
 def test_transition_energy_matches_p1_8_formula():
     """Energy dissipated in R_s per transition (mean of up and down) = mrm.plant.electrical.data_activity_heat_row
-    junction share 0.5 C_eff Vpp^2 R_s/(R_s + R_drv) for the nonlinear C_j(V) (07 P1-8, cross-module check)."""
-    tab = el.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
-                                     c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
-                                     r_series_ohm_m=100.0 * 33e-6)
+    junction share 0.5 C_eff Vpp^2 R_s/(R_s + R_drv) for the nonlinear C_j(V) (a cross-module check)."""
+    tab = electrical.analytic_junction_table(shift_amp_m=170e-12, v_bi_v=0.9, m=0.5, lambda_m=1.31e-6, n_g=4.0,
+                                             c0_f_per_m=15e-15 / 33e-6, alpha0_per_m=1500.0, loss_ratio_q=0.06,
+                                             r_series_ohm_m=100.0 * 33e-6)
     cj = tab.capacitance_f_per_m[0] * 33e-6
     dj = DriverJunction(tab.v_reverse_v, cj, 100.0, 50.0)
     bits = np.array([0] * 8 + [1] * 8, np.uint8)
@@ -409,16 +431,17 @@ def test_transition_energy_matches_p1_8_formula():
     tg = run.t_s[m]
     e_rs = np.trapezoid(i[m] ** 2 * 100.0, tg)          # one up and one down transition in the window
     ce = np.zeros(1)
-    el.junction_swing_capacitance_row(np.array([lo]), np.array([hi]), tab.v_reverse_v, tab.capacitance_f_per_m[0],
-                                      np.array([1.0]), np.array([33e-6]), ce)
+    electrical.junction_swing_capacitance_row(np.array([lo]), np.array([hi]), tab.v_reverse_v,
+                                              tab.capacitance_f_per_m[0], np.array([1.0]), np.array([33e-6]), ce)
     pj = np.zeros(1)
     pd = np.zeros(1)
-    el.data_activity_heat_row(ce, np.array([hi - lo]), 1.0, np.array([1.0]), np.array([1.0]), np.array([100.0]),
-                              np.array([50.0]), np.array([0.0]), np.array([0.0]), 0, pj, pd)
+    electrical.data_activity_heat_row(ce, np.array([hi - lo]), 1.0, np.array([1.0]), np.array([1.0]), np.array([100.0]),
+                                      np.array([50.0]), np.array([0.0]), np.array([0.0]), 0, pj, pd)
     assert e_rs / 2 == pytest.approx(pj[0], rel=2e-3)
 
 
-# ============================================================================================ eye
+# ------------------------------------------------------------------------------------------------------------------ eye
+
 def test_eye_metrics_on_ideal_and_delayed_nrz():
     s = 32
     bits = prbs(7)
@@ -449,9 +472,11 @@ def test_eye_metrics_on_ideal_and_delayed_nrz():
     assert em3.p1 == pytest.approx(4.0 - em2.p1, abs=1e-12) and em3.p0 == pytest.approx(4.0 - em2.p0, abs=1e-12)
 
 
-# ============================================================================================ plant consistency
+# ---------------------------------------------------------------------------------------------------- plant consistency
+
 @pytest.fixture(scope="module")
 def g26():
+    """PlantParams of the g26 nominal world (B = 1)."""
     from mrm import params
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -465,16 +490,19 @@ def test_ring_from_plant_params_matches_plant_optics(g26):
     pp = g26
     ring = RingTCMT.from_plant_params(pp, 0, 0, v_bias=1.0, x_bias=0.5)
     assert ring.x(1.0) == pytest.approx(0.5, abs=1e-9)
-    P = ph.PhaseParams.from_plant_params(pp)
+    phase_params = phase.PhaseParams.from_plant_params(pp)
     n_r = pp.n_rings
     lam = np.array([ring.meta["lambda_line_m"]])
     for v in (0.2, 1.0, 1.8):
-        o = {k: np.zeros((n_r, 1)) for k in ("p0", "p1", "a0", "a1", "e0", "e1", "kt", "kd", "trt")}
-        ph.ring_optics_row(P.ring[0], lam, np.full(n_r, ring.meta["t_ring_k"]), np.full(n_r, ring.meta["t_ring_k"]),
-                           np.full(n_r, v), np.full(n_r, v), P.grid, P.dneff[0], P.alpha_fca[0], P.capacitance[0],
-                           P.r_series[0], o["p0"], o["p1"], o["a0"], o["a1"], o["e0"], o["e1"], o["kt"], o["kd"],
-                           o["trt"], np.zeros((n_r, 2)), np.zeros((n_r, 2)), np.zeros((n_r, 2)), np.zeros(n_r, np.int8))
-        ex = op.ring_exact(o["p0"][0, 0], o["kt"][0, 0], o["kd"][0, 0], o["a0"][0, 0], o["trt"][0, 0])
+        rows = {k: np.zeros((n_r, 1)) for k in ("p0", "p1", "a0", "a1", "e0", "e1", "kt", "kd", "trt")}
+        phase.ring_optics_row(phase_params.ring[0], lam, np.full(n_r, ring.meta["t_ring_k"]),
+                              np.full(n_r, ring.meta["t_ring_k"]), np.full(n_r, v), np.full(n_r, v),
+                              phase_params.grid, phase_params.dneff[0], phase_params.alpha_fca[0],
+                              phase_params.capacitance[0], phase_params.r_series[0], rows["p0"], rows["p1"],
+                              rows["a0"], rows["a1"], rows["e0"], rows["e1"], rows["kt"], rows["kd"], rows["trt"],
+                              np.zeros((n_r, 2)), np.zeros((n_r, 2)), np.zeros((n_r, 2)), np.zeros(n_r, np.int8))
+        ex = optics.ring_exact(rows["p0"][0, 0], rows["kt"][0, 0], rows["kd"][0, 0], rows["a0"][0, 0],
+                               rows["trt"][0, 0])
         st = ring.steady(v)
         assert abs(st["thru"][0] - ex.p_thru) < 2e-3
         assert abs(st["drop"][0] / ex.p_drop - 1) < 5e-3
@@ -495,11 +523,11 @@ def test_ring_from_plant_params_lock_order(g26):
         r2 = RingTCMT.from_plant_params(pp, 0, 0, v_bias=1.0, x_bias=0.5, order=m0 + 1)
     assert r1.meta["t_ring_k"] == pytest.approx(r0.meta["t_ring_k"], abs=1e-9)
     assert r2.meta["order"] == m0 + 1 and r2.x(1.0) == pytest.approx(0.5, abs=1e-9)
-    P = ph.PhaseParams.from_plant_params(pp)
-    rp = P.ring[0][0]
-    fsr = rp[ph.RP_LAM_RES] ** 2 / (rp[ph.RP_N_G] * rp[ph.RP_LEN])
+    phase_params = phase.PhaseParams.from_plant_params(pp)
+    rp = phase_params.ring[0][0]
+    fsr = rp[phase.RP_LAM_RES] ** 2 / (rp[phase.RP_N_G] * rp[phase.RP_LEN])
     s_mean = fsr / (r2.meta["t_ring_k"] - r0.meta["t_ring_k"])          # mean thermal slope over one FSR
-    assert 0.5 * rp[ph.RP_S0] < s_mean < 2.0 * rp[ph.RP_S0]
+    assert 0.5 * rp[phase.RP_S0] < s_mean < 2.0 * rp[phase.RP_S0]
     with pytest.warns(UserWarning, match="lock order"):
         RingTCMT.from_plant_params(pp, 0, 0, v_bias=1.0, x_bias=0.5, lambda_line_m=r0.meta["lambda_line_m"] + fsr)
     with pytest.raises(ValueError):
@@ -508,7 +536,7 @@ def test_ring_from_plant_params_lock_order(g26):
 
 def test_g26_prbs_waveform_converges_and_is_near_the_static_average(g26):
     """End-to-end g26 run (PRBS7, 50 Gb/s, 1.3 Vpp centered at 1 V, 8 ps driver edges): converged in the sample
-    count; the mean drop power within 3 % of the two-level static average (07 P2-6)."""
+    count; the mean drop power within 3 % of the two-level static average."""
     pp = g26
     ring = RingTCMT.from_plant_params(pp, 0, 0, v_bias=1.0, x_bias=1 / math.sqrt(3))
     dj = DriverJunction.from_plant_params(pp, 0, 0, rise_time_s=8e-12)
@@ -523,7 +551,8 @@ def test_g26_prbs_waveform_converges_and_is_near_the_static_average(g26):
     assert abs(b[0] - 1.0) < 0.03
 
 
-# ============================================================================================ normalized LUT model
+# ------------------------------------------------------------------------------------------------- normalized LUT model
+
 def test_normalized_model_is_the_physical_tcmt():
     """The normalized node reproduces the dimensional TCMT run driven by the same single-pole edge exactly: mean
     energy, through and drop OMA (the r_e algebra of lut.py)."""
@@ -536,7 +565,7 @@ def test_normalized_model_is_the_physical_tcmt():
     bits = prbs(7)
     s = 32
     nw = 32
-    # the exact single-pole edge at the half-step instants (the same recursion as lut._node_nb)
+    # the exact single-pole edge at the half-step instants (the same recursion as lut._normalized_node_nb)
     q = math.exp(-0.5 * (1.0 / s) * math.log(9.0) / tr_ui)
     seq = np.concatenate([bits[-nw:], bits, bits[:1]]).astype(float)
     e = float(bits[-nw])
@@ -549,7 +578,7 @@ def test_normalized_model_is_the_physical_tcmt():
     tr = ring.run(np.array(vh), tb / s)
     a1 = tr.a1[nw * s:(nw + bits.size) * s]
     u = np.abs(a1) ** 2 * KAP ** 2 / (4 * ke)
-    d = L.normalized_node(x0, x1, bits, tau, tr_ui, re_grid=(ke / KAP,), samples_per_bit=s, n_warm=nw)
+    d = lut.normalized_node(x0, x1, bits, tau, tr_ui, re_grid=(ke / KAP,), samples_per_bit=s, n_warm=nw)
     assert np.mean(u) == pytest.approx(d["u_td"], rel=1e-9)
     em = eye_metrics(tr.powers["thru"][nw * s:(nw + bits.size) * s], bits, s)
     assert em.oma == pytest.approx(d["oma_thru_td"][0], rel=1e-7)
@@ -560,27 +589,29 @@ def test_normalized_model_is_the_physical_tcmt():
 def test_normalized_mirror_symmetry():
     """x(t) -> -x(t) with relabelled levels leaves the corrections unchanged (stored half-plane of the LUT)."""
     bits = markov_bits(256, 0.3, 0.35)
-    a = L.normalized_node(0.4, 1.3, bits, 0.12, 0.25, re_grid=(0.45,))
+    a = lut.normalized_node(0.4, 1.3, bits, 0.12, 0.25, re_grid=(0.45,))
     # mirrored trajectory: bit 0 -> -0.4, bit 1 -> -1.3; relabelled so that level 1 has the larger x
-    b = L.normalized_node(-1.3, -0.4, (1 - bits).astype(np.uint8), 0.12, 0.25, re_grid=(0.45,))
+    b = lut.normalized_node(-1.3, -0.4, (1 - bits).astype(np.uint8), 0.12, 0.25, re_grid=(0.45,))
     for k in ("u_td", "u_st", "oma_drop_td", "oma_drop_st"):
         assert a[k] == pytest.approx(b[k], rel=1e-10)
     assert a["oma_thru_td"][0] == pytest.approx(b["oma_thru_td"][0], rel=1e-10)
 
 
 def test_p2_6_mean_drop_correction_prbs_tau3ps_ui20ps():
-    """07 P2-6: the correction to the mean drop power for PRBS at tau_p ~ 3 ps and a 20 ps UI (tau_p/UI = 0.15).
+    """The design review's PRBS test: it expects the correction to the mean drop power for PRBS at tau_p ~ 3 ps and a
+    20 ps UI (tau_p/UI = 0.15) to stay below 3 %.
 
-    Honest result (PRBS9, full grid in the artefact sidecar, validation.p2_6_prbs9_tau_0p15): the 07 claim holds only
-    for small swings. Over every detuning x_c in [0, 6] HWHM and edge rise time 0-0.7 UI, |c_mean - 1| stays below 3 %
-    up to a resonance swing of 0.25 FWHM (max 2.6 %; the G25-like drive of 45-65 pm at Q 3500-4000 is 0.13-0.2 FWHM).
-    At 0.3 FWHM it reaches 2.4 % (ideal edges) to 3.7 % (0.7 UI edges); at 0.5 FWHM 9.6 %, at 1 FWHM 30 % (x_c = 0:
-    the resonance sweeps across the laser during every edge). The 170-230 pm swing that 07 D9 says the printed relOMA
-    needs (0.5-0.7 FWHM) is therefore NOT inside the < 3 % regime: there fidelity.data_modulation: lut matters."""
-    xc = [0.0, 0.5, 1.0, 1.5, 2.5] if NOJIT else L.DEFAULT_AXES["xc"]
+    Honest result (PRBS9, full grid in the artefact sidecar, validation.p2_6_prbs9_tau_0p15): the claim holds only for
+    small swings. Over every detuning x_c in [0, 6] HWHM and edge rise time 0-0.7 UI, |c_mean - 1| stays below 3 % up to
+    a resonance swing of 0.25 FWHM (max 2.6 %; the G25-like drive of 45-65 pm at Q 3500-4000 is 0.13-0.2 FWHM). At 0.3
+    FWHM it reaches 2.4 % (ideal edges) to 3.7 % (0.7 UI edges); at 0.5 FWHM 9.6 %, at 1 FWHM 30 % (x_c = 0: the
+    resonance sweeps across the laser during every edge). The 170-230 pm swing that the design review says the printed
+    relOMA needs (0.5-0.7 FWHM) is therefore NOT inside the < 3 % regime: there fidelity.data_modulation: lut matters.
+    """
+    xc = [0.0, 0.5, 1.0, 1.5, 2.5] if NOJIT else lut.DEFAULT_AXES["xc"]
     w = [0.1, 0.25, 0.3, 1.0] if NOJIT else [0.05, 0.1, 0.2, 0.25, 0.3, 0.5, 1.0]
-    tr = [0.0, 0.35, 0.7] if NOJIT else L.DEFAULT_AXES["tr"]
-    r = L.p2_6_prbs_check(0.15, order=7 if NOJIT else 9, xc=xc, w=w, tr=tr)
+    tr = [0.0, 0.35, 0.7] if NOJIT else lut.DEFAULT_AXES["tr"]
+    r = lut.prbs_mean_correction_check(0.15, order=7 if NOJIT else 9, xc=xc, w=w, tr=tr)
     c = np.abs(np.array(r["c_mean"]) - 1.0)
     small = [i for i, x in enumerate(w) if x <= 0.25]
     assert c[:, small, :].max() < 0.03
@@ -588,81 +619,83 @@ def test_p2_6_mean_drop_correction_prbs_tau3ps_ui20ps():
     assert 0.2 < c.max() < 0.4                          # 1 FWHM at x_c = 0
 
 
-# ============================================================================================ LUT artefact
+# --------------------------------------------------------------------------------------------------------- LUT artefact
+
 @pytest.fixture(scope="module")
-def lut():
+def nrz_lut():
+    """The committed NRZ LUT artefact (skips when it is not built)."""
     try:
-        return L.load_lut("nrz")
+        return lut.load_lut("nrz")
     except FileNotFoundError:
         pytest.skip("waveform_lut_nrz.npz not built (python -m mrm.waveform.lut)")
 
 
-def test_lut_artefact_integrity_and_domain(lut):
-    assert lut.config["schema"] == L.SCHEMA and len(lut.config_hash) == 64
-    assert lut.tab6.shape[0] == L.N_F6 and np.all(np.isfinite(lut.tab6)) and np.all(np.isfinite(lut.tab7))
-    dom = lut.domain
+def test_lut_artefact_integrity_and_domain(nrz_lut):
+    assert nrz_lut.config["schema"] == lut.SCHEMA and len(nrz_lut.config_hash) == 64
+    assert nrz_lut.tab6.shape[0] == lut.N_F6 and np.all(np.isfinite(nrz_lut.tab6)) and np.all(np.isfinite(nrz_lut.tab7))
+    dom = nrz_lut.domain
     assert dom["abs_xc"][1] >= 6.0 and dom["w"][1] >= 1.0 and dom["tau_ui"][0] <= 0.07 and dom["tau_ui"][1] >= 0.25
     # tau_p = 2.7 ps at 50 and 56 Gb/s (the g26 ring) is inside
     assert dom["tau_ui"][0] < 2.7e-12 * 50e9 < 2.7e-12 * 56e9 < dom["tau_ui"][1]
-    # P2-6: an error outside the domain, naming the key
+    # outside the validity domain: an error that names the key
     for bad, key in (((7.0, 7.4, 0.5, 0.5, 0.1, 0.1, 0.5), "x_c"), ((1.0, 4.0, 0.5, 0.5, 0.1, 0.1, 0.5), "w"),
                      ((0.5, 1.0, 0.9, 0.1, 0.1, 0.1, 0.5), "mark"),
                      ((0.5, 1.0, 0.35, 0.65, 0.1, 0.1, 0.5), "transition"),
                      ((0.5, 1.0, 0.5, 0.5, 0.9, 0.1, 0.5), "rise"), ((0.5, 1.0, 0.5, 0.5, 0.1, 0.5, 0.5), "tau_p"),
                      ((0.5, 1.0, 0.5, 0.5, 0.1, 0.1, 0.9), "kappa_e"), ((np.nan, 1.0, 0.5, 0.5, 0.1, 0.1, 0.5),
                                                                        "non-finite")):
-        with pytest.raises(L.LutDomainError, match=key):
-            lut.eval(*bad)
-    out = np.zeros(L.N_OUT)
-    st = L.lut_eval_nb(*lut.kernel_args(), 7.0, 10.0, 0.5, 0.5, 0.1, 0.1, 0.5, out)
-    assert st == (L.ST_XC | L.ST_W) and np.all(np.isfinite(out))
+        with pytest.raises(lut.LutDomainError, match=key):
+            nrz_lut.eval(*bad)
+    out = np.zeros(lut.N_OUT)
+    st = lut.lut_eval_nb(*nrz_lut.kernel_args(), 7.0, 10.0, 0.5, 0.5, 0.1, 0.1, 0.5, out)
+    assert st == (lut.ST_XC | lut.ST_W) and np.all(np.isfinite(out))
     with pytest.raises(ValueError):
-        L.lut_eval_strict_nb(*lut.kernel_args(), 7.0, 10.0, 0.5, 0.5, 0.1, 0.1, 0.5, out)
-    assert L.lut_eval_strict_nb(*lut.kernel_args(), 0.2, 0.8, 0.5, 0.5, 0.1, 0.1, 0.5, out) == 0
+        lut.lut_eval_strict_nb(*nrz_lut.kernel_args(), 7.0, 10.0, 0.5, 0.5, 0.1, 0.1, 0.5, out)
+    assert lut.lut_eval_strict_nb(*nrz_lut.kernel_args(), 0.2, 0.8, 0.5, 0.5, 0.1, 0.1, 0.5, out) == 0
 
 
-def test_lut_nodes_are_the_normalized_runs(lut):
+def test_lut_nodes_are_the_normalized_runs(nrz_lut):
     """At a node the table returns the stored run exactly (same build pattern, regenerated from the seed)."""
-    a = lut.axes
-    cfgd = lut.config
+    a = nrz_lut.axes
+    cfgd = nrz_lut.config
     ip, it = 1, 3                                   # p1 = 0.5, td = 0.45
     bits = markov_bits(cfgd["n_bits"], a["p1"][ip], a["td"][it], seed=cfgd["seed"] + 1000 * ip + 100 * it)
     for xc, w, tr, tau, re_ in ((1.0, 0.3, 0.2, 0.15, 0.5), (0.25, 1.0, 0.0, 0.07, 0.3), (3.0, 0.1, 0.7, 0.25, 0.7)):
-        d = L.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(re_,), n_warm=cfgd["n_warm"],
-                              samples_per_bit=L.samples_per_bit_for(tau, cfgd["base_samples"]))
-        r = lut.eval(xc - w, xc + w, a["p1"][ip], a["td"][it], tr, tau, re_)
+        d = lut.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(re_,), n_warm=cfgd["n_warm"],
+                                samples_per_bit=lut.samples_per_bit_for(tau, cfgd["base_samples"]))
+        r = nrz_lut.eval(xc - w, xc + w, a["p1"][ip], a["td"][it], tr, tau, re_)
         assert r["c_mean"] == pytest.approx(d["c_mean"], rel=1e-6)          # float32 storage
         assert r["c_oma_thru"] == pytest.approx(d["oma_thru_td"][0] / d["oma_thru_st"][0], rel=1e-6)
         assert r["c_oma_drop"] == pytest.approx(d["oma_drop_td"] / d["oma_drop_st"], rel=1e-6)
 
 
-def test_lut_query_mapping_mirror_and_relabel(lut):
+def test_lut_query_mapping_mirror_and_relabel(nrz_lut):
     """The engine queries with physical levels in any order and on either side of the resonance: lut_eval_nb maps
     (x0, x1, p1) to the stored half-plane (x_c >= 0, p = density of the larger-x level). At a node all four
     equivalent queries return the stored run, and a direct run of the MIRRORED dynamics gives the same numbers."""
-    a = lut.axes
-    cfgd = lut.config
+    a = nrz_lut.axes
+    cfgd = nrz_lut.config
     ip, it = 0, 2                                   # p1 = 0.3 (relabelling matters), td = 0.45
     p1, td = a["p1"][ip], a["td"][it]
     bits = markov_bits(cfgd["n_bits"], p1, td, seed=cfgd["seed"] + 1000 * ip + 100 * it)
     xc, w, tr, tau, re_ = 1.0, 0.3, 0.2, 0.15, 0.4
-    kw = dict(re_grid=(re_,), n_warm=cfgd["n_warm"], samples_per_bit=L.samples_per_bit_for(tau, cfgd["base_samples"]))
-    d = L.normalized_node(xc - w, xc + w, bits, tau, tr, **kw)
-    dm = L.normalized_node(-(xc - w), -(xc + w), bits, tau, tr, **kw)          # mirrored: blue/red swapped
+    kw = dict(re_grid=(re_,), n_warm=cfgd["n_warm"], samples_per_bit=lut.samples_per_bit_for(tau, cfgd["base_samples"]))
+    d = lut.normalized_node(xc - w, xc + w, bits, tau, tr, **kw)
+    dm = lut.normalized_node(-(xc - w), -(xc + w), bits, tau, tr, **kw)          # mirrored: blue/red swapped
     assert dm["c_mean"] == pytest.approx(d["c_mean"], rel=1e-10)
     ref = {"c_mean": d["c_mean"], "c_oma_thru": d["oma_thru_td"][0] / d["oma_thru_st"][0],
            "c_oma_drop": d["oma_drop_td"] / d["oma_drop_st"]}
     x0, x1 = xc - w, xc + w
     for q in ((x0, x1, p1), (x1, x0, 1 - p1), (-x0, -x1, p1), (-x1, -x0, 1 - p1)):
-        r = lut.eval(*q, td, tr, tau, re_)
+        r = nrz_lut.eval(*q, td, tr, tau, re_)
         assert r["status"] == 0
         for k, v in ref.items():
             assert r[k] == pytest.approx(v, rel=2e-6), (q, k)
     # an off-node query and its three equivalents agree with each other to rounding
     q0 = (-0.37, -1.21, 0.42, 0.33, 0.27, 0.13, 0.47)
-    r0 = lut.eval(*q0)
+    r0 = nrz_lut.eval(*q0)
     for q in ((-1.21, -0.37, 0.58), (0.37, 1.21, 0.42), (1.21, 0.37, 0.58)):
-        r = lut.eval(*q, *q0[3:])
+        r = nrz_lut.eval(*q, *q0[3:])
         for k in ("c_mean", "c_oma_thru", "d_oma_thru", "c_oma_drop", "d_oma_drop", "d_mean_u"):
             assert r[k] == pytest.approx(r0[k], rel=1e-12, abs=1e-15)
 
@@ -675,29 +708,29 @@ def test_lut_build_resolution_is_converged():
     bits = markov_bits(128 if NOJIT else 512, 0.5, 0.45, seed=3)
     corners = ((0.0, 1.0, 0.05, 0.07), (0.75, 1.0, 0.0, 0.07), (1.0, 0.5, 0.2, 0.07), (2.0, 1.0, 0.1, 0.085))
     for xc, w, tr, tau in corners[:2] if NOJIT else corners:
-        s = L.samples_per_bit_for(tau, 32)
-        a = L.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(0.5,), samples_per_bit=s)
-        b = L.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(0.5,), samples_per_bit=4 * s)
+        s = lut.samples_per_bit_for(tau, 32)
+        a = lut.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(0.5,), samples_per_bit=s)
+        b = lut.normalized_node(xc - w, xc + w, bits, tau, tr, re_grid=(0.5,), samples_per_bit=4 * s)
         assert abs(a["c_mean"] / b["c_mean"] - 1) < 2e-5
         assert abs(a["oma_drop_td"] / b["oma_drop_td"] - 1) < 8e-3
         assert abs(a["oma_thru_td"][0] / b["oma_thru_td"][0] - 1) < 8e-3
 
 
 @pytest.mark.skipif(NOJIT, reason="60 normalized runs of 1024 bits are too slow without numba")
-def test_lut_interpolation_accuracy(lut):
+def test_lut_interpolation_accuracy(nrz_lut):
     """Random off-node queries against direct runs with fresh patterns (interpolation + pattern sampling). In the
     practical domain (x_c 0.3-3, w <= 0.6, p1 = td = 0.5, t_r <= 0.5 UI, tau_p/UI 0.1-0.2, r_e 0.4-0.6) the mean
     correction is good to ~0.5 % and the through-OMA ratio to ~2 %; over the whole domain the mean stays within
     ~1.5 % while the OMA error grows near x_c -> 0 and at the edges of (p1, td, tau) (sidecar validation)."""
-    r = L.interpolation_check(lut, n_random=40, seed=11, practical=True)
+    r = lut.interpolation_check(nrz_lut, n_random=40, seed=11, practical=True)
     assert r["c_mean_abs_err_max"] < 5e-3
     assert r["c_oma_thru_abs_err_max"] < 2.5e-2
-    r = L.interpolation_check(lut, n_random=20, seed=12)
+    r = lut.interpolation_check(nrz_lut, n_random=20, seed=12)
     assert r["c_mean_abs_err_max"] < 1.5e-2
     assert r["oma_thru_diff_err_rel_scale_p95"] < 5e-2
 
 
-def test_lut_matches_full_driver_junction_runs_on_g26(lut, g26):
+def test_lut_matches_full_driver_junction_runs_on_g26(nrz_lut, g26):
     """Engine path: LUT keys from the plant's optics inputs (lut_query_nb), times the static two-level average,
     against the full chain (Gaussian driver edge, nonlinear C_j(V), sqrt shift law, loss modulation) on g26 with
     PRBS9 at 50 Gb/s. The residual measures the canonical single-pole edge and the omitted loss modulation."""
@@ -714,8 +747,8 @@ def test_lut_matches_full_driver_junction_runs_on_g26(lut, g26):
         t_r = dj.step_rise_time_s(lo, hi)["mean"]
         x0, x1 = w.x_levels
         kap = 0.5 * (ring.kappa(lo) + ring.kappa(hi))
-        r = lut.eval(x0, x1, float(bits.mean()), pattern_stats(bits)[1], t_r / tb, 1.0 / kap / tb,
-                     ring.kappa_e / kap)
+        r = nrz_lut.eval(x0, x1, float(bits.mean()), pattern_stats(bits)[1], t_r / tb, 1.0 / kap / tb,
+                         ring.kappa_e / kap)
         pred_mean = r["c_mean"] * w.static["drop"]["mean"]
         worst_mean = max(worst_mean, abs(w.mean("drop") / pred_mean - 1))
         oma_st = abs(w.static["thru"]["p1"] - w.static["thru"]["p0"])
@@ -729,12 +762,12 @@ def test_lut_query_from_plant_optics_inputs():
     the TCMT rate mapping of mrm.plant.optics."""
     ki, ke, kd = 3e11, 2.0e11, 0.03e11
     t_rt = 0.5555e-12
-    k2t, k2d, a0 = op.tcmt_to_exact(ki, ke, kd, t_rt)
+    k2t, k2d, a0 = optics.tcmt_to_exact(ki, ke, kd, t_rt)
     a1 = math.exp(-0.5 * (ki * 0.98) * t_rt)
     phi0 = 2 * math.pi * 80 + 0.2e11 * t_rt
     phi1 = 2 * math.pi * 80 + 1.5e11 * t_rt
     out = np.zeros(5)
-    L.lut_query_nb(phi0, phi1, k2t, k2d, a0, a1, t_rt, 50e9, 6e-12, out)
+    lut.lut_query_nb(phi0, phi1, k2t, k2d, a0, a1, t_rt, 50e9, 6e-12, out)
     kap = 0.5 * (ki + 0.98 * ki) + ke + kd
     assert out[0] == pytest.approx(2 * 0.2e11 / kap, rel=1e-9)
     assert out[1] == pytest.approx(2 * 1.5e11 / kap, rel=1e-9)
@@ -743,7 +776,7 @@ def test_lut_query_from_plant_optics_inputs():
 
 _NOJIT_SCRIPT = r"""
 import json, math, numpy as np
-from mrm.waveform import lut as L
+from mrm.waveform import lut
 from mrm.waveform.driver import DriverJunction, prbs
 from mrm.waveform.eye import simulate
 from mrm.waveform.tcmt_time import RingTCMT
@@ -752,11 +785,11 @@ ring = RingTCMT.from_rates(0.5 * kap, 0.45 * kap, 0.05 * kap, 0.3 * kap, v_bias=
                            dkappa_i_dv=-0.02 * kap, g=0.05j * kap)
 dj = DriverJunction(np.linspace(-0.5, 4, 46), 10e-15, 100.0, 50.0, c_pad_f=3e-15, rise_time_s=6e-12)
 w = simulate(ring, dj, prbs(7)[:40], 50e9, v_bias=1.0, swing_vpp=1.2, samples_per_bit=16, n_warm_bits=8)
-d = L.normalized_node(0.2, 0.9, prbs(7), 0.15, 0.2, re_grid=(0.4, 0.6), samples_per_bit=16)
+d = lut.normalized_node(0.2, 0.9, prbs(7), 0.15, 0.2, re_grid=(0.4, 0.6), samples_per_bit=16)
 ax = {"xc": [0, 1, 2], "w": [0, 0.5], "p1": [0.3, 0.7], "td": [0, 0.6], "tr": [0, 0.5], "tau": [0.1, 0.2],
       "re": [0.4, 0.6]}
-lut = L.build_lut(ax, n_bits=64, n_warm=8, base_samples=16)
-r = lut.eval(0.3, 1.1, 0.5, 0.4, 0.3, 0.15, 0.5)
+table = lut.build_lut(ax, n_bits=64, n_warm=8, base_samples=16)
+r = table.eval(0.3, 1.1, 0.5, 0.4, 0.3, 0.15, 0.5)
 print(json.dumps({"thru": w.powers["thru"].tolist(), "vj": w.v_j.tolist(), "node": [d["u_td"], d["oma_drop_td"]]
                   + d["oma_thru_td"].tolist(), "lut": [r[k] for k in sorted(r)]}))
 """

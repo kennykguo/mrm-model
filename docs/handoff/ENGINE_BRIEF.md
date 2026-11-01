@@ -113,19 +113,19 @@ Tick k is the instant at the END of interval [k-1, k). Per plant interval [k, k+
    args_i[b], p_max, d2p_max, max_iter=10, tol_k=1e-9, n_outer=1, g_work, t_obs, p_new, t_ring, n_iter)` -> n_fail.
    T_base_end = scenario `thermal.t_base_k + thermal.xpu_rise_k` at k+1 (records keep both). Then
    `p_prev = p_new`, `t_prev = t_ring`, `t_heater = t_obs[sys.heater_obs]`. The optics walk ran inside (commit_fn):
-   read `out_rl (N_RL,N,L)`, `out_r (N_R,N)`, `out_l (N_L,L)` from `selfheat_views`.
+   read `out_rl (RING_LINE_OUTPUT_ROW_COUNT,N,L)`, `out_r (RING_OUTPUT_ROW_COUNT,N)`, `out_l (LASER_LINE_OUTPUT_ROW_COUNT,L)` from `selfheat_views`.
    Self-heating off (`pp.flags.self_heating == 0`): `bus_propagate_nb` at the ring temperatures, then
    `thermal_advance_b(x, a, c0, c1, lag_src, obs_ptr, u0, u1, src_scale, t_base, t_obs)` with u[wg] = 0.
-10. **Sensors of the interval**: `monitor_tick_row(k, p_pd = out_r[R_DROP_SUM], p_bg = sum_l out_rl[RL_PIN, n, l],
+10. **Sensors of the interval**: `monitor_tick_row(k, p_pd = out_r[RING_OUTPUT_ROW_TOTAL_CLOCKWISE_DROP_POWER], p_bg = sum_l out_rl[RING_LINE_OUTPUT_ROW_INPUT_POWER, n, l],
     t_pd = t_obs[sys.pd_obs], t_adc = hw.adc_temperature(t_pd, T_base_end), pga_sel, fault, ...)` (t_adc:
     ring.monitor.adc_ref_site, the package base T_base_end by default, t_pd for monitor_pd; kernel row RF_T_ADC);
-    `errors_tick_row(k, oma = |out_rl[RL_POUT1, n, line(n)] - out_rl[RL_POUT0, n, line(n)]|, ...)` with
+    `errors_tick_row(k, oma = |out_rl[RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER, n, line(n)] - out_rl[RING_LINE_OUTPUT_ROW_LEVEL_ZERO_BUS_OUTPUT_POWER, n, line(n)]|, ...)` with
     `line = pp.layout.ring_to_line`; `temp_tick_row(k, t_obs[sys.temp_obs], ...)`; `readback_tick_row(k, heater v,
     i, ...)`.
 
 At a controller edge k (after the interval [k-1, k)): (1) state at k; (2) release every sensor bank
 (`monitor_release_row`, `temp_release_row`, `readback_release_row`, `errors_release_row`), run the bit-statistics
-window (`MonitorBank.level_codes` -> `bitstat_window_row` on R_DROP_SUM1/R_DROP_SUM0, threshold = actuator
+window (`MonitorBank.level_codes` -> `bitstat_window_row` on RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER/RING_OUTPUT_ROW_LEVEL_ZERO_TOTAL_CLOCKWISE_DROP_POWER, threshold = actuator
 `datapath.bitstat_threshold`, density = the scenario's `data.ones_density`, not the tick's realized n1/nb), run
 the `fast_kernel` once per released monitor sample (07 P0-7); (3) controller step; (4) clip `act_i64` to each
 channel's [min, max] (never cast to uint16 first), latch at k + latency_ticks; (5) the DAC FIFOs and slew/settle
@@ -177,9 +177,9 @@ pp.layout.ring_spacing_on_bus_m)` (1 for the first ring in bus order; g26: 0.073
 segment), `mrm.plant.phase.bus_t2_from_plant_params(pp)` (B, N); `bus_t2_out` = 1 (the output segment is not
 modelled). Correction (2026-10-16, physics_optics review): this line said the spacing is absent in g26; it is 50 um,
 and until then Plant._build passed no `bus_t2`, so the engine ran every segment at 1 (docs/CHANGELOG.md).
-Outputs: `R_DROP_SUM` (monitor input, rho-weighted, every line and order), `R_ABS_SUM` (self-heating source),
-`R_DROP_SUM1/0` (per level, for the bit statistics), `RL_POUT1/0` (per level at the bus output, OMA), `RL_PIN`
-(bus power at each ring), `L_POUT`, `L_BOUND` (single-pass error bound; large only when several rings sit on one
+Outputs: `RING_OUTPUT_ROW_TOTAL_CLOCKWISE_DROP_POWER` (monitor input, rho-weighted, every line and order), `RING_OUTPUT_ROW_TOTAL_ABSORBED_POWER` (self-heating source),
+`RING_OUTPUT_ROW_LEVEL_ONE_TOTAL_CLOCKWISE_DROP_POWER/0` (per level, for the bit statistics), `RING_LINE_OUTPUT_ROW_LEVEL_ONE_BUS_OUTPUT_POWER/0` (per level at the bus output, OMA), `RING_LINE_OUTPUT_ROW_INPUT_POWER`
+(bus power at each ring), `LASER_LINE_OUTPUT_ROW_BUS_OUTPUT_POWER`, `LASER_LINE_OUTPUT_ROW_FORWARD_POWER_RELATIVE_ERROR_BOUND` (single-pass error bound; large only when several rings sit on one
 line). Each prange worker needs its own `cw, fw, work` and args row. With `selfheat_bounds` use `dt_max_k` >= the
 largest ring temperature change of a step (the wiring test uses 50 K). The engine uses 50 K for every step
 (`mrm.plant.plant.DEFAULT_SH_DT_MAX_K`, `KParams.dt_max_k`; nothing scales it with the substep length, and an auto
