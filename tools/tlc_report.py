@@ -47,10 +47,12 @@ def _telemetry_summary(path: Path) -> dict | None:
     if not path.is_file():
         return None
     z = np.load(path)
-    return {"core_steps": int(z["t_s"].size),
-            "core_step_us_mean": float(np.mean(z["core_step_us"][..., 0])),
-            "track_fraction": float(np.mean(z["state"] == MODE_TRACK)),
-            "dither_amp_pm_max": float(np.max(np.abs(z["dither_amp_pm"]))) if z["t_s"].size else 0.0}
+    rows = slice(1, None)                    # row 0 is the start state at the first edge, before any core step
+    steps = int(z["t_s"][rows].size)
+    return {"core_steps": steps,
+            "core_step_us_mean": float(np.mean(z["core_step_us"][rows, ..., 0])) if steps else 0.0,
+            "track_fraction": float(np.mean(z["state"][rows] == MODE_TRACK)) if steps else 0.0,
+            "dither_amp_pm_max": float(np.max(np.abs(z["dither_amp_pm"][rows]))) if steps else 0.0}
 
 
 def clopper_pearson(k: int, n: int, alpha: float = 0.05) -> tuple[float, float]:
@@ -98,9 +100,12 @@ def remove_tones(t: np.ndarray, x: np.ndarray, tones_hz, block_s: float = DITHER
     cos/sin at each frequency, of which only the tone part is subtracted (Q8: dither-removed tracking error)."""
     f = np.r_[np.asarray(tones_hz, float), 2 * np.asarray(tones_hz, float)]
     out = np.array(x, dtype=float)
-    edges = np.arange(t[0], t[-1] + block_s, block_s)
-    for lo in edges:
-        sel = (t >= lo) & (t < lo + block_s)
+    edges = list(np.arange(t[0], t[-1] + block_s, block_s))
+    if len(edges) > 1 and t[-1] - edges[-1] < 0.75 * block_s:
+        edges.pop()                                    # a short remainder joins the previous block
+    for i, lo in enumerate(edges):
+        hi = edges[i + 1] if i + 1 < len(edges) else np.inf
+        sel = (t >= lo) & (t < hi)
         if sel.sum() < 2 * f.size + 4:
             continue
         tb = t[sel]
@@ -202,7 +207,7 @@ def overview_rows(summaries: list[dict]) -> list[dict]:
                      else None,
                      "rings_within_5pm": sum(x["within_5pm"] for x in r),
                      "excursions": sum(int(x.get("excursion_count") or 0) for x in r),
-                     "unlocked_final": sum(not x.get("locked_final", True) for x in r),
+                     "unlocked_final": sum(x.get("locked_final") is False for x in r),
                      "wrong_line_final": sum(bool(x.get("wrong_line_final")) for x in r)})
     return rows
 
@@ -243,7 +248,9 @@ def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> s
            "world 0, scored from `score_from_s`. The p99.9 / peak / rms columns come from the recorded 10 us-mean "
            "detuning trace; `track_*` is the same error with the TLC's dither tones removed (least squares per 4 ms "
            "block; TLC runs only). The mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
-           "Thresholds: mrm 5 pm budget, ECE496 2 GHz.", ""]
+           "Thresholds: mrm 5 pm budget, ECE496 2 GHz. Corner runs (`experiment@corner`): the plant and every "
+           "controller's nominal knowledge follow the corner, as mrm treats every model-based controller, so a corner "
+           "tests the TLC on a different plant it knows, not a model mismatch.", ""]
     out += _overview_markdown(overview_rows(summaries))
     out += _campaign_markdown(summaries)
     for s in summaries:
