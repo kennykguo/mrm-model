@@ -1,7 +1,7 @@
 {
   "runs": [
     {
-      "run": "20261101T025326Z_fac6115c",
+      "run": "20261101T025841Z_fac6115c",
       "experiment": "steady_tlc_faithful",
       "controller": "tlc",
       "scenario": "static",
@@ -179,13 +179,13 @@
       ],
       "telemetry": {
         "core_steps": 400,
-        "core_step_us_mean": 1589.5432050092495,
+        "core_step_us_mean": 1580.6992573016032,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 2.8792211983200264
       }
     },
     {
-      "run": "20261101T025330Z_56d67c52",
+      "run": "20261101T025845Z_56d67c52",
       "experiment": "steady_tlc_faithful",
       "controller": "tlc_pi",
       "scenario": "static",
@@ -363,13 +363,13 @@
       ],
       "telemetry": {
         "core_steps": 400,
-        "core_step_us_mean": 573.7044698980753,
+        "core_step_us_mean": 569.6457398153143,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 1.740026494306431
       }
     },
     {
-      "run": "20261101T025333Z_ff90403b",
+      "run": "20261101T025848Z_ff90403b",
       "experiment": "steady_tlc_faithful",
       "controller": "pi_lock_c",
       "scenario": "static",
@@ -532,7 +532,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025334Z_6dd73c52",
+      "run": "20261101T025849Z_6dd73c52",
       "experiment": "steady_tlc_faithful",
       "controller": "dither_lockin_c",
       "scenario": "static",
@@ -695,7 +695,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025336Z_3dc78dc2",
+      "run": "20261101T025850Z_3dc78dc2",
       "experiment": "steady_tlc_faithful",
       "controller": "kalman_lqg_c",
       "scenario": "static",
@@ -858,7 +858,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025337Z_e47a892f",
+      "run": "20261101T025851Z_e47a892f",
       "experiment": "steady_tlc_faithful",
       "controller": "mpc_c",
       "scenario": "static",
@@ -1021,7 +1021,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025339Z_496bec31",
+      "run": "20261101T025852Z_496bec31",
       "experiment": "tlc_xpu_step",
       "controller": "tlc",
       "scenario": "xpu_power_step",
@@ -1199,13 +1199,13 @@
       ],
       "telemetry": {
         "core_steps": 1000,
-        "core_step_us_mean": 1611.2882998932037,
+        "core_step_us_mean": 1597.854438041395,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 2.89618478674258
       }
     },
     {
-      "run": "20261101T025345Z_ddd3830e",
+      "run": "20261101T025858Z_ddd3830e",
       "experiment": "tlc_xpu_step",
       "controller": "tlc_pi",
       "scenario": "xpu_power_step",
@@ -1383,13 +1383,13 @@
       ],
       "telemetry": {
         "core_steps": 1000,
-        "core_step_us_mean": 579.3527369387448,
+        "core_step_us_mean": 576.9577870960347,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 1.740026494306431
       }
     },
     {
-      "run": "20261101T025350Z_c5819ed2",
+      "run": "20261101T025903Z_c5819ed2",
       "experiment": "tlc_xpu_step",
       "controller": "pi_lock_c",
       "scenario": "xpu_power_step",
@@ -1552,7 +1552,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025352Z_06d3d609",
+      "run": "20261101T025904Z_06d3d609",
       "experiment": "tlc_xpu_step",
       "controller": "dither_lockin_c",
       "scenario": "xpu_power_step",
@@ -1715,7 +1715,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025353Z_92701e08",
+      "run": "20261101T025906Z_92701e08",
       "experiment": "tlc_xpu_step",
       "controller": "kalman_lqg_c",
       "scenario": "xpu_power_step",
@@ -1878,7 +1878,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025355Z_09522c45",
+      "run": "20261101T025908Z_09522c45",
       "experiment": "tlc_xpu_step",
       "controller": "mpc_c",
       "scenario": "xpu_power_step",
@@ -2041,7 +2041,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025357Z_082c563e",
+      "run": "20261101T025909Z_082c563e",
       "experiment": "tlc_a1",
       "controller": "tlc",
       "scenario": "a1",
@@ -2219,13 +2219,13 @@
       ],
       "telemetry": {
         "core_steps": 1357,
-        "core_step_us_mean": 1608.0112835770599,
+        "core_step_us_mean": 1605.3228614734387,
         "track_fraction": 0.9954863669859986,
         "dither_amp_pm_max": 2.900044157177385
       }
     },
     {
-      "run": "20261101T025404Z_3fdfbfb0",
+      "run": "20261101T025917Z_3fdfbfb0",
       "experiment": "tlc_a1",
       "controller": "tlc_pi",
       "scenario": "a1",
@@ -2403,13 +2403,13 @@
       ],
       "telemetry": {
         "core_steps": 1357,
-        "core_step_us_mean": 586.3148407401845,
+        "core_step_us_mean": 575.670396464775,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 1.740026494306431
       }
     },
     {
-      "run": "20261101T025411Z_a075a201",
+      "run": "20261101T025923Z_a075a201",
       "experiment": "tlc_a1",
       "controller": "pi_lock_c",
       "scenario": "a1",
@@ -2572,7 +2572,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025413Z_9361d896",
+      "run": "20261101T025925Z_9361d896",
       "experiment": "tlc_a1",
       "controller": "dither_lockin_c",
       "scenario": "a1",
@@ -2735,7 +2735,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025415Z_84aaa512",
+      "run": "20261101T025927Z_84aaa512",
       "experiment": "tlc_a1",
       "controller": "kalman_lqg_c",
       "scenario": "a1",
@@ -2898,7 +2898,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025417Z_6e3a8466",
+      "run": "20261101T025929Z_6e3a8466",
       "experiment": "tlc_a1",
       "controller": "mpc_c",
       "scenario": "a1",
@@ -3061,7 +3061,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025419Z_528e8e4a",
+      "run": "20261101T025931Z_528e8e4a",
       "experiment": "tlc_power_step",
       "controller": "tlc",
       "scenario": "fibre_loss_step",
@@ -3239,13 +3239,13 @@
       ],
       "telemetry": {
         "core_steps": 600,
-        "core_step_us_mean": 1594.291313267604,
+        "core_step_us_mean": 1587.9507983724277,
         "track_fraction": 0.6970833333333334,
         "dither_amp_pm_max": 2.897254303920096
       }
     },
     {
-      "run": "20261101T025423Z_ea02dd7d",
+      "run": "20261101T025935Z_ea02dd7d",
       "experiment": "tlc_power_step",
       "controller": "tlc_pi",
       "scenario": "fibre_loss_step",
@@ -3423,13 +3423,13 @@
       ],
       "telemetry": {
         "core_steps": 600,
-        "core_step_us_mean": 579.3598583841231,
+        "core_step_us_mean": 572.3856368301009,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 1.740026494306431
       }
     },
     {
-      "run": "20261101T025426Z_3ef453ed",
+      "run": "20261101T025938Z_3ef453ed",
       "experiment": "tlc_power_step",
       "controller": "pi_lock_c",
       "scenario": "fibre_loss_step",
@@ -3592,7 +3592,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025427Z_c8c51534",
+      "run": "20261101T025939Z_c8c51534",
       "experiment": "tlc_power_step",
       "controller": "dither_lockin_c",
       "scenario": "fibre_loss_step",
@@ -3755,7 +3755,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025429Z_72c8b9f7",
+      "run": "20261101T025940Z_72c8b9f7",
       "experiment": "tlc_power_step",
       "controller": "kalman_lqg_c",
       "scenario": "fibre_loss_step",
@@ -3918,7 +3918,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025430Z_9d2116e2",
+      "run": "20261101T025942Z_9d2116e2",
       "experiment": "tlc_power_step",
       "controller": "mpc_c",
       "scenario": "fibre_loss_step",
@@ -4081,7 +4081,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025431Z_60f1cfc9",
+      "run": "20261101T025943Z_60f1cfc9",
       "experiment": "tlc_squelch",
       "controller": "tlc",
       "scenario": "squelch",
@@ -4259,13 +4259,13 @@
       ],
       "telemetry": {
         "core_steps": 600,
-        "core_step_us_mean": 1585.7218683110357,
+        "core_step_us_mean": 1571.1985449161148,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 2.897254303920096
       }
     },
     {
-      "run": "20261101T025435Z_6a36c270",
+      "run": "20261101T025947Z_6a36c270",
       "experiment": "tlc_squelch",
       "controller": "tlc_pi",
       "scenario": "squelch",
@@ -4443,13 +4443,13 @@
       ],
       "telemetry": {
         "core_steps": 600,
-        "core_step_us_mean": 574.9118049546572,
+        "core_step_us_mean": 572.1594566299851,
         "track_fraction": 1.0,
         "dither_amp_pm_max": 1.740026494306431
       }
     },
     {
-      "run": "20261101T025439Z_da79b172",
+      "run": "20261101T025950Z_da79b172",
       "experiment": "tlc_squelch",
       "controller": "pi_lock_c",
       "scenario": "squelch",
@@ -4612,7 +4612,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025440Z_20c491f9",
+      "run": "20261101T025951Z_20c491f9",
       "experiment": "tlc_squelch",
       "controller": "dither_lockin_c",
       "scenario": "squelch",
@@ -4775,7 +4775,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025441Z_8c9e2c1e",
+      "run": "20261101T025953Z_8c9e2c1e",
       "experiment": "tlc_squelch",
       "controller": "kalman_lqg_c",
       "scenario": "squelch",
@@ -4938,7 +4938,7 @@
       "telemetry": null
     },
     {
-      "run": "20261101T025443Z_6b44f44a",
+      "run": "20261101T025954Z_6b44f44a",
       "experiment": "tlc_squelch",
       "controller": "mpc_c",
       "scenario": "squelch",
@@ -5096,6 +5096,537 @@
           "excursion_count": 2,
           "oma_penalty_db": -0.0005844785408671431,
           "peak_slew_codes_per_s": 9000000.0
+        }
+      ],
+      "telemetry": null
+    },
+    {
+      "run": "20261101T025955Z_61e0313c",
+      "experiment": "tlc_fallback",
+      "controller": "tlc",
+      "scenario": "static",
+      "score_from_s": 0.005,
+      "duration_s": 0.08,
+      "rings": [
+        {
+          "ring": 0,
+          "p999_err_pm": 26.51688950416974,
+          "peak_err_pm": 26.5511918026651,
+          "rms_err_pm": 13.687549414632823,
+          "p999_err_ghz": 4.571807887570003,
+          "peak_err_ghz": 4.577721986914053,
+          "rms_err_ghz": 2.359886379791355,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 23.79674033457676,
+          "track_rms_err_pm": 13.555111192051806,
+          "max_abs_lock_error_pm": 26.5990066031299,
+          "rms_lock_error_pm": 13.689288390860545,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 43,
+          "oma_penalty_db": 0.3661705228582788,
+          "peak_slew_codes_per_s": 1500000.0000000002
+        },
+        {
+          "ring": 1,
+          "p999_err_pm": 24.544749013688616,
+          "peak_err_pm": 24.659562539887148,
+          "rms_err_pm": 11.633170845696652,
+          "p999_err_ghz": 4.246692841346298,
+          "peak_err_ghz": 4.26655769225698,
+          "rms_err_ghz": 2.0127524353590514,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 21.89830743526084,
+          "track_rms_err_pm": 11.485483732355393,
+          "max_abs_lock_error_pm": 24.743212791055285,
+          "rms_lock_error_pm": 11.635965862239113,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 111,
+          "oma_penalty_db": 0.237116372362696,
+          "peak_slew_codes_per_s": 2200000.0
+        },
+        {
+          "ring": 2,
+          "p999_err_pm": 22.626209146709172,
+          "peak_err_pm": 22.74387627439097,
+          "rms_err_pm": 10.273523596186646,
+          "p999_err_ghz": 3.9285133509304715,
+          "peak_err_ghz": 3.9489435024890596,
+          "rms_err_ghz": 1.7837576921093963,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 20.003573189356548,
+          "track_rms_err_pm": 10.111810373877786,
+          "max_abs_lock_error_pm": 22.799940739201222,
+          "rms_lock_error_pm": 10.277200801634928,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 148,
+          "oma_penalty_db": 0.15687922248332714,
+          "peak_slew_codes_per_s": 2600000.0
+        },
+        {
+          "ring": 3,
+          "p999_err_pm": 28.694013284145484,
+          "peak_err_pm": 28.80112492720302,
+          "rms_err_pm": 13.4672140499197,
+          "p999_err_ghz": 4.9995307387917105,
+          "peak_err_ghz": 5.018193445421338,
+          "rms_err_ghz": 2.346473807679714,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 26.02963626172323,
+          "track_rms_err_pm": 13.33964081782152,
+          "max_abs_lock_error_pm": 28.9422511706061,
+          "rms_lock_error_pm": 13.471639849963314,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 137,
+          "oma_penalty_db": 0.18376622793073705,
+          "peak_slew_codes_per_s": 3300000.0000000005
+        },
+        {
+          "ring": 4,
+          "p999_err_pm": 21.516199286627817,
+          "peak_err_pm": 21.630319483017686,
+          "rms_err_pm": 9.480490503190046,
+          "p999_err_ghz": 3.7620308892852354,
+          "peak_err_ghz": 3.781984399577214,
+          "rms_err_ghz": 1.6576300323051205,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 19.05703596564571,
+          "track_rms_err_pm": 9.318369204665228,
+          "max_abs_lock_error_pm": 21.750272550289118,
+          "rms_lock_error_pm": 9.486116385959974,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 197,
+          "oma_penalty_db": 0.022429715284143406,
+          "peak_slew_codes_per_s": 3300000.0000000005
+        },
+        {
+          "ring": 5,
+          "p999_err_pm": 23.877346814979823,
+          "peak_err_pm": 24.02469426467991,
+          "rms_err_pm": 10.685052788127404,
+          "p999_err_ghz": 4.189469821414508,
+          "peak_err_ghz": 4.215323099777648,
+          "rms_err_ghz": 1.8747772331219343,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 21.44118895193422,
+          "track_rms_err_pm": 10.549605277898612,
+          "max_abs_lock_error_pm": 24.16398078041011,
+          "rms_lock_error_pm": 10.691573842165347,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 212,
+          "oma_penalty_db": 0.02968432136766163,
+          "peak_slew_codes_per_s": 3800000.0000000005
+        },
+        {
+          "ring": 6,
+          "p999_err_pm": 24.195420990220086,
+          "peak_err_pm": 24.35692602585563,
+          "rms_err_pm": 10.808372293753363,
+          "p999_err_ghz": 4.2600994699167165,
+          "peak_err_ghz": 4.288535739613283,
+          "rms_err_ghz": 1.9030353345739572,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 21.785469783633992,
+          "track_rms_err_pm": 10.677482319917049,
+          "max_abs_lock_error_pm": 24.502468152540036,
+          "rms_lock_error_pm": 10.815919757776813,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 230,
+          "oma_penalty_db": 0.028508498002521036,
+          "peak_slew_codes_per_s": 4200000.0
+        },
+        {
+          "ring": 7,
+          "p999_err_pm": 25.059944075071414,
+          "peak_err_pm": 25.21517825983011,
+          "rms_err_pm": 11.293705518912136,
+          "p999_err_ghz": 4.427693796399647,
+          "peak_err_ghz": 4.455121209437211,
+          "rms_err_ghz": 1.9954182545121748,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 22.703254172412528,
+          "track_rms_err_pm": 11.171741766332046,
+          "max_abs_lock_error_pm": 25.450084821428835,
+          "rms_lock_error_pm": 11.303506176980125,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 258,
+          "oma_penalty_db": 0.027216871560116793,
+          "peak_slew_codes_per_s": 4900000.0
+        }
+      ],
+      "telemetry": {
+        "core_steps": 800,
+        "core_step_us_mean": 1335.8292638713465,
+        "track_fraction": 1.0,
+        "dither_amp_pm_max": 2.8989480178514073
+      }
+    },
+    {
+      "run": "20261101T030000Z_4c0d6d23",
+      "experiment": "tlc_cold",
+      "controller": "tlc",
+      "scenario": "static",
+      "score_from_s": 0.0,
+      "duration_s": 0.8,
+      "rings": [
+        {
+          "ring": 0,
+          "p999_err_pm": 3783.9139861637923,
+          "peak_err_pm": 3784.176240787923,
+          "rms_err_pm": 3774.980170472618,
+          "p999_err_ghz": 652.3890294564821,
+          "peak_err_ghz": 652.4342450825065,
+          "rms_err_ghz": 650.8487398596731,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3868.9288042112507,
+          "track_rms_err_pm": 3774.987973220599,
+          "max_abs_lock_error_pm": 3785.248921149525,
+          "rms_lock_error_pm": 3774.9804954042393,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.588338778928062,
+          "peak_slew_codes_per_s": 90900000.00000001
+        },
+        {
+          "ring": 1,
+          "p999_err_pm": 3758.2158083615773,
+          "peak_err_pm": 3765.308934678204,
+          "rms_err_pm": 3753.5088238282583,
+          "p999_err_ghz": 650.240430680416,
+          "peak_err_ghz": 651.4676719422755,
+          "rms_err_ghz": 649.4260358169433,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3842.5604445374997,
+          "track_rms_err_pm": 3753.518182769493,
+          "max_abs_lock_error_pm": 3771.436825528906,
+          "rms_lock_error_pm": 3753.5094834624592,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.552783722953833,
+          "peak_slew_codes_per_s": 120700000.00000001
+        },
+        {
+          "ring": 2,
+          "p999_err_pm": 3757.5046395709974,
+          "peak_err_pm": 3758.249110055658,
+          "rms_err_pm": 3750.35247940014,
+          "p999_err_ghz": 652.4030184209978,
+          "peak_err_ghz": 652.5322783522306,
+          "rms_err_ghz": 651.1612126665729,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3836.9590251372238,
+          "track_rms_err_pm": 3750.366004926169,
+          "max_abs_lock_error_pm": 3762.3246769036155,
+          "rms_lock_error_pm": 3750.3535466132817,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.557449744040387,
+          "peak_slew_codes_per_s": 134900000.0
+        },
+        {
+          "ring": 3,
+          "p999_err_pm": 3736.128677907226,
+          "peak_err_pm": 3737.0014433537795,
+          "rms_err_pm": 3729.4142797355603,
+          "p999_err_ghz": 650.9681996836322,
+          "peak_err_ghz": 651.1202668634508,
+          "rms_err_ghz": 649.7983096539834,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3809.11205496509,
+          "track_rms_err_pm": 3729.424074070792,
+          "max_abs_lock_error_pm": 3741.376653371802,
+          "rms_lock_error_pm": 3729.415610457734,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.522607710432435,
+          "peak_slew_codes_per_s": 158200000.0
+        },
+        {
+          "ring": 4,
+          "p999_err_pm": 3710.650233926463,
+          "peak_err_pm": 3713.699780009828,
+          "rms_err_pm": 3699.925450386561,
+          "p999_err_ghz": 648.7939906766262,
+          "peak_err_ghz": 649.327192958827,
+          "rms_err_ghz": 646.9188004341244,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3808.3824476438,
+          "track_rms_err_pm": 3699.9404272201305,
+          "max_abs_lock_error_pm": 3718.1828044466247,
+          "rms_lock_error_pm": 3699.9267548644016,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.468128829581367,
+          "peak_slew_codes_per_s": 146800000.0
+        },
+        {
+          "ring": 5,
+          "p999_err_pm": 3363.7101946121497,
+          "peak_err_pm": 3363.778808104541,
+          "rms_err_pm": 3358.598079573096,
+          "p999_err_ghz": 590.1896243962493,
+          "peak_err_ghz": 590.2016631775236,
+          "rms_err_ghz": 589.2926632788492,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3361.3922899673735,
+          "track_rms_err_pm": 3358.6041376064277,
+          "max_abs_lock_error_pm": 3375.8420621922023,
+          "rms_lock_error_pm": 3358.6116253746713,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": false,
+          "excursion_count": 0,
+          "oma_penalty_db": 29.64786544145071,
+          "peak_slew_codes_per_s": 152200000.0
+        },
+        {
+          "ring": 6,
+          "p999_err_pm": 3652.130414193145,
+          "peak_err_pm": 3652.4374702983505,
+          "rms_err_pm": 3647.6751376776606,
+          "p999_err_ghz": 643.0323674822496,
+          "peak_err_ghz": 643.0864309991252,
+          "rms_err_ghz": 642.2479247924687,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3767.0469983557914,
+          "track_rms_err_pm": 3647.686619142073,
+          "max_abs_lock_error_pm": 3657.167485638096,
+          "rms_lock_error_pm": 3647.6763988814,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.372740866889416,
+          "peak_slew_codes_per_s": 163600000.0
+        },
+        {
+          "ring": 7,
+          "p999_err_pm": 3624.159742604068,
+          "peak_err_pm": 3624.3516859828605,
+          "rms_err_pm": 3620.0675694668844,
+          "p999_err_ghz": 640.3314213878047,
+          "peak_err_ghz": 640.3653347319444,
+          "rms_err_ghz": 639.6083994385529,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "track_peak_err_pm": 3776.3942025368074,
+          "track_rms_err_pm": 3620.0895751395037,
+          "max_abs_lock_error_pm": 3629.701340049967,
+          "rms_lock_error_pm": 3620.068856441375,
+          "time_to_lock_s": null,
+          "locked_final": false,
+          "wrong_line_final": true,
+          "excursion_count": 0,
+          "oma_penalty_db": 30.32056869961639,
+          "peak_slew_codes_per_s": 194100000.00000003
+        }
+      ],
+      "telemetry": {
+        "core_steps": 8000,
+        "core_step_us_mean": 1569.8691391571626,
+        "track_fraction": 0.8593125,
+        "dither_amp_pm_max": 2.900044157177385
+      }
+    },
+    {
+      "run": "20261101T030037Z_5aed4137",
+      "experiment": "tlc_cold_wdm",
+      "controller": "wdm_supervisor",
+      "scenario": "static",
+      "score_from_s": 0.0,
+      "duration_s": 0.8,
+      "rings": [
+        {
+          "ring": 0,
+          "p999_err_pm": 3062.05320226766,
+          "peak_err_pm": 4704.303768232207,
+          "rms_err_pm": 269.07361712198355,
+          "p999_err_ghz": 527.9321686687623,
+          "peak_err_ghz": 811.0745066742206,
+          "rms_err_ghz": 46.39129656975173,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5222.721007276556,
+          "rms_lock_error_pm": 278.2219181453122,
+          "time_to_lock_s": 0.0024419999999999997,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 2,
+          "oma_penalty_db": 2.299993906537591,
+          "peak_slew_codes_per_s": 5105400000.0
+        },
+        {
+          "ring": 1,
+          "p999_err_pm": 3673.386234249012,
+          "peak_err_pm": 4496.072471256123,
+          "rms_err_pm": 286.2886032260036,
+          "p999_err_ghz": 635.5633547438327,
+          "peak_err_ghz": 777.9031990593638,
+          "rms_err_ghz": 49.53319185300528,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5213.103376222559,
+          "rms_lock_error_pm": 297.4337984809291,
+          "time_to_lock_s": 0.004918,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 3,
+          "oma_penalty_db": 0.813023066031143,
+          "peak_slew_codes_per_s": 5173400000.0
+        },
+        {
+          "ring": 2,
+          "p999_err_pm": 3764.9925779034393,
+          "peak_err_pm": 4421.938939510402,
+          "rms_err_pm": 351.6538796880179,
+          "p999_err_ghz": 653.703124219508,
+          "peak_err_ghz": 767.7665334138632,
+          "rms_err_ghz": 61.05649215488678,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5190.971885301404,
+          "rms_lock_error_pm": 359.74380250492175,
+          "time_to_lock_s": 0.007331,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 2,
+          "oma_penalty_db": 0.8365472817175312,
+          "peak_slew_codes_per_s": 4919800000.0
+        },
+        {
+          "ring": 3,
+          "p999_err_pm": 3777.134859646691,
+          "peak_err_pm": 4323.912620791127,
+          "rms_err_pm": 410.4177845349878,
+          "p999_err_ghz": 658.1129536801117,
+          "peak_err_ghz": 753.3813358704743,
+          "rms_err_ghz": 71.50956226340126,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5172.001559757004,
+          "rms_lock_error_pm": 417.1810483858286,
+          "time_to_lock_s": 0.009703,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 3,
+          "oma_penalty_db": 1.188103557746696,
+          "peak_slew_codes_per_s": 4896200000.0
+        },
+        {
+          "ring": 4,
+          "p999_err_pm": 3787.681620654311,
+          "peak_err_pm": 4608.118494048485,
+          "rms_err_pm": 442.12669819639734,
+          "p999_err_ghz": 662.2626545635026,
+          "peak_err_ghz": 805.7131227108083,
+          "rms_err_ghz": 77.30428006521879,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5154.946133450688,
+          "rms_lock_error_pm": 450.60548187731723,
+          "time_to_lock_s": 0.011992,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 3,
+          "oma_penalty_db": 0.5772716685620225,
+          "peak_slew_codes_per_s": 4872400000.0
+        },
+        {
+          "ring": 5,
+          "p999_err_pm": 3576.9009926005538,
+          "peak_err_pm": 4229.767214487204,
+          "rms_err_pm": 449.0213494684882,
+          "p999_err_ghz": 627.5956402863967,
+          "peak_err_ghz": 742.1461954719956,
+          "rms_err_ghz": 78.78435604029812,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5139.330424101466,
+          "rms_lock_error_pm": 455.10385206672265,
+          "time_to_lock_s": 0.014254,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 3,
+          "oma_penalty_db": 0.6973217594662522,
+          "peak_slew_codes_per_s": 4848600000.0
+        },
+        {
+          "ring": 6,
+          "p999_err_pm": 3767.5562297824717,
+          "peak_err_pm": 4731.340145164876,
+          "rms_err_pm": 520.020451376349,
+          "p999_err_ghz": 663.3554466303889,
+          "peak_err_ghz": 833.0493465089829,
+          "rms_err_ghz": 91.56025225391564,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5119.554329371679,
+          "rms_lock_error_pm": 524.1153420056179,
+          "time_to_lock_s": 0.016693,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 2,
+          "oma_penalty_db": 0.7018909480899881,
+          "peak_slew_codes_per_s": 5195900000.0
+        },
+        {
+          "ring": 7,
+          "p999_err_pm": 3757.299157494999,
+          "peak_err_pm": 4370.886432742103,
+          "rms_err_pm": 549.2744952507622,
+          "p999_err_ghz": 663.855039780683,
+          "peak_err_ghz": 772.2661584975801,
+          "rms_err_ghz": 97.04807272740958,
+          "within_5pm": false,
+          "within_2ghz": false,
+          "max_abs_lock_error_pm": 5100.2306101902,
+          "rms_lock_error_pm": 554.3429816325787,
+          "time_to_lock_s": 0.018983,
+          "locked_final": true,
+          "wrong_line_final": false,
+          "excursion_count": 3,
+          "oma_penalty_db": 0.705386355669225,
+          "peak_slew_codes_per_s": 4943400000.0
         }
       ],
       "telemetry": null
