@@ -33,3 +33,24 @@ Run `20261101T022643Z_58b978f5`, 0.04 s simulated, scored from 0.005 s.
 | 5 | 0.0389 | 0.0409 | 0.0132 | 0.00717 | yes | yes | 0.0629 | 0.0164 | 1e-06 | yes | no | 0 | 0.112 | 1e+05 |
 | 6 | 0.0408 | 0.0456 | 0.0129 | 0.00804 | yes | yes | 0.0561 | 0.0162 | 1e-06 | yes | no | 0 | 0.114 | 1e+05 |
 | 7 | 0.0407 | 0.0436 | 0.0117 | 0.0077 | yes | yes | 0.0586 | 0.0147 | 1e-06 | yes | no | 0 | 0.114 | 1e+05 |
+
+## ECE496 4-ring reference (published; reproduced by the vendored core)
+
+| scenario | req | controller | ring | p999_err_ghz | peak_err_ghz | rms_err_ghz | peak_err_pm |
+|---|---|---|---|---|---|---|---|
+| steady | R1 | baseline | 0 | 0.644 | 0.702 | 0.304 | 4.02 |
+| steady | R1 | baseline | 1 | 0.556 | 0.567 | 0.291 | 3.25 |
+| steady | R1 | baseline | 2 | 0.967 | 0.999 | 0.588 | 5.72 |
+| steady | R1 | baseline | 3 | 0.874 | 0.895 | 0.589 | 5.12 |
+| steady | R1 | tlc | 0 | 0.462 | 0.477 | 0.257 | 2.73 |
+| steady | R1 | tlc | 1 | 0.367 | 0.376 | 0.21 | 2.15 |
+| steady | R1 | tlc | 2 | 0.644 | 0.652 | 0.379 | 3.73 |
+| steady | R1 | tlc | 3 | 0.449 | 0.47 | 0.25 | 2.69 |
+| d2_common | R3 | tlc | 0 | 1.79 | 2.02 | 0.292 | 11.6 |
+| d2_common | R3 | tlc | 1 | 2.22 | 2.55 | 0.27 | 14.6 |
+| d2_common | R3 | tlc | 2 | 1.87 | 2.01 | 0.301 | 11.5 |
+| d2_common | R3 | tlc | 3 | 1.76 | 2.02 | 0.305 | 11.6 |
+| d2_common | R3 | baseline | 0 | 486 | 486 | 386 | 2.78e+03 |
+| d2_common | R3 | baseline | 1 | 406 | 406 | 308 | 2.32e+03 |
+| d2_common | R3 | baseline | 2 | 538 | 538 | 421 | 3.08e+03 |
+| d2_common | R3 | baseline | 3 | 262 | 262 | 201 | 1.5e+03 |

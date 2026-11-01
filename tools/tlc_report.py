@@ -23,6 +23,10 @@ C_M_PER_S = 299_792_458.0
 MRM_BUDGET_PM = 5.0           # metrics.lock_threshold_pm of the shipped experiments
 ECE496_TIGHT_GHZ = 2.0        # ECE496 tight lock threshold (docs/TLC_PORT_SPEC_AND_PLAN.md 6, Q8)
 MODE_TRACK = 2
+ECE496_LAMBDA_M = 1310e-9    # the ECE496 plant's band (thermal_control/params.py: 86 pm/K at 1310 nm)
+ECE496_REFERENCE = {          # published scenario -> requirement block holding the error statistics
+    "steady": "R1", "d2_common": "R3"}
+DEFAULT_ECE496_METRICS = Path(__file__).resolve().parents[2] / "ECE496_project/thermal_control/results/metrics.json"
 MRM_COLUMNS = ("max_abs_lock_error_pm", "rms_lock_error_pm", "time_to_lock_s", "locked_final", "wrong_line_final",
                "excursion_count", "oma_penalty_db", "peak_slew_codes_per_s")
 
@@ -79,6 +83,30 @@ def summarize_run(run_dir: str | Path) -> dict:
             "telemetry": _telemetry_summary(run / "tlc_telemetry.npz")}
 
 
+def ece496_reference(metrics_path: str | Path) -> list[dict]:
+    """Per-ring error rows of the published ECE496 4-ring results (GHz, and pm at 1310 nm). The vendored core
+    reproduces them (tests/tlc/test_core_fidelity.py), so they are the report's 4-ring reference column."""
+    pub = json.loads(Path(metrics_path).read_text())
+    ppg = ECE496_LAMBDA_M ** 2 / C_M_PER_S * 1e21
+    rows = []
+    for scenario, req in ECE496_REFERENCE.items():
+        for kind, res in pub.get(scenario, {}).items():
+            m = res[req]
+            for i in range(len(m["peak"])):
+                rows.append({"scenario": scenario, "req": req, "controller": kind, "ring": i,
+                             **{f"{k}_err_ghz": m[k][i] for k in ("p999", "peak", "rms")},
+                             **{f"{k}_err_pm": m[k][i] * ppg for k in ("p999", "peak", "rms")}})
+    return rows
+
+
+def _reference_markdown(rows: list[dict]) -> list[str]:
+    cols = ["scenario", "req", "controller", "ring", "p999_err_ghz", "peak_err_ghz", "rms_err_ghz", "peak_err_pm"]
+    out = ["## ECE496 4-ring reference (published; reproduced by the vendored core)", "",
+           "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    out += ["| " + " | ".join(_fmt(r[c]) for c in cols) + " |" for r in rows]
+    return out + [""]
+
+
 def _fmt(v) -> str:
     if isinstance(v, bool):
         return "yes" if v else "no"
@@ -87,7 +115,7 @@ def _fmt(v) -> str:
     return str(v)
 
 
-def to_markdown(summaries: list[dict]) -> str:
+def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> str:
     cols = ["ring", "p999_err_pm", "peak_err_pm", "rms_err_pm", "peak_err_ghz", "within_5pm", "within_2ghz",
             *MRM_COLUMNS]
     out = ["# TLC results", "",
@@ -107,6 +135,8 @@ def to_markdown(summaries: list[dict]) -> str:
         out += ["| " + " | ".join(present) + " |", "|" + "---|" * len(present)]
         out += ["| " + " | ".join(_fmt(r[c]) for c in present) + " |" for r in s["rings"]]
         out.append("")
+    if reference:
+        out += _reference_markdown(reference)
     return "\n".join(out)
 
 
@@ -114,12 +144,16 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("runs", nargs="+", help="run directories")
     ap.add_argument("--out", default="docs/tlc/results.md", help="Markdown output; a .json twin is written beside it")
+    ap.add_argument("--ece496-metrics", default=str(DEFAULT_ECE496_METRICS),
+                    help="published ECE496 results/metrics.json for the 4-ring reference column ('' to skip)")
     args = ap.parse_args(argv)
     summaries = [summarize_run(r) for r in args.runs]
+    ref_path = Path(args.ece496_metrics) if args.ece496_metrics else None
+    reference = ece496_reference(ref_path) if ref_path and ref_path.is_file() else None
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(to_markdown(summaries))
-    out.with_suffix(".json").write_text(json.dumps({"runs": summaries}, indent=2))
+    out.write_text(to_markdown(summaries, reference))
+    out.with_suffix(".json").write_text(json.dumps({"runs": summaries, "ece496_reference": reference}, indent=2))
     print(f"wrote {out} and {out.with_suffix('.json')}")
     return 0
 

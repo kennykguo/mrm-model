@@ -86,3 +86,24 @@ def test_markdown_and_json_are_written(tmp_path):
     text = out.read_text()
     assert "steady_tlc" in text and "| ring |" in text
     assert json.loads(out.with_suffix(".json").read_text())["runs"][0]["controller"] == "tlc"
+
+
+def test_ece496_reference_rows_convert_ghz_to_pm_at_1310nm(tmp_path):
+    pub = {"steady": {"tlc": {"R1": {"p999": [0.5, 0.4], "peak": [1.0, 0.6], "rms": [0.2, 0.1]}}},
+           "d2_common": {"tlc": {"R3": {"p999": [1.8, 2.2], "peak": [2.0, 2.5], "rms": [0.3, 0.3]}}}}
+    path = tmp_path / "metrics.json"
+    path.write_text(json.dumps(pub))
+    rows = tlc_report.ece496_reference(path)
+    assert len(rows) == 4
+    r = next(r for r in rows if r["scenario"] == "d2_common" and r["ring"] == 1)
+    assert r["peak_err_ghz"] == 2.5
+    assert r["peak_err_pm"] == pytest.approx(2.5 * (1310e-9) ** 2 / 299_792_458.0 * 1e21)
+
+
+def test_report_includes_the_reference_section_when_given(tmp_path):
+    pub = {"steady": {"tlc": {"R1": {"p999": [0.5], "peak": [1.0], "rms": [0.2]}}}}
+    ref = tmp_path / "metrics.json"
+    ref.write_text(json.dumps(pub))
+    out = tmp_path / "results.md"
+    tlc_report.main([str(_make_run(tmp_path)), "--out", str(out), "--ece496-metrics", str(ref)])
+    assert "ECE496 4-ring reference" in out.read_text()
