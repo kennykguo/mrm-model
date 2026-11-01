@@ -10,3 +10,4 @@ runs/
 .agents/
 tools/katex/node_modules/
 archive/
+docs/tlc/*.runs.txt
