@@ -27,6 +27,8 @@ ECE496_LAMBDA_M = 1310e-9    # the ECE496 plant's band (thermal_control/params.p
 ECE496_REFERENCE = {          # published scenario -> requirement block holding the error statistics
     "steady": "R1", "d2_common": "R3"}
 DEFAULT_ECE496_METRICS = Path(__file__).resolve().parents[2] / "ECE496_project/thermal_control/results/metrics.json"
+TLC_CONTROLLERS = ("tlc", "tlc_pi")
+DITHER_BLOCK_S = 4e-3         # one lock-in window: every tone of the plan is a whole number of cycles in it
 MRM_COLUMNS = ("max_abs_lock_error_pm", "rms_lock_error_pm", "time_to_lock_s", "locked_final", "wrong_line_final",
                "excursion_count", "oma_penalty_db", "peak_slew_codes_per_s")
 
@@ -65,6 +67,33 @@ def _ring_stats(err_pm: np.ndarray, pm_per_ghz: float) -> dict:
             "within_5pm": bool(peak <= MRM_BUDGET_PM), "within_2ghz": bool(peak <= ECE496_TIGHT_GHZ * pm_per_ghz)}
 
 
+def remove_tones(t: np.ndarray, x: np.ndarray, tones_hz, block_s: float = DITHER_BLOCK_S) -> np.ndarray:
+    """x (S, N) minus its components at every tone and 2nd harmonic: per block, a least-squares fit of a line plus
+    cos/sin at each frequency, of which only the tone part is subtracted (Q8: dither-removed tracking error)."""
+    f = np.r_[np.asarray(tones_hz, float), 2 * np.asarray(tones_hz, float)]
+    out = np.array(x, dtype=float)
+    edges = np.arange(t[0], t[-1] + block_s, block_s)
+    for lo in edges:
+        sel = (t >= lo) & (t < lo + block_s)
+        if sel.sum() < 2 * f.size + 4:
+            continue
+        tb = t[sel]
+        w = 2 * np.pi * f[None, :] * tb[:, None]
+        tone = np.hstack([np.cos(w), np.sin(w)])
+        X = np.hstack([np.ones((tb.size, 1)), (tb - tb.mean())[:, None], tone])
+        coef, *_ = np.linalg.lstsq(X, x[sel], rcond=None)
+        out[sel] = x[sel] - tone @ coef[2:]
+    return out
+
+
+def _tlc_tones(controller: str | None, n_rings: int):
+    """The TLC's tone plan for this run, or None for a controller whose tones the report does not know."""
+    if controller not in TLC_CONTROLLERS:
+        return None
+    from mrm.control.tlc.tone_plan import EIGHT_RING_BINS, search, to_hz
+    return to_hz(EIGHT_RING_BINS if n_rings == len(EIGHT_RING_BINS) else search(n_rings))
+
+
 def summarize_run(run_dir: str | Path) -> dict:
     run = Path(run_dir)
     cfg = yaml.safe_load((run / "experiment.resolved.yaml").read_text())
@@ -76,15 +105,22 @@ def summarize_run(run_dir: str | Path) -> dict:
         t, det_pm = _detuning_trace(f)
         lam_m = np.asarray(f["truth_final/main/lam_m"])[0]
     ref = np.asarray(m["lock_reference_pm"], dtype=float)[0]
-    err = det_pm[t >= score_from, 0, :] - ref[None, :]
+    scored = t >= score_from
+    err = det_pm[scored, 0, :] - ref[None, :]
     ppg = lam_m ** 2 / C_M_PER_S * 1e21
+    controller = cfg.get("controller", {}).get("name")
+    tones = _tlc_tones(controller, err.shape[1])
+    track = remove_tones(t[scored], err, tones) if tones else None
     rings = []
     for i in range(err.shape[1]):
         row = {"ring": i, **_ring_stats(err[:, i], float(ppg[min(i, ppg.size - 1)]))}
+        if track is not None:
+            row.update(track_peak_err_pm=float(np.abs(track[:, i]).max()),
+                       track_rms_err_pm=float(np.sqrt(np.mean(track[:, i] ** 2))))
         row.update({k: _cell(m[k], i) for k in MRM_COLUMNS if k in m})
         rings.append(row)
     return {"run": run.name, "experiment": metrics.get("name") or run.name,
-            "controller": cfg.get("controller", {}).get("name"), "scenario": cfg.get("scenario", {}).get("name"),
+            "controller": controller, "scenario": cfg.get("scenario", {}).get("name"),
             "score_from_s": score_from, "duration_s": exp.get("duration_s"), "rings": rings,
             "telemetry": _telemetry_summary(run / "tlc_telemetry.npz")}
 
@@ -132,6 +168,8 @@ def overview_rows(summaries: list[dict]) -> list[dict]:
         rows.append({"experiment": s["experiment"], "controller": s["controller"],
                      "peak_err_pm_max": max(peak), "peak_err_pm_max_rings_1_up": max(peak[1:]) if len(peak) > 1 else None,
                      "rms_err_pm_mean": sum(x["rms_err_pm"] for x in r) / len(r),
+                     "track_peak_err_pm_max": max(x["track_peak_err_pm"] for x in r) if "track_peak_err_pm" in r[0]
+                     else None,
                      "rings_within_5pm": sum(x["within_5pm"] for x in r),
                      "excursions": sum(int(x.get("excursion_count") or 0) for x in r),
                      "unlocked_final": sum(not x.get("locked_final", True) for x in r),
@@ -141,6 +179,7 @@ def overview_rows(summaries: list[dict]) -> list[dict]:
 
 def _overview_markdown(rows: list[dict]) -> list[str]:
     cols = ["experiment", "controller", "peak_err_pm_max", "peak_err_pm_max_rings_1_up", "rms_err_pm_mean",
+            "track_peak_err_pm_max",
             "rings_within_5pm", "excursions", "unlocked_final", "wrong_line_final"]
     out = ["## Overview", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     out += ["| " + " | ".join(_fmt(r[c]) for c in cols) + " |" for r in rows]
@@ -148,12 +187,14 @@ def _overview_markdown(rows: list[dict]) -> list[str]:
 
 
 def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> str:
-    cols = ["ring", "p999_err_pm", "peak_err_pm", "rms_err_pm", "peak_err_ghz", "within_5pm", "within_2ghz",
+    cols = ["ring", "p999_err_pm", "peak_err_pm", "rms_err_pm", "track_peak_err_pm", "track_rms_err_pm",
+            "peak_err_ghz", "within_5pm", "within_2ghz",
             *MRM_COLUMNS]
     out = ["# TLC results", "",
            "Generated by `tools/tlc_report.py`. Errors are the true lock error (detuning minus mrm's lock reference), "
            "world 0, scored from `score_from_s`. The p99.9 / peak / rms columns come from the recorded 10 us-mean "
-           "detuning trace; the mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
+           "detuning trace; `track_*` is the same error with the TLC's dither tones removed (least squares per 4 ms "
+           "block; TLC runs only). The mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
            "Thresholds: mrm 5 pm budget, ECE496 2 GHz.", ""]
     out += _overview_markdown(overview_rows(summaries))
     for s in summaries:

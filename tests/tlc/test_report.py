@@ -114,3 +114,16 @@ def test_overview_row_per_run(tmp_path):
     assert rows[0]["peak_err_pm_max"] == pytest.approx(3.0)
     assert rows[0]["peak_err_pm_max_rings_1_up"] == pytest.approx(3.0)
     assert rows[0]["rings_within_5pm"] == 2 and rows[0]["unlocked_final"] == 0
+
+
+def test_remove_tones_strips_the_dither_and_keeps_the_trend():
+    t = np.arange(4000) * 1e-5                                         # 40 ms at 10 us
+    trend = 5.0 + 100.0 * t
+    dither = 2.0 * np.sin(2 * np.pi * 4000 * t + 0.3) + 0.5 * np.cos(2 * np.pi * 8000 * t)
+    out = tlc_report.remove_tones(t, (trend + dither)[:, None], (4000.0,))
+    np.testing.assert_allclose(out[:, 0], trend, atol=1e-6)
+
+
+def test_tracking_error_only_for_tlc_runs(tmp_path):
+    s = tlc_report.summarize_run(_make_run(tmp_path))
+    assert "track_peak_err_pm" in s["rings"][0]                         # the synthetic run is a tlc run
