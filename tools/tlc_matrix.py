@@ -41,12 +41,14 @@ def main(argv: list[str] | None = None) -> int:
     only = {s for s in args.only.split(",") if s}
     run_tool, report = _tool("tlc_run"), _tool("tlc_report")
     runs = []
-    for exp in matrix["experiments"]:
+    for entry in matrix["experiments"]:
+        exp, names = (entry, None) if isinstance(entry, str) else (entry["path"], set(entry["controllers"]))
         for ctrl in matrix["controllers"]:
-            if only and ctrl["name"] not in only:
+            if (only and ctrl["name"] not in only) or (names is not None and ctrl["name"] not in names):
                 continue
             print(f"== {exp} :: {ctrl['name']}", file=sys.stderr, flush=True)
-            runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, overrides_for(ctrl))))
+            ov = overrides_for(ctrl) if names is None else []      # restricted entries keep their own controller
+            runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, ov)))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     Path(f"{out}.runs.txt").write_text("\n".join(runs) + "\n")

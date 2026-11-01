@@ -55,6 +55,10 @@ class FaithfulCore:
         self.ctl.cold_start()
         self.last = self._start_last(np.zeros(self.n))
 
+    def force_fault(self) -> None:
+        """R22: the supervisor's fault state, i.e. the PI fallback with a bumpless transfer (source B5)."""
+        self.ctl.force_fault()
+
     def first_plan(self, t0: float) -> np.ndarray:
         seq, _, _ = self.ctl.out.produce(self.ctl.u_cmd, t0, self.ctl.dither, np.ones(self.n))
         return seq

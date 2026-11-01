@@ -47,6 +47,9 @@ class StubCore:
         self.u_hold = np.zeros(self.n)
         self.modes = np.full(self.n, MODE_ACQUIRE, dtype=np.int64)
 
+    def force_fault(self) -> None:
+        raise NotImplementedError("the stub core has no fallback; use core = faithful")
+
     def first_plan(self, t0: float) -> np.ndarray:
         """The heater samples (n_out, N) of the first block [t0, t0 + ts), before any PD block was consumed."""
         return self._plan(t0)

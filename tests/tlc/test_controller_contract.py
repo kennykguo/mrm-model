@@ -211,3 +211,11 @@ def test_faithful_core_needs_model_nominal(spec):
     ctrl.reset(spec)
     with pytest.raises(Exception, match="model_nominal"):
         ctrl.step(_obs(spec, 0, np.zeros((B, spec.n_rings), dtype=np.int64)))
+
+
+def test_forced_fault_switches_the_faithful_core_to_its_fallback(nominal_spec):
+    ctrl = TlcController(core="faithful", force_fault_at_s=0.0002)
+    ctrl.reset(nominal_spec)
+    _run_edges(ctrl, nominal_spec, 41, np.full((B, nominal_spec.n_rings), 34500))
+    assert all(c.ctl.fault for c in ctrl.cores)
+    assert np.all(ctrl.telemetry()["fault"])

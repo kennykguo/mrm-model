@@ -52,6 +52,7 @@ class TlcController(BaseController):
         start_mode: str = "warm"            # warm: lock at the applied codes; cold: the core's acquisition
         dither_amp_u: float = 0.0           # stub only: dither amplitude in power fraction
         buffer_capacity: int = 64           # monitor samples per ring per core block (G26: 25)
+        force_fault_at_s: float | None = None   # R22: force the core's PI fallback at this time (faithful core)
         latency_ticks: int = 0
 
     def reset(self, spec: ControllerSpec) -> None:
@@ -75,6 +76,7 @@ class TlcController(BaseController):
         self.plan = self.zeros("B", "N", self.n_out)
         self.edge = 0
         self.core_step_us = 0.0
+        self.fault_forced = False
         self.telemetry_log = TelemetryLog()
 
     def step(self, obs: Observation) -> dict[str, np.ndarray]:
@@ -90,6 +92,7 @@ class TlcController(BaseController):
             self.buffer.drain()
             self.telemetry_log.record(obs.t_s, self.telemetry())
         elif k == 0:
+            self._maybe_force_fault(obs.t_s)
             self._run_cores(obs.t_s - self.core_ts)
             self.telemetry_log.record(obs.t_s, self.telemetry())
         self.edge += 1
@@ -130,6 +133,13 @@ class TlcController(BaseController):
             core.warm_start(u0[b]) if p.start_mode == "warm" else core.cold_start()
         self.plan = np.stack([np.asarray(c.first_plan(obs.t_s), dtype=np.float64).T for c in cores])
         return cores
+
+    def _maybe_force_fault(self, t_s: float) -> None:
+        at = self.params.force_fault_at_s
+        if at is not None and t_s >= at and not self.fault_forced:
+            for core in self.cores:
+                core.force_fault()
+            self.fault_forced = True
 
     def _run_cores(self, t_block_start: float) -> None:
         data, fill = self.buffer.drain()
