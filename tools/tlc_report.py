@@ -127,6 +127,10 @@ def summarize_run(run_dir: str | Path) -> dict:
     score_from = float(exp.get("score_from_s") or 0.0)
     metrics = json.loads((run / "metrics.json").read_text())
     m = metrics["cases"]["main"]
+    run_info = json.loads((run / "tlc_run.json").read_text()) if (run / "tlc_run.json").is_file() else {}
+    name = metrics.get("name") or run.name
+    if run_info.get("corner"):
+        name = f"{name}@{run_info['corner']}"
     with h5py.File(run / "trace.h5", "r") as f:
         t, det_pm = _detuning_trace(f)
         lam_m = np.asarray(f["truth_final/main/lam_m"])[0]
@@ -145,7 +149,7 @@ def summarize_run(run_dir: str | Path) -> dict:
                        track_rms_err_pm=float(np.sqrt(np.mean(track[:, i] ** 2))))
         row.update({k: _cell(m[k], i) for k in MRM_COLUMNS if k in m})
         rings.append(row)
-    return {"run": run.name, "experiment": metrics.get("name") or run.name,
+    return {"run": run.name, "experiment": name, "corner": run_info.get("corner"),
             "controller": controller, "scenario": cfg.get("scenario", {}).get("name"),
             "score_from_s": score_from, "duration_s": exp.get("duration_s"), "rings": rings,
             "telemetry": _telemetry_summary(run / "tlc_telemetry.npz"), "campaign": campaign_rates(m)}

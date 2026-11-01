@@ -30,6 +30,22 @@ def overrides_for(ctrl: dict) -> list[str]:
     return [f"controller.name={ctrl['name']}", f"controller.params={json.dumps(ctrl.get('params') or {})}"]
 
 
+def corner_alts(name: str) -> dict:
+    """The alternatives a corner preset pins (mrm/params/presets/<name>.yaml, ``alts``)."""
+    import mrm.params
+    path = Path(mrm.params.__file__).parent / "presets" / f"{name}.yaml"
+    return dict(yaml.safe_load(path.read_text()).get("alts") or {})
+
+
+def expand_corners(matrix: dict, only: set | None = None) -> list[tuple[str, dict, list[str], str]]:
+    """(experiment, controller, overrides, corner) for the matrix's ``corners`` section: each listed experiment and
+    controller on each corner preset (spec 6, Q7: model trust)."""
+    sec = matrix.get("corners") or {}
+    sub = {"experiments": sec.get("experiments", []), "controllers": [
+        c for c in matrix["controllers"] if c["name"] in set(sec.get("controllers", []))]}
+    return [(e, c, ov, corner) for corner in sec.get("presets", []) for e, c, ov in expand(sub, only)]
+
+
 def expand(matrix: dict, only: set | None = None) -> list[tuple[str, dict, list[str]]]:
     """(experiment path, controller entry, overrides) for every run of the matrix."""
     out = []
@@ -50,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", default="", help="comma-separated controller names to run (default: all)")
     ap.add_argument("--out", default="docs/tlc/results.md")
     ap.add_argument("--runs-dir", default=None)
+    ap.add_argument("--no-corners", action="store_true", help="skip the corners section")
     args = ap.parse_args(argv)
     matrix = yaml.safe_load(Path(args.matrix).read_text())
     only = {s for s in args.only.split(",") if s}
@@ -58,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     for exp, ctrl, ov in expand(matrix, only):
         print(f"== {exp} :: {ctrl['name']}", file=sys.stderr, flush=True)
         runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, ov)))
+    if not args.no_corners:
+        for exp, ctrl, ov, corner in expand_corners(matrix, only):
+            print(f"== {exp} :: {ctrl['name']} @ {corner}", file=sys.stderr, flush=True)
+            runs.append(str(run_tool.run_with_telemetry(exp, args.runs_dir, ov, corner_alts(corner),
+                                                        {"corner": corner})))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     Path(f"{out}.runs.txt").write_text("\n".join(runs) + "\n")

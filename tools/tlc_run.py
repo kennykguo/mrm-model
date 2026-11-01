@@ -10,6 +10,7 @@ run directory per experiment on stdout, for tools/tlc_report.py.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -17,7 +18,10 @@ from mrm.control.tlc.controller import TlcController
 from mrm.sim import experiment as E
 
 
-def run_with_telemetry(path: str, runs_dir: str | None = None, overrides: list[str] | None = None) -> Path:
+def run_with_telemetry(path: str, runs_dir: str | None = None, overrides: list[str] | None = None,
+                       alts: dict | None = None, label: dict | None = None) -> Path:
+    """Run one experiment; save every TLC instance's telemetry and ``tlc_run.json`` (overrides, alts, label) into
+    the run directory."""
     created = []
     make = E._make_controller
 
@@ -28,7 +32,7 @@ def run_with_telemetry(path: str, runs_dir: str | None = None, overrides: list[s
 
     E._make_controller = keep            # the experiment module builds every controller through this function
     try:
-        res = E.run(path, runs_dir=runs_dir, overrides=overrides or None)
+        res = E.run(path, runs_dir=runs_dir, overrides=overrides or None, alts=alts or None)
     finally:
         E._make_controller = make
     if res.run_dir is None:
@@ -37,6 +41,8 @@ def run_with_telemetry(path: str, runs_dir: str | None = None, overrides: list[s
     for i, ctrl in enumerate(tlcs):
         name = "tlc_telemetry.npz" if i == len(tlcs) - 1 else f"tlc_telemetry_pre{i}.npz"
         ctrl.telemetry_log.save(Path(res.run_dir) / name)
+    info = {"experiment": path, "overrides": overrides or [], "alts": alts or {}, **(label or {})}
+    (Path(res.run_dir) / "tlc_run.json").write_text(json.dumps(info, indent=2))
     return Path(res.run_dir)
 
 

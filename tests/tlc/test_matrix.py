@@ -29,3 +29,16 @@ def test_only_filter():
     pairs = tlc_matrix.expand(matrix, only={"pi_lock_c"})
     assert [(p[0], p[1]["name"]) for p in pairs] == [("a.yaml", "pi_lock_c")]
     assert tlc_matrix.expand(matrix)[0][2] == ['controller.name=tlc', 'controller.params={"core": "faithful"}']
+
+
+def test_corners_section_expands_each_preset():
+    matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
+    runs = tlc_matrix.expand_corners(matrix)
+    sec = matrix["corners"]
+    assert len(runs) == len(sec["presets"]) * len(sec["experiments"]) * len(sec["controllers"])
+    assert {r[3] for r in runs} == set(sec["presets"])
+
+
+def test_corner_alts_come_from_the_preset():
+    assert tlc_matrix.corner_alts("g26_fast_thermal") == {"uncertainty.thermal.time_scale_fast": "low",
+                                                          "uncertainty.thermal.time_scale_slow": "low"}

@@ -27,3 +27,10 @@ controllers:                                      # spec 6, Q2
   - {name: kalman_lqg_c, params: {}}
   - {name: mpc_c, params: {}}
   - {name: wdm_supervisor, params: {}, restricted_only: true}   # cold start only
+
+corners:                                          # spec 6, Q7: model trust (plant and priors follow the corner)
+  presets: [g26_fast_thermal, g26_slow_thermal, g26_textbook_thermal, g26_tec_package]   # tec_package: crosstalk
+  experiments:
+    - experiments/tlc/steady_tlc_faithful.yaml
+    - experiments/tlc/a1_tlc.yaml
+  controllers: [tlc, pi_lock_c]
