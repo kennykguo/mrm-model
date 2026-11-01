@@ -145,7 +145,7 @@ Implemented in `experiments/tlc/matrix.yaml`, run by `tools/tlc_matrix.py` (stat
 | D2 common aggressor | R3, R4 | `ext_common_aggressor_tlc.yaml` | die-wide `xpu_power_step`, +3 K at 2200 K/s | 🧩 extension |
 | +10 K kick, loss of lock | R10 | `ext_kick_tlc.yaml` | die-wide `xpu_power_step`, +10 K in 20 µs | 🧩 extension (common, not local) |
 | PD missing | R21 | `ext_pd_fault_tlc.yaml` | `static` + adapter `pd_fault_*` | 🧩 extension (controller boundary) |
-| D3 + D2, 1.5× | R11 | — | `a1` + corners | ⚠️ not yet |
+| D3 + D2, 1.5× | R11 | `a1_pd_adjacent_tlc.yaml` | `a1_slide10_aggressor_pd_adjacent` (A1 at the PD-side stress site) | ⚠️ approximate |
 | restart one ring | R8 | — | `line_enable` restarts the laser, not the controller | ❌ not mapped |
 | B10 learning (eff ±15 %, coupling ±20 %) | O5 | — | sampled worlds | ⚠️ not yet |
 
@@ -203,7 +203,7 @@ Findings of Phase 3 (each is measured, none is fixed):
 - [x] One YAML per mapped row of §3 under `experiments/tlc/`; `matrix.yaml` + `tools/tlc_matrix.py` run every row with its comparators.
 - [x] Extensions for the rows G26 lacks (Q9), labelled `ext_*`; no plant change.
 - [x] Report: overview table, dither-removed tracking error (`track_*`, Q8), Monte Carlo rates with Clopper-Pearson intervals (Q10), corner runs named `experiment@corner` (Q7).
-- [ ] Open rows: R11 (D3 + D2), O5 (B10 learning), the 300-trial cold-start campaign (`--set experiment.batch=300`, ≈ 2 h for the TLC arm here).
+- [ ] Open rows: O5 (B10 learning: needs each world's true heater efficiency on the scoring side), the 300-trial cold-start campaign (`--set experiment.batch=300`, ≈ 2 h for the TLC arm here).
 - Runtime: full matrix ≈ 10 min on this machine (8-trial campaign included).
 
 Findings of Phase 4 (first pass, nominal world unless stated):

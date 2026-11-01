@@ -1,0 +1,20 @@
+# TLC scenario matrix, ECE496 D3 uneven heating + D2 at 1.5x (R11) -> mrm A1 at its PD-adjacent stress site (the
+# same 88.5 K, 2127 K/s aggressor placed beside the PDs, so the rings see it unevenly). Approximate mapping: A1 is
+# already ~30x the source's 3 K D2 swing; the stress site supplies the unevenness. Judge rings 1-7 (KNOWN_ISSUES #38).
+extends: g26
+meta: {name: tlc_a1_pd_adjacent, kind: experiment, description: "A1 at the PD-adjacent site, one period; TLC matrix"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: a1_slide10_aggressor_pd_adjacent, params: {phase_s: 0.06535}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.1357
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}
