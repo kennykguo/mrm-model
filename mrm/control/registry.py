@@ -21,6 +21,7 @@ _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _REGISTRY: dict[str, Any] = {
     "composite": "mrm.control.api:CompositeController",
     "tlc": "mrm.control.tlc.controller:TlcController",       # ECE496 TLC port (docs/TLC_PORT_SPEC_AND_PLAN.md)
+    "tlc_pi": "mrm.control.tlc.controller:TlcPiController",  # its BaselinePI comparator
 }
 _RESOLVED: dict[str, Any] = {}
 _BUILTINS_LOADED = False

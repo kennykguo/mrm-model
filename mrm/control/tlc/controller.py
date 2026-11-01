@@ -5,6 +5,10 @@ mrm calls ``step`` every 10 us (G26: controller_interface.update_rate_hz = 100 k
 previous block and plans ``core_every_n_edges`` heater samples for the next one. Each call emits one planned
 sample, which reproduces the source's 100 kS/s heater stream with its dither. One core per world (B).
 
+As in the source's driver, the first block's samples come from the start state (``core.first_plan``) and the core
+first runs one block later, on a full block; the samples delivered at the first edge predate the start and are
+dropped.
+
 Units: the core speaks power fraction and GHz; :mod:`mrm.control.tlc.units` converts to DAC codes and pm.
 """
 from __future__ import annotations
@@ -20,16 +24,25 @@ from mrm.control.tlc.stub_core import MODE_TRACK, StubCore
 from mrm.control.tlc.telemetry_log import TelemetryLog
 from mrm.control.tlc.units import HeaterLaw, level_from_codes, pm_per_ghz
 
-#: core name -> factory(n_rings, *, ts, n_out, params) returning an object with the StubCore interface
+def _faithful(kind: str):
+    def make(spec, *, ts, n_out, params):
+        from mrm.control.tlc.faithful_core import FaithfulCore       # imports scipy and the nominal model
+        return FaithfulCore(spec, ts=ts, n_out=n_out, kind=kind)
+    return make
+
+
+#: core name -> factory(spec, *, ts, n_out, params) returning an object with the StubCore interface
 CORES = {
-    "stub": lambda n_rings, *, ts, n_out, params: StubCore(n_rings, ts=ts, n_out=n_out,
-                                                           dither_amp_u=params.dither_amp_u),
+    "stub": lambda spec, *, ts, n_out, params: StubCore(spec.n_rings, ts=ts, n_out=n_out,
+                                                        dither_amp_u=params.dither_amp_u),
+    "faithful": _faithful("tlc"),           # the vendored ECE496 TLC with G26 priors
+    "faithful_pi": _faithful("pi"),         # the source's BaselinePI (same B1/B2/B3/B8, PI only)
 }
 START_MODES = ("warm", "cold")
 
 
 class TlcController(BaseController):
-    """The ECE496 TLC behind a multirate adapter. Phase 1: ``core = "stub"`` only."""
+    """The ECE496 TLC behind a multirate adapter. ``core``: stub | faithful | faithful_pi."""
     name = "tlc"
 
     @dataclass
@@ -69,9 +82,14 @@ class TlcController(BaseController):
         if self.cores is None:
             self.cores = self._start_cores(obs)
         samples = level_from_codes(obs["tx.monitor.samples"], spec.adc.full_scale_codes)
+        if "monitor_valid" in obs.sensors:          # an invalid sample reaches the core as missing (B2: NaN)
+            samples = np.where(np.asarray(obs.sensors["monitor_valid"], dtype=bool)[..., None], samples, np.nan)
         self.buffer.push(samples, obs["tx.monitor.count"])
         k = self.edge % self.n_out
-        if k == 0:
+        if self.edge == 0:
+            self.buffer.drain()
+            self.telemetry_log.record(obs.t_s, self.telemetry())
+        elif k == 0:
             self._run_cores(obs.t_s - self.core_ts)
             self.telemetry_log.record(obs.t_s, self.telemetry())
         self.edge += 1
@@ -83,7 +101,9 @@ class TlcController(BaseController):
             last = [StubCore(shape[1], ts=1.0, n_out=1).last] * shape[0]
         else:
             last = [c.last for c in self.cores]
-        per = lambda key: np.stack([np.broadcast_to(np.asarray(d[key], dtype=np.float64), shape[1:]) for d in last])
+        absent = {"eff": 1.0}                    # BaselinePI's last omits the estimator fields: report 0 (eff 1)
+        per = lambda key: np.stack([np.broadcast_to(np.asarray(d.get(key, absent.get(key, 0.0)), dtype=np.float64),
+                                                    shape[1:]) for d in last])
         modes, u = per("modes"), per("u")
         return {
             "state": modes.astype(np.int64),
@@ -104,11 +124,11 @@ class TlcController(BaseController):
     def _start_cores(self, obs: Observation) -> list:
         spec, p = self._require_spec(), self.params
         make = CORES[p.core]
-        cores = [make(spec.n_rings, ts=self.core_ts, n_out=self.n_out, params=p) for _ in range(spec.n_batch)]
+        cores = [make(spec, ts=self.core_ts, n_out=self.n_out, params=p) for _ in range(spec.n_batch)]
         u0 = self.heater_law.u_from_code(obs["tx.heater.applied"])
         for b, core in enumerate(cores):
             core.warm_start(u0[b]) if p.start_mode == "warm" else core.cold_start()
-        self.plan = np.repeat(u0[:, :, None], self.n_out, axis=2)
+        self.plan = np.stack([np.asarray(c.first_plan(obs.t_s), dtype=np.float64).T for c in cores])
         return cores
 
     def _run_cores(self, t_block_start: float) -> None:
@@ -128,3 +148,12 @@ class TlcController(BaseController):
         grid = np.asarray(spec.line_grid_hz, dtype=np.float64)
         r2l = np.asarray(spec.ring_to_line if spec.ring_to_line is not None else np.arange(spec.n_rings))
         return pm_per_ghz(grid[r2l])
+
+
+class TlcPiController(TlcController):
+    """``tlc_pi``: the source's BaselinePI (B1/B2/B3/B8 with a PI loop) behind the same adapter."""
+    name = "tlc_pi"
+
+    @dataclass
+    class Params(TlcController.Params):
+        core: str = "faithful_pi"

@@ -38,18 +38,24 @@ class RecordingCore:
     """A core whose planned samples are unique numbers, so the test can see which sample went out when."""
     calls: list = []
 
-    def __init__(self, n_rings, *, ts, n_out, params):
-        self.n, self.n_out, self.k = n_rings, n_out, 0
-        self.last = StubCore(n_rings, ts=ts, n_out=n_out).last
+    def __init__(self, spec, *, ts, n_out, params):
+        self.n, self.n_out, self.k = spec.n_rings, n_out, 0
+        self.last = StubCore(self.n, ts=ts, n_out=n_out).last
 
     def warm_start(self, u0):
         self.u0 = np.array(u0)
+
+    def first_plan(self, t0):
+        return self._seq()
 
     def cold_start(self):
         raise AssertionError("not used")
 
     def step(self, pd, t_block_start):
         RecordingCore.calls.append((pd.shape, t_block_start))
+        return self._seq()
+
+    def _seq(self):
         seq = (self.k * self.n_out + np.arange(self.n_out))[:, None] * 1e-4 + np.zeros((1, self.n))
         self.k += 1
         return seq
@@ -91,9 +97,10 @@ def test_core_runs_every_tenth_edge_and_each_planned_sample_goes_out_once_in_ord
     ctrl.reset(spec)
     applied = np.zeros((B, spec.n_rings), dtype=np.int64)
     acts = _run_edges(ctrl, spec, 100, applied)
-    assert len(RecordingCore.calls) == 10 * B                    # 100 edges / 10, one core per world
+    assert len(RecordingCore.calls) == 9 * B                     # edges 10, 20, ..., 90; one core per world
     law = ctrl.heater_law
     want = law.code_from_u(np.arange(100) * 1e-4)                # sample j of the stream is planned value j
+                                                                 # (block 0 from first_plan)
     assert np.array_equal(acts[:, 0, 0], want)
 
 
@@ -104,12 +111,13 @@ def test_core_blocks_hold_the_samples_of_the_previous_ten_edges(spec, monkeypatc
     ctrl.reset(spec)
     _run_edges(ctrl, spec, 21, np.zeros((B, spec.n_rings), dtype=np.int64))
     shapes = [c[0] for c in RecordingCore.calls[::B]]
-    # the samples delivered at an edge were taken in the 10 us before it, so a block at edge e holds the samples of
-    # edges e-9 .. e: the first block has only edge 0's 3 samples, the next 10 edges of 2, 3, 2, 3, ... samples
-    assert shapes[0] == (3, spec.n_rings)
+    # the samples delivered at an edge were taken in the 10 us before it, so the block at edge e holds the samples
+    # of edges e-9 .. e (10 edges of 2, 3, 2, 3, ... samples); edge 0's samples predate the start and are dropped
+    assert shapes[0] == (25, spec.n_rings)
     assert shapes[1] == (25, spec.n_rings)
     starts = [c[1] for c in RecordingCore.calls[::B]]
-    assert starts[2] - starts[1] == pytest.approx(10 * spec.period_s)
+    assert starts[0] == pytest.approx(spec.phase_ticks * spec.tick_s)     # the block that began at the first edge
+    assert starts[1] - starts[0] == pytest.approx(10 * spec.period_s)
 
 
 def test_core_period_must_be_whole_edges(spec):
@@ -155,3 +163,51 @@ def test_reset_starts_a_fresh_run(spec):
     assert ctrl.telemetry_log.to_arrays()["t_s"].shape == (0,)
     acts = _run_edges(ctrl, spec, 3, np.full((B, spec.n_rings), 12345))
     assert np.all(acts == 12345)
+
+
+def test_tlc_pi_is_registered_with_the_source_baseline_core():
+    ctrl = registry.create("tlc_pi", {})
+    assert ctrl.params.core == "faithful_pi"
+
+
+def test_invalid_monitor_samples_reach_the_core_as_missing(spec, monkeypatch):
+    monkeypatch.setitem(tlc_controller.CORES, "recording", RecordingCore)
+    seen = []
+    orig = RecordingCore.step
+    monkeypatch.setattr(RecordingCore, "step", lambda self, pd, t: (seen.append(pd.copy()), orig(self, pd, t))[1])
+    ctrl = TlcController(core="recording")
+    ctrl.reset(spec)
+    applied = np.zeros((B, spec.n_rings), dtype=np.int64)
+    for e in range(11):
+        obs = _obs(spec, e, applied)
+        valid = np.ones((B, spec.n_rings), dtype=bool)
+        valid[:, 3] = e != 5                                     # ring 3 invalid at edge 5
+        sensors = {k: obs.sensors[k] for k in obs.sensors}
+        sensors["monitor_valid"] = valid
+        ctrl.step(Observation(tick=obs.tick, dt_s=obs.dt_s, sensors=sensors))
+    pd = seen[0]                                                 # world 0, block of edges 1..10
+    assert np.isnan(pd[:, 3]).sum() == 2                         # edge 5 delivered 2 samples
+    assert not np.isnan(np.delete(pd, 3, axis=1)).any()
+
+
+@pytest.fixture(scope="module")
+def nominal_spec():
+    cfg = P.load("g26", overrides=["controller_interface.knowledge=[line_grid,ring_to_line,model_nominal]"])
+    return ControllerSpec.from_config(cfg, n_batch=B, nominal=cfg)
+
+
+@pytest.mark.parametrize("core", ["faithful", "faithful_pi"])
+def test_faithful_cores_run_in_the_adapter(nominal_spec, core):
+    ctrl = TlcController(core=core)
+    ctrl.reset(nominal_spec)
+    acts = _run_edges(ctrl, nominal_spec, 31, np.full((B, nominal_spec.n_rings), 34500))
+    assert acts.dtype == np.int64 and acts.min() >= 0 and acts.max() <= 65535
+    assert len(ctrl.telemetry_log) == 4
+    assert np.all(np.isfinite(ctrl.telemetry()["detuning_est_pm"]))
+
+
+def test_faithful_core_needs_model_nominal(spec):
+    ctrl = TlcController(core="faithful")
+    ctrl.reset(spec)
+    with pytest.raises(Exception, match="model_nominal"):
+        ctrl.step(_obs(spec, 0, np.zeros((B, spec.n_rings), dtype=np.int64)))

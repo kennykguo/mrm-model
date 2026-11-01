@@ -6,6 +6,8 @@ telemetry and the report can be built and tested end to end before the real core
 Interface shared with the real core, per world:
 
 - ``warm_start(u0)`` / ``cold_start()``: start locked at power fractions u0 (N,), or acquire;
+- ``first_plan(t0) -> seq``: the heater samples (n_out, N) of the first block, from the start state (the
+  source driver's ``out.produce(u_cmd, 0, ...)`` before its loop);
 - ``step(pd, t_block_start) -> seq``: consume one block of PD levels (K, N) whose first sample is at
   ``t_block_start`` and return the heater power fractions (n_out, N) for the NEXT block, as the source does;
 - ``last``: the source's telemetry dict (delta_hat and sigma in GHz, rate_hat in GHz/s, modes, u, amp in GHz,
@@ -45,12 +47,19 @@ class StubCore:
         self.u_hold = np.zeros(self.n)
         self.modes = np.full(self.n, MODE_ACQUIRE, dtype=np.int64)
 
+    def first_plan(self, t0: float) -> np.ndarray:
+        """The heater samples (n_out, N) of the first block [t0, t0 + ts), before any PD block was consumed."""
+        return self._plan(t0)
+
     def step(self, pd: np.ndarray, t_block_start: float) -> np.ndarray:
-        t = t_block_start + self.ts + np.arange(self.n_out) * self.ts / self.n_out
-        seq = self.u_hold[None, :] + self.amp * np.sin(2 * np.pi * self.freqs[None, :] * t[:, None])
-        seq = np.clip(seq, 0.0, 1.0)
+        seq = self._plan(t_block_start + self.ts)
         self.last = self._telemetry(seq[-1])
         return seq
+
+    def _plan(self, t_start: float) -> np.ndarray:
+        t = t_start + np.arange(self.n_out) * self.ts / self.n_out
+        seq = self.u_hold[None, :] + self.amp * np.sin(2 * np.pi * self.freqs[None, :] * t[:, None])
+        return np.clip(seq, 0.0, 1.0)
 
     def _telemetry(self, u: np.ndarray) -> dict:
         z = np.zeros(self.n)

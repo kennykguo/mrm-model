@@ -1,0 +1,22 @@
+# TLC Phase 3 (kind run): the faithful ECE496 core with G26 priors (mrm/control/tlc/priors.py) on
+# all eight g26 rings at 25 degC for 40 ms from a settled warm start. Same conditions as
+# experiments/examples/steady_pi_lock.yaml, so the two runs compare directly.
+#   .venv/bin/python tools/tlc_run.py experiments/tlc/steady_tlc_faithful.yaml     (keeps the TLC telemetry)
+#   .venv/bin/mrm run experiments/tlc/steady_tlc_faithful.yaml                     (mrm metrics only)
+extends: g26
+meta: {name: steady_tlc_faithful, kind: experiment, description: "tlc (faithful core, G26 priors), static 25 degC, nominal world, 40 ms"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]    # the model-based baselines' tier (spec 6, Q7)
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: static}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.04
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm                 # locked-steady-state lock codes, settled thermal state
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

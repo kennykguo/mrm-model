@@ -51,6 +51,12 @@ def _telemetry_summary(path: Path) -> dict | None:
             "dither_amp_pm_max": float(np.max(np.abs(z["dither_amp_pm"]))) if z["t_s"].size else 0.0}
 
 
+def _cell(values, ring: int):
+    """World 0, ring ``ring`` of a (B, N) metric from metrics.json; None (not defined, e.g. never locked) stays None."""
+    v = np.asarray(values, dtype=object)[0, ring]
+    return None if v is None else (v.item() if hasattr(v, "item") else v)
+
+
 def _ring_stats(err_pm: np.ndarray, pm_per_ghz: float) -> dict:
     a = np.abs(err_pm)
     peak, p999, rms = float(a.max()), float(np.quantile(a, 0.999)), float(np.sqrt(np.mean(err_pm ** 2)))
@@ -75,7 +81,7 @@ def summarize_run(run_dir: str | Path) -> dict:
     rings = []
     for i in range(err.shape[1]):
         row = {"ring": i, **_ring_stats(err[:, i], float(ppg[min(i, ppg.size - 1)]))}
-        row.update({k: np.asarray(m[k])[0, i].item() for k in MRM_COLUMNS if k in m})
+        row.update({k: _cell(m[k], i) for k in MRM_COLUMNS if k in m})
         rings.append(row)
     return {"run": run.name, "experiment": metrics.get("name") or run.name,
             "controller": cfg.get("controller", {}).get("name"), "scenario": cfg.get("scenario", {}).get("name"),
@@ -108,6 +114,8 @@ def _reference_markdown(rows: list[dict]) -> list[str]:
 
 
 def _fmt(v) -> str:
+    if v is None:
+        return "—"
     if isinstance(v, bool):
         return "yes" if v else "no"
     if isinstance(v, float):
