@@ -1,3 +1,70 @@
+# mrm-model · branch `feature/tlc-port`
+
+> **This branch** ports the ECE496 thermal locking controller (TLC, [msilve160/ECE496_project](https://github.com/msilve160/ECE496_project))
+> into mrm-model, so it can run closed loop on the 8-ring G26 plant and produce performance and locking
+> metrics for the ECE496 project.
+>
+> **Status: Phase 1 (walking skeleton) in progress. Decisions Q1–Q12 are settled in spec §6.**
+> 📄 Spec & plan: [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) · 📋 Tracker: [`PLAN.md`](PLAN.md)
+
+## Goal of this branch
+- **Deliverable:** a framework. One command runs the TLC (and comparators) through the ECE496 scenario set on G26 and writes a metrics report.
+- **Not a deliverable yet:** good TLC numbers on G26. The TLC is proven on the ECE496 4-ring plant; here it is ported faithfully, and where it falls short on G26 the report records the failure and the reason.
+
+## ⚠️ Things that need to be addressed
+
+### Decisions (settled 2026-10-31, spec §6; the owner can reopen any)
+- [x] **Q1** Meaning of "work better than the 4-ring ECE496 baseline": G26 as the higher-fidelity testbed (side-by-side report), TLC beating ECE496 `BaselinePI` on G26, or TLC-on-G26 beating TLC-on-4-ring?
+- [x] **Q2** Which comparators go in the report (`tlc_pi`, `pi_lock_c`, `kalman_lqg_c`, `mpc_c`, `dither_lockin_c`)
+- [x] **Q3** Report units: pm, GHz, or both
+- [x] **Q4** What to do with the rev 1 code (archive / delete / repair)
+- [x] **Q5** How the ECE496 source enters this repo (copy with attribution / submodule / sibling import)
+- [x] **Q6** Main now has its own README; this branch section sits on top of it. Before merging to main, move it to `docs/tlc/README.md`?
+- [x] **Q7** Which knowledge tokens the TLC gets (`spec.nominal` exposes only the line grid by default)
+- [x] **Q8** Pass thresholds: ECE496 R-reqs converted to pm, mrm's 5 pm budget, or both
+- [x] **Q9** ECE496 scenarios with no mrm equivalent (common-mode D2, +10 K kick, PD dropout): skip, add to mrm, or emulate in the adapter
+- [x] **Q10** Run durations and Monte Carlo size (the Python TLC takes ~3 ms per 100 µs step)
+- [x] **Q11** Which results get committed
+- [x] **Q12** Push target and reviewer (`origin` is `kennykguo/mrm-model`)
+
+### Problems found in the existing rev 1 port (spec §1)
+- [ ] B3 lock-in returns unsigned y1/y2/ζ, so the loop can't tell which side of the lock point it is on
+- [ ] B1 tone plan collides: 2f of 1.5/2.0/2.5 kHz lands on other rings' tones (the source plan didn't)
+- [ ] B4 UKF doesn't converge on clean self-consistent data (160 pm true → 140 pm estimate)
+- [ ] Invented or drifted constants (`p_nominal=42116`, `mod_shift=50 pm`, `0.05 pm/code`, 3 ms tail vs plant 4 ms)
+- [ ] The 140 tests don't touch mrm's plant or API; several are written so they can't fail
+- Full evidence: [`docs/tlc/REV1_REVIEW.md`](docs/tlc/REV1_REVIEW.md)
+- [ ] The rev 1 spec used a non-existent `obs["tx.monitor"]`, the wrong default rate (G26 is 100 kHz), and the wrong telemetry keys
+
+### G26 facts the port must handle
+- [ ] Heater is a 16-bit **voltage** DAC (power ∝ code²); the TLC assumes a power fraction, so the adapter converts
+- [ ] Controller `step()` runs every 10 µs with ~2–3 ADC samples per call; the TLC core expects 100 µs blocks, so the adapter runs it multirate
+- [ ] `spec.nominal` is knowledge-gated: TLC priors need tokens granted in the experiment YAML
+- [ ] Telemetry must be numeric `(B,N)` with the standard keys; mrm's runner doesn't record controller telemetry, so a TelemetryLog is needed
+- [ ] Metrics include the TLC's own dither in the error; ±5 pm or more of dither scores as excursions
+- [ ] Monitor sees the NRZ-averaged drop, so the TLC's noise-based squelch detector will be blind on G26
+- [ ] Cold rings start ~7.6 nm blue and the warm-up ramp crosses foreign lines, so the TLC's ACQUIRE will lock to wrong lines
+- [ ] Ring 0 runs out of heater under the A1 aggressor for every controller (`docs/KNOWN_ISSUES.md` #38)
+- [ ] Thermal poles 3.2 µs / 13 µs / 4 ms and crosstalk 3 % at 1.52 ms (vs ECE496's 13 / 78 µs and 20 % at 250 µs); the TLC's internal model gains must come from priors
+
+### Housekeeping
+- [ ] **Upstream main is broken from `84de49b` (optics revamp) on:** `mrm.sim.kernel` still uses ~60 names that `mrm.plant.optics` no longer defines, so `mrm run` fails. This branch merges main only up to `ca3f8fe`, the last working commit; report it upstream and merge again once main is fixed
+- [ ] No `.venv` yet: create it per the Install section below (`python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`)
+- [ ] `tests/verification` needs `gymnasium` (4 gym test files fail to collect without it); main later moves them to `archive/rl`
+- [ ] First `mrm run` takes ~2 min for numba compilation (cached afterwards)
+
+## Plan at a glance
+| Phase | Outcome |
+|---|---|
+| 0 | Decisions above, env, rev 1 archived, source brought in |
+| 1 | **Walking skeleton:** `mrm run experiments/tlc/steady_tlc.yaml` works end to end with a stub TLC, and a report is generated |
+| 2 | Faithful TLC core; it reproduces ECE496's own results on the ECE496 plant |
+| 3 | TLC core on G26 (priors, open-loop lock-in diagnostic, warm closed loop) |
+| 4 | Full scenario matrix: ECE496 D1–D6 / R-reqs mapped to mrm scenarios |
+| 5 | `docs/tlc/results.md`: R-table, ECE496-plant vs G26 side by side, scorecard rows |
+
+---
+
 # mrm: a control-oriented model of a silicon microring-modulator bank
 
 `mrm` simulates a bank of eight silicon microring modulators on one bus waveguide, the heaters and converters around
