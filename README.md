@@ -45,7 +45,7 @@
 - [ ] ζ = z2/z1 is weak on G26 (span ≈ 2x its noise; [`docs/tlc/lockin_diag.md`](docs/tlc/lockin_diag.md)), so the UKF leans on the DC channel
 - [ ] Faithful `tlc` steady state: 1.6-4.0 pm rms; removing its dither barely changes that (tracking error, not dither). `tlc_pi`: 7-10 pm rms
 - [ ] A1: the TLC loses lock (~1 nm) where `pi_lock_c` / `kalman_lqg_c` / `mpc_c` hold rings 1-7 within ~15 pm; under the TEC-held package corner it holds (8.3 pm)
-- [ ] Cold start: TLC ACQUIRE ends on a wrong line in 41/64 ring trials [0.51, 0.76] vs 1/64 for `wdm_supervisor`
+- [ ] Cold start: TLC ACQUIRE ends on a wrong line in 43/64 ring trials [0.54, 0.78] vs 1/64 for `wdm_supervisor`
 - [ ] Open matrix rows: R11 (D3 + D2), O5 (B10 learning), the 300-trial campaign
 - [ ] Upstream at `ca3f8fe`, some `tests/verification/test_ctrl_c_*` fail with or without this branch (stale `mrm.plant.optics` names)
 

@@ -208,7 +208,7 @@ Findings of Phase 3 (each is measured, none is fixed):
 
 Findings of Phase 4 (first pass, nominal world unless stated):
 - **A1:** the faithful TLC loses lock (rings leave by ~1 nm) where `pi_lock_c`, `kalman_lqg_c` and `mpc_c` hold rings 1-7 within ~15 pm. Under the TEC-held package corner it rides through (8.3 pm on rings 1-7): the A1 verdict depends on the package model. In corner runs the TLC's priors follow the corner (as every model-based baseline's nominal knowledge does in mrm), so this is "a different plant the TLC knows", not a model-mismatch test; a mismatch variant (g26 priors on a corner plant) is open.
-- **Cold start:** the TLC's ACQUIRE locks on the first fringe it meets; 41 of 64 ring trials end on a wrong line [0.51, 0.76] and none on its own line, against 1/64 for `wdm_supervisor` (expected discrepancy 2, confirmed).
+- **Cold start:** the TLC's ACQUIRE locks on the first fringe it meets; 43 of 64 ring trials end on a wrong line [0.54, 0.78] and none on its own line, against 1/64 for `wdm_supervisor` (expected discrepancy 2, confirmed).
 - **Squelch:** the TLC leaves its points (33 pm peak; expected discrepancy 1).
 - **+3 dB power step:** every controller unlocks; the step is 3x mrm's 3-sigma re-mate change.
 - **Dither:** removing the TLC's tones barely changes its error (steady 9.1 → 7.4 pm peak): the error is tracking error, not dither (expected discrepancy 3 refuted).
