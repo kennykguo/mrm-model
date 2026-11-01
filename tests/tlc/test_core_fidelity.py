@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 import mrm.control.tlc.core as vendored
+from mrm.control.tlc.core import params as vparams
 
 COMPARED = ("p999", "peak", "rms", "heater_mw", "max_slew_pct_per_ms", "cmd_range")
 TOL = 1.5e-3
@@ -31,7 +32,7 @@ def _run_vendored(sim, **kw):
     orig = sim.TLC
     sim.TLC = vendored.TLC
     try:
-        return sim.run("tlc", **kw)
+        return sim.run("tlc", pp=vparams.PlantParams(), cp=vparams.ControllerParams(), **kw)
     finally:
         sim.TLC = orig
 

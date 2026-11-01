@@ -6,7 +6,7 @@ from collections import deque
 import numpy as np
 
 from .optics import lockin_ratios
-from .params import ControllerParams, PlantParams
+from .params import ControllerParams, PlantParams, check_ring_count
 from .b1_dither import B1Dither
 from .b2_conditioner import B2Conditioner
 from .b3_lockin import B3LockIn
@@ -19,13 +19,15 @@ from .b7_pi import PIController
 from .b8_output import B8Output
 from .b9_diagnostics import B9Diagnostics
 from .b10_calibration import B10Calibration
-from .common import Mode, N
+from .common import Mode
 
 
 class TLC(SupervisorMixin):
     """Thermal locking controller: call step() once per 100 us block of PD samples."""
 
     def __init__(self, pp: PlantParams, cp: ControllerParams, use_mpc=True, learn=True):
+        check_ring_count(pp, cp)
+        self.N = cp.n_rings
         self.pp, self.cp = pp, cp
         self.cal = B10Calibration(pp, cp)
         self.sp = B6Setpoints(self.cal, cp)
@@ -36,36 +38,36 @@ class TLC(SupervisorMixin):
         self.lockin = B3LockIn(cp, self.out_delay, pp.pd_rate / cp.decim)
         self.ukf = B4UKF(cp, self.cal.hwhm, self.cal.mod,
                          self.cal.p_laser * self.cal.depth / pp.pd_full_scale_mw)
-        self.theta_obs = np.ones(N)
-        self.model = ThermalModel(cp.ts, pp.tau_hs, pp.tau_x)
+        self.theta_obs = np.ones(self.N)
+        self.model = ThermalModel(cp.ts, pp.tau_hs, pp.tau_x, n=cp.n_rings)
         self.mpc = B7MPC(cp)
         self.pi = PIController(cp, self.cal.dc_gain_open())
         self.diag = B9Diagnostics()
         self.use_mpc = use_mpc
         self.learn = learn
-        self.modes = np.full(N, Mode.INIT)
+        self.modes = np.full(self.N, Mode.INIT)
         self.fault = False
         self.k = 0
         self.t = 0.0
         self.h_hist = deque(maxlen=int(round(cp.lockin_window / cp.ts)))
         self.a_hist = deque(maxlen=int(round(cp.lockin_window / cp.ts)))
-        self.u_cmd = np.zeros(N)
-        self.lol_count = np.zeros(N)
-        self.lim_count = np.zeros(N)
-        self.limit_flag = np.zeros(N, bool)
-        self.invalid_count = np.zeros(N)
-        self.valid_count = np.zeros(N)
-        self.squelch = np.zeros(N, bool)
-        self.sq_count = np.zeros(N)
-        self.acq = [dict() for _ in range(N)]
-        self.hold_from = np.full(N, Mode.TRACK)
+        self.u_cmd = np.zeros(self.N)
+        self.lol_count = np.zeros(self.N)
+        self.lim_count = np.zeros(self.N)
+        self.limit_flag = np.zeros(self.N, bool)
+        self.invalid_count = np.zeros(self.N)
+        self.valid_count = np.zeros(self.N)
+        self.squelch = np.zeros(self.N, bool)
+        self.sq_count = np.zeros(self.N)
+        self.acq = [dict() for _ in range(self.N)]
+        self.hold_from = np.full(self.N, Mode.TRACK)
         self._refresh_model()
         # acquisition lookup: z1 / max(z1) on the approach -> detuning on the long side
         self._build_acq_tables()
         self.fallback_steps = []
-        self.iq_avg = np.zeros(N, complex)
-        self.theta_obs = np.ones(N)
-        self._d_blk = np.zeros(N)
+        self.iq_avg = np.zeros(self.N, complex)
+        self.theta_obs = np.ones(self.N)
+        self._d_blk = np.zeros(self.N)
         self.log = None
 
     # ------------------------------------------------------------------------------
@@ -74,8 +76,8 @@ class TLC(SupervisorMixin):
         self.model.set_gains(gf, ghs, gx)
         self.mpc.build(self.model)
         H = self.cal.dither_response(self.sp.targets, self.cp.tone_freqs, self.out_delay)
-        if hasattr(self, "H") and np.any(np.abs(getattr(self, "iq_avg", np.zeros(N))) > 0.5):
-            own = np.arange(N)
+        if hasattr(self, "H") and np.any(np.abs(getattr(self, "iq_avg", np.zeros(self.N))) > 0.5):
+            own = np.arange(self.N)
             H[own, own] = np.abs(H[own, own]) * np.exp(1j * np.angle(self.H[own, own]))
         self.H = H
         self.h_own_abs = np.abs(np.diag(self.H))
@@ -91,21 +93,21 @@ class TLC(SupervisorMixin):
 
     def _build_acq_tables(self):
         self.acq_tab = []
-        for i in range(N):
+        for i in range(self.N):
             dgrid = np.linspace(-150, 60, 4201)
             z1, _ = lockin_ratios(dgrid, self.cp.dither_max, self.cal.hwhm[i], self.cal.mod)
             zmax = z1.max()
             self.acq_tab.append((dgrid, z1 / zmax))
             self.acq_peak = getattr(self, "acq_peak", []) + [zmax / self.cp.dither_max]
         # lock threshold: ratio at the target (negative) times 0.85
-        self.acq_ratio = np.array([np.interp(self.sp.targets[i], *self.acq_tab[i]) for i in range(N)])
+        self.acq_ratio = np.array([np.interp(self.sp.targets[i], *self.acq_tab[i]) for i in range(self.N)])
         self.acq_peak = np.array(self.acq_peak)
 
     def _guard_hi(self):
         """B8 channel guard (R23): max command keeping the predicted resonance within
         +channel_guard GHz of the ring's own laser target."""
         g_self = self.model.gf + self.model.ghs
-        hi = np.ones(N)
+        hi = np.ones(self.N)
         tr = self.modes == Mode.TRACK
         room = self.sp.targets + self.cp.channel_guard - self.ukf.delta
         hi_tr = self.u_cmd + room / g_self
@@ -125,24 +127,26 @@ class TLC(SupervisorMixin):
         self.out.last = u0.copy()
         self.model.settle(u0)
         self.modes[:] = Mode.TRACK
-        for i in range(N):
+        for i in range(self.N):
             self.ukf.init_ring(i, delta_true[i], var=1.0)
-        self.ukf.P[N:2 * N, N:2 * N] = np.eye(N) * 100.0
+        self.ukf.P[self.N:2 * self.N, self.N:2 * self.N] = np.eye(self.N) * 100.0
         self.ukf.hist.clear()
         self.pi.reset(u0)
         self.h_hist.clear()
         for _ in range(self.h_hist.maxlen):
             self.h_hist.append(self.model.h(u0))
         self.dither.schedule(self.ukf.sigma, self.modes)
-        self.dither.set_command_amplitude(self.h_own_abs, np.ones(N))
+        self.dither.set_command_amplitude(self.h_own_abs, np.ones(self.N))
         self._d_blk = self.dither.cmd_amp.copy()
 
-    def cold_start(self, rings=range(N)):
+    def cold_start(self, rings=None):
+        if rings is None:
+            rings = range(self.N)
         for i in rings:
             self.modes[i] = Mode.ACQUIRE
             self.acq[i] = dict(zmax=0.0, zf=0.0, n=0)
         self.dither.schedule(self.ukf.sigma, self.modes)
-        self.dither.set_command_amplitude(self.h_own_abs, np.ones(N))
+        self.dither.set_command_amplitude(self.h_own_abs, np.ones(self.N))
         self._d_blk = self.dither.cmd_amp.copy()
 
     # ------------------------------------------------------------------------------
@@ -168,7 +172,7 @@ class TLC(SupervisorMixin):
             if use.any():
                 d = np.where(use, ph - np.angle(np.diag(self.H)), 0.0)
                 self.H = self.H.copy()
-                self.H[np.arange(N), np.arange(N)] *= np.exp(1j * d)
+                self.H[np.arange(self.N), np.arange(self.N)] *= np.exp(1j * d)
         z1 = y1 / np.maximum(y0, 1e-6)
         z2 = y2 / np.maximum(y0, 1e-6)
         y0b = y.mean(0)                                   # fast DC level of this block
@@ -209,22 +213,22 @@ class TLC(SupervisorMixin):
         meas = dict(zeta=zeta, rz=rz, ok_lock=valid & tracking & lock_q,
                     y0b=y0b, r0=r0, ok_dc=~invalid & tracking, a_nom=a_win,
                     wob_blk=wob_blk, lag_lock=lag_lock, lag_dc=lag_dc, squelch=self.squelch)
-        p_before = self.ukf.x[2 * N:].copy()
+        p_before = self.ukf.x[2 * self.N:].copy()
         self.ukf.update(meas)
         # squelch changes the lineshape, not the optical power or PD gain: keep the DC scale fixed so
         # the model mismatch of the bare Lorentzian cannot be absorbed into p as a detuning bias
         sq = self.squelch & tracking
-        self.ukf.x[2 * N:] = np.where(sq, p_before, self.ukf.x[2 * N:])
+        self.ukf.x[2 * self.N:] = np.where(sq, p_before, self.ukf.x[2 * self.N:])
         # a held ring has no measurement: propagate it on the model alone, with the common drift
         # rate seen by the tracking rings
         held = ~tracking
         # physical bound on the drift rate: D2's peak rate is 2300 K/s = 34.5 GHz/ms
-        self.ukf.x[N:2 * N] = np.clip(self.ukf.x[N:2 * N], -self.cp.rate_max, self.cp.rate_max)
+        self.ukf.x[self.N:2 * self.N] = np.clip(self.ukf.x[self.N:2 * self.N], -self.cp.rate_max, self.cp.rate_max)
         if held.any():
             common = self.ukf.rate[tracking].mean() if tracking.any() else 0.0
             for i in np.where(held)[0]:
                 self.ukf.x[i] = prior[i]
-                self.ukf.x[N + i] = common
+                self.ukf.x[self.N + i] = common
         self.ukf.remember()
         upd = valid & tracking
 
@@ -240,9 +244,9 @@ class TLC(SupervisorMixin):
             # coupling from cross tones: y1_all[i, j] for neighbours j
             if np.all(upd) and not self.squelch.any() and self.ukf.q_mult < 2.0:
                 yy, pp_ = [], []
-                for i in range(N):
+                for i in range(self.N):
                     for j in (i - 1, i + 1):
-                        if 0 <= j < N:
+                        if 0 <= j < self.N:
                             # expected cross response relative to own: |H_ij| d_j / (|H_ii| d_i)
                             ratio = (np.abs(self.H[i, j]) * self.dither.cmd_amp[j]) / \
                                     (np.abs(self.H[i, i]) * self.dither.cmd_amp[i])
@@ -266,11 +270,11 @@ class TLC(SupervisorMixin):
         # ---- B6 targets, B7 control -------------------------------------------------
         target = self.sp.targets
         guard_hi = self._guard_hi()
-        lo = np.zeros(N)
+        lo = np.zeros(self.N)
         hi = guard_hi.copy()
         planned = self.u_cmd.copy()
         qmask = (self.modes == Mode.TRACK).astype(float)
-        for i in range(N):
+        for i in range(self.N):
             if self.modes[i] in (Mode.ACQUIRE, Mode.REACQUIRE, Mode.HOLD, Mode.INIT):
                 planned[i] = self._planned_command(i)
                 lo[i] = hi[i] = planned[i]
@@ -287,7 +291,7 @@ class TLC(SupervisorMixin):
 
         # ---- B1 dither schedule, B8 output ----------------------------------------------
         self.dither.schedule(self.ukf.sigma, self.modes)
-        self.dither.set_command_amplitude(self.h_own_abs, np.ones(N))
+        self.dither.set_command_amplitude(self.h_own_abs, np.ones(self.N))
         self._d_blk = self.dither.cmd_amp.copy()
         self.a_hist.append(self.dither.cmd_amp * self.h_own_abs)
         self._d_blk = self.dither.cmd_amp.copy()
@@ -323,14 +327,14 @@ class BaselinePI(TLC):
         y0, y1, y2, y1_all, valid = self.lockin.demod(self.H)
         z1 = y1 / np.maximum(y0, 1e-6)
         err = (z1 / cp.dither_nominal - self.z1_target) / self.z1_slope
-        hi = np.ones(N)
+        hi = np.ones(self.N)
         u_new = self.pi.step(err, valid, hi)
         self.dither.schedule(None, None, fixed=cp.dither_nominal)
-        self.dither.set_command_amplitude(self.h_own_abs, np.ones(N))
+        self.dither.set_command_amplitude(self.h_own_abs, np.ones(self.N))
         seq, u_c, _ = self.out.produce(u_new, t_block_start + ts, self.dither, hi)
         self.u_cmd = u_c
         self.k += 1
         self.last = dict(z1=z1, y0=y0, valid=valid, delta_hat=self.sp.targets + np.where(valid, err, 0),
                          u=u_c.copy(), modes=self.modes.copy(), amp=self.dither.amp_ghz.copy(),
-                         fault=False, squelch=np.zeros(N, bool), limit=np.zeros(N, bool))
+                         fault=False, squelch=np.zeros(self.N, bool), limit=np.zeros(self.N, bool))
         return seq

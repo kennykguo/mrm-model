@@ -5,14 +5,14 @@ import numpy as np
 
 from .params import ControllerParams
 from .b4_thermal_model import ThermalModel
-from .common import N
 
 
 class B7MPC:
     def __init__(self, cp: ControllerParams):
+        self.N = cp.n_rings
         self.cp = cp
         self.nh = cp.horizon
-        self.nv = N * self.nh
+        self.nv = self.N * self.nh
         self.U = None
         self.iters_used = 0
         self._cache = {}
@@ -20,19 +20,19 @@ class B7MPC:
     def build(self, model: ThermalModel):
         """Condensed prediction matrices: h_pred = free(z) + G U  (U ordered step-major)."""
         nh = self.nh
-        G = np.zeros((N * nh, N * nh))
+        G = np.zeros((self.N * nh, self.N * nh))
         for j in range(nh):          # prediction step j+1
             for i in range(j + 1):   # input applied at step i+1
-                blk = np.zeros((N, N))
+                blk = np.zeros((self.N, self.N))
                 if i == j:
                     blk += np.diag(model.gf)
                 blk += (model.a_hs ** (j - i)) * (1 - model.a_hs) * np.diag(model.ghs)
                 blk += (model.a_x ** (j - i)) * (1 - model.a_x) * model.gx
-                G[j * N:(j + 1) * N, i * N:(i + 1) * N] = blk
+                G[j * self.N:(j + 1) * self.N, i * self.N:(i + 1) * self.N] = blk
         self.G = G
         self.pw_hs = model.a_hs ** np.arange(1, nh + 1)
         self.pw_x = model.a_x ** np.arange(1, nh + 1)
-        D = np.eye(N * nh) - np.eye(N * nh, k=-N)
+        D = np.eye(self.N * nh) - np.eye(self.N * nh, k=-self.N)
         self.D = D
         self.DtD = D.T @ D
         self.model = model
@@ -61,13 +61,13 @@ class B7MPC:
             beta = (np.sqrt(L) - np.sqrt(mu)) / (np.sqrt(L) + np.sqrt(mu))
             self._cache[key] = (M, L, beta)
         M, L, beta = self._cache[key]
-        b = np.zeros(self.nv); b[:N] = u_prev
+        b = np.zeros(self.nv); b[:self.N] = u_prev
         q = G.T @ (qv * (c - tgt)) - cp.s_weight * (self.D.T @ b)
         lo_v, hi_v = np.tile(lo, nh), np.tile(hi, nh)
         if self.U is None:
             U = np.tile(u_prev, nh)
         else:
-            U = np.r_[self.U[N:], self.U[-N:]]
+            U = np.r_[self.U[self.N:], self.U[-self.N:]]
         U = np.clip(U, lo_v, hi_v)
         y_prev = U.copy()
         z = U.copy()
@@ -82,4 +82,4 @@ class B7MPC:
         self.U = y_prev
         self.iters_used = cp.fgm_iters
         pred = c + G @ self.U
-        return self.U[:N].copy(), pred.reshape(nh, N)
+        return self.U[:self.N].copy(), pred.reshape(nh, self.N)

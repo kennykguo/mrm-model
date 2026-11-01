@@ -4,22 +4,23 @@
 import numpy as np
 
 from .params import ControllerParams
-from .common import Mode, N
+from .common import Mode
 
 
 class B1Dither:
     def __init__(self, cp: ControllerParams):
+        self.N = cp.n_rings
         self.cp = cp
         self.f = np.array(cp.tone_freqs)
         self.w = 2 * np.pi * self.f
-        self.amp_ghz = np.full(N, cp.dither_nominal)     # scheduled peak detuning
-        self.cmd_amp = np.zeros(N)                       # peak command (fraction of FS)
+        self.amp_ghz = np.full(self.N, cp.dither_nominal)     # scheduled peak detuning
+        self.cmd_amp = np.zeros(self.N)                       # peak command (fraction of FS)
 
     def schedule(self, sigma_delta, modes, fixed=None):
         """Amplitude between 0.1 and 0.5 GHz from the estimator's uncertainty (proposal B1)."""
         cp = self.cp
         if fixed is not None:
-            a = np.full(N, fixed)
+            a = np.full(self.N, fixed)
         else:
             a_new = np.clip(0.3 + 0.5 * sigma_delta, cp.dither_min, cp.dither_max)
             # slow schedule: amplitude changes inside a lock-in window would smear the tone bins

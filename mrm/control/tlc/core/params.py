@@ -72,6 +72,7 @@ class PlantParams:
 
 @dataclass
 class ControllerParams:
+    n_rings: int = N_RINGS             # rings controlled; per-ring tuples here and in PlantParams must match
     ts: float = 100e-6                 # s, 10 kHz update (proposal R25)
     out_rate: float = 100e3            # S/s heater command stream (S2 >= 10 kS/s; 100 kS/s chosen to carry dither)
     decim: int = 2                     # B2 decimation 1 MS/s -> 500 kS/s
@@ -142,3 +143,16 @@ def coupling_matrix(coupling, n=N_RINGS):
             if 0 < d <= len(coupling):
                 c[i, j] = coupling[d - 1]
     return c
+
+
+PER_RING_PLANT = ("hwhm", "depth", "laser_power", "unheated_offset", "heater_eff_scale")
+PER_RING_CONTROLLER = ("tone_freqs",)
+
+
+def check_ring_count(pp, cp):
+    """Raise ValueError unless every per-ring tuple has cp.n_rings entries (mrm port: N is a parameter)."""
+    n = cp.n_rings
+    bad = [f"PlantParams.{k} ({len(getattr(pp, k))})" for k in PER_RING_PLANT if len(getattr(pp, k)) != n]
+    bad += [f"ControllerParams.{k} ({len(getattr(cp, k))})" for k in PER_RING_CONTROLLER if len(getattr(cp, k)) != n]
+    if bad:
+        raise ValueError(f"n_rings = {n}, but these per-ring parameters have another length: {', '.join(bad)}")

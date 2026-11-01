@@ -3,15 +3,16 @@
 """Reduced-order thermal model (inside B4, also used by B7)."""
 import numpy as np
 
-from .common import N
+from .params import N_RINGS
 
 
 class ThermalModel:
-    def __init__(self, ts, tau_hs, tau_x):
+    def __init__(self, ts, tau_hs, tau_x, n=N_RINGS):
+        self.N = n
         self.a_hs = np.exp(-ts / tau_hs)
         self.a_x = np.exp(-ts / tau_x)
-        self.z_hs = np.zeros(N)
-        self.z_x = np.zeros(N)
+        self.z_hs = np.zeros(self.N)
+        self.z_x = np.zeros(self.N)
         self.gf = self.ghs = None
         self.gx = None
 

@@ -4,7 +4,6 @@
 import numpy as np
 
 from .params import ControllerParams
-from .common import N
 
 
 class PIController:
@@ -12,10 +11,11 @@ class PIController:
     Used as the TLC fallback (B7) and as the baseline controller (App. C.3)."""
 
     def __init__(self, cp: ControllerParams, dc_gain):
+        self.N = cp.n_rings
         self.cp = cp
         self.g = dc_gain                     # GHz per unit u (for gain normalisation)
-        self.integ = np.zeros(N)
-        self.u = np.zeros(N)
+        self.integ = np.zeros(self.N)
+        self.u = np.zeros(self.N)
 
     def reset(self, u):
         self.integ = np.asarray(u, float).copy()

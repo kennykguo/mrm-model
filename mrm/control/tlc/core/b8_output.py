@@ -5,17 +5,17 @@ import numpy as np
 
 from .params import ControllerParams
 from .b1_dither import B1Dither
-from .common import N
 
 
 class B8Output:
     def __init__(self, cp: ControllerParams):
+        self.N = cp.n_rings
         self.cp = cp
         self.n_sub = int(round(cp.ts * cp.out_rate))
         self.dt = 1.0 / cp.out_rate
         self.slew = 0.10 / 1e-3 * self.dt          # 10 % FS per ms (R19), per output sample
-        self.last = np.zeros(N)                    # last output sample (with dither)
-        self.u_prev = np.zeros(N)                  # last command without dither
+        self.last = np.zeros(self.N)                    # last output sample (with dither)
+        self.u_prev = np.zeros(self.N)                  # last command without dither
         self.limit_hits = 0
         self.slew_hits = 0
         self.max_step = 0.0          # largest output change per sample (R19 audit)

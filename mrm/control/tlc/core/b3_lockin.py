@@ -6,11 +6,11 @@ from collections import deque
 import numpy as np
 
 from .params import ControllerParams
-from .common import N
 
 
 class B3LockIn:
     def __init__(self, cp: ControllerParams, out_delay, fs_dec):
+        self.N = cp.n_rings
         self.cp = cp
         self.nwin = int(round(cp.lockin_window * fs_dec))
         self.buf = deque(maxlen=self.nwin)
@@ -47,7 +47,7 @@ class B3LockIn:
         # project on the expected phase: wobble ~ |H| cos(w t + arg H)
         phi = np.angle(h_complex)                    # [ring, tone]
         y1_all = i1 * np.cos(phi) - q1 * np.sin(phi)
-        own = np.arange(N)
+        own = np.arange(self.N)
         y1 = y1_all[own, own]
         p2 = 2 * phi[own, own]
         y2 = i2[own, own] * np.cos(p2) - q2[own, own] * np.sin(p2)

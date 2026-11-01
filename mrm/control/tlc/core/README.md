@@ -16,3 +16,5 @@ source core on the source plant.
 | # | Change | Files | Spec 2.3 |
 |---|---|---|---|
 | 1 | Imports: `from params` / `from optics` become relative (`from .params`, `from .optics`) | all | packaging |
+| 2 | Ring count is `ControllerParams.n_rings` (default 4) instead of the module-level `N`: every block sets `self.N` in its constructor; `ThermalModel` takes `n`; `coupling_matrix` gets `n`; `cold_start(rings=None)` means every ring. `common.N` stays for the source's 4-ring default | all blocks, `controller.py`, `params.py` | 2.3-1 |
+| 3 | `params.check_ring_count`: the core refuses per-ring tuples whose length is not `n_rings` | `params.py`, `controller.py` | 2.3-1 |

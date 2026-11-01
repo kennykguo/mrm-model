@@ -5,17 +5,17 @@ import numpy as np
 from scipy.signal import firwin, lfilter, lfilter_zi
 
 from .params import ControllerParams
-from .common import N
 
 
 class B2Conditioner:
     def __init__(self, cp: ControllerParams, pd_rate):
+        self.N = cp.n_rings
         self.cp = cp
         self.h = firwin(cp.fir_taps, cp.fir_cutoff, fs=pd_rate)
         self.delay = (cp.fir_taps - 1) / 2 / pd_rate
-        self.zi = np.zeros((cp.fir_taps - 1, N))
-        self.last_valid = np.full(N, np.nan)
-        self.noise = np.full(N, 1e-3)              # running rms noise estimate (FS)
+        self.zi = np.zeros((cp.fir_taps - 1, self.N))
+        self.last_valid = np.full(self.N, np.nan)
+        self.noise = np.full(self.N, 1e-3)              # running rms noise estimate (FS)
         self.noise_gain = np.sqrt(np.sum(self.h ** 2))
         lsb = 1 / 4096
         self.lsb = lsb
@@ -26,7 +26,7 @@ class B2Conditioner:
         sat = (x >= 1 - 2 * self.lsb) | (x <= self.lsb)
         # fill gaps with last valid value so the filter state stays sane
         xf = x.copy()
-        for i in range(N):
+        for i in range(self.N):
             if missing[:, i].any():
                 fill = self.last_valid[i] if np.isfinite(self.last_valid[i]) else 0.0
                 col = xf[:, i]

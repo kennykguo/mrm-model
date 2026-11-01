@@ -4,7 +4,7 @@
 import numpy as np
 
 from .optics import drop_avg
-from .common import Mode, N
+from .common import Mode
 
 
 class SupervisorMixin:
@@ -32,7 +32,7 @@ class SupervisorMixin:
         quiet = self.cond.noise_inst < 1.25 * floor
         loud = self.cond.noise_inst > 2.0 * floor
         self.sq_count = np.where(quiet, self.sq_count + 1, 0)
-        self.unsq_count = np.where(loud, getattr(self, "unsq_count", np.zeros(N)) + 1, 0)
+        self.unsq_count = np.where(loud, getattr(self, "unsq_count", np.zeros(self.N)) + 1, 0)
         tracking = self.modes == Mode.TRACK
         on = np.where(self.squelch, self.unsq_count < 2, self.sq_count >= 2)
         self.squelch = np.where(tracking, on, False)
@@ -52,14 +52,14 @@ class SupervisorMixin:
 
     def _supervise(self, z1, y0, valid, invalid):
         cp = self.cp
-        for i in range(N):
+        for i in range(self.N):
             m = self.modes[i]
             # sensor validity -> HOLD (R21)
             if m in (Mode.TRACK, Mode.ACQUIRE, Mode.REACQUIRE) and not valid[i] and invalid[i]:
                 self.hold_from[i] = m
                 self.modes[i] = Mode.HOLD
                 # decouple the held ring so the other rings' updates cannot drag its estimate
-                self.ukf.init_ring(i, self.ukf.x[i], var=4.0, p=self.ukf.x[2 * N + i])
+                self.ukf.init_ring(i, self.ukf.x[i], var=4.0, p=self.ukf.x[2 * self.N + i])
                 self.valid_count[i] = 0
                 self.diag.alarm(self.t, i, "pd_invalid")
                 continue
@@ -68,7 +68,7 @@ class SupervisorMixin:
                 if self.valid_count[i] >= 3:
                     if self.hold_from[i] == Mode.TRACK:
                         self.modes[i] = Mode.TRACK
-                        self.ukf.init_ring(i, self.ukf.x[i], var=9.0, p=self.ukf.x[2 * N + i])
+                        self.ukf.init_ring(i, self.ukf.x[i], var=9.0, p=self.ukf.x[2 * self.N + i])
                         self.ukf.hist.clear()
                     else:
                         self.start_acquire(i)
@@ -112,7 +112,7 @@ class SupervisorMixin:
                 if self.lol_count[i] * cp.ts >= cp.lol_time:
                     self.diag.alarm(self.t, i, "loss_of_lock")
                     # decouple the lost ring so its runaway estimate cannot leak into its neighbours
-                    self.ukf.init_ring(i, self.sp.targets[i], var=100.0, p=self.ukf.x[2 * N + i])
+                    self.ukf.init_ring(i, self.sp.targets[i], var=100.0, p=self.ukf.x[2 * self.N + i])
                     back = cp.reacquire_backoff / self.cal.dc_gain_open()[i]
                     self.acq[i] = dict(phase="back", u_floor=max(self.u_cmd[i] - back, 0.0))
                     self.modes[i] = Mode.REACQUIRE

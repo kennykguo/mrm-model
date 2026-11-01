@@ -6,7 +6,6 @@ import numpy as np
 from .optics import er_db, oma_dbm
 from .params import ControllerParams
 from .b10_calibration import B10Calibration
-from .common import N
 
 
 class B6Setpoints:
@@ -14,6 +13,7 @@ class B6Setpoints:
     W-OP to balance OMA across channels using an offline map (proposal B6)."""
 
     def __init__(self, cal: B10Calibration, cp: ControllerParams):
+        self.N = cp.n_rings
         self.base = cal.targets_raw.copy()
         grid = np.linspace(-cp.oma_shift_max, cp.oma_shift_max, 81)
         oma = np.array([[oma_dbm(b + s, h, d, cal.mod, p) for s in grid]
@@ -26,7 +26,7 @@ class B6Setpoints:
         best = None
         for target in np.linspace(np.nanmin(oma_masked), np.nanmax(oma_masked), 200):
             idx = np.nanargmin(np.abs(oma_masked - target), axis=1)
-            vals = oma[np.arange(N), idx]
+            vals = oma[np.arange(self.N), idx]
             spread = vals.max() - vals.min()
             cost = spread + 0.02 * np.abs(grid[idx]).sum()
             if best is None or cost < best[0]:

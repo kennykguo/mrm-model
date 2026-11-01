@@ -7,7 +7,6 @@ import numpy as np
 
 from .optics import lockin_ratios, drop_avg
 from .params import ControllerParams
-from .common import N
 
 
 class B4UKF:
@@ -28,21 +27,22 @@ class B4UKF:
     """
 
     def __init__(self, cp: ControllerParams, hwhm, mod, p_nominal):
+        self.N = cp.n_rings
         self.cp = cp
         self.hwhm = np.asarray(hwhm)
         self.mod = mod
-        self.nx = 3 * N
+        self.nx = 3 * self.N
         self.x = np.zeros(self.nx)
-        self.x[2 * N:] = p_nominal
-        self.P = np.diag(np.r_[np.full(N, 25.0), np.full(N, 1e4), (0.03 * np.asarray(p_nominal)) ** 2])
-        e = np.ones(N) / 2
-        g1 = np.linspace(-1, 1, N); g1 /= np.linalg.norm(g1)
+        self.x[2 * self.N:] = p_nominal
+        self.P = np.diag(np.r_[np.full(self.N, 25.0), np.full(self.N, 1e4), (0.03 * np.asarray(p_nominal)) ** 2])
+        e = np.ones(self.N) / 2
+        g1 = np.linspace(-1, 1, self.N); g1 /= np.linalg.norm(g1)
         g2 = g1 ** 2; g2 -= g2.mean(); g2 /= np.linalg.norm(g2)
-        self.Qr_base = ((cp.ukf_q_rate_common ** 2) * np.outer(e, e) * 4 / N
+        self.Qr_base = ((cp.ukf_q_rate_common ** 2) * np.outer(e, e) * 4 / self.N
                         + (cp.ukf_q_rate_grad ** 2) * (np.outer(g1, g1) + np.outer(g2, g2))
-                        + (cp.ukf_q_rate_local ** 2) * np.eye(N))
-        self.qm = np.ones(N)            # per-ring adaptive multiplier of the drift-rate noise
-        self.gated = np.zeros(N, int)   # consecutive DC samples rejected by the innovation gate
+                        + (cp.ukf_q_rate_local ** 2) * np.eye(self.N))
+        self.qm = np.ones(self.N)            # per-ring adaptive multiplier of the drift-rate noise
+        self.gated = np.zeros(self.N, int)   # consecutive DC samples rejected by the innovation gate
         self.ts = cp.ts
         n = self.nx
         alpha, beta, kappa = 0.5, 2.0, 0.0
@@ -52,19 +52,19 @@ class B4UKF:
         self.wc = self.wm.copy()
         self.wm[0] = lam / self.c
         self.wc[0] = lam / self.c + (1 - alpha ** 2 + beta)
-        self.nis = np.zeros(N)
-        self.nis_dc = np.zeros(N)
+        self.nis = np.zeros(self.N)
+        self.nis_dc = np.zeros(self.N)
         self.hist = deque(maxlen=int(round(cp.lockin_window / cp.ts)))
 
     def init_ring(self, i, delta, var=9.0, p=None):
-        for s in (i, N + i):
+        for s in (i, self.N + i):
             self.P[s, :] = 0; self.P[:, s] = 0
         self.x[i] = delta
-        self.x[N + i] = 0.0
+        self.x[self.N + i] = 0.0
         self.P[i, i] = var
-        self.P[N + i, N + i] = 1e4
+        self.P[self.N + i, self.N + i] = 1e4
         if p is not None:
-            s = 2 * N + i
+            s = 2 * self.N + i
             self.P[s, :] = 0; self.P[:, s] = 0
             self.x[s] = p
             self.P[s, s] = (0.03 * p) ** 2
@@ -72,14 +72,14 @@ class B4UKF:
     def predict(self, dh):
         ts = self.ts
         F = np.eye(self.nx)
-        F[:N, N:2 * N] = ts * np.eye(N)
+        F[:self.N, self.N:2 * self.N] = ts * np.eye(self.N)
         self.x = F @ self.x
-        self.x[:N] += dh
+        self.x[:self.N] += dh
         Q = np.zeros((self.nx, self.nx))
-        Q[:N, :N] = np.eye(N) * self.cp.ukf_q_delta ** 2
+        Q[:self.N, :self.N] = np.eye(self.N) * self.cp.ukf_q_delta ** 2
         dq = np.sqrt(self.qm)
-        Q[N:2 * N, N:2 * N] = self.Qr_base * np.outer(dq, dq)
-        Q[2 * N:, 2 * N:] = np.diag((self.cp.ukf_q_p * self.x[2 * N:]) ** 2)
+        Q[self.N:2 * self.N, self.N:2 * self.N] = self.Qr_base * np.outer(dq, dq)
+        Q[2 * self.N:, 2 * self.N:] = np.diag((self.cp.ukf_q_p * self.x[2 * self.N:]) ** 2)
         self.P = F @ self.P @ F.T + Q
         self.P = 0.5 * (self.P + self.P.T)
 
@@ -103,7 +103,7 @@ class B4UKF:
         if len(il) == 0 and len(idc) == 0:
             return
         X = self._sigma()
-        D, PS = X[:, :N], X[:, 2 * N:]
+        D, PS = X[:, :self.N], X[:, 2 * self.N:]
         mods = np.where(m["squelch"], 0.0, self.mod)
         cols = []
         if len(il):
@@ -131,13 +131,13 @@ class B4UKF:
         # the shared state, while a genuine fast disturbance still gets through (and raises qm)
         nl = len(il)
         big = nis_all > self.cp.ukf_gate
-        gd = np.zeros(N, bool)
+        gd = np.zeros(self.N, bool)
         gd[idc[big[nl:]]] = True
         self.gated = np.where(gd, self.gated + 1, np.where(m["ok_dc"], 0, self.gated))
-        nisd = np.zeros(N)
+        nisd = np.zeros(self.N)
         nisd[idc] = nis_all[nl:]
         self.nis_dc = np.where(m["ok_dc"], 0.7 * self.nis_dc + 0.3 * np.minimum(nisd, 4 * self.cp.ukf_gate), self.nis_dc)
-        nis = np.zeros(N)
+        nis = np.zeros(self.N)
         nis[il] = nis_all[:nl]
         self.nis = np.where(m["ok_lock"], 0.9 * self.nis + 0.1 * np.minimum(nis, 50), self.nis)
         # adaptive drift-rate noise per ring: persistent large DC innovations -> faster disturbance
@@ -150,7 +150,7 @@ class B4UKF:
         K = np.linalg.solve(Pzz, Pxz.T).T
         # an outlying ring may only correct its own states, never its neighbours'
         rows_ring = np.r_[il, idc]
-        state_ring = np.tile(np.arange(N), 3)
+        state_ring = np.tile(np.arange(self.N), 3)
         for j in np.where(big)[0]:
             K[state_ring != rows_ring[j], j] = 0.0
         self.x = self.x + K @ (z - zm)
@@ -163,20 +163,20 @@ class B4UKF:
         return float(self.qm.max())
 
     def remember(self):
-        self.hist.append(self.x[:N].copy())
+        self.hist.append(self.x[:self.N].copy())
 
     @property
     def delta(self):
-        return self.x[:N]
+        return self.x[:self.N]
 
     @property
     def rate(self):
-        return self.x[N:2 * N]
+        return self.x[self.N:2 * self.N]
 
     @property
     def pscale(self):
-        return self.x[2 * N:]
+        return self.x[2 * self.N:]
 
     @property
     def sigma(self):
-        return np.sqrt(np.maximum(np.diag(self.P)[:N], 0))
+        return np.sqrt(np.maximum(np.diag(self.P)[:self.N], 0))

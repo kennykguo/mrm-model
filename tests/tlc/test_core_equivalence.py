@@ -13,14 +13,19 @@ import numpy as np
 import pytest
 
 import mrm.control.tlc.core as vendored
+from mrm.control.tlc.core import params as vparams
 
 T_S = 0.05
 SIGNALS = ("delta", "delta_hat", "u", "mode", "heater_w", "sigma", "amp", "rate_hat", "eff")
 
 
 def _run(sim, core_cls, **kw):
+    """sim.run with ``core_cls`` as the TLC; the vendored core also gets the vendored parameter classes (same
+    values as the source's, plus the injected fields of spec 2.3)."""
     orig = sim.TLC
     sim.TLC = core_cls
+    if core_cls is vendored.TLC:
+        kw = dict(kw, pp=vparams.PlantParams(), cp=vparams.ControllerParams())
     try:
         return sim.run("tlc", **kw)
     finally:

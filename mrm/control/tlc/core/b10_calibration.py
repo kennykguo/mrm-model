@@ -5,7 +5,6 @@ import numpy as np
 
 from .optics import drop_avg, inflection
 from .params import ControllerParams, PlantParams, coupling_matrix
-from .common import N
 
 
 class B10Calibration:
@@ -19,6 +18,7 @@ class B10Calibration:
     """
 
     def __init__(self, pp: PlantParams, cp: ControllerParams):
+        self.N = cp.n_rings
         self.pp, self.cp = pp, cp
         self.kappa = pp.kappa
         self.hwhm = np.array(pp.hwhm)
@@ -26,12 +26,12 @@ class B10Calibration:
         self.p_laser = np.array(pp.laser_power)
         self.mod = pp.mod_shift
         self.unheated = np.array(pp.unheated_offset, float)
-        self.cnom = coupling_matrix(pp.coupling)
-        self.eff = np.ones(N)          # learned heater efficiency scale
+        self.cnom = coupling_matrix(pp.coupling, n=self.N)
+        self.eff = np.ones(self.N)          # learned heater efficiency scale
         self.cpl = 1.0                 # learned coupling scale
         # RLS states
-        self._eff_P = np.full(N, 0.01)
-        self._eff_x = np.ones(N)
+        self._eff_P = np.full(self.N, 0.01)
+        self._eff_x = np.ones(self.N)
         self._c_num = 0.0
         self._c_den = 0.0
         self.version = 0
@@ -71,7 +71,7 @@ class B10Calibration:
     def dither_response(self, targets, tones, delay):
         """Complex response H[i, j] of ring i's detuning to heater j's tone j (GHz per unit u)."""
         pp = self.pp
-        h = np.zeros((N, N), complex)
+        h = np.zeros((self.N, self.N), complex)
         for j, f in enumerate(tones):
             w = 2 * np.pi * f
             sh = self.self_heating_factor(targets, w)
@@ -79,7 +79,7 @@ class B10Calibration:
             own = self.kappa * pp.p_heater_max * self.eff[j] * (pp.r_hf / (1 + 1j * w * pp.tau_hf)
                                                                + pp.r_hs / (1 + 1j * w * pp.tau_hs))
             h[j, j] = own * sh[j] * dly
-            for i in range(N):
+            for i in range(self.N):
                 if i != j:
                     h[i, j] = (self.kappa * pp.p_heater_max * (pp.r_hf + pp.r_hs) * self.cpl * self.cnom[i, j]
                                * self.eff[j] / (1 + 1j * w * pp.tau_x)) * sh[i] * dly
@@ -89,7 +89,7 @@ class B10Calibration:
     def rls_efficiency(self, theta_obs, ok):
         """Scalar RLS (random-constant model with forgetting) on the UKF's dither-gain estimate."""
         lam = self.cp.rls_lambda
-        for i in range(N):
+        for i in range(self.N):
             if not ok[i]:
                 continue
             target = self.eff[i] * theta_obs[i]        # theta is relative to the current model
