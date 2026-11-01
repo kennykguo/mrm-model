@@ -1,0 +1,22 @@
+# TLC scenario matrix, EXTENSION (spec 6, Q9): ECE496 PD missing (R21). mrm has no monitor-fault scenario, so the
+# fault is injected at the controller boundary (tlc params pd_fault_*): ring 1's monitor samples are missing (NaN,
+# the source's PDFault kind 1) from 20 to 70 ms; the plant is untouched. Source: 100 ms from 50 ms, shortened.
+# TLC and tlc_pi only (the parameter belongs to the TLC adapter).
+extends: g26
+meta: {name: tlc_ext_pd_fault, kind: experiment, description: "EXTENSION ring 1 PD missing 20-70 ms"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful, pd_fault_ring: 1, pd_fault_t0_s: 0.02, pd_fault_dur_s: 0.05,
+                                 pd_fault_kind: 1}}
+scenario: {name: static}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.1
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

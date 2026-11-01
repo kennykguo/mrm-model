@@ -219,3 +219,27 @@ def test_forced_fault_switches_the_faithful_core_to_its_fallback(nominal_spec):
     _run_edges(ctrl, nominal_spec, 41, np.full((B, nominal_spec.n_rings), 34500))
     assert all(c.ctl.fault for c in ctrl.cores)
     assert np.all(ctrl.telemetry()["fault"])
+
+
+@pytest.mark.parametrize("kind,check", [(1, np.isnan), (2, lambda x: x == 0.31), (3, lambda x: x > 0.9999)])
+def test_pd_fault_extension_replaces_one_rings_samples_in_its_window(spec, monkeypatch, kind, check):
+    monkeypatch.setitem(tlc_controller.CORES, "recording", RecordingCore)
+    seen = []
+    orig = RecordingCore.step
+    monkeypatch.setattr(RecordingCore, "step", lambda self, pd, t: (seen.append(pd.copy()), orig(self, pd, t))[1])
+    t0 = spec.phase_ticks * spec.tick_s
+    ctrl = TlcController(core="recording", pd_fault_ring=2, pd_fault_t0_s=t0 + 10.5 * spec.period_s,
+                         pd_fault_dur_s=10 * spec.period_s, pd_fault_kind=kind)        # edges 11-20
+    ctrl.reset(spec)
+    _run_edges(ctrl, spec, 31, np.zeros((B, spec.n_rings), dtype=np.int64))
+    blocks = seen[::B]                         # blocks of edges 1-10, 11-20, 21-30 (world 0)
+    assert not check(blocks[0][:, 2]).any() and not check(blocks[2][:, 2]).any()
+    assert check(blocks[1][:, 2]).all()
+    assert not np.isnan(np.delete(blocks[1], 2, axis=1)).any()
+
+
+def test_pd_fault_parameters_are_validated(spec):
+    with pytest.raises(ValueError):
+        TlcController(pd_fault_ring=8).reset(spec)
+    with pytest.raises(ValueError):
+        TlcController(pd_fault_ring=1, pd_fault_kind=7).reset(spec)

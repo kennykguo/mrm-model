@@ -39,6 +39,7 @@ CORES = {
     "faithful_pi": _faithful("pi"),         # the source's BaselinePI (same B1/B2/B3/B8, PI only)
 }
 START_MODES = ("warm", "cold")
+PD_FAULT_VALUES = {1: np.nan, 2: 0.31, 3: None}     # source PDFault kinds; 3 = one LSB below full scale
 
 
 class TlcController(BaseController):
@@ -53,6 +54,12 @@ class TlcController(BaseController):
         dither_amp_u: float = 0.0           # stub only: dither amplitude in power fraction
         buffer_capacity: int = 64           # monitor samples per ring per core block (G26: 25)
         force_fault_at_s: float | None = None   # R22: force the core's PI fallback at this time (faithful core)
+        # R21 extension (spec 6, Q9): a PD fault injected at the controller boundary, as the source's PDFault:
+        # kind 1 missing (NaN), 2 stuck at 0.31 of full scale, 3 saturated. pd_fault_ring < 0: off
+        pd_fault_ring: int = -1
+        pd_fault_t0_s: float = 0.0
+        pd_fault_dur_s: float = 0.0
+        pd_fault_kind: int = 1
         latency_ticks: int = 0
 
     def reset(self, spec: ControllerSpec) -> None:
@@ -64,6 +71,8 @@ class TlcController(BaseController):
             raise ValueError(f"tlc: core_every_n_edges must be >= 1, got {p.core_every_n_edges}")
         if p.start_mode not in START_MODES:
             raise ValueError(f"tlc: start_mode must be one of {START_MODES}, got {p.start_mode!r}")
+        if p.pd_fault_ring >= 0 and (p.pd_fault_ring >= spec.n_rings or p.pd_fault_kind not in PD_FAULT_VALUES):
+            raise ValueError(f"tlc: pd_fault_ring must be < {spec.n_rings} and pd_fault_kind in {sorted(PD_FAULT_VALUES)}")
         if spec.schedule != "simultaneous":
             raise ValueError("tlc: needs controller_interface.schedule = simultaneous")
         self.latency_ticks = int(p.latency_ticks)
@@ -86,6 +95,7 @@ class TlcController(BaseController):
         samples = level_from_codes(obs["tx.monitor.samples"], spec.adc.full_scale_codes)
         if "monitor_valid" in obs.sensors:          # an invalid sample reaches the core as missing (B2: NaN)
             samples = np.where(np.asarray(obs.sensors["monitor_valid"], dtype=bool)[..., None], samples, np.nan)
+        samples = self._inject_pd_fault(samples, obs.t_s)
         self.buffer.push(samples, obs["tx.monitor.count"])
         k = self.edge % self.n_out
         if self.edge == 0:
@@ -133,6 +143,17 @@ class TlcController(BaseController):
             core.warm_start(u0[b]) if p.start_mode == "warm" else core.cold_start()
         self.plan = np.stack([np.asarray(c.first_plan(obs.t_s), dtype=np.float64).T for c in cores])
         return cores
+
+    def _inject_pd_fault(self, samples: np.ndarray, t_s: float) -> np.ndarray:
+        p = self.params
+        if p.pd_fault_ring < 0 or not p.pd_fault_t0_s <= t_s < p.pd_fault_t0_s + p.pd_fault_dur_s:
+            return samples
+        value = PD_FAULT_VALUES[p.pd_fault_kind]
+        if value is None:
+            value = 1.0 - 1.0 / self._require_spec().adc.full_scale_codes
+        out = np.array(samples, dtype=np.float64)
+        out[:, p.pd_fault_ring, :] = value
+        return out
 
     def _maybe_force_fault(self, t_s: float) -> None:
         at = self.params.force_fault_at_s

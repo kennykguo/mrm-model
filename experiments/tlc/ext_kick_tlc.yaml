@@ -1,0 +1,20 @@
+# TLC scenario matrix, EXTENSION (spec 6, Q9): ECE496 +10 K kick (R10, loss of lock and relock). The source kicks
+# ONE ring by +10 K in 20 us; mrm has no per-ring temperature input, so this is a die-wide kick on mrm's XPU
+# signal (every ring +10 K in 20 us at 10 ms; held). Approximate mapping: common rather than local. No plant change.
+extends: g26
+meta: {name: tlc_ext_kick, kind: experiment, description: "EXTENSION die-wide +10 K kick in 20 us"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: xpu_power_step, params: {t_peak_rate_s: 1.0e-5, delta_k: 10.0, t0_s: 0.01}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.1
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

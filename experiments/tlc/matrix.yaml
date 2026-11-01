@@ -12,6 +12,10 @@ experiments:
   - {path: experiments/tlc/fallback_tlc.yaml, controllers: [tlc]}   # R22 forced PI fallback
   - {path: experiments/tlc/cold_tlc.yaml, controllers: [tlc]}       # R8 cold start (TLC ACQUIRE)
   - {path: experiments/tlc/cold_wdm.yaml, controllers: [wdm_supervisor]}   # R8 comparator
+  # extensions (spec 6, Q9): ECE496 disturbances G26 lacks, labelled as such
+  - experiments/tlc/ext_common_aggressor_tlc.yaml # R3 / R4 common-mode aggressor (die-wide signal)
+  - experiments/tlc/ext_kick_tlc.yaml             # R10 +10 K kick (die-wide, not local)
+  - {path: experiments/tlc/ext_pd_fault_tlc.yaml, controllers: [tlc]}   # R21 PD missing (adapter boundary)
 controllers:                                      # spec 6, Q2
   - {name: tlc, params: {core: faithful}}
   - {name: tlc_pi, params: {}}
