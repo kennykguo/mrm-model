@@ -1,0 +1,21 @@
+# TLC scenario matrix, ECE496 cold start (R8): heaters at code 0, lasers on at t = 0, 25 degC, nominal world; the
+# faithful TLC starts in its own ACQUIRE (a heater ramp from the blue side, 2 GHz/ms). The G26 rings start ~1170 GHz
+# (~6.7 nm) blue of their lines, so the ramp crosses foreign lines first: expected discrepancy 2 (wrong-line locks).
+# A ring counts as locked when it ends within 300 pm of its own line (as acceptance B5). TLC only; the comparator
+# wdm_supervisor runs from experiments/tlc/cold_wdm.yaml.
+extends: g26
+meta: {name: tlc_cold, kind: experiment, description: "cold start, 25 degC; TLC only"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful, start_mode: cold}}
+scenario: {name: static}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
+experiment:
+  kind: run
+  duration_s: 0.8
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: cold
+  score_from_s: 0.0

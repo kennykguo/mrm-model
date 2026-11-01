@@ -9,6 +9,8 @@ experiments:
   - experiments/tlc/power_step_tlc.yaml           # R7 laser power step (D5)
   - experiments/tlc/squelch_tlc.yaml              # R12 squelch (D6)
   - {path: experiments/tlc/fallback_tlc.yaml, controllers: [tlc]}   # R22 forced PI fallback
+  - {path: experiments/tlc/cold_tlc.yaml, controllers: [tlc]}       # R8 cold start (TLC ACQUIRE)
+  - {path: experiments/tlc/cold_wdm.yaml, controllers: [wdm_supervisor]}   # R8 comparator
 controllers:                                      # spec 6, Q2
   - {name: tlc, params: {core: faithful}}
   - {name: tlc_pi, params: {}}
@@ -16,3 +18,4 @@ controllers:                                      # spec 6, Q2
   - {name: dither_lockin_c, params: {}}
   - {name: kalman_lqg_c, params: {}}
   - {name: mpc_c, params: {}}
+  - {name: wdm_supervisor, params: {}}            # cold start only (restricted entries)

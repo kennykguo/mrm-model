@@ -1,0 +1,18 @@
+# Cold-start comparator for experiments/tlc/cold_tlc.yaml: mrm's wdm_supervisor (map, assign, acquire, track) under
+# the same conditions, with the knowledge tokens it needs (acceptance B5) and a fixed assignment.
+extends: g26
+meta: {name: tlc_cold_wdm, kind: experiment, description: "cold start, 25 degC; wdm_supervisor comparator"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
+controller: {name: wdm_supervisor}
+scenario: {name: static}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
+experiment:
+  kind: run
+  duration_s: 0.8
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: cold
+  score_from_s: 0.0
