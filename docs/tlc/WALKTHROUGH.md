@@ -44,3 +44,29 @@ Once the plumbing is proven, every later phase swaps a real part in behind the s
   this is scoring, not control) and the telemetry, and writes `docs/tlc/results.md`.
 - The boundary test (`tests/tlc/test_boundaries.py`) fails if anything under `mrm/control/tlc/` imports the plant
   or the simulator, so the controller cannot cheat.
+
+## 6. The real core (Phases 2-3)
+- **Vendored, not rewritten.** `mrm/control/tlc/core/` is the ECE496 code with relative imports and one
+  structural change: the ring count is `ControllerParams.n_rings` instead of a module constant. A test runs the
+  vendored and the original core side by side on the original plant and requires every logged signal to be
+  bit-identical; another reproduces the published R1/R3/R4 numbers.
+- **Priors: how the core "knows" G26.** The core models its plant with ECE496 `PlantParams` (Lorentzian lineshape,
+  two heater poles, self-heating, crosstalk). `priors.py` fills them from the nominal G26 design that the
+  `model_nominal` token releases: the tuning slope at the lock temperature (74 pm/K → 12.9 GHz/K), a Lorentzian
+  fitted to the nominal drop curve (HWHM ≈ 32 GHz, about 1.6x ECE496's), the NRZ swing from the junction model
+  (±33 pm), the heater and self-heating residues of the thermal network split into a fast and a slow path, and the
+  crosstalk fractions. The controller never sees a sampled world.
+- **Eight tones.** The source plan has four. `tone_plan.py` encodes its collision rule (tone and 2nd harmonic
+  clear of every other tone, harmonic, intermodulation product and the 10 kHz ripple, on the 250 Hz lock-in grid);
+  the search finds the source's four-tone plan exactly, and an eight-tone plan up to 13.5 kHz.
+
+## 7. What the first measurements say (Phases 3-4)
+- **The slope channel works, the ratio channel barely does.** The lock-in's first harmonic z1 matches the source
+  model on G26 (0.87x, SNR ≈ 50), but ζ = z2/z1, the power-invariant detuning measurement the UKF leans on, spans
+  only about twice its noise: z2 scales with (dither / linewidth)², and G26's line is 1.6x wider.
+- **Steady state is real tracking error.** The faithful TLC holds 2-4 pm rms; removing its dither tones from the
+  error barely changes it.
+- **Where it breaks:** the A1 aggressor (lock lost, ~1 nm), cold start (the ACQUIRE ramp stops at the first fringe,
+  usually a foreign line), squelch. Each was predicted in the consultation brief and is now measured.
+- **Model trust matters:** under the TEC-held package corner the TLC rides through A1. Conclusions are stated per
+  corner in the report.
