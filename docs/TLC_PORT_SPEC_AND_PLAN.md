@@ -162,12 +162,19 @@ performance on G26.
 - [ ] Reproducible env: `uv venv .venv && uv pip install -e .` (Python ≥ 3.12; numba, h5py; gymnasium optional). Document it in `TEST_INFRA.md`.
 - [ ] Bring in the source per Q5.
 
-### Phase 1: walking skeleton (end to end with a stub)
-- [ ] Adapter + `@register("tlc")` with a **stub core**: hold the warm code + source-tone dither.
-- [ ] TelemetryLog sink; `tools/tlc_report.py` (mrm metrics + ECE496 per-ring stats from traces).
-- [ ] `experiments/tlc/steady_tlc.yaml`; `tools/tlc_run_all.sh` (or a `compare` YAML).
-- [ ] Contract tests: action dtype/shape/range, telemetry keys/shapes, exactly 10 samples per core step, code↔u round trip, no `mrm.plant`/`mrm.sim` imports under `mrm/control/tlc/`.
-- **Exit:** `mrm run experiments/tlc/steady_tlc.yaml` + report works. Every later phase swaps the stub for real parts.
+### Phase 1: walking skeleton (end to end with a stub) — DONE 2026-10-31
+- [x] Adapter `mrm/control/tlc/controller.py` (registry `tlc`, lazy entry in `mrm/control/registry.py`) with a **stub core** (`stub_core.py`: hold the warm code + source-tone dither).
+- [x] `units.py` (heater code ↔ power fraction, ADC level, pm per GHz from the line grid), `sample_buffer.py`, `telemetry_log.py`.
+- [x] `tools/tlc_run.py` (runs an experiment, saves `tlc_telemetry.npz` into the run dir), `tools/tlc_report.py` (mrm metrics + ECE496 per-ring stats → `docs/tlc/results.md` + JSON), `tools/tlc_run_all.sh`.
+- [x] `experiments/tlc/steady_tlc.yaml` (same conditions as `steady_pi_lock.yaml`, primary knowledge tier).
+- [x] Tests `tests/tlc/` (35): unit laws, sample buffer, multirate contract (core every 10th edge; each planned sample out once, in order), telemetry keys/shapes/log, boundary (no `mrm.plant`/`mrm.sim`/`mrm.validation` imports), report stats on a synthetic run, closed-loop smoke on g26 (`slow`).
+- **Exit met:** `tools/tlc_run_all.sh` runs `steady_tlc` and `steady_pi_lock` and writes the report in about 6 s (after the one-off ~2 min kernel compile).
+
+Found in Phase 1, carried forward:
+- The source tone plan has **4 tones**; G26 has 8 rings. An 8-ring collision-free plan is needed before dither runs on G26 (Phase 3; the stub refuses dither on more rings than tones).
+- The source `warm_start(u0, delta_true)` reads the **true detuning**. On G26 the initial δ must come from priors or a short estimate (Phase 3).
+- `monitor_valid` / `adc_overrange` are not yet handed to the core (Phase 2, with B2's validity logic).
+- The report's p99.9 / peak / rms come from the 10 µs-mean detuning trace; mrm's own columns are per tick.
 
 ### Phase 2: faithful core + fidelity check on the source plant
 - [ ] Port the core (deviations 2.3-1, 2.3-2 only).

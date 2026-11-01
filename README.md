@@ -4,7 +4,8 @@
 > into mrm-model, so it can run closed loop on the 8-ring G26 plant and produce performance and locking
 > metrics for the ECE496 project.
 >
-> **Status: Phase 1 (walking skeleton) in progress. Decisions Q1–Q12 are settled in spec §6.**
+> **Status: Phase 1 (walking skeleton) done; Phase 2 (faithful core) next. Decisions Q1–Q12 are settled in spec §6.**
+> ▶ Try it: `tools/tlc_run_all.sh` → [`docs/tlc/results.md`](docs/tlc/results.md) · How it works: [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md)
 > 📄 Spec & plan: [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) · 📋 Tracker: [`PLAN.md`](PLAN.md)
 
 ## Goal of this branch
@@ -36,6 +37,11 @@
 - Full evidence: [`docs/tlc/REV1_REVIEW.md`](docs/tlc/REV1_REVIEW.md)
 - [ ] The rev 1 spec used a non-existent `obs["tx.monitor"]`, the wrong default rate (G26 is 100 kHz), and the wrong telemetry keys
 
+### Found while building Phase 1
+- [ ] The source tone plan has 4 tones; G26 has 8 rings, so an 8-ring collision-free tone plan is needed (Phase 3)
+- [ ] The source `warm_start(u0, delta_true)` reads the true detuning; on G26 the initial estimate must come from priors (Phase 3)
+- [ ] `monitor_valid` / `adc_overrange` are not yet passed to the core (Phase 2)
+
 ### G26 facts the port must handle
 - [ ] Heater is a 16-bit **voltage** DAC (power ∝ code²); the TLC assumes a power fraction, so the adapter converts
 - [ ] Controller `step()` runs every 10 µs with ~2–3 ADC samples per call; the TLC core expects 100 µs blocks, so the adapter runs it multirate
@@ -49,15 +55,15 @@
 
 ### Housekeeping
 - [ ] **Upstream main is broken from `84de49b` (optics revamp) on:** `mrm.sim.kernel` still uses ~60 names that `mrm.plant.optics` no longer defines, so `mrm run` fails. This branch merges main only up to `ca3f8fe`, the last working commit; report it upstream and merge again once main is fixed
-- [ ] No `.venv` yet: create it per the Install section below (`python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`)
+- [x] `.venv` created (uv, Python 3.13) per the Install section below (`python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]'`)
 - [ ] `tests/verification` needs `gymnasium` (4 gym test files fail to collect without it); main later moves them to `archive/rl`
-- [ ] First `mrm run` takes ~2 min for numba compilation (cached afterwards)
+- [ ] First `mrm run` takes ~2 min for numba compilation (cached afterwards; later runs ~1-2 s)
 
 ## Plan at a glance
 | Phase | Outcome |
 |---|---|
-| 0 | Decisions above, env, rev 1 archived, source brought in |
-| 1 | **Walking skeleton:** `mrm run experiments/tlc/steady_tlc.yaml` works end to end with a stub TLC, and a report is generated |
+| 0 ✅ | Decisions above, env, rev 1 archived, source brought in |
+| 1 ✅ | **Walking skeleton:** `mrm run experiments/tlc/steady_tlc.yaml` works end to end with a stub TLC, and a report is generated |
 | 2 | Faithful TLC core; it reproduces ECE496's own results on the ECE496 plant |
 | 3 | TLC core on G26 (priors, open-loop lock-in diagnostic, warm closed loop) |
 | 4 | Full scenario matrix: ECE496 D1–D6 / R-reqs mapped to mrm scenarios |

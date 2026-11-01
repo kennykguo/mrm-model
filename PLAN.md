@@ -6,9 +6,9 @@
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Answer spec §6 questions, archive rev 1 code, reproducible env, bring in the source | decisions DONE (spec §6); rest IN PROGRESS |
-| 1 | Walking skeleton: adapter + stub core + telemetry log + report + `steady_tlc.yaml` | IN PROGRESS |
-| 2 | Faithful core port + fidelity check on the ECE496 plant | OPEN |
+| 0 | Answer spec §6 questions, archive rev 1 code, reproducible env, bring in the source | DONE except bringing in the source (Phase 2) |
+| 1 | Walking skeleton: adapter + stub core + telemetry log + report + `steady_tlc.yaml` | **DONE** (`tools/tlc_run_all.sh`) |
+| 2 | Faithful core port + fidelity check on the ECE496 plant | NEXT |
 | 3 | Core on G26: priors, open-loop lock-in diagnostic, warm closed loop | OPEN |
 | 4 | Scenario matrix (ECE496 D1–D6 / R-reqs → mrm scenarios) | OPEN |
 | 5 | Results report + README status | OPEN |
