@@ -129,25 +129,29 @@ misbehave on G26 (§1). The report records how, and redesigning them is follow-u
 ---
 
 ## 3. Scenario matrix (ECE496 → mrm)
-| ECE496 scenario | Req | mrm scenario | Mapping |
-|---|---|---|---|
-| steady | R1 | `static`, warm (as in `steady_pi_lock.yaml`) | ✅ direct |
-| D1 slow ramp, 10 K/s | R2 | `xpu_power_step` (10–120 K/s) | ✅ close |
-| D2 common aggressor | R3, R4 | none common-mode; `aggressor_direct` with a far/central site? | ⚠️ Q9 |
-| D2 local | R3, R6 | `a1` (ring 0 victim), `a2` | ✅ (ring 0 heater-limited, KNOWN_ISSUES #38) |
-| D3 + D2, 1.5× | R11 | `a1` + uncertainty corners | ⚠️ approximate |
-| D4 laser offset / drift | R5 | `laser_drift`, `laser_sweep_emulation` | ✅ |
-| D5 laser power ±2.5 % / ±3 dB | R7 | `fibre_loss_step(delta_db=…)` (power into the rings) | ✅ close |
-| D6 squelch, all / one ring | R12 | `squelch` / `b1` (`rings=` param) | ✅ (detector expected blind, §2.3) |
-| cold start | R8 | `cold_start` / `b5` | ✅ (wrong-line expected, §1) |
-| random cold-start campaign | R9 | `mc` of `b5` worlds | ✅ |
-| restart one ring | R8 | `line_enable` off→on | ⚠️ restarts the laser, not the controller |
-| +10 K kick, loss of lock | R10 | none | ❌ Q9 |
-| PD missing 100 ms | R21 | none (no monitor-fault scenario) | ❌ Q9 |
-| forced PI fallback | R22 | controller param `force_fault_at_s` | ✅ (controller-side) |
-| B10 learning (eff ±15 %, coupling ±20 %) | O5 | robust named corners / LHS worlds | ✅ (truth for scoring from `truth_final`) |
+Implemented in `experiments/tlc/matrix.yaml`, run by `tools/tlc_matrix.py` (status 2026-10-31).
 
-Comparators on G26: `tlc`, `tlc_pi`, `pi_lock_c`, `kalman_lqg_c`, `mpc_c`, `dither_lockin_c` (Q2).
+| ECE496 scenario | Req | Experiment (`experiments/tlc/`) | mrm scenario | Mapping |
+|---|---|---|---|---|
+| steady | R1 | `steady_tlc_faithful.yaml` | `static`, warm | ✅ direct |
+| D1 die-temperature ramp | R2 | `xpu_step_tlc.yaml` | `xpu_power_step`, 120 K/s | ✅ close |
+| D2 local aggressor | R3, R6 | `a1_tlc.yaml` | `a1`, one period (ring 0 heater-limited, KNOWN_ISSUES #38) | ✅ |
+| D4 laser drift | R5 | `laser_drift_tlc.yaml` | `laser_drift`, 24 h limit in 0.2 s (wavelength only) | ✅ close |
+| D5 laser power step | R7 | `power_step_tlc.yaml` | `fibre_loss_step`, +3 dB | ✅ close |
+| D6 squelch, all rings | R12 | `squelch_tlc.yaml` | `squelch` 10-30 ms | ✅ |
+| cold start | R8 | `cold_tlc.yaml` / `cold_wdm.yaml` | `static`, start cold | ✅ |
+| random cold-start campaign | R9 | `cold_campaign_tlc.yaml` / `_wdm.yaml` | `cold_start`, ambient 0-105 °C, 8 trials (300 planned) | ✅ |
+| forced PI fallback | R22 | `fallback_tlc.yaml` | `static` + `force_fault_at_s` | ✅ (controller side) |
+| D2 common aggressor | R3, R4 | `ext_common_aggressor_tlc.yaml` | die-wide `xpu_power_step`, +3 K at 2200 K/s | 🧩 extension |
+| +10 K kick, loss of lock | R10 | `ext_kick_tlc.yaml` | die-wide `xpu_power_step`, +10 K in 20 µs | 🧩 extension (common, not local) |
+| PD missing | R21 | `ext_pd_fault_tlc.yaml` | `static` + adapter `pd_fault_*` | 🧩 extension (controller boundary) |
+| D3 + D2, 1.5× | R11 | — | `a1` + corners | ⚠️ not yet |
+| restart one ring | R8 | — | `line_enable` restarts the laser, not the controller | ❌ not mapped |
+| B10 learning (eff ±15 %, coupling ±20 %) | O5 | — | sampled worlds | ⚠️ not yet |
+
+Comparators: `tlc`, `tlc_pi`, `pi_lock_c`, `dither_lockin_c`, `kalman_lqg_c`, `mpc_c` on every plain experiment;
+`wdm_supervisor` on cold start only. Model-trust corners (`corners` section): fast, slow and textbook thermal and
+the TEC-held package (crosstalk) for steady state and A1, with `tlc` and `pi_lock_c`.
 
 ---
 
@@ -195,10 +199,20 @@ Findings of Phase 3 (each is measured, none is fixed):
 - The 8-ring tone plan tops out at 13.5 kHz (source 4.5 kHz): 3x the heater slew per unit dither amplitude.
 - B2 hardcodes a 12-bit LSB (1/4096) for its saturation margin; harmless on the 16-bit G26 ADC (it only flags samples within 0.05 % of full scale).
 
-### Phase 4: scenario matrix
-- [ ] One YAML per mapped row of §3 under `experiments/tlc/`, with comparators.
-- [ ] Gap scenarios per Q9.
-- [ ] Runtime budget check (Python core ~3 ms per 100 µs step; Q10).
+### Phase 4: scenario matrix — framework DONE 2026-10-31 (rows still open below)
+- [x] One YAML per mapped row of §3 under `experiments/tlc/`; `matrix.yaml` + `tools/tlc_matrix.py` run every row with its comparators.
+- [x] Extensions for the rows G26 lacks (Q9), labelled `ext_*`; no plant change.
+- [x] Report: overview table, dither-removed tracking error (`track_*`, Q8), Monte Carlo rates with Clopper-Pearson intervals (Q10), corner runs named `experiment@corner` (Q7).
+- [ ] Open rows: R11 (D3 + D2), O5 (B10 learning), the 300-trial cold-start campaign (`--set experiment.batch=300`, ≈ 2 h for the TLC arm here).
+- Runtime: full matrix ≈ 10 min on this machine (8-trial campaign included).
+
+Findings of Phase 4 (first pass, nominal world unless stated):
+- **A1:** the faithful TLC loses lock (rings leave by ~1 nm) where `pi_lock_c`, `kalman_lqg_c` and `mpc_c` hold rings 1-7 within ~15 pm. Under the TEC-held package corner it rides through (8.3 pm on rings 1-7): the A1 verdict depends on the package model.
+- **Cold start:** the TLC's ACQUIRE locks on the first fringe it meets; 41 of 64 ring trials end on a wrong line [0.51, 0.76] and none on its own line, against 1/64 for `wdm_supervisor` (expected discrepancy 2, confirmed).
+- **Squelch:** the TLC leaves its points (33 pm peak; expected discrepancy 1).
+- **+3 dB power step:** every controller unlocks; the step is 3x mrm's 3-sigma re-mate change.
+- **Dither:** removing the TLC's tones barely changes its error (steady 9.1 → 7.4 pm peak): the error is tracking error, not dither (expected discrepancy 3 refuted).
+- Note: the source's "0 of 40" campaign bounds the wrong-line rate below 8.8 % (two-sided 95 % Clopper-Pearson), not 7.5 % (the one-sided rule of three).
 
 ### Phase 5: report
 - [ ] `docs/tlc/results.md`: R-table, the ECE496-vs-G26 side by side, the scorecard rows, and known failure explanations.

@@ -4,7 +4,7 @@
 > into mrm-model, so it can run closed loop on the 8-ring G26 plant and produce performance and locking
 > metrics for the ECE496 project.
 >
-> **Status: Phases 0-3 done: the faithful ECE496 TLC runs closed loop on G26 (steady state). Phase 4 (scenario matrix) next. Decisions Q1–Q12 are settled in spec §6.**
+> **Status: Phases 0-4 framework done: one command runs the faithful ECE496 TLC and six comparators through 15 experiments, a Monte Carlo campaign and four model-trust corners on G26. Phase 5 (write-up) next. Decisions Q1–Q12 are settled in spec §6.**
 > ▶ Try it: `tools/tlc_run_all.sh` → [`docs/tlc/results.md`](docs/tlc/results.md) · How it works: [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md)
 > 📄 Spec & plan: [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) · 📋 Tracker: [`PLAN.md`](PLAN.md)
 
@@ -43,7 +43,10 @@
 - [x] Invalid monitor samples reach the core as missing (NaN)
 - [ ] **Owner to confirm:** G26 cannot meet the source's R13 ER floor (2.8-3.0 dB vs 3.5 dB at the inflection), so B6 has no setpoint; the G26 priors drop the floor to 0 dB (the only parameter change to the primary arm)
 - [ ] ζ = z2/z1 is weak on G26 (span ≈ 2x its noise; [`docs/tlc/lockin_diag.md`](docs/tlc/lockin_diag.md)), so the UKF leans on the DC channel
-- [ ] Faithful `tlc` steady state: 1.6-4.0 pm rms including its 1.7-2.9 pm dither; rings 0-1 exceed 5 pm. `tlc_pi`: 7-10 pm rms
+- [ ] Faithful `tlc` steady state: 1.6-4.0 pm rms; removing its dither barely changes that (tracking error, not dither). `tlc_pi`: 7-10 pm rms
+- [ ] A1: the TLC loses lock (~1 nm) where `pi_lock_c` / `kalman_lqg_c` / `mpc_c` hold rings 1-7 within ~15 pm; under the TEC-held package corner it holds (8.3 pm)
+- [ ] Cold start: TLC ACQUIRE ends on a wrong line in 41/64 ring trials [0.51, 0.76] vs 1/64 for `wdm_supervisor`
+- [ ] Open matrix rows: R11 (D3 + D2), O5 (B10 learning), the 300-trial campaign
 - [ ] Upstream at `ca3f8fe`, some `tests/verification/test_ctrl_c_*` fail with or without this branch (stale `mrm.plant.optics` names)
 
 ### G26 facts the port must handle
@@ -70,7 +73,7 @@
 | 1 ✅ | **Walking skeleton:** `mrm run experiments/tlc/steady_tlc.yaml` works end to end with a stub TLC, and a report is generated |
 | 2 ✅ | Faithful TLC core; it reproduces ECE496's own results on the ECE496 plant |
 | 3 ✅ | TLC core on G26 (priors, open-loop lock-in diagnostic, warm closed loop) |
-| 4 | Full scenario matrix: ECE496 D1–D6 / R-reqs mapped to mrm scenarios |
+| 4 ✅ | Full scenario matrix: ECE496 D1–D6 / R-reqs mapped to mrm scenarios |
 | 5 | `docs/tlc/results.md`: R-table, ECE496-plant vs G26 side by side, scorecard rows |
 
 ---

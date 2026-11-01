@@ -1,22 +1,9 @@
 #!/usr/bin/env bash
-# Run the TLC experiment set and its comparators, then write the report (docs/TLC_PORT_SPEC_AND_PLAN.md 4).
-#   tools/tlc_run_all.sh [--out docs/tlc/results.md]
-# Steady state: tlc (faithful core), tlc_pi (its BaselinePI), pi_lock_c, and the stub-core skeleton check.
+# One command for the whole TLC evaluation (docs/TLC_PORT_SPEC_AND_PLAN.md 0): the scenario matrix of
+# experiments/tlc/matrix.yaml (every experiment x controller, Monte Carlo campaign, model-trust corners), then the
+# report docs/tlc/results.md (+ .json). About 10 min on a laptop after the one-off kernel compile.
+#   tools/tlc_run_all.sh [extra tools/tlc_matrix.py arguments, e.g. --only tlc,pi_lock_c --no-corners]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python
-OUT=${2:-docs/tlc/results.md}
-
-EXPERIMENTS=(
-  experiments/tlc/steady_tlc_faithful.yaml
-  experiments/tlc/steady_tlc_pi.yaml
-  experiments/examples/steady_pi_lock.yaml
-  experiments/tlc/steady_tlc.yaml
-)
-
-RUNS=()
-for exp in "${EXPERIMENTS[@]}"; do
-  echo "== $exp" >&2
-  RUNS+=("$($PY tools/memguard.py -- $PY tools/tlc_run.py "$exp" | tail -n 1)")
-done
-$PY tools/tlc_report.py "${RUNS[@]}" --out "$OUT"
+exec $PY tools/memguard.py -- $PY tools/tlc_matrix.py experiments/tlc/matrix.yaml "$@"
