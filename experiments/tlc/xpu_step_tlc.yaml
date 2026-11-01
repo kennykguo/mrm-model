@@ -1,0 +1,19 @@
+# TLC scenario matrix, ECE496 D1 die-temperature ramp (R2) -> mrm B3 XPU power step (raised-cosine die-wide rise,
+# 120 K/s peak rate, from 10 ms). Run every controller of the matrix with tools/tlc_matrix.py.
+extends: g26
+meta: {name: tlc_xpu_step, kind: experiment, description: "XPU power step 120 K/s; TLC matrix"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: xpu_power_step, params: {t0_s: 0.01}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.1
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

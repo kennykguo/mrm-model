@@ -17,7 +17,7 @@ from mrm.control.tlc.controller import TlcController
 from mrm.sim import experiment as E
 
 
-def run_with_telemetry(path: str, runs_dir: str | None = None) -> Path:
+def run_with_telemetry(path: str, runs_dir: str | None = None, overrides: list[str] | None = None) -> Path:
     created = []
     make = E._make_controller
 
@@ -28,7 +28,7 @@ def run_with_telemetry(path: str, runs_dir: str | None = None) -> Path:
 
     E._make_controller = keep            # the experiment module builds every controller through this function
     try:
-        res = E.run(path, runs_dir=runs_dir)
+        res = E.run(path, runs_dir=runs_dir, overrides=overrides or None)
     finally:
         E._make_controller = make
     if res.run_dir is None:
@@ -44,9 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("experiments", nargs="+")
     ap.add_argument("--runs-dir", default=None)
+    ap.add_argument("--set", action="append", default=[], metavar="PATH=VALUE",
+                    help="experiment override, e.g. --set controller.name=pi_lock_c --set 'controller.params={}'")
     args = ap.parse_args(argv)
     for path in args.experiments:
-        print(run_with_telemetry(path, args.runs_dir), flush=True)
+        print(run_with_telemetry(path, args.runs_dir, args.set), flush=True)
     return 0
 
 

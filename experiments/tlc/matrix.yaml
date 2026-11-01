@@ -1,0 +1,16 @@
+# TLC scenario matrix (docs/TLC_PORT_SPEC_AND_PLAN.md 3): every experiment runs with every controller.
+# tools/tlc_matrix.py runs it and writes docs/tlc/results.md. Each experiment file names the TLC as its own
+# controller; the matrix overrides controller.name and controller.params per run.
+experiments:
+  - experiments/tlc/steady_tlc_faithful.yaml      # R1 steady state
+  - experiments/tlc/xpu_step_tlc.yaml             # R2 die-temperature ramp (D1)
+  - experiments/tlc/a1_tlc.yaml                   # R3 / R6 local aggressor (D2 local)
+  - experiments/tlc/power_step_tlc.yaml           # R7 laser power step (D5)
+  - experiments/tlc/squelch_tlc.yaml              # R12 squelch (D6)
+controllers:                                      # spec 6, Q2
+  - {name: tlc, params: {core: faithful}}
+  - {name: tlc_pi, params: {}}
+  - {name: pi_lock_c, params: {}}
+  - {name: dither_lockin_c, params: {}}
+  - {name: kalman_lqg_c, params: {}}
+  - {name: mpc_c, params: {}}

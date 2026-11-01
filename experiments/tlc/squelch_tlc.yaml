@@ -1,0 +1,20 @@
+# TLC scenario matrix, ECE496 D6 squelch of all rings (R12) -> mrm squelch from 10 to 30 ms (swing to zero, average
+# power kept). The TLC detects squelch from vanishing data-pattern noise, which the G26 monitor (NRZ-averaged) does
+# not show: expected discrepancy 1. Run every controller of the matrix with tools/tlc_matrix.py.
+extends: g26
+meta: {name: tlc_squelch, kind: experiment, description: "squelch 10-30 ms; TLC matrix"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful}}
+scenario: {name: squelch, params: {t_on_s: 0.01, t_off_s: 0.03}}
+metrics: {lock_threshold_pm: 5.0, hysteresis_pm: 1.0}
+experiment:
+  kind: run
+  duration_s: 0.06
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: warm
+  score_from_s: 0.005
+  self_reference: {duration_s: 0.02, window_s: 0.005}

@@ -107,3 +107,10 @@ def test_report_includes_the_reference_section_when_given(tmp_path):
     out = tmp_path / "results.md"
     tlc_report.main([str(_make_run(tmp_path)), "--out", str(out), "--ece496-metrics", str(ref)])
     assert "ECE496 4-ring reference" in out.read_text()
+
+
+def test_overview_row_per_run(tmp_path):
+    rows = tlc_report.overview_rows([tlc_report.summarize_run(_make_run(tmp_path))])
+    assert rows[0]["peak_err_pm_max"] == pytest.approx(3.0)
+    assert rows[0]["peak_err_pm_max_rings_1_up"] == pytest.approx(3.0)
+    assert rows[0]["rings_within_5pm"] == 2 and rows[0]["unlocked_final"] == 0

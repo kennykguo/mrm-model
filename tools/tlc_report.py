@@ -123,6 +123,30 @@ def _fmt(v) -> str:
     return str(v)
 
 
+def overview_rows(summaries: list[dict]) -> list[dict]:
+    """One row per run: the worst and typical ring numbers (ring 0 also left out: it is A1's heater-limited victim)."""
+    rows = []
+    for s in summaries:
+        r = s["rings"]
+        peak = [x["peak_err_pm"] for x in r]
+        rows.append({"experiment": s["experiment"], "controller": s["controller"],
+                     "peak_err_pm_max": max(peak), "peak_err_pm_max_rings_1_up": max(peak[1:]) if len(peak) > 1 else None,
+                     "rms_err_pm_mean": sum(x["rms_err_pm"] for x in r) / len(r),
+                     "rings_within_5pm": sum(x["within_5pm"] for x in r),
+                     "excursions": sum(int(x.get("excursion_count") or 0) for x in r),
+                     "unlocked_final": sum(not x.get("locked_final", True) for x in r),
+                     "wrong_line_final": sum(bool(x.get("wrong_line_final")) for x in r)})
+    return rows
+
+
+def _overview_markdown(rows: list[dict]) -> list[str]:
+    cols = ["experiment", "controller", "peak_err_pm_max", "peak_err_pm_max_rings_1_up", "rms_err_pm_mean",
+            "rings_within_5pm", "excursions", "unlocked_final", "wrong_line_final"]
+    out = ["## Overview", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    out += ["| " + " | ".join(_fmt(r[c]) for c in cols) + " |" for r in rows]
+    return out + [""]
+
+
 def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> str:
     cols = ["ring", "p999_err_pm", "peak_err_pm", "rms_err_pm", "peak_err_ghz", "within_5pm", "within_2ghz",
             *MRM_COLUMNS]
@@ -131,6 +155,7 @@ def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> s
            "world 0, scored from `score_from_s`. The p99.9 / peak / rms columns come from the recorded 10 us-mean "
            "detuning trace; the mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
            "Thresholds: mrm 5 pm budget, ECE496 2 GHz.", ""]
+    out += _overview_markdown(overview_rows(summaries))
     for s in summaries:
         out += [f"## {s['experiment']}: `{s['controller']}` on `{s['scenario']}`", "",
                 f"Run `{s['run']}`, {s['duration_s']} s simulated, scored from {s['score_from_s']} s.", ""]
