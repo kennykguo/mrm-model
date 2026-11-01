@@ -50,7 +50,7 @@ from mrm.control.tlc.units import pm_per_ghz
 
 PD_RATE_HZ_FALLBACK = 250e3
 FIR_CUTOFF_HZ = 60e3          # 250 kS/s: gain within 0.1 % of 1 at every G26 tone and 2nd harmonic (<= 27 kHz)
-FAST_TAU_SPLIT_S = 8e-6       # residues with tau below this go to the fast path (G26 poles: 3.2 us, 13 us, ms)
+TAIL_TAU_S = 1e-3             # poles at or above this are the package tail (G26: 4 ms), not ring paths
 FIT_SPAN_HWHM = 1.5           # lineshape fit over |delta| <= 1.5 half widths: the lock region (rms misfit 0.5 %)
 
 
@@ -181,16 +181,19 @@ def _lags(pp_nom, obs: int, src: int):
 
 
 def _paths(pp_nom, source: str, ring: int = 0) -> dict:
-    """Ring ``ring``'s own path from ``source`` (heater_src | wg_src), split into the source's fast and slow paths."""
+    """Ring ``ring``'s own path from ``source`` (heater_src | wg_src), split into the source's fast and slow paths:
+    the fastest sub-ms pole is the fast path, the other sub-ms poles the slow path; the ms package tail has no slot
+    in the source model, so its gain joins the slow path (its time constant does not)."""
     sysm = pp_nom.thermal.system
     tau, res = _lags(pp_nom, int(sysm.ring_obs[ring]), int(getattr(sysm, source)[ring]))
-    fast = tau < FAST_TAU_SPLIT_S
+    sub_ms = tau < TAIL_TAU_S
+    fast = sub_ms & np.isclose(tau, tau[sub_ms].min(), rtol=1e-9)
+    slow_core = sub_ms & ~fast
     r_f, r_s = float(res[fast].sum()), float(res[~fast].sum())
-    t_f = float(np.dot(res[fast], tau[fast]) / r_f) if r_f else 1e-6
-    slow_core = ~fast & (tau < 1e-3)                    # the slow ring pole; the ms package tail joins its gain only
-    t_s = float(np.dot(res[slow_core], tau[slow_core]) / res[slow_core].sum()) if slow_core.any() else 1e-5
+    t_f = float(np.dot(res[fast], tau[fast]) / r_f)
+    t_s = float(np.dot(res[slow_core], tau[slow_core]) / res[slow_core].sum()) if slow_core.any() else t_f
     return {"r_fast": r_f, "tau_fast": t_f, "r_slow": r_s, "tau_slow": t_s, "r_total": r_f + r_s,
-            "tail_share": float(res[tau >= 1e-3].sum() / (r_f + r_s))}
+            "tail_share": float(res[~sub_ms].sum() / (r_f + r_s))}
 
 
 def _crosstalk(pp_nom, ring: int = 0, max_distance: int = 3) -> tuple[tuple[float, ...], float]:

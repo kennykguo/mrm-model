@@ -106,3 +106,16 @@ def test_core_builds_and_steps_with_the_priors(priors):
     for k in range(5):
         seq = ctl.step(np.full((n_pd, 8), 0.7), k * priors.cp.ts)
     assert seq.shape == (10, 8) and np.all(np.isfinite(seq))
+
+
+@pytest.mark.parametrize("corner", ["g26_fast_thermal", "g26_slow_thermal", "g26_textbook_thermal"])
+def test_heater_paths_follow_the_corner_poles(corner):
+    """The fast path takes the fastest sub-ms pole and the slow path the rest, whatever the time scales."""
+    import yaml
+    from pathlib import Path
+    alts = yaml.safe_load((Path(P.__file__).parent / "presets" / f"{corner}.yaml").read_text()).get("alts", {})
+    cfg = P.load("g26", overrides=[TIER], alts=alts)
+    pr = g26_priors(ControllerSpec.from_config(cfg, n_batch=1, nominal=cfg))
+    pp_nom = M.nominal_plant_params(cfg)
+    assert pr.pp.r_hf + pr.pp.r_hs == pytest.approx(float(np.ravel(pp_nom.thermal.z_heater_ring_k_per_w)[0]))
+    assert 0 < pr.pp.tau_hf < pr.pp.tau_hs < 1e-3 and pr.pp.r_hf > 0 and pr.pp.r_hs > 0
