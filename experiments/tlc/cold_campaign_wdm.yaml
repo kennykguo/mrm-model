@@ -1,0 +1,21 @@
+# Comparator of experiments/tlc/cold_campaign_tlc.yaml: mrm's wdm_supervisor on the same worlds (same seeds), with
+# the knowledge tokens it needs and its own (cyclic) assignment, as acceptance B5 (the TLC keeps the fixed one).
+# Committed size: 8 worlds; the planned campaign is 300:
+#   .venv/bin/python tools/tlc_run.py experiments/tlc/cold_campaign_wdm.yaml --set experiment.batch=300
+extends: g26
+meta: {name: tlc_cold_campaign_wdm, kind: experiment, description: "cold-start campaign, sampled worlds; wdm_supervisor"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
+  bind: {tx.assignment: controller}     # as acceptance B5: it chooses the ring-to-line assignment (cyclic)
+controller: {name: wdm_supervisor}
+scenario: {name: cold_start}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0, allowed_assignments: cyclic}
+experiment:
+  kind: run
+  duration_s: 0.8
+  batch: 8
+  seeds: {device: 1000, uncertainty: 2000, noise: 3000, scenario: 4000}
+  uncertainty: nominal       # nominal device; the trials differ in ambient (0-105 degC) and noise
+  variation: "off"           # sampled worlds: a model-trust variant (Phase 4 corners)
+  start: cold
+  score_from_s: 0.0

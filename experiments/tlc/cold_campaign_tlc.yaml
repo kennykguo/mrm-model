@@ -1,0 +1,22 @@
+# TLC Monte Carlo campaign, ECE496 random cold-start campaign (R9; source: 40 trials, 0 wrong-channel): B trials
+# of the nominal device, ambient drawn over 0-105 degC per trial (mrm cold_start), heaters
+# at code 0; the faithful TLC acquires from its own ACQUIRE. A ring is locked when it ends within 300 pm of its own
+# line. The report gives wrong-line and unlocked rates with 95 % Clopper-Pearson intervals.
+# Committed size: 8 worlds (~5 min). The planned campaign (spec 6, Q10) is 300 worlds:
+#   .venv/bin/python tools/tlc_run.py experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300
+extends: g26
+meta: {name: tlc_cold_campaign, kind: experiment, description: "cold-start campaign, sampled worlds; TLC"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal]
+controller: {name: tlc, params: {core: faithful, start_mode: cold}}
+scenario: {name: cold_start}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
+experiment:
+  kind: run
+  duration_s: 0.8
+  batch: 8
+  seeds: {device: 1000, uncertainty: 2000, noise: 3000, scenario: 4000}
+  uncertainty: nominal       # nominal device; the trials differ in ambient (0-105 degC) and noise
+  variation: "off"           # sampled worlds: a model-trust variant (Phase 4 corners)
+  start: cold
+  score_from_s: 0.0

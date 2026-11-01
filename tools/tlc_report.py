@@ -53,6 +53,32 @@ def _telemetry_summary(path: Path) -> dict | None:
             "dither_amp_pm_max": float(np.max(np.abs(z["dither_amp_pm"]))) if z["t_s"].size else 0.0}
 
 
+def clopper_pearson(k: int, n: int, alpha: float = 0.05) -> tuple[float, float]:
+    """Exact (Clopper-Pearson) two-sided 1 - alpha interval of a binomial rate k / n (spec 6, Q10)."""
+    from scipy.stats import beta
+    lo = 0.0 if k == 0 else float(beta.ppf(alpha / 2, k, n - k + 1))
+    hi = 1.0 if k == n else float(beta.ppf(1 - alpha / 2, k + 1, n - k))
+    return lo, hi
+
+
+def campaign_rates(m: dict) -> dict | None:
+    """Rates over every world of a run with B > 1: per ring-trial and per world (any ring), with 95 % intervals."""
+    locked = np.asarray(m.get("locked_final"), dtype=object)
+    if locked.ndim != 2 or locked.shape[0] < 2:
+        return None
+    out = {"worlds": int(locked.shape[0]), "rings": int(locked.shape[1])}
+    events = {"unlocked": locked.astype(object) == False}                               # noqa: E712
+    if "wrong_line_final" in m:
+        events["wrong_line"] = np.asarray(m["wrong_line_final"], dtype=object).astype(bool)
+    for name, ev in events.items():
+        ev = np.asarray(ev, dtype=bool)
+        k_ring, n_ring = int(ev.sum()), int(ev.size)
+        k_world, n_world = int(ev.any(axis=1).sum()), int(ev.shape[0])
+        out[name] = {"ring_trials": [k_ring, n_ring, *clopper_pearson(k_ring, n_ring)],
+                     "worlds_any_ring": [k_world, n_world, *clopper_pearson(k_world, n_world)]}
+    return out
+
+
 def _cell(values, ring: int):
     """World 0, ring ``ring`` of a (B, N) metric from metrics.json; None (not defined, e.g. never locked) stays None."""
     v = np.asarray(values, dtype=object)[0, ring]
@@ -122,7 +148,7 @@ def summarize_run(run_dir: str | Path) -> dict:
     return {"run": run.name, "experiment": metrics.get("name") or run.name,
             "controller": controller, "scenario": cfg.get("scenario", {}).get("name"),
             "score_from_s": score_from, "duration_s": exp.get("duration_s"), "rings": rings,
-            "telemetry": _telemetry_summary(run / "tlc_telemetry.npz")}
+            "telemetry": _telemetry_summary(run / "tlc_telemetry.npz"), "campaign": campaign_rates(m)}
 
 
 def ece496_reference(metrics_path: str | Path) -> list[dict]:
@@ -177,6 +203,24 @@ def overview_rows(summaries: list[dict]) -> list[dict]:
     return rows
 
 
+def _campaign_markdown(summaries: list[dict]) -> list[str]:
+    rows = [s for s in summaries if s.get("campaign")]
+    if not rows:
+        return []
+    out = ["## Monte Carlo rates (95 % Clopper-Pearson)", "",
+           "| experiment | controller | worlds | event | ring trials k/n | interval | worlds with any k/n | interval |",
+           "|---|---|---|---|---|---|---|---|"]
+    for s in rows:
+        c = s["campaign"]
+        for ev in ("wrong_line", "unlocked"):
+            if ev not in c:
+                continue
+            r, w = c[ev]["ring_trials"], c[ev]["worlds_any_ring"]
+            out.append(f"| {s['experiment']} | {s['controller']} | {c['worlds']} | {ev} | {r[0]}/{r[1]} | "
+                       f"[{r[2]:.3g}, {r[3]:.3g}] | {w[0]}/{w[1]} | [{w[2]:.3g}, {w[3]:.3g}] |")
+    return out + [""]
+
+
 def _overview_markdown(rows: list[dict]) -> list[str]:
     cols = ["experiment", "controller", "peak_err_pm_max", "peak_err_pm_max_rings_1_up", "rms_err_pm_mean",
             "track_peak_err_pm_max",
@@ -197,6 +241,7 @@ def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> s
            "block; TLC runs only). The mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
            "Thresholds: mrm 5 pm budget, ECE496 2 GHz.", ""]
     out += _overview_markdown(overview_rows(summaries))
+    out += _campaign_markdown(summaries)
     for s in summaries:
         out += [f"## {s['experiment']}: `{s['controller']}` on `{s['scenario']}`", "",
                 f"Run `{s['run']}`, {s['duration_s']} s simulated, scored from {s['score_from_s']} s.", ""]

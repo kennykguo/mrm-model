@@ -127,3 +127,22 @@ def test_remove_tones_strips_the_dither_and_keeps_the_trend():
 def test_tracking_error_only_for_tlc_runs(tmp_path):
     s = tlc_report.summarize_run(_make_run(tmp_path))
     assert "track_peak_err_pm" in s["rings"][0]                         # the synthetic run is a tlc run
+
+
+def test_clopper_pearson_known_values():
+    lo, hi = tlc_report.clopper_pearson(0, 40)
+    assert lo == 0.0 and hi == pytest.approx(1 - 0.025 ** (1 / 40), rel=1e-9)     # 0.0881: the "3/n" rule is 0.075
+    lo, hi = tlc_report.clopper_pearson(40, 40)
+    assert hi == 1.0 and lo == pytest.approx(0.025 ** (1 / 40), rel=1e-9)
+    lo, hi = tlc_report.clopper_pearson(5, 10)
+    assert lo == pytest.approx(0.187086, abs=1e-5) and hi == pytest.approx(0.812914, abs=1e-5)
+
+
+def test_campaign_rates_count_ring_trials_and_worlds():
+    m = {"locked_final": [[True, True], [True, False], [False, False]],
+         "wrong_line_final": [[False, False], [False, True], [False, False]]}
+    c = tlc_report.campaign_rates(m)
+    assert c["worlds"] == 3
+    assert c["unlocked"]["ring_trials"][:2] == [3, 6] and c["unlocked"]["worlds_any_ring"][:2] == [2, 3]
+    assert c["wrong_line"]["ring_trials"][:2] == [1, 6]
+    assert tlc_report.campaign_rates({"locked_final": [[True, False]]}) is None       # one world: no campaign

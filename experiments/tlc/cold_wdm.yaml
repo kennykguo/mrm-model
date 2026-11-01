@@ -1,12 +1,14 @@
 # Cold-start comparator for experiments/tlc/cold_tlc.yaml: mrm's wdm_supervisor (map, assign, acquire, track) under
-# the same conditions, with the knowledge tokens it needs (acceptance B5) and a fixed assignment.
+# the same conditions, with the knowledge tokens it needs and, as acceptance B5, its own (cyclic) ring-to-line
+# assignment; the TLC keeps the fixed one, so the wrong-line counts follow different rules.
 extends: g26
 meta: {name: tlc_cold_wdm, kind: experiment, description: "cold start, 25 degC; wdm_supervisor comparator"}
 controller_interface:
   knowledge: [line_grid, ring_to_line, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
+  bind: {tx.assignment: controller}     # as acceptance B5: it chooses the ring-to-line assignment (cyclic)
 controller: {name: wdm_supervisor}
 scenario: {name: static}
-metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
+metrics: {lock_reference: line, lock_threshold_pm: 300.0, hysteresis_pm: 20.0, allowed_assignments: cyclic}
 experiment:
   kind: run
   duration_s: 0.8
