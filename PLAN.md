@@ -11,7 +11,7 @@
 | 2 | Faithful core port + fidelity check on the ECE496 plant | **DONE** (bit-identical; published R1/R3/R4 reproduced) |
 | 3 | Core on G26: priors, open-loop lock-in diagnostic, warm closed loop | **DONE** (steady state; findings in spec §4 Phase 3) |
 | 4 | Scenario matrix (ECE496 D1–D6 / R-reqs → mrm scenarios) | **framework DONE**; open items below |
-| 5 | Results report + README status | NEXT (`docs/tlc/results.md` regenerates; write-up pending) |
+| 5 | Results report + README status | **first pass DONE** ([`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md)); refresh after the open items |
 
 Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 
@@ -27,7 +27,7 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 5. **Model-mismatch corners.** Corner runs give the TLC the corner's own priors; a variant with g26 priors on a
    corner plant is still to do.
 6. **Restart-one-ring (R8 variant)** has no mrm equivalent (`line_enable` restarts the laser, not the controller).
-7. **Phase 5 write-up**: turn `docs/tlc/results.md` into a short results narrative with per-corner conclusions.
+7. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 4 and 5 land (the R13 decision and the 300-trial campaign change its numbers).
 8. **Optional second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model
    gains), only after the faithful results are reviewed.
 

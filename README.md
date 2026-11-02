@@ -4,8 +4,8 @@
 > into mrm-model, so it can run closed loop on the 8-ring G26 plant and produce performance and locking
 > metrics for the ECE496 project.
 >
-> **Status: Phases 0-4 framework done: one command runs the faithful ECE496 TLC and six comparators through 15 experiments, a Monte Carlo campaign and four model-trust corners on G26. Phase 5 (write-up) next. Decisions Q1–Q12 are settled in spec §6.**
-> ▶ Try it: `tools/tlc_run_all.sh` → [`docs/tlc/results.md`](docs/tlc/results.md) · How it works: [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md)
+> **Status: Phases 0-4 framework done, Phase 5 first pass written: one command runs the faithful ECE496 TLC and six comparators through 16 experiments, a Monte Carlo campaign and four model-trust corners on G26. First results write-up in `docs/tlc/SUMMARY.md`; open items in `PLAN.md`. Decisions Q1–Q12 are settled in spec §6.**
+> ▶ Results: [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md) (write-up) · [`docs/tlc/results.md`](docs/tlc/results.md) (tables) · Run: `tools/tlc_run_all.sh` · How it works: [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md)
 > 📄 Spec & plan: [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) · 📋 Tracker: [`PLAN.md`](PLAN.md)
 
 ## Goal of this branch
