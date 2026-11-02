@@ -231,7 +231,7 @@ Findings of Phase 4 (first pass, nominal world unless stated):
 
 ---
 
-## 6. Decisions (2026-10-31, lead: Claude, owner: A. Patel)
+## 6. Decisions (2026-10-31, A. Patel)
 The consultation questions are settled as below. Any of them can be reopened by the owner.
 
 | # | Decision |
