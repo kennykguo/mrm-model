@@ -1,0 +1,20 @@
+\section*{thermal tuning}
+\[
+\begin{array}{ll}T,T_{\rm ref},T_0\ [\mathrm K]&\text{ring, resonance anchor, slope anchor}\\[0.6em]\lambda_r,\Delta\lambda_T\ [\mathrm m]&\text{resonance, thermal shift}\\[0.6em]s(T),s_0\ [\mathrm{m/K}]&\text{local, anchor tuning sensitivity}\\[0.6em]\beta\ [\mathrm{K^{-1}}]&\text{relative tuning curvature}\\[0.6em]u\ [\mathrm K]&\text{integration temperature}\end{array}
+\]
+\subsection*{sensitivity}
+\[
+\displaystyle s(T)=\frac{d\lambda_r}{dT}=s_0[1+\beta(T-T_0)]
+\]
+\subsection*{shift}
+\[
+\displaystyle \Delta\lambda_T(T)=\int_{T_{\rm ref}}^T s(u)\,du
+\]
+\subsection*{integrated law}
+\[
+\displaystyle \begin{aligned}\Delta\lambda_T(T)=s_0\biggl[&(T-T_{\rm ref})\\&+\frac{\beta}{2}\bigl((T-T_0)^2-(T_{\rm ref}-T_0)^2\bigr)\biggr]\end{aligned}
+\]
+\subsection*{reference}
+\[
+\displaystyle \Delta\lambda_T(T_{\rm ref})=0,\qquad s(T_0)=s_0
+\]

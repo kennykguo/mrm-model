@@ -1,0 +1,274 @@
+[
+  {
+    "slug": "01-reference-state",
+    "bounds": [
+      90,
+      65,
+      1644.216,
+      773.4639999999999
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "02-bus-segments",
+    "bounds": [
+      90,
+      65,
+      1881.348,
+      767.236
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "03-thermal-tuning",
+    "bounds": [
+      90,
+      65,
+      1870.116,
+      1174.604
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "04-rebase-thermal-law",
+    "bounds": [
+      90,
+      65,
+      1781.844,
+      959.332
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "05-junction-device",
+    "bounds": [
+      90,
+      65,
+      1963.536,
+      771.124
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "06-voltage-tables",
+    "bounds": [
+      90,
+      65,
+      1884.588,
+      1124.636
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "07-combined-shifts",
+    "bounds": [
+      90,
+      65,
+      1868.892,
+      906.52
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "08-loss-and-heat",
+    "bounds": [
+      90,
+      65,
+      1848.8400000000001,
+      1070.96
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "09-shifted-phase-curve",
+    "bounds": [
+      90,
+      65,
+      1823.3519999999999,
+      963.932
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "10-wavelength-dispersion",
+    "bounds": [
+      90,
+      65,
+      1905.144,
+      1077.404
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "11-shared-delay",
+    "bounds": [
+      90,
+      65,
+      1865.22,
+      1010.9480000000002
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "12-two-data-levels",
+    "bounds": [
+      90,
+      65,
+      1859.3519999999999,
+      752
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "13-evanescent-overlap",
+    "bounds": [
+      90,
+      65,
+      1891.932,
+      1021.784
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "14-coherent-power-exchange",
+    "bounds": [
+      90,
+      65,
+      1856.5079999999998,
+      981.0319999999999
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "15-local-coupling-model",
+    "bounds": [
+      90,
+      65,
+      1804.56,
+      1131.836
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "16-rigid-resonance-comb",
+    "bounds": [
+      90,
+      65,
+      1762.6200000000001,
+      1064.588
+    ],
+    "elements": 11,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  },
+  {
+    "slug": "17-optical-input-handoff",
+    "bounds": [
+      90,
+      65,
+      1636.98,
+      779.368
+    ],
+    "elements": 9,
+    "fonts": [
+      {
+        "family": "Excalifont",
+        "status": "loaded"
+      }
+    ]
+  }
+]

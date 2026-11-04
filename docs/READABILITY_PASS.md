@@ -618,3 +618,82 @@ accuracy discussion distinguishes exact resonance placement within the translate
 rigid translation misses temperature-dependent changes of resonance spacing. documented solver-table comparison gives about33 pm adjacent-order and66 pm second-order discrepancy for the stated g26 7.6 nm case.
 existing phase tests check moved resonance, baseline delay, FSR, and comparison with the fuller extracted-index calculation. no tests rerun for this explanation.
 next - evaluate_binary_ring_optical_inputs and its workspace body. skip duplicated allocation mechanics and connect zero/one outputs to already-covered bit averaging. then evaluate_coupler_power_fractions, which introduces the wavelength-dependent coupling law.
+
+## binary inputs and coupler dispersion - 2 november 2026
+
+finished phase.py in code order.
+evaluate_binary_ring_optical_inputs is an allocation wrapper. its workspace body repeats established junction, thermal-shift, and per-line optics-input calculations for V0 and V1 at shared instantaneous temperatures.
+save resonance shift, capacitance, and series resistance for both levels. output flags retain clipping from either level.
+the common intrinsic-loss temperature multiplier is evaluated once and reused exactly because its inputs are the same.
+only the level-zero round-trip delay is stored and used for both levels. this is a separate approximation when dispersion and distinct resonance shifts would give distinct delays.
+no bit weighting or field solve happens here. optics.py performs those downstream, as already covered.
+evaluate_coupler_power_fractions introduces the last new law - constant logarithmic coupling sensitivity versus actual laser wavelength, separately for through and drop couplers.
+define K_j^2 as cross-coupled power fraction at a coupler, not the final through-port transmission of the complete ring.
+K_j^2(lambda)=K_j,ref^2*exp(gamma_j*(lambda-lambda_ref)), where gamma_j=d ln(K_j^2)/d lambda and has units 1/m.
+reference to the prior fractional-temperature-sensitivity derivation avoids repeating it. integrate logarithmic ratio once to justify the wavelength law.
+use actual laser wavelength rather than the shifted reference coordinate used by phase. within this model, heating a ring does not change its coupler fractions at fixed laser wavelength.
+illustrative values lambda_ref1310 nm, lambda1315 nm, coupling_ref.1 and gamma.014/nm give coupling.107250818.
+loop writes fractions for each ring and line, with values >=1 clamped to1-1e-15.
+accuracy limits - local constant logarithmic wavelength slope, no direct temperature/bias coupling dependence, and common delay at level zero. saturation guard does not validate extrapolation.
+evaluate_ring_optical_inputs calls the binary input stage and the coupling stage. remaining names are aliases, not other models.
+existing split-interface test checks that the combined interface equals the separate calls. optical per-line test checks isolation of line coupling changes. extraction tests inspect coupling artefact passivity and trends. no tests rerun for this explanation.
+next file in agreed order - thermal.py. begin with heat storage, source-to-observer paths, and thermal states without repeating the already established temperature-to-optics laws.
+
+## delay and coupling intuition clarification - 2 november 2026
+
+pause forward reading to clarify shared delay and exponential coupling.
+explain level-zero delay as a common propagation-time parameter for both voltage cases. separate phase/loss calculations remain intact.
+within the translated phase model the two voltage shifts sample different points on the reference group-index curve. this need not give equal delays. no magnitude or hardware-error claim without a calculation.
+for coupling exposition, use C(lambda)=K^2 for one coupler to remove the unnecessary j index until the idea is understood.
+start from local field overlap and a fractional change per wavelength increment, then dC/dlambda=gamma*C.
+explain exponential as the limit of multiplying small fractional changes, before identifying d ln C/dlambda=gamma.
+logarithm rewrites fractional sensitivity; it does not introduce a separate physical mechanism.
+clarify with one-port excitation that coupler cross-transfer fraction differs from full-ring through-port power because the latter includes the returning ring field and interference.
+constant fractional wavelength sensitivity is a compact fit, not a universal directional-coupler law. preserve the actual laser wavelength versus shifted reference-coordinate distinction.
+no production code changed and no tests run.
+
+## coupling model foundations and textbook connection - 2 november 2026
+
+user needs physical justification of the exponential wavelength model, not only its consequence under an assumed constant fractional slope.
+use lightmatter-capstone chapters3 and4 as the starting point. inspected Ch04.tsx coupled-mode derivation and CouplerWidget.tsx, plus mrm/extraction/coupling.py and coupling_rib160.json.
+separate three dependencies - evanescent field versus transverse distance, coherent power exchange versus propagation distance, and final power fraction versus wavelength at fixed geometry.
+use sigma for evanescent spatial decay to avoid conflating textbook gamma with the simulator's logarithmic wavelength slope.
+the ideal uniform phase-matched lossless coupler gives C=sin^2(kappa_c*ell). derive from the two amplitude equations and initial one-guide launch, referencing textbook equations4.10/4.11.
+weak coupling gives C approximately (kappa_c*ell)^2; a gap-overlap approximation kappa_c approximately A(lambda)*exp(-sigma(lambda)*g) connects the Chapter3 tail to wavelength sensitivity. this does not imply an exact exponential versus wavelength.
+state that stronger tails at longer wavelength explain the increasing trend only in the illustrated regime; phase mismatch, material dispersion, geometry, and coherent exchange can change it.
+exponential runtime law comes from a first-order Taylor expansion of log C around the reference wavelength, gamma=C_prime/C at that point. exponentiation preserves positive C and matches value and first derivative, but is a local approximation and is not uniquely required by physics.
+offline extraction computes mode-overlap coupling at nearby wavelengths and saves a central finite difference of log C; runtime reads reference value and slope.
+saved rib160 through-coupler example - C0=.104496899 at1310nm, gamma=.00766997928/nm. runtime exponential at1315nm gives .108582179. values refer to saved extraction, not every realized device.
+fuller geometry extraction remains distinct from the ideal straight-coupler teaching formula. half-step derivative agreement is numerical support, not validation of geometry or a global exponential fit.
+no simulation code changed. phase.py remains covered. pause before thermal.py until this clarification is understood.
+
+## phase.py equation-free visual companion - 2 november 2026
+
+read EXCALIDRAW.md and the supplied clipboard before authoring.
+created docs/diagrams/phase with17 new topic drawings and the unchanged39-element ring reference.
+all new labels use Excalifont, family5, size36, with dark sketch strokes and transparent shapes.
+covered reference state, bus attenuation, thermal tuning and rebasing, junction depletion and tables, combined shifts, loss/heat budget, shifted phase curve, dispersion, shared level-zero delay, two data levels, evanescent overlap, coherent power exchange, local wavelength coupling fit, rigid-comb limitation, and the full input handoff.
+physical diagrams and the final calculation-flow board remain separate. no equations were added.
+function mapping and assumptions are recorded in the gallery and README rather than crowded into the physical artwork.
+individual native files, a combined18-frame Excalidraw atlas, embedded-font SVGs, PNGs, and an offline gallery are complete.
+tools/build_phase_diagrams.py rebuilds layouts from the preserved reference. tools/render_excalidraw_atlas.mjs exports with the official Excalidraw package and explicitly loaded font.
+rendered and inspected all topics. measured checks found zero text overlaps and zero line crossings through labels.
+validated native elements, unchanged reference, frame membership, unique IDs, font settings, equation-free new labels, embedded fonts, README links, and all18 gallery selections.
+local-file loading, editable/export links, enlargement, drag panning, keyboard navigation, and mobile width checks pass.
+results are recorded in render-report.json, validation.json, and viewer-validation.json.
+no production simulation code changed. phase.py reading is complete; thermal.py remains the next file after this visual clarification.
+
+## phase.py equation-only companion - 2 november 2026
+
+created docs/diagrams/phase-math with17 sheets matching the concept-diagram slugs.
+artwork contains short labels, symbol definitions, units, and equations. no explanatory paragraphs.
+tools/build_phase_equations.py holds the source and renders78 mathematical blocks with MathJax at36 em pixels.
+Excalidraw embeds mathematical SVG images and preserves LaTeX in image metadata. titles and group labels remain native Excalifont36 text.
+individual .tex snippets and a complete standalone equations.tex document are included.
+the complete source compiles successfully with the desktop LaTeX compiler.
+all78 vector images parse as valid XML and decode in the browser. checked all17 sheets, with no overlapping elements.
+tools/render_excalidraw_atlas.mjs now carries embedded images into the combined atlas. all78 image assets are present in the17-frame math atlas.
+fixed root-only SVG dimension insertion in the new builder so nested MathJax SVGs retain their own attributes.
+existing concept gallery now links to the matching equation sheet and back.
+offline viewing, download targets, cross-links, keyboard navigation, enlargement, drag panning, and mobile width checks pass.
+no production simulation code changed.

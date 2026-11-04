@@ -1,0 +1,20 @@
+\section*{intrinsic loss and heat}
+\[
+\begin{array}{ll}T_r,T_h,T_{\rm ref}\ [\mathrm K]&\text{ring, heater, reference temperature}\\[0.6em]c_r,c_h\ [\mathrm{K^{-1}}]&\text{fractional temperature sensitivities}\\[0.6em]\alpha_{\rm ref},\Delta\alpha_J\ [\mathrm{m^{-1}}]&\text{reference loss, junction loss change}\\[0.6em]\alpha,\alpha_{\rm nh},\alpha_{\rm heat}\ [\mathrm{m^{-1}}]&\text{total, nonabsorptive, absorptive loss}\\[0.6em]s_\alpha,a,\eta\ [1]&\text{loss factor, field retention, heat share}\\[0.6em]L\ [\mathrm m]&\text{round-trip length}\end{array}
+\]
+\subsection*{temperature factor}
+\[
+\displaystyle s_\alpha=\exp\!\left[c_r(T_r-T_{\rm ref})+c_h(T_h-T_{\rm ref})\right]
+\]
+\subsection*{loss budget}
+\[
+\displaystyle \begin{aligned}\alpha&=\max\!\left(0,(\alpha_{\rm ref}+\Delta\alpha_J)s_\alpha\right)\\\alpha_{\rm nh}&=\alpha_{\rm nh,ref}\\\alpha_{\rm heat}&=\max(0,\alpha-\alpha_{\rm nh})\end{aligned}
+\]
+\subsection*{optical inputs}
+\[
+\displaystyle a=e^{-\alpha L/2},\qquad\eta=\begin{cases}\min(1,\alpha_{\rm heat}/\alpha)&\alpha>0\\0&\alpha=0\end{cases}
+\]
+\subsection*{base G26}
+\[
+\displaystyle c_r=c_h=0\quad\Longrightarrow\quad s_\alpha=1
+\]

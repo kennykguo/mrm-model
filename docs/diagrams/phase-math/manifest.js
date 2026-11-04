@@ -1,0 +1,104 @@
+window.PHASE_DIAGRAMS = [
+  {
+    "slug": "01-reference-state",
+    "title": "reference state",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "02-bus-segments",
+    "title": "bus attenuation",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "03-thermal-tuning",
+    "title": "thermal tuning",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "04-rebase-thermal-law",
+    "title": "thermal rebasing",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "05-junction-device",
+    "title": "junction coverage",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "06-voltage-tables",
+    "title": "junction table interpolation",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "07-combined-shifts",
+    "title": "thermal and voltage shifts",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "08-loss-and-heat",
+    "title": "intrinsic loss and heat",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "09-shifted-phase-curve",
+    "title": "shifted reference phase",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "10-wavelength-dispersion",
+    "title": "reference dispersion",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "11-shared-delay",
+    "title": "shared level-zero delay",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "12-two-data-levels",
+    "title": "two data levels",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "13-evanescent-overlap",
+    "title": "evanescent overlap",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "14-coherent-power-exchange",
+    "title": "coherent power exchange",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "15-local-coupling-model",
+    "title": "local coupling model",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "16-rigid-resonance-comb",
+    "title": "rigid resonance comb",
+    "subtitle": "",
+    "code": ""
+  },
+  {
+    "slug": "17-optical-input-handoff",
+    "title": "optical-input handoff",
+    "subtitle": "",
+    "code": ""
+  }
+];

@@ -1,0 +1,16 @@
+\section*{thermal rebasing}
+\[
+\begin{array}{ll}T_{\rm prev},T_0,\delta T\ [\mathrm K]&\text{previous, anchor, increment}\\[0.6em]s_0,s_{\rm loc}\ [\mathrm{m/K}]&\text{anchor, local sensitivity}\\[0.6em]\beta,\beta_{\rm loc}\ [\mathrm{K^{-1}}]&\text{anchor, local relative curvature}\\[0.6em]r_s\ [1]&\text{sensitivity ratio}\\[0.6em]\lambda_r\ [\mathrm m]&\text{resonance wavelength}\end{array}
+\]
+\subsection*{coefficients}
+\[
+\displaystyle \begin{aligned}r_s&=1+\beta(T_{\rm prev}-T_0)\ne0\\s_{\rm loc}&=s_0r_s,\qquad\beta_{\rm loc}=\frac{\beta}{r_s}\end{aligned}
+\]
+\subsection*{local shift}
+\[
+\displaystyle \begin{aligned}\delta T&=T-T_{\rm prev}\\\lambda_r(T)-\lambda_r(T_{\rm prev})&=s_{\rm loc}\left(\delta T+\frac{\beta_{\rm loc}}2\delta T^2\right)\end{aligned}
+\]
+\subsection*{curvature}
+\[
+\displaystyle s_{\rm loc}\beta_{\rm loc}=s_0\beta=\frac{d^2\lambda_r}{dT^2}
+\]

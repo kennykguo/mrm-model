@@ -1,0 +1,20 @@
+\section*{shared level-zero delay}
+\[
+\begin{array}{ll}b\in\{0,1\}&\text{data level}\\[0.6em]\lambda_L,\lambda_0,\Delta\lambda_b,x_b\ [\mathrm m]&\text{laser, reference, shift, coordinate}\\[0.6em]n_{g0}\ [1],\quad D\ [\mathrm{m^{-1}}]&\text{reference group index, slope}\\[0.6em]L\ [\mathrm m],\quad c\ [\mathrm{m/s}]&\text{ring length, vacuum light speed}\\[0.6em]\widetilde\tau_b,\tau_{{\rm used},b}\ [\mathrm s]&\text{estimated, retained delay}\end{array}
+\]
+\subsection*{per-level estimate}
+\[
+\displaystyle x_b=\lambda_L-\Delta\lambda_b,\qquad\widetilde\tau_b=\frac{L}{c}[n_{g0}+D(x_b-\lambda_0)]
+\]
+\subsection*{difference}
+\[
+\displaystyle \widetilde\tau_1-\widetilde\tau_0=-\frac{DL}{c}(\Delta\lambda_1-\Delta\lambda_0)
+\]
+\subsection*{implementation}
+\[
+\displaystyle \tau_{{\rm used},0}=\tau_{{\rm used},1}=\widetilde\tau_0
+\]
+\subsection*{equal-delay limit}
+\[
+\displaystyle D(\Delta\lambda_1-\Delta\lambda_0)=0\quad\Longrightarrow\quad\widetilde\tau_1=\widetilde\tau_0
+\]

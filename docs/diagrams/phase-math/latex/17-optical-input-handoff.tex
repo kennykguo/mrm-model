@@ -1,0 +1,16 @@
+\section*{optical-input handoff}
+\[
+\begin{array}{ll}T_r,T_h,T_{n+1},T_{\rm other}\ [\mathrm K]&\text{ring, heater, endpoint, remainder}\\[0.6em]V_0,V_1\ [\mathrm V],\quad\lambda_\ell\ [\mathrm m]&\text{binary biases, laser wavelength}\\[0.6em]\phi_{b\ell}\ [\mathrm{rad}]&\text{round-trip phase}\\[0.6em]a_{b\ell},\eta_{b\ell}\ [1]&\text{retention, absorbed share}\\[0.6em]K_{t\ell}^2,K_{d\ell}^2\ [1],\quad\tau_\ell\ [\mathrm s]&\text{coupler fractions, common delay}\\[0.6em]P_{\rm in},P_{\rm mon},P_{\rm abs}\ [\mathrm W]&\text{input, monitor, absorbed power}\\[0.6em]g\ [\mathrm{K/W}]&\text{substep optical-heat gain}\end{array}
+\]
+\subsection*{phase.py}
+\[
+\displaystyle \begin{aligned}\mathbf p_{b\ell}&=(\phi_{b\ell},a_{b\ell},\eta_{b\ell},K_{t\ell}^2,K_{d\ell}^2,\tau_\ell)\\\mathbf p&=\mathcal F_{\rm phase}(T_r,T_h,V_0,V_1,\{\lambda_\ell\})\end{aligned}
+\]
+\subsection*{optics.py}
+\[
+\displaystyle (\mathbf P_{\rm mon},\mathbf P_{\rm abs})=\mathcal F_{\rm optics}(\mathbf p,\mathbf P_{\rm in})
+\]
+\subsection*{thermal closure}
+\[
+\displaystyle T_{n+1}=T_{\rm other}+gP_{\rm abs}(T_{n+1})
+\]

@@ -1,0 +1,23 @@
+{
+  "newDiagrams": 17,
+  "preservedReferenceElements": 39,
+  "referenceUnchanged": true,
+  "namedAtlasFrames": 18,
+  "nativeElementTypes": {
+    "text": 186,
+    "ellipse": 88,
+    "line": 177,
+    "arrow": 49,
+    "rectangle": 17
+  },
+  "nativeTextLabels": 186,
+  "fontFamily": 5,
+  "fontSize": 36,
+  "equationsInNewDrawings": false,
+  "textOverlaps": [],
+  "lineCrossingsThroughLabels": [],
+  "embeddedOfflineFonts": true,
+  "allEditableAndPreviewFilesPresent": true,
+  "readmeTargetsExist": true,
+  "scope": "schematic diagrams; no device accuracy claim"
+}

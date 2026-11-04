@@ -1,0 +1,1392 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mrm-model phase.py visual companion",
+  "elements": [
+    {
+      "id": "04-rebase-thermal-law-000",
+      "type": "text",
+      "x": 90,
+      "y": 65,
+      "width": 822.2396240234375,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 207848334,
+      "version": 1,
+      "versionNonce": 207848334,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "what changes when we rebase the thermal law?",
+      "originalText": "what changes when we rebase the thermal law?",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 90,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-001",
+      "type": "arrow",
+      "x": 230,
+      "y": 1080,
+      "width": 1850,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 121101956,
+      "version": 1,
+      "versionNonce": 121101956,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1850,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-002",
+      "type": "arrow",
+      "x": 230,
+      "y": 1080,
+      "width": 0,
+      "height": 650,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 60436835,
+      "version": 1,
+      "versionNonce": 60436835,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -650
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-003",
+      "type": "text",
+      "x": 230,
+      "y": 345,
+      "width": 374.5798645019531,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 48215229,
+      "version": 1,
+      "versionNonce": 48215229,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "resonance wavelength",
+      "originalText": "resonance wavelength",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 230,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-004",
+      "type": "text",
+      "x": 1011.6840515136719,
+      "y": 1145,
+      "width": 286.63189697265625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 246721963,
+      "version": 1,
+      "versionNonce": 246721963,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "ring temperature",
+      "originalText": "ring temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1155,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-005",
+      "type": "line",
+      "x": 230,
+      "y": 1015,
+      "width": 1850,
+      "height": 500.4999999999999,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 129512580,
+      "version": 1,
+      "versionNonce": 129512580,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          13.309352517985616,
+          -1.6508203509134773
+        ],
+        [
+          26.61870503597123,
+          -3.329900108690026
+        ],
+        [
+          39.92805755395682,
+          -5.037239273329533
+        ],
+        [
+          53.23741007194246,
+          -6.772837844831997
+        ],
+        [
+          66.54676258992805,
+          -8.536695823197533
+        ],
+        [
+          79.85611510791364,
+          -10.328813208426027
+        ],
+        [
+          93.16546762589928,
+          -12.149190000517592
+        ],
+        [
+          106.47482014388493,
+          -13.997826199472115
+        ],
+        [
+          119.78417266187051,
+          -15.874721805289596
+        ],
+        [
+          133.0935251798561,
+          -17.779876817970035
+        ],
+        [
+          146.40287769784175,
+          -19.713291237513545
+        ],
+        [
+          159.71223021582733,
+          -21.674965063920126
+        ],
+        [
+          173.02158273381292,
+          -23.664898297189552
+        ],
+        [
+          186.33093525179856,
+          -25.68309093732205
+        ],
+        [
+          199.64028776978415,
+          -27.729542984317618
+        ],
+        [
+          212.9496402877698,
+          -29.80425443817603
+        ],
+        [
+          226.25899280575538,
+          -31.90722529889763
+        ],
+        [
+          239.56834532374103,
+          -34.03845556648207
+        ],
+        [
+          252.87769784172667,
+          -36.197945240929585
+        ],
+        [
+          266.1870503597122,
+          -38.385694322240056
+        ],
+        [
+          279.49640287769785,
+          -40.6017028104136
+        ],
+        [
+          292.8057553956835,
+          -42.845970705449986
+        ],
+        [
+          306.11510791366914,
+          -45.118498007349444
+        ],
+        [
+          319.42446043165467,
+          -47.419284716111974
+        ],
+        [
+          332.7338129496402,
+          -49.74833083173746
+        ],
+        [
+          346.04316546762584,
+          -52.10563635422602
+        ],
+        [
+          359.3525179856115,
+          -54.491201283577425
+        ],
+        [
+          372.66187050359713,
+          -56.9050256197919
+        ],
+        [
+          385.9712230215828,
+          -59.347109362869446
+        ],
+        [
+          399.2805755395683,
+          -61.81745251280995
+        ],
+        [
+          412.58992805755395,
+          -64.31605506961341
+        ],
+        [
+          425.8992805755396,
+          -66.84291703327983
+        ],
+        [
+          439.2086330935251,
+          -69.39803840380932
+        ],
+        [
+          452.51798561151077,
+          -71.98141918120177
+        ],
+        [
+          465.8273381294964,
+          -74.5930593654573
+        ],
+        [
+          479.13669064748206,
+          -77.23295895657577
+        ],
+        [
+          492.4460431654677,
+          -79.90111795455721
+        ],
+        [
+          505.75539568345334,
+          -82.59753635940172
+        ],
+        [
+          519.0647482014388,
+          -85.32221417110918
+        ],
+        [
+          532.3741007194244,
+          -88.0751513896796
+        ],
+        [
+          545.68345323741,
+          -90.8563480151131
+        ],
+        [
+          558.9928057553957,
+          -93.66580404740955
+        ],
+        [
+          572.3021582733813,
+          -96.50351948656908
+        ],
+        [
+          585.6115107913669,
+          -99.36949433259144
+        ],
+        [
+          598.9208633093525,
+          -102.26372858547688
+        ],
+        [
+          612.2302158273382,
+          -105.1862222452254
+        ],
+        [
+          625.5395683453238,
+          -108.13697531183686
+        ],
+        [
+          638.8489208633093,
+          -111.11598778531129
+        ],
+        [
+          652.1582733812949,
+          -114.12325966564879
+        ],
+        [
+          665.4676258992805,
+          -117.15879095284924
+        ],
+        [
+          678.7769784172662,
+          -120.22258164691266
+        ],
+        [
+          692.0863309352518,
+          -123.31463174783914
+        ],
+        [
+          705.3956834532374,
+          -126.43494125562859
+        ],
+        [
+          718.7050359712231,
+          -129.5835101702811
+        ],
+        [
+          732.0143884892086,
+          -132.76033849179646
+        ],
+        [
+          745.3237410071943,
+          -135.965426220175
+        ],
+        [
+          758.6330935251799,
+          -139.1987733554164
+        ],
+        [
+          771.9424460431655,
+          -142.46037989752085
+        ],
+        [
+          785.2517985611511,
+          -145.75024584648827
+        ],
+        [
+          798.5611510791366,
+          -149.06837120231876
+        ],
+        [
+          811.8705035971223,
+          -152.4147559650121
+        ],
+        [
+          825.1798561151079,
+          -155.7894001345686
+        ],
+        [
+          838.4892086330935,
+          -159.19230371098797
+        ],
+        [
+          851.7985611510792,
+          -162.62346669427052
+        ],
+        [
+          865.1079136690646,
+          -166.0828890844159
+        ],
+        [
+          878.4172661870502,
+          -169.57057088142437
+        ],
+        [
+          891.7266187050359,
+          -173.0865120852958
+        ],
+        [
+          905.0359712230215,
+          -176.6307126960303
+        ],
+        [
+          918.3453237410072,
+          -180.20317271362762
+        ],
+        [
+          931.6546762589928,
+          -183.80389213808803
+        ],
+        [
+          944.9640287769785,
+          -187.4328709694115
+        ],
+        [
+          958.2733812949641,
+          -191.09010920759795
+        ],
+        [
+          971.5827338129495,
+          -194.77560685264734
+        ],
+        [
+          984.8920863309354,
+          -198.4893639045598
+        ],
+        [
+          998.2014388489208,
+          -202.23138036333523
+        ],
+        [
+          1011.5107913669067,
+          -206.00165622897362
+        ],
+        [
+          1024.820143884892,
+          -209.80019150147507
+        ],
+        [
+          1038.1294964028775,
+          -213.62698618083948
+        ],
+        [
+          1051.4388489208634,
+          -217.48204026706696
+        ],
+        [
+          1064.7482014388488,
+          -221.3653537601573
+        ],
+        [
+          1078.0575539568347,
+          -225.2769266601108
+        ],
+        [
+          1091.36690647482,
+          -229.21675896692716
+        ],
+        [
+          1104.6762589928057,
+          -233.1848506806066
+        ],
+        [
+          1117.9856115107914,
+          -237.18120180114897
+        ],
+        [
+          1131.294964028777,
+          -241.20581232855443
+        ],
+        [
+          1144.6043165467627,
+          -245.25868226282296
+        ],
+        [
+          1157.913669064748,
+          -249.33981160395422
+        ],
+        [
+          1171.2230215827337,
+          -253.44920035194855
+        ],
+        [
+          1184.5323741007194,
+          -257.58684850680606
+        ],
+        [
+          1197.841726618705,
+          -261.7527560685264
+        ],
+        [
+          1211.1510791366907,
+          -265.94692303710985
+        ],
+        [
+          1224.4604316546763,
+          -270.16934941255636
+        ],
+        [
+          1237.7697841726617,
+          -274.4200351948657
+        ],
+        [
+          1251.0791366906476,
+          -278.6989803840381
+        ],
+        [
+          1264.388489208633,
+          -283.0061849800734
+        ],
+        [
+          1277.6978417266187,
+          -287.34164898297195
+        ],
+        [
+          1291.0071942446043,
+          -291.70537239273335
+        ],
+        [
+          1304.3165467625897,
+          -296.0973552093576
+        ],
+        [
+          1317.6258992805756,
+          -300.51759743284515
+        ],
+        [
+          1330.935251798561,
+          -304.96609906319554
+        ],
+        [
+          1344.2446043165469,
+          -309.4428601004088
+        ],
+        [
+          1357.5539568345323,
+          -313.9478805444853
+        ],
+        [
+          1370.863309352518,
+          -318.4811603954247
+        ],
+        [
+          1384.1726618705036,
+          -323.04269965322703
+        ],
+        [
+          1397.4820143884892,
+          -327.63249831789244
+        ],
+        [
+          1410.7913669064749,
+          -332.2505563894209
+        ],
+        [
+          1424.1007194244605,
+          -336.89687386781225
+        ],
+        [
+          1437.4100719424462,
+          -341.57145075306676
+        ],
+        [
+          1450.7194244604316,
+          -346.274287045184
+        ],
+        [
+          1464.0287769784172,
+          -351.0053827441643
+        ],
+        [
+          1477.3381294964029,
+          -355.7647378500078
+        ],
+        [
+          1490.6474820143885,
+          -360.55235236271415
+        ],
+        [
+          1503.9568345323742,
+          -365.36822628228356
+        ],
+        [
+          1517.2661870503598,
+          -370.21235960871593
+        ],
+        [
+          1530.5755395683452,
+          -375.08475234201114
+        ],
+        [
+          1543.884892086331,
+          -379.98540448216966
+        ],
+        [
+          1557.1942446043165,
+          -384.914316029191
+        ],
+        [
+          1570.5035971223022,
+          -389.87148698307544
+        ],
+        [
+          1583.8129496402878,
+          -394.8569173438227
+        ],
+        [
+          1597.1223021582732,
+          -399.8706071114332
+        ],
+        [
+          1610.431654676259,
+          -404.9125562859065
+        ],
+        [
+          1623.7410071942445,
+          -409.98276486724285
+        ],
+        [
+          1637.0503597122304,
+          -415.0812328554423
+        ],
+        [
+          1650.3597122302158,
+          -420.2079602505046
+        ],
+        [
+          1663.6690647482014,
+          -425.36294705242994
+        ],
+        [
+          1676.978417266187,
+          -430.5461932612184
+        ],
+        [
+          1690.2877697841727,
+          -435.75769887686965
+        ],
+        [
+          1703.5971223021584,
+          -440.997463899384
+        ],
+        [
+          1716.9064748201438,
+          -446.2654883287614
+        ],
+        [
+          1730.2158273381294,
+          -451.5617721650017
+        ],
+        [
+          1743.525179856115,
+          -456.88631540810513
+        ],
+        [
+          1756.8345323741007,
+          -462.2391180580714
+        ],
+        [
+          1770.1438848920864,
+          -467.6201801149009
+        ],
+        [
+          1783.453237410072,
+          -473.0295015785932
+        ],
+        [
+          1796.7625899280574,
+          -478.4670824491485
+        ],
+        [
+          1810.0719424460433,
+          -483.93292272656697
+        ],
+        [
+          1823.3812949640287,
+          -489.4270224108483
+        ],
+        [
+          1836.6906474820144,
+          -494.94938150199266
+        ],
+        [
+          1850,
+          -500.4999999999999
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-006",
+      "type": "ellipse",
+      "x": 479,
+      "y": 967.7992,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 97832602,
+      "version": 1,
+      "versionNonce": 97832602,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "04-rebase-thermal-law-007",
+      "type": "line",
+      "x": 489,
+      "y": 997.7992,
+      "width": 0,
+      "height": 92.20079999999996,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 240247233,
+      "version": 1,
+      "versionNonce": 240247233,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          92.20079999999996
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-008",
+      "type": "text",
+      "x": 340.30206298828125,
+      "y": 1210,
+      "width": 297.3958740234375,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 203622490,
+      "version": 1,
+      "versionNonce": 203622490,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "original reference",
+      "originalText": "original reference",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 489,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-009",
+      "type": "ellipse",
+      "x": 1274.5,
+      "y": 786.6273000000001,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 75911284,
+      "version": 1,
+      "versionNonce": 75911284,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "04-rebase-thermal-law-010",
+      "type": "line",
+      "x": 1284.5,
+      "y": 816.6273000000001,
+      "width": 0,
+      "height": 273.3726999999999,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 116300365,
+      "version": 1,
+      "versionNonce": 116300365,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          273.3726999999999
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-011",
+      "type": "text",
+      "x": 1102.1420593261719,
+      "y": 1210,
+      "width": 364.71588134765625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 19712198,
+      "version": 1,
+      "versionNonce": 19712198,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "previous temperature",
+      "originalText": "previous temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1284.5,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-012",
+      "type": "ellipse",
+      "x": 1755.5,
+      "y": 628.1053,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 148528666,
+      "version": 1,
+      "versionNonce": 148528666,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "04-rebase-thermal-law-013",
+      "type": "line",
+      "x": 1765.5,
+      "y": 658.1053,
+      "width": 0,
+      "height": 431.89469999999994,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 108818995,
+      "version": 1,
+      "versionNonce": 108818995,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          431.89469999999994
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-014",
+      "type": "text",
+      "x": 1617.2700500488281,
+      "y": 1210,
+      "width": 296.45989990234375,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 88428655,
+      "version": 1,
+      "versionNonce": 88428655,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "trial temperature",
+      "originalText": "trial temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1765.5,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-015",
+      "type": "line",
+      "x": 1284.5,
+      "y": 1286,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 138863103,
+      "version": 1,
+      "versionNonce": 138863103,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-016",
+      "type": "line",
+      "x": 1765.5,
+      "y": 1286,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 219370495,
+      "version": 1,
+      "versionNonce": 219370495,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-017",
+      "type": "line",
+      "x": 1284.5,
+      "y": 1300,
+      "width": 481,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 52930839,
+      "version": 1,
+      "versionNonce": 52930839,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          481,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "04-rebase-thermal-law-018",
+      "type": "text",
+      "x": 1373.7640686035156,
+      "y": 1330,
+      "width": 302.47186279296875,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 219211044,
+      "version": 1,
+      "versionNonce": 219211044,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "next local change",
+      "originalText": "next local change",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1525,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-019",
+      "type": "text",
+      "x": 320,
+      "y": 260,
+      "width": 357.587890625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 113323207,
+      "version": 1,
+      "versionNonce": 113323207,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "one unchanged curve",
+      "originalText": "one unchanged curve",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 320,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "04-rebase-thermal-law-020",
+      "type": "text",
+      "x": 1240,
+      "y": 260,
+      "width": 596.123779296875,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 106488038,
+      "version": 1,
+      "versionNonce": 106488038,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "slope and curvature both retained",
+      "originalText": "slope and curvature both retained",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1240,
+        "labelCentered": false
+      }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

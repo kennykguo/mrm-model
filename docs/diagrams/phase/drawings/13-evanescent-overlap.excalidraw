@@ -1,0 +1,2852 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mrm-model phase.py visual companion",
+  "elements": [
+    {
+      "id": "13-evanescent-overlap-000",
+      "type": "text",
+      "x": 90,
+      "y": 65,
+      "width": 638.27978515625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 203363010,
+      "version": 1,
+      "versionNonce": 203363010,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "why can wavelength change coupling?",
+      "originalText": "why can wavelength change coupling?",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 90,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-001",
+      "type": "text",
+      "x": 422.27606201171875,
+      "y": 220,
+      "width": 335.4478759765625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 158379597,
+      "version": 1,
+      "versionNonce": 158379597,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "shorter wavelength",
+      "originalText": "shorter wavelength",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 590,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-002",
+      "type": "rectangle",
+      "x": 270,
+      "y": 430,
+      "width": 140,
+      "height": 780,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 224794506,
+      "version": 1,
+      "versionNonce": 224794506,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "13-evanescent-overlap-003",
+      "type": "rectangle",
+      "x": 750,
+      "y": 430,
+      "width": 140,
+      "height": 780,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 205650923,
+      "version": 1,
+      "versionNonce": 205650923,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "13-evanescent-overlap-004",
+      "type": "text",
+      "x": 310.37200927734375,
+      "y": 1320,
+      "width": 59.2559814453125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 191914780,
+      "version": 1,
+      "versionNonce": 191914780,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "bus",
+      "originalText": "bus",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 340,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-005",
+      "type": "text",
+      "x": 748.0720291137695,
+      "y": 1320,
+      "width": 143.85594177246094,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 122612662,
+      "version": 1,
+      "versionNonce": 122612662,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "neighbor",
+      "originalText": "neighbor",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 820,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-006",
+      "type": "line",
+      "x": 410,
+      "y": 336,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 254062329,
+      "version": 1,
+      "versionNonce": 254062329,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-007",
+      "type": "line",
+      "x": 750,
+      "y": 336,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 85087303,
+      "version": 1,
+      "versionNonce": 85087303,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-008",
+      "type": "line",
+      "x": 410,
+      "y": 350,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 87673769,
+      "version": 1,
+      "versionNonce": 87673769,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-009",
+      "type": "text",
+      "x": 501.03401947021484,
+      "y": 285,
+      "width": 157.9319610595703,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 118004756,
+      "version": 1,
+      "versionNonce": 118004756,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "same gap",
+      "originalText": "same gap",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 580,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-010",
+      "type": "line",
+      "x": 410,
+      "y": 600,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 90279909,
+      "version": 1,
+      "versionNonce": 90279909,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-011",
+      "type": "line",
+      "x": 410,
+      "y": 500,
+      "width": 340,
+      "height": 98.92551996880127,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 203437666,
+      "version": 1,
+      "versionNonce": 203437666,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.762711864406754,
+          7.395843449792835
+        ],
+        [
+          11.525423728813564,
+          14.244701896247193
+        ],
+        [
+          17.288135593220318,
+          20.58702949390397
+        ],
+        [
+          23.05084745762713,
+          26.460288471364947
+        ],
+        [
+          28.813559322033882,
+          31.89917040945204
+        ],
+        [
+          34.57627118644069,
+          36.93580115397913
+        ],
+        [
+          40.338983050847446,
+          41.59993057349698
+        ],
+        [
+          46.10169491525426,
+          45.919108282851425
+        ],
+        [
+          51.86440677966101,
+          49.91884637050373
+        ],
+        [
+          57.627118644067764,
+          53.622770090791505
+        ],
+        [
+          63.389830508474574,
+          57.05275741122705
+        ],
+        [
+          69.15254237288138,
+          60.229068239095454
+        ],
+        [
+          74.91525423728814,
+          63.170464090655855
+        ],
+        [
+          80.67796610169489,
+          65.8943189097962
+        ],
+        [
+          86.4406779661017,
+          68.4167216907133
+        ],
+        [
+          92.20338983050846,
+          70.75257151078051
+        ],
+        [
+          97.96610169491527,
+          72.91566553493328
+        ],
+        [
+          103.72881355932202,
+          74.91878051138792
+        ],
+        [
+          109.49152542372883,
+          76.7737482400646
+        ],
+        [
+          115.25423728813553,
+          78.49152545948414
+        ],
+        [
+          121.01694915254234,
+          80.08225856493925
+        ],
+        [
+          126.77966101694915,
+          81.55534354021086
+        ],
+        [
+          132.54237288135596,
+          82.91948145682898
+        ],
+        [
+          138.30508474576277,
+          84.18272986869476
+        ],
+        [
+          144.06779661016947,
+          85.35255040563698
+        ],
+        [
+          149.83050847457628,
+          86.43585284702328
+        ],
+        [
+          155.5932203389831,
+          87.43903593575703
+        ],
+        [
+          161.35593220338978,
+          88.36802517373314
+        ],
+        [
+          167.1186440677966,
+          89.22830782200322
+        ],
+        [
+          172.8813559322034,
+          90.02496531238137
+        ],
+        [
+          178.64406779661022,
+          90.76270326194026
+        ],
+        [
+          184.4067796610169,
+          91.44587926767997
+        ],
+        [
+          190.16949152542372,
+          92.07852864554854
+        ],
+        [
+          195.93220338983053,
+          92.66438826584397
+        ],
+        [
+          201.69491525423723,
+          93.20691862578678
+        ],
+        [
+          207.45762711864404,
+          93.70932428964068
+        ],
+        [
+          213.22033898305085,
+          94.17457281711302
+        ],
+        [
+          218.98305084745766,
+          94.60541229184093
+        ],
+        [
+          224.74576271186447,
+          95.00438755349819
+        ],
+        [
+          230.50847457627117,
+          95.37385522939985
+        ],
+        [
+          236.27118644067798,
+          95.71599765439419
+        ],
+        [
+          242.03389830508468,
+          96.03283576126069
+        ],
+        [
+          247.7966101694915,
+          96.326241017754
+        ],
+        [
+          253.5593220338983,
+          96.59794648080356
+        ],
+        [
+          259.3220338983051,
+          96.84955703316155
+        ],
+        [
+          265.0847457627119,
+          97.08255886296388
+        ],
+        [
+          270.8474576271186,
+          97.29832824219898
+        ],
+        [
+          276.6101694915254,
+          97.49813965593319
+        ],
+        [
+          282.3728813559321,
+          97.6831733303128
+        ],
+        [
+          288.13559322033893,
+          97.85452220380591
+        ],
+        [
+          293.89830508474574,
+          98.01319838286247
+        ],
+        [
+          299.66101694915255,
+          98.16013912012397
+        ],
+        [
+          305.42372881355936,
+          98.29621235049353
+        ],
+        [
+          311.1864406779662,
+          98.42222181776799
+        ],
+        [
+          316.9491525423729,
+          98.53891182211078
+        ],
+        [
+          322.7118644067797,
+          98.64697161641095
+        ],
+        [
+          328.4745762711864,
+          98.74703947749242
+        ],
+        [
+          334.2372881355932,
+          98.83970647622482
+        ],
+        [
+          340,
+          98.92551996880127
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-012",
+      "type": "line",
+      "x": 410,
+      "y": 760,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 76464282,
+      "version": 1,
+      "versionNonce": 76464282,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-013",
+      "type": "line",
+      "x": 410,
+      "y": 660,
+      "width": 340,
+      "height": 98.92551996880127,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 128895269,
+      "version": 1,
+      "versionNonce": 128895269,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.762711864406754,
+          7.395843449792778
+        ],
+        [
+          11.525423728813564,
+          14.244701896247193
+        ],
+        [
+          17.288135593220318,
+          20.58702949390397
+        ],
+        [
+          23.05084745762713,
+          26.460288471364947
+        ],
+        [
+          28.813559322033882,
+          31.89917040945204
+        ],
+        [
+          34.57627118644069,
+          36.93580115397913
+        ],
+        [
+          40.338983050847446,
+          41.59993057349698
+        ],
+        [
+          46.10169491525426,
+          45.919108282851425
+        ],
+        [
+          51.86440677966101,
+          49.91884637050373
+        ],
+        [
+          57.627118644067764,
+          53.622770090791505
+        ],
+        [
+          63.389830508474574,
+          57.05275741122705
+        ],
+        [
+          69.15254237288138,
+          60.229068239095454
+        ],
+        [
+          74.91525423728814,
+          63.170464090655855
+        ],
+        [
+          80.67796610169489,
+          65.8943189097962
+        ],
+        [
+          86.4406779661017,
+          68.4167216907133
+        ],
+        [
+          92.20338983050846,
+          70.75257151078051
+        ],
+        [
+          97.96610169491527,
+          72.91566553493328
+        ],
+        [
+          103.72881355932202,
+          74.91878051138792
+        ],
+        [
+          109.49152542372883,
+          76.7737482400646
+        ],
+        [
+          115.25423728813553,
+          78.49152545948414
+        ],
+        [
+          121.01694915254234,
+          80.08225856493925
+        ],
+        [
+          126.77966101694915,
+          81.55534354021086
+        ],
+        [
+          132.54237288135596,
+          82.91948145682898
+        ],
+        [
+          138.30508474576277,
+          84.18272986869476
+        ],
+        [
+          144.06779661016947,
+          85.35255040563698
+        ],
+        [
+          149.83050847457628,
+          86.43585284702328
+        ],
+        [
+          155.5932203389831,
+          87.43903593575703
+        ],
+        [
+          161.35593220338978,
+          88.36802517373314
+        ],
+        [
+          167.1186440677966,
+          89.22830782200322
+        ],
+        [
+          172.8813559322034,
+          90.02496531238137
+        ],
+        [
+          178.64406779661022,
+          90.76270326194026
+        ],
+        [
+          184.4067796610169,
+          91.44587926767997
+        ],
+        [
+          190.16949152542372,
+          92.07852864554854
+        ],
+        [
+          195.93220338983053,
+          92.66438826584397
+        ],
+        [
+          201.69491525423723,
+          93.20691862578678
+        ],
+        [
+          207.45762711864404,
+          93.70932428964068
+        ],
+        [
+          213.22033898305085,
+          94.17457281711302
+        ],
+        [
+          218.98305084745766,
+          94.60541229184093
+        ],
+        [
+          224.74576271186447,
+          95.00438755349819
+        ],
+        [
+          230.50847457627117,
+          95.37385522939985
+        ],
+        [
+          236.27118644067798,
+          95.71599765439419
+        ],
+        [
+          242.03389830508468,
+          96.03283576126069
+        ],
+        [
+          247.7966101694915,
+          96.326241017754
+        ],
+        [
+          253.5593220338983,
+          96.59794648080356
+        ],
+        [
+          259.3220338983051,
+          96.84955703316155
+        ],
+        [
+          265.0847457627119,
+          97.08255886296388
+        ],
+        [
+          270.8474576271186,
+          97.29832824219898
+        ],
+        [
+          276.6101694915254,
+          97.49813965593319
+        ],
+        [
+          282.3728813559321,
+          97.6831733303128
+        ],
+        [
+          288.13559322033893,
+          97.85452220380591
+        ],
+        [
+          293.89830508474574,
+          98.01319838286247
+        ],
+        [
+          299.66101694915255,
+          98.16013912012397
+        ],
+        [
+          305.42372881355936,
+          98.29621235049353
+        ],
+        [
+          311.1864406779662,
+          98.42222181776799
+        ],
+        [
+          316.9491525423729,
+          98.53891182211078
+        ],
+        [
+          322.7118644067797,
+          98.64697161641095
+        ],
+        [
+          328.4745762711864,
+          98.74703947749242
+        ],
+        [
+          334.2372881355932,
+          98.83970647622482
+        ],
+        [
+          340,
+          98.92551996880127
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-014",
+      "type": "line",
+      "x": 410,
+      "y": 920,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 189797706,
+      "version": 1,
+      "versionNonce": 189797706,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-015",
+      "type": "line",
+      "x": 410,
+      "y": 820,
+      "width": 340,
+      "height": 98.92551996880127,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 195383246,
+      "version": 1,
+      "versionNonce": 195383246,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.762711864406754,
+          7.395843449792778
+        ],
+        [
+          11.525423728813564,
+          14.244701896247193
+        ],
+        [
+          17.288135593220318,
+          20.58702949390397
+        ],
+        [
+          23.05084745762713,
+          26.460288471364947
+        ],
+        [
+          28.813559322033882,
+          31.89917040945204
+        ],
+        [
+          34.57627118644069,
+          36.93580115397913
+        ],
+        [
+          40.338983050847446,
+          41.59993057349698
+        ],
+        [
+          46.10169491525426,
+          45.919108282851425
+        ],
+        [
+          51.86440677966101,
+          49.91884637050373
+        ],
+        [
+          57.627118644067764,
+          53.622770090791505
+        ],
+        [
+          63.389830508474574,
+          57.05275741122705
+        ],
+        [
+          69.15254237288138,
+          60.229068239095454
+        ],
+        [
+          74.91525423728814,
+          63.170464090655855
+        ],
+        [
+          80.67796610169489,
+          65.8943189097962
+        ],
+        [
+          86.4406779661017,
+          68.4167216907133
+        ],
+        [
+          92.20338983050846,
+          70.75257151078051
+        ],
+        [
+          97.96610169491527,
+          72.91566553493328
+        ],
+        [
+          103.72881355932202,
+          74.91878051138792
+        ],
+        [
+          109.49152542372883,
+          76.7737482400646
+        ],
+        [
+          115.25423728813553,
+          78.49152545948414
+        ],
+        [
+          121.01694915254234,
+          80.08225856493925
+        ],
+        [
+          126.77966101694915,
+          81.55534354021086
+        ],
+        [
+          132.54237288135596,
+          82.91948145682898
+        ],
+        [
+          138.30508474576277,
+          84.18272986869476
+        ],
+        [
+          144.06779661016947,
+          85.35255040563698
+        ],
+        [
+          149.83050847457628,
+          86.43585284702328
+        ],
+        [
+          155.5932203389831,
+          87.43903593575703
+        ],
+        [
+          161.35593220338978,
+          88.36802517373314
+        ],
+        [
+          167.1186440677966,
+          89.22830782200322
+        ],
+        [
+          172.8813559322034,
+          90.02496531238137
+        ],
+        [
+          178.64406779661022,
+          90.76270326194026
+        ],
+        [
+          184.4067796610169,
+          91.44587926767997
+        ],
+        [
+          190.16949152542372,
+          92.07852864554854
+        ],
+        [
+          195.93220338983053,
+          92.66438826584397
+        ],
+        [
+          201.69491525423723,
+          93.20691862578678
+        ],
+        [
+          207.45762711864404,
+          93.70932428964068
+        ],
+        [
+          213.22033898305085,
+          94.17457281711302
+        ],
+        [
+          218.98305084745766,
+          94.60541229184093
+        ],
+        [
+          224.74576271186447,
+          95.00438755349819
+        ],
+        [
+          230.50847457627117,
+          95.37385522939985
+        ],
+        [
+          236.27118644067798,
+          95.71599765439419
+        ],
+        [
+          242.03389830508468,
+          96.03283576126069
+        ],
+        [
+          247.7966101694915,
+          96.326241017754
+        ],
+        [
+          253.5593220338983,
+          96.59794648080356
+        ],
+        [
+          259.3220338983051,
+          96.84955703316155
+        ],
+        [
+          265.0847457627119,
+          97.08255886296388
+        ],
+        [
+          270.8474576271186,
+          97.29832824219898
+        ],
+        [
+          276.6101694915254,
+          97.49813965593319
+        ],
+        [
+          282.3728813559321,
+          97.6831733303128
+        ],
+        [
+          288.13559322033893,
+          97.85452220380591
+        ],
+        [
+          293.89830508474574,
+          98.01319838286247
+        ],
+        [
+          299.66101694915255,
+          98.16013912012397
+        ],
+        [
+          305.42372881355936,
+          98.29621235049353
+        ],
+        [
+          311.1864406779662,
+          98.42222181776799
+        ],
+        [
+          316.9491525423729,
+          98.53891182211078
+        ],
+        [
+          322.7118644067797,
+          98.64697161641095
+        ],
+        [
+          328.4745762711864,
+          98.74703947749242
+        ],
+        [
+          334.2372881355932,
+          98.83970647622482
+        ],
+        [
+          340,
+          98.92551996880127
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-016",
+      "type": "arrow",
+      "x": 340,
+      "y": 1180,
+      "width": 0,
+      "height": 210,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 82454865,
+      "version": 1,
+      "versionNonce": 82454865,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -210
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-017",
+      "type": "text",
+      "x": 250,
+      "y": 1480,
+      "width": 486.2158203125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 258730550,
+      "version": 1,
+      "versionNonce": 258730550,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "field decays across the gap",
+      "originalText": "field decays across the gap",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 250,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-018",
+      "type": "text",
+      "x": 1616.6580505371094,
+      "y": 220,
+      "width": 306.68389892578125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 46667561,
+      "version": 1,
+      "versionNonce": 46667561,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "longer wavelength",
+      "originalText": "longer wavelength",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1770,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-019",
+      "type": "rectangle",
+      "x": 1450,
+      "y": 430,
+      "width": 140,
+      "height": 780,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 167502877,
+      "version": 1,
+      "versionNonce": 167502877,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "13-evanescent-overlap-020",
+      "type": "rectangle",
+      "x": 1930,
+      "y": 430,
+      "width": 140,
+      "height": 780,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 166436721,
+      "version": 1,
+      "versionNonce": 166436721,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "13-evanescent-overlap-021",
+      "type": "text",
+      "x": 1490.3720092773438,
+      "y": 1320,
+      "width": 59.2559814453125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 218125253,
+      "version": 1,
+      "versionNonce": 218125253,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "bus",
+      "originalText": "bus",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1520,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-022",
+      "type": "text",
+      "x": 1928.0720291137695,
+      "y": 1320,
+      "width": 143.85594177246094,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 148788950,
+      "version": 1,
+      "versionNonce": 148788950,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "neighbor",
+      "originalText": "neighbor",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 2000,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-023",
+      "type": "line",
+      "x": 1590,
+      "y": 336,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 189367650,
+      "version": 1,
+      "versionNonce": 189367650,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-024",
+      "type": "line",
+      "x": 1930,
+      "y": 336,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 268166063,
+      "version": 1,
+      "versionNonce": 268166063,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-025",
+      "type": "line",
+      "x": 1590,
+      "y": 350,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 139962004,
+      "version": 1,
+      "versionNonce": 139962004,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-026",
+      "type": "text",
+      "x": 1681.0340194702148,
+      "y": 285,
+      "width": 157.9319610595703,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 59909457,
+      "version": 1,
+      "versionNonce": 59909457,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "same gap",
+      "originalText": "same gap",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1760,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-027",
+      "type": "line",
+      "x": 1590,
+      "y": 600,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 136333392,
+      "version": 1,
+      "versionNonce": 136333392,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-028",
+      "type": "line",
+      "x": 1590,
+      "y": 500,
+      "width": 340,
+      "height": 89.63428713884718,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 157467687,
+      "version": 1,
+      "versionNonce": 157467687,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.7627118644068105,
+          3.7689465140242646
+        ],
+        [
+          11.525423728813621,
+          7.395843449792835
+        ],
+        [
+          17.28813559322043,
+          10.886044579933468
+        ],
+        [
+          23.050847457627015,
+          14.244701896247193
+        ],
+        [
+          28.813559322033825,
+          17.476773214719742
+        ],
+        [
+          34.576271186440636,
+          20.58702949390397
+        ],
+        [
+          40.338983050847446,
+          23.580061877476624
+        ],
+        [
+          46.10169491525426,
+          26.460288471364947
+        ],
+        [
+          51.86440677966107,
+          29.231960865447036
+        ],
+        [
+          57.62711864406788,
+          31.89917040945204
+        ],
+        [
+          63.38983050847446,
+          34.46585425232661
+        ],
+        [
+          69.15254237288127,
+          36.93580115397913
+        ],
+        [
+          74.91525423728808,
+          39.31265707798366
+        ],
+        [
+          80.67796610169489,
+          41.59993057349698
+        ],
+        [
+          86.4406779661017,
+          43.80099795433489
+        ],
+        [
+          92.20338983050851,
+          45.919108282851425
+        ],
+        [
+          97.96610169491532,
+          47.95738816597816
+        ],
+        [
+          103.72881355932213,
+          49.91884637050373
+        ],
+        [
+          109.49152542372872,
+          51.806378264405794
+        ],
+        [
+          115.25423728813553,
+          53.622770090791505
+        ],
+        [
+          121.01694915254234,
+          55.370703080755675
+        ],
+        [
+          126.77966101694915,
+          57.05275741122705
+        ],
+        [
+          132.54237288135596,
+          58.671416013646194
+        ],
+        [
+          138.30508474576277,
+          60.229068239095454
+        ],
+        [
+          144.06779661016958,
+          61.728013385293025
+        ],
+        [
+          149.83050847457616,
+          63.170464090655855
+        ],
+        [
+          155.59322033898297,
+          64.55854960044246
+        ],
+        [
+          161.35593220338978,
+          65.8943189097962
+        ],
+        [
+          167.1186440677966,
+          67.17974378832969
+        ],
+        [
+          172.8813559322034,
+          68.4167216907133
+        ],
+        [
+          178.64406779661022,
+          69.60707855756573
+        ],
+        [
+          184.40677966101703,
+          70.75257151078051
+        ],
+        [
+          190.16949152542384,
+          71.85489144726671
+        ],
+        [
+          195.93220338983042,
+          72.91566553493328
+        ],
+        [
+          201.69491525423723,
+          73.93645961460106
+        ],
+        [
+          207.45762711864404,
+          74.91878051138792
+        ],
+        [
+          213.22033898305085,
+          75.8640782589788
+        ],
+        [
+          218.98305084745766,
+          76.7737482400646
+        ],
+        [
+          224.74576271186447,
+          77.64913324610916
+        ],
+        [
+          230.50847457627106,
+          78.49152545948414
+        ],
+        [
+          236.27118644067787,
+          79.3021683608988
+        ],
+        [
+          242.03389830508468,
+          80.08225856493925
+        ],
+        [
+          247.7966101694915,
+          80.83294758642842
+        ],
+        [
+          253.5593220338983,
+          81.55534354021086
+        ],
+        [
+          259.3220338983051,
+          82.2505127768759
+        ],
+        [
+          265.0847457627119,
+          82.91948145682898
+        ],
+        [
+          270.84745762711873,
+          83.56323706503906
+        ],
+        [
+          276.61016949152554,
+          84.18272986869476
+        ],
+        [
+          282.3728813559321,
+          84.77887431992235
+        ],
+        [
+          288.13559322033893,
+          85.35255040563698
+        ],
+        [
+          293.89830508474574,
+          85.90460494651711
+        ],
+        [
+          299.66101694915255,
+          86.43585284702328
+        ],
+        [
+          305.42372881355936,
+          86.94707829830259
+        ],
+        [
+          311.1864406779662,
+          87.43903593575703
+        ],
+        [
+          316.94915254237276,
+          87.91245195298416
+        ],
+        [
+          322.71186440677957,
+          88.36802517373314
+        ],
+        [
+          328.4745762711864,
+          88.80642808345999
+        ],
+        [
+          334.2372881355932,
+          89.22830782200322
+        ],
+        [
+          340,
+          89.63428713884718
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-029",
+      "type": "line",
+      "x": 1590,
+      "y": 760,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 22442210,
+      "version": 1,
+      "versionNonce": 22442210,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-030",
+      "type": "line",
+      "x": 1590,
+      "y": 660,
+      "width": 340,
+      "height": 89.63428713884718,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 166687621,
+      "version": 1,
+      "versionNonce": 166687621,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.7627118644068105,
+          3.7689465140242646
+        ],
+        [
+          11.525423728813621,
+          7.395843449792778
+        ],
+        [
+          17.28813559322043,
+          10.886044579933468
+        ],
+        [
+          23.050847457627015,
+          14.244701896247193
+        ],
+        [
+          28.813559322033825,
+          17.476773214719742
+        ],
+        [
+          34.576271186440636,
+          20.58702949390397
+        ],
+        [
+          40.338983050847446,
+          23.580061877476624
+        ],
+        [
+          46.10169491525426,
+          26.460288471364947
+        ],
+        [
+          51.86440677966107,
+          29.231960865447036
+        ],
+        [
+          57.62711864406788,
+          31.89917040945204
+        ],
+        [
+          63.38983050847446,
+          34.46585425232661
+        ],
+        [
+          69.15254237288127,
+          36.93580115397913
+        ],
+        [
+          74.91525423728808,
+          39.31265707798366
+        ],
+        [
+          80.67796610169489,
+          41.59993057349698
+        ],
+        [
+          86.4406779661017,
+          43.80099795433489
+        ],
+        [
+          92.20338983050851,
+          45.919108282851425
+        ],
+        [
+          97.96610169491532,
+          47.95738816597816
+        ],
+        [
+          103.72881355932213,
+          49.91884637050373
+        ],
+        [
+          109.49152542372872,
+          51.806378264405794
+        ],
+        [
+          115.25423728813553,
+          53.622770090791505
+        ],
+        [
+          121.01694915254234,
+          55.370703080755675
+        ],
+        [
+          126.77966101694915,
+          57.05275741122705
+        ],
+        [
+          132.54237288135596,
+          58.671416013646194
+        ],
+        [
+          138.30508474576277,
+          60.229068239095454
+        ],
+        [
+          144.06779661016958,
+          61.728013385293025
+        ],
+        [
+          149.83050847457616,
+          63.170464090655855
+        ],
+        [
+          155.59322033898297,
+          64.55854960044246
+        ],
+        [
+          161.35593220338978,
+          65.8943189097962
+        ],
+        [
+          167.1186440677966,
+          67.17974378832969
+        ],
+        [
+          172.8813559322034,
+          68.4167216907133
+        ],
+        [
+          178.64406779661022,
+          69.60707855756573
+        ],
+        [
+          184.40677966101703,
+          70.75257151078051
+        ],
+        [
+          190.16949152542384,
+          71.85489144726671
+        ],
+        [
+          195.93220338983042,
+          72.91566553493328
+        ],
+        [
+          201.69491525423723,
+          73.93645961460106
+        ],
+        [
+          207.45762711864404,
+          74.91878051138792
+        ],
+        [
+          213.22033898305085,
+          75.8640782589788
+        ],
+        [
+          218.98305084745766,
+          76.7737482400646
+        ],
+        [
+          224.74576271186447,
+          77.64913324610916
+        ],
+        [
+          230.50847457627106,
+          78.49152545948414
+        ],
+        [
+          236.27118644067787,
+          79.3021683608988
+        ],
+        [
+          242.03389830508468,
+          80.08225856493925
+        ],
+        [
+          247.7966101694915,
+          80.83294758642842
+        ],
+        [
+          253.5593220338983,
+          81.55534354021086
+        ],
+        [
+          259.3220338983051,
+          82.2505127768759
+        ],
+        [
+          265.0847457627119,
+          82.91948145682898
+        ],
+        [
+          270.84745762711873,
+          83.56323706503906
+        ],
+        [
+          276.61016949152554,
+          84.18272986869476
+        ],
+        [
+          282.3728813559321,
+          84.77887431992235
+        ],
+        [
+          288.13559322033893,
+          85.35255040563698
+        ],
+        [
+          293.89830508474574,
+          85.90460494651711
+        ],
+        [
+          299.66101694915255,
+          86.43585284702328
+        ],
+        [
+          305.42372881355936,
+          86.94707829830259
+        ],
+        [
+          311.1864406779662,
+          87.43903593575703
+        ],
+        [
+          316.94915254237276,
+          87.91245195298416
+        ],
+        [
+          322.71186440677957,
+          88.36802517373314
+        ],
+        [
+          328.4745762711864,
+          88.80642808345999
+        ],
+        [
+          334.2372881355932,
+          89.22830782200322
+        ],
+        [
+          340,
+          89.63428713884718
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-031",
+      "type": "line",
+      "x": 1590,
+      "y": 920,
+      "width": 340,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 252737430,
+      "version": 1,
+      "versionNonce": 252737430,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          340,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-032",
+      "type": "line",
+      "x": 1590,
+      "y": 820,
+      "width": 340,
+      "height": 89.63428713884718,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 166618830,
+      "version": 1,
+      "versionNonce": 166618830,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          5.7627118644068105,
+          3.7689465140242646
+        ],
+        [
+          11.525423728813621,
+          7.395843449792778
+        ],
+        [
+          17.28813559322043,
+          10.886044579933468
+        ],
+        [
+          23.050847457627015,
+          14.244701896247193
+        ],
+        [
+          28.813559322033825,
+          17.476773214719742
+        ],
+        [
+          34.576271186440636,
+          20.58702949390397
+        ],
+        [
+          40.338983050847446,
+          23.580061877476624
+        ],
+        [
+          46.10169491525426,
+          26.460288471364947
+        ],
+        [
+          51.86440677966107,
+          29.231960865447036
+        ],
+        [
+          57.62711864406788,
+          31.89917040945204
+        ],
+        [
+          63.38983050847446,
+          34.46585425232661
+        ],
+        [
+          69.15254237288127,
+          36.93580115397913
+        ],
+        [
+          74.91525423728808,
+          39.31265707798366
+        ],
+        [
+          80.67796610169489,
+          41.59993057349698
+        ],
+        [
+          86.4406779661017,
+          43.80099795433489
+        ],
+        [
+          92.20338983050851,
+          45.919108282851425
+        ],
+        [
+          97.96610169491532,
+          47.95738816597816
+        ],
+        [
+          103.72881355932213,
+          49.91884637050373
+        ],
+        [
+          109.49152542372872,
+          51.806378264405794
+        ],
+        [
+          115.25423728813553,
+          53.622770090791505
+        ],
+        [
+          121.01694915254234,
+          55.370703080755675
+        ],
+        [
+          126.77966101694915,
+          57.05275741122705
+        ],
+        [
+          132.54237288135596,
+          58.671416013646194
+        ],
+        [
+          138.30508474576277,
+          60.229068239095454
+        ],
+        [
+          144.06779661016958,
+          61.728013385293025
+        ],
+        [
+          149.83050847457616,
+          63.170464090655855
+        ],
+        [
+          155.59322033898297,
+          64.55854960044246
+        ],
+        [
+          161.35593220338978,
+          65.8943189097962
+        ],
+        [
+          167.1186440677966,
+          67.17974378832969
+        ],
+        [
+          172.8813559322034,
+          68.4167216907133
+        ],
+        [
+          178.64406779661022,
+          69.60707855756573
+        ],
+        [
+          184.40677966101703,
+          70.75257151078051
+        ],
+        [
+          190.16949152542384,
+          71.85489144726671
+        ],
+        [
+          195.93220338983042,
+          72.91566553493328
+        ],
+        [
+          201.69491525423723,
+          73.93645961460106
+        ],
+        [
+          207.45762711864404,
+          74.91878051138792
+        ],
+        [
+          213.22033898305085,
+          75.8640782589788
+        ],
+        [
+          218.98305084745766,
+          76.7737482400646
+        ],
+        [
+          224.74576271186447,
+          77.64913324610916
+        ],
+        [
+          230.50847457627106,
+          78.49152545948414
+        ],
+        [
+          236.27118644067787,
+          79.3021683608988
+        ],
+        [
+          242.03389830508468,
+          80.08225856493925
+        ],
+        [
+          247.7966101694915,
+          80.83294758642842
+        ],
+        [
+          253.5593220338983,
+          81.55534354021086
+        ],
+        [
+          259.3220338983051,
+          82.2505127768759
+        ],
+        [
+          265.0847457627119,
+          82.91948145682898
+        ],
+        [
+          270.84745762711873,
+          83.56323706503906
+        ],
+        [
+          276.61016949152554,
+          84.18272986869476
+        ],
+        [
+          282.3728813559321,
+          84.77887431992235
+        ],
+        [
+          288.13559322033893,
+          85.35255040563698
+        ],
+        [
+          293.89830508474574,
+          85.90460494651711
+        ],
+        [
+          299.66101694915255,
+          86.43585284702328
+        ],
+        [
+          305.42372881355936,
+          86.94707829830259
+        ],
+        [
+          311.1864406779662,
+          87.43903593575703
+        ],
+        [
+          316.94915254237276,
+          87.91245195298416
+        ],
+        [
+          322.71186440677957,
+          88.36802517373314
+        ],
+        [
+          328.4745762711864,
+          88.80642808345999
+        ],
+        [
+          334.2372881355932,
+          89.22830782200322
+        ],
+        [
+          340,
+          89.63428713884718
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-033",
+      "type": "arrow",
+      "x": 1520,
+      "y": 1180,
+      "width": 0,
+      "height": 210,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 217085265,
+      "version": 1,
+      "versionNonce": 217085265,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -210
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "13-evanescent-overlap-034",
+      "type": "text",
+      "x": 1430,
+      "y": 1480,
+      "width": 486.2158203125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 193468549,
+      "version": 1,
+      "versionNonce": 193468549,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "field decays across the gap",
+      "originalText": "field decays across the gap",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1430,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "13-evanescent-overlap-035",
+      "type": "text",
+      "x": 1400,
+      "y": 1570,
+      "width": 572.6157836914062,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 227148366,
+      "version": 1,
+      "versionNonce": 227148366,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "a longer tail can increase overlap",
+      "originalText": "a longer tail can increase overlap",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1400,
+        "labelCentered": false
+      }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

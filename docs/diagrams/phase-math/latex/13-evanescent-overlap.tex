@@ -1,0 +1,20 @@
+\section*{evanescent overlap}
+\[
+\begin{array}{ll}y,g,\lambda,\ell\ [\mathrm m]&\text{distance, gap, wavelength, length}\\[0.6em]E(y),E_0\ [\mathrm{V/m}]&\text{field, wall field}\\[0.6em]n_{\rm eff},n_{\rm clad}\ [1]&\text{effective, cladding index}\\[0.6em]\sigma,\kappa_c,F\ [\mathrm{m^{-1}}]&\text{decay, coupling, prefactor}\\[0.6em]C\ [1]&\text{cross-coupled power fraction}\end{array}
+\]
+\subsection*{field tail}
+\[
+\displaystyle E(y)=E_0e^{-\sigma y},\qquad\sigma(\lambda)=\frac{2\pi}{\lambda}\sqrt{n_{\rm eff}^2-n_{\rm clad}^2}
+\]
+\subsection*{overlap approximation}
+\[
+\displaystyle \kappa_c(\lambda,g)\simeq F(\lambda)e^{-\sigma(\lambda)g}
+\]
+\subsection*{weak transfer}
+\[
+\displaystyle |\kappa_c\ell|\ll1\quad\Longrightarrow\quad C\simeq(\kappa_c\ell)^2\simeq[F(\lambda)\ell]^2e^{-2\sigma(\lambda)g}
+\]
+\subsection*{fixed indices}
+\[
+\displaystyle \frac{dn_{\rm eff}}{d\lambda}=\frac{dn_{\rm clad}}{d\lambda}=0\quad\Longrightarrow\quad\frac{d\sigma}{d\lambda}=-\frac{\sigma}{\lambda}
+\]

@@ -1,0 +1,20 @@
+\section*{junction table interpolation}
+\[
+\begin{array}{ll}V,V_i,V_{\rm ref}\ [\mathrm V]&\text{query, grid, reference bias}\\[0.6em]i\in\{0,\ldots,G-2\}&\text{grid interval}\\[0.6em]y_i,\mathcal I_y(V)&\text{table, interpolated property}\\[0.6em]w_i\ [1]&\text{interpolation weight}\\[0.6em]\chi_{\rm clip}\in\{0,1\}&\text{clipping flag}\\[0.6em]n_J\ [1],\quad\alpha_J\ [\mathrm{m^{-1}}]&\text{ring index, junction loss}\end{array}
+\]
+\subsection*{interior}
+\[
+\displaystyle w_i=\frac{V-V_i}{V_{i+1}-V_i},\qquad\mathcal I_y(V)=y_i+w_i(y_{i+1}-y_i)
+\]
+\subsection*{endpoints}
+\[
+\displaystyle \mathcal I_y(V)=\begin{cases}y_0&V\le V_0\\y_{G-1}&V\ge V_{G-1}\end{cases}
+\]
+\subsection*{clipping}
+\[
+\displaystyle \chi_{\rm clip}=\begin{cases}1&V<V_0\ \lor\ V>V_{G-1}\\0&V_0\le V\le V_{G-1}\end{cases}
+\]
+\subsection*{reference differences}
+\[
+\displaystyle \begin{aligned}\Delta n_J&=n_J(V)-n_J(V_{\rm ref})\\\Delta\alpha_J&=\alpha_J(V)-\alpha_J(V_{\rm ref})\end{aligned}
+\]

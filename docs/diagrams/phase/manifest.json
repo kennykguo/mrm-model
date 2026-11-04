@@ -1,0 +1,111 @@
+[
+  {
+    "slug": "00-supplied-ring-reference",
+    "title": "your ring reference",
+    "code": "optics.py - supplied style reference",
+    "subtitle": "original supplied elements, unchanged",
+    "reference": true
+  },
+  {
+    "slug": "01-reference-state",
+    "title": "what does the reference ring already contain?",
+    "code": "PhaseParams.from_plant_params",
+    "subtitle": "reference bias is already included in the configured resonance and loss"
+  },
+  {
+    "slug": "02-bus-segments",
+    "title": "how much light reaches the next ring?",
+    "code": "calculate_bus_segment_power_transmission",
+    "subtitle": "equal supplied spacing and power attenuation; chip input loss handled upstream; final segment unmodeled"
+  },
+  {
+    "slug": "03-thermal-tuning",
+    "title": "how does warming move the resonance?",
+    "code": "calculate_thermal_resonance_shift_m",
+    "subtitle": "quadratic wavelength tuning; the slope anchor and reference resonance temperature need not coincide"
+  },
+  {
+    "slug": "04-rebase-thermal-law",
+    "title": "what changes when we rebase the thermal law?",
+    "code": "rebase_thermal_tuning_coefficients",
+    "subtitle": "same quadratic curve and curvature; only the expansion point and coefficient representation change"
+  },
+  {
+    "slug": "05-junction-device",
+    "title": "what does reverse bias change physically?",
+    "code": "evaluate_ring_resonance_shifts; junction_eval_row",
+    "subtitle": "voltage tables describe carrier-dependent index, absorption, capacitance, and resistance; fill fraction scales the junction-covered length"
+  },
+  {
+    "slug": "06-voltage-tables",
+    "title": "how does a voltage become device properties?",
+    "code": "junction_eval_row; PhaseParams.from_plant_params",
+    "subtitle": "piecewise-linear interpolation; values outside the table hold the endpoint and flag clipping; the reference index and loss are subtracted downstream"
+  },
+  {
+    "slug": "07-combined-shifts",
+    "title": "how do heat and bias move the same resonance?",
+    "code": "evaluate_ring_resonance_shifts_with_workspace",
+    "subtitle": "thermal and electrical shifts are added; the reference bias contribution is already in the original resonance"
+  },
+  {
+    "slug": "08-loss-and-heat",
+    "title": "which optical loss becomes heat?",
+    "code": "calculate_intrinsic_loss_temperature_factor; write_ring_optical_inputs_for_data_level",
+    "subtitle": "two temperature sensitivities scale total intrinsic loss; nonabsorptive loss stays fixed; negative loss and invalid heat shares are clamped"
+  },
+  {
+    "slug": "09-shifted-phase-curve",
+    "title": "where does a fixed laser sit on the shifted phase curve?",
+    "code": "write_ring_optical_inputs_for_data_level",
+    "subtitle": "translate the reference phase curve; the physical laser wavelength stays fixed; reference phase already includes coupler phase"
+  },
+  {
+    "slug": "10-wavelength-dispersion",
+    "title": "what wavelength dependence does the reference curve retain?",
+    "code": "write_ring_optical_inputs_for_data_level",
+    "subtitle": "quadratic effective-index expansion and linear group-index expansion about the reference wavelength; these are local wavelength approximations, not time integration"
+  },
+  {
+    "slug": "11-shared-delay",
+    "title": "what does sharing the level-zero delay mean?",
+    "code": "evaluate_binary_ring_optical_inputs_with_workspace",
+    "subtitle": "the two voltage cases can sample different group indices; only the level-zero group delay is retained for both"
+  },
+  {
+    "slug": "12-two-data-levels",
+    "title": "which inputs differ between zero and one?",
+    "code": "evaluate_binary_ring_optical_inputs_with_workspace",
+    "subtitle": "same instantaneous temperatures; separate voltage-dependent outputs; probability weighting occurs later in optics.py"
+  },
+  {
+    "slug": "13-evanescent-overlap",
+    "title": "why can wavelength change coupling?",
+    "code": "evaluate_coupler_power_fractions; offline coupling extraction",
+    "subtitle": "evanescent overlap motivates wavelength dependence; this picture holds geometry and index factors fixed to isolate the tail mechanism"
+  },
+  {
+    "slug": "14-coherent-power-exchange",
+    "title": "how does power transfer along a coupler?",
+    "code": "textbook chapter 4; offline coupling extraction",
+    "subtitle": "ideal phase-matched lossless uniform coupler; power exchanges sinusoidally with distance and can return to the launch guide"
+  },
+  {
+    "slug": "15-local-coupling-model",
+    "title": "why does runtime coupling use a local exponential?",
+    "code": "evaluate_coupler_power_fractions; extraction.coupler_block",
+    "subtitle": "first-order approximation to logarithmic wavelength dependence; matches reference value and slope, but omits changing relative slope"
+  },
+  {
+    "slug": "16-rigid-resonance-comb",
+    "title": "what does sliding every resonance together miss?",
+    "code": "write_ring_optical_inputs_for_data_level",
+    "subtitle": "all orders receive one wavelength shift; a fuller thermal-dispersion model also changes spacing; anchoring one order does not verify the others"
+  },
+  {
+    "slug": "17-optical-input-handoff",
+    "title": "how do the phase.py calculations connect?",
+    "code": "evaluate_ring_optical_inputs",
+    "subtitle": "this is an input-assembly map, separate from the physical schematics; time advancement belongs to thermal.py and selfheat.py"
+  }
+]

@@ -1,0 +1,20 @@
+\section*{local coupling model}
+\[
+\begin{array}{ll}C(\lambda)=K^2(\lambda),\ C_0\ [1]&\text{coupled fraction, reference value}\\[0.6em]\lambda,\lambda_0,h\ [\mathrm m]&\text{laser, reference, extraction offset}\\[0.6em]\gamma_0\ [\mathrm{m^{-1}}]&\text{fractional wavelength slope}\\[0.6em]C_{\rm raw},C_{\rm used}\ [1]&\text{exponential, retained coupling}\end{array}
+\]
+\subsection*{local coefficients}
+\[
+\displaystyle C_0=C(\lambda_0),\qquad\gamma_0=\left.\frac{d\ln C}{d\lambda}\right|_{\lambda_0}=\frac{C'(\lambda_0)}{C_0}
+\]
+\subsection*{logarithmic tangent}
+\[
+\displaystyle \begin{aligned}\ln C(\lambda)&\simeq\ln C_0+\gamma_0(\lambda-\lambda_0)\\C_{\rm raw}(\lambda)&=C_0e^{\gamma_0(\lambda-\lambda_0)}\end{aligned}
+\]
+\subsection*{extracted slope}
+\[
+\displaystyle \gamma_0\simeq\frac{\ln C(\lambda_0+h)-\ln C(\lambda_0-h)}{2h}
+\]
+\subsection*{runtime bound}
+\[
+\displaystyle C_{\rm used}=\begin{cases}C_{\rm raw}&C_{\rm raw}<1\\1-10^{-15}&C_{\rm raw}\ge1\end{cases}
+\]

@@ -1,0 +1,14 @@
+{
+  "sheets": 17,
+  "renderedMathBlocks": 78,
+  "mathRenderer": "MathJax SVG",
+  "mathEmSize": 36,
+  "labelFontSize": 36,
+  "labelsAndDefinitionsOnly": true,
+  "overlappingElements": [],
+  "allMathImagesValidXML": true,
+  "allAtlasImagesEmbedded": true,
+  "latexPreservedInImageMetadata": true,
+  "latexDocumentCompiled": true,
+  "topicSlugsMatchConceptDiagrams": true
+}

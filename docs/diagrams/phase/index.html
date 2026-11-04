@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>phase.py — visual companion</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;color:#1e1e1e;background:#fff;font:14px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}
+    a{color:inherit;text-underline-offset:4px}button{font:inherit;color:inherit;background:#fff;border:1px solid #ddd;padding:8px 13px;cursor:pointer}
+    button:hover,nav a:hover{background:#f5f5f5}button:disabled{opacity:.35;cursor:default}:focus-visible{outline:2px solid #1e1e1e;outline-offset:4px}
+    aside{position:fixed;inset:0 auto 0 0;width:310px;padding:25px 18px;overflow:auto;border-right:1px solid #e5e5e5}
+    h1{font:inherit;font-weight:600;margin:0 12px 12px}aside p{color:#666;margin:0 12px 22px}
+    nav a{display:block;text-decoration:none;padding:12px;margin:3px 0}nav a[aria-current=page]{background:#f1f1f1}
+    main{margin-left:310px;padding:26px 30px 50px}header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}#count{margin-right:auto;color:#666}
+    .links{display:flex;flex-wrap:wrap;gap:12px 22px;margin-bottom:22px}.stage{border-block:1px solid #eee;overflow:auto;padding:20px 0;cursor:default}
+    .stage img{display:block;width:100%;height:auto}.stage.enlarged img{width:2400px;max-width:none}.stage.enlarged{cursor:grab;touch-action:none}.stage.dragging{cursor:grabbing}
+    #note{max-width:95ch;margin:25px 0 12px;color:#555}#code{overflow-wrap:anywhere;color:#666}footer{margin-top:24px;color:#777}
+    @media(max-width:950px){aside{position:relative;width:auto;height:260px;border-right:0;border-bottom:1px solid #ddd}main{margin-left:0;padding:22px 16px}header{gap:8px}}
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>phase.py — visual companion</h1>
+    <p>labelled diagrams · no equations<br>native and editable in Excalidraw</p>
+    <nav id="topics" aria-label="drawings"></nav>
+  </aside>
+  <main>
+    <header>
+      <span id="count" aria-live="polite"></span>
+      <button id="previous" type="button">previous</button>
+      <button id="next" type="button">next</button>
+      <button id="zoom" type="button" aria-pressed="false">enlarge</button>
+    </header>
+    <div class="links">
+      <a id="drawing" download>editable drawing</a>
+      <a id="svg" target="_blank" rel="noopener">SVG</a>
+      <a id="png" download>PNG</a>
+      <a href="phase-walkthrough.excalidraw" download>complete Excalidraw atlas</a>
+      <a id="math" href="../phase-math/index.html">equations</a>
+      <a href="README.md">reading map</a>
+    </div>
+    <div id="stage" class="stage"><img id="preview" alt="" draggable="false"></div>
+    <p id="note"></p>
+    <p id="code"></p>
+    <footer>schematic curves and exaggerated differences · not measured device data</footer>
+  </main>
+  <script src="manifest.js"></script>
+  <script src="viewer.js"></script>
+</body>
+</html>

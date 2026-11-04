@@ -1,0 +1,16 @@
+\section*{two data levels}
+\[
+\begin{array}{ll}b\in\{0,1\},\quad\ell\in\{0,\ldots,M-1\}&\text{data level, laser line}\\[0.6em]V_b\ [\mathrm V],\quad T_r,T_h\ [\mathrm K]&\text{bias, shared temperatures}\\[0.6em]\phi_{b\ell}\ [\mathrm{rad}]&\text{round-trip phase}\\[0.6em]a_{b\ell},\eta_{b\ell}\ [1]&\text{retention, absorbed share}\\[0.6em]\Delta\lambda_b\ [\mathrm m],\quad C_{Jb}\ [\mathrm F]&\text{shift, capacitance}\\[0.6em]R_{sb}\ [\Omega],\quad p_b\ [1]&\text{resistance, bit probability}\\[0.6em]P_b,\overline P\ [\mathrm W]&\text{level, mean optical power}\end{array}
+\]
+\subsection*{shared state}
+\[
+\displaystyle T_{r,0}=T_{r,1}=T_r,\qquad T_{h,0}=T_{h,1}=T_h
+\]
+\subsection*{per-level inputs}
+\[
+\displaystyle \mathcal F(T_r,T_h,V_b,\lambda_\ell)\mapsto\left(\phi_{b\ell},a_{b\ell},\eta_{b\ell},\Delta\lambda_b,C_{Jb},R_{sb}\right)
+\]
+\subsection*{optics.py}
+\[
+\displaystyle p_0=1-p_1,\qquad\overline P=p_0P_0+p_1P_1
+\]

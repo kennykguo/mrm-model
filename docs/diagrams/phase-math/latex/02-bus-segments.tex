@@ -1,0 +1,16 @@
+\section*{bus attenuation}
+\[
+\begin{array}{ll}P(z),P_{{\rm in},k}\ [\mathrm W]&\text{waveguide, ring input power}\\[0.6em]z,d_k\ [\mathrm m]&\text{distance, segment length}\\[0.6em]\alpha_{\rm bus}\ [\mathrm{m^{-1}}]&\text{power attenuation}\\[0.6em]B_k\ [1]&\text{segment power transmission}\\[0.6em]k\in\{0,\ldots,N-1\}&\text{bus position}\\[0.6em]\bar q_k\ [1]&\text{mean ring through fraction}\end{array}
+\]
+\subsection*{propagation}
+\[
+\displaystyle \frac{dP}{dz}=-\alpha_{\rm bus}P,\qquad P(z+d)=P(z)e^{-\alpha_{\rm bus}d}
+\]
+\subsection*{segments}
+\[
+\displaystyle B_0=1,\qquad B_k=e^{-\alpha_{\rm bus}d_k}\ (k\ge1),\qquad B_{\rm out}=1
+\]
+\subsection*{power handoff}
+\[
+\displaystyle P_{{\rm in},k+1}=B_{k+1}\bar q_kP_{{\rm in},k}
+\]

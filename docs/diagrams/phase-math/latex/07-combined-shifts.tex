@@ -1,0 +1,16 @@
+\section*{thermal and voltage shifts}
+\[
+\begin{array}{ll}T\ [\mathrm K],\quad V,V_{\rm ref}\ [\mathrm V]&\text{temperature, current and reference bias}\\[0.6em]\lambda_0,\lambda_r\ [\mathrm m]&\text{reference, shifted resonance}\\[0.6em]\Delta\lambda_T,\Delta\lambda_V\ [\mathrm m]&\text{thermal, voltage shift}\\[0.6em]\Delta n_J,n_{g0}\ [1]&\text{junction index difference, group index}\\[0.6em]n_{\rm eff}\ [1]&\text{effective index}\end{array}
+\]
+\subsection*{dispersion}
+\[
+\displaystyle n_g=n_{\rm eff}-\lambda\frac{dn_{\rm eff}}{d\lambda}
+\]
+\subsection*{voltage conversion}
+\[
+\displaystyle \Delta\lambda_V\simeq\frac{\lambda_0}{n_{g0}}\Delta n_J
+\]
+\subsection*{combined model}
+\[
+\displaystyle \begin{aligned}\Delta\lambda_r(T,V)&=\Delta\lambda_T(T)+\frac{\lambda_0}{n_{g0}}[n_J(V)-n_J(V_{\rm ref})]\\\lambda_r(T,V)&=\lambda_0+\Delta\lambda_r(T,V)\end{aligned}
+\]

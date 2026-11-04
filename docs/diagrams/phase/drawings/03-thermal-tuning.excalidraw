@@ -1,0 +1,1266 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mrm-model phase.py visual companion",
+  "elements": [
+    {
+      "id": "03-thermal-tuning-000",
+      "type": "text",
+      "x": 90,
+      "y": 65,
+      "width": 683.0277709960938,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 238364548,
+      "version": 1,
+      "versionNonce": 238364548,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "how does warming move the resonance?",
+      "originalText": "how does warming move the resonance?",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 90,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "03-thermal-tuning-001",
+      "type": "arrow",
+      "x": 230,
+      "y": 1030,
+      "width": 1850,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 70931632,
+      "version": 1,
+      "versionNonce": 70931632,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1850,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-002",
+      "type": "arrow",
+      "x": 230,
+      "y": 1030,
+      "width": 0,
+      "height": 620,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 238780613,
+      "version": 1,
+      "versionNonce": 238780613,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -620
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-003",
+      "type": "text",
+      "x": 230,
+      "y": 325,
+      "width": 374.5798645019531,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 229059504,
+      "version": 1,
+      "versionNonce": 229059504,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "resonance wavelength",
+      "originalText": "resonance wavelength",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 230,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "03-thermal-tuning-004",
+      "type": "text",
+      "x": 1011.6840515136719,
+      "y": 1095,
+      "width": 286.63189697265625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 24207638,
+      "version": 1,
+      "versionNonce": 24207638,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "ring temperature",
+      "originalText": "ring temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1155,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "03-thermal-tuning-005",
+      "type": "line",
+      "x": 230,
+      "y": 955.6,
+      "width": 1850,
+      "height": 477.4,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 125618329,
+      "version": 1,
+      "versionNonce": 125618329,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          13.309352517985616,
+          -1.5746286424098344
+        ],
+        [
+          26.61870503597123,
+          -3.1762124113658956
+        ],
+        [
+          39.92805755395682,
+          -4.804751306868184
+        ],
+        [
+          53.23741007194246,
+          -6.4602453289168125
+        ],
+        [
+          66.54676258992805,
+          -8.142694477511554
+        ],
+        [
+          79.85611510791364,
+          -9.852098752652523
+        ],
+        [
+          93.16546762589928,
+          -11.588458154339833
+        ],
+        [
+          106.47482014388493,
+          -13.351772682573369
+        ],
+        [
+          119.78417266187051,
+          -15.142042337353132
+        ],
+        [
+          133.0935251798561,
+          -16.959267118679122
+        ],
+        [
+          146.40287769784175,
+          -18.803447026551453
+        ],
+        [
+          159.71223021582733,
+          -20.67458206097001
+        ],
+        [
+          173.02158273381292,
+          -22.57267222193468
+        ],
+        [
+          186.33093525179856,
+          -24.497717509445692
+        ],
+        [
+          199.64028776978415,
+          -26.44971792350293
+        ],
+        [
+          212.9496402877698,
+          -28.428673464106396
+        ],
+        [
+          226.25899280575538,
+          -30.4345841312562
+        ],
+        [
+          239.56834532374103,
+          -32.46744992495212
+        ],
+        [
+          252.87769784172667,
+          -34.52727084519438
+        ],
+        [
+          266.1870503597122,
+          -36.614046891982866
+        ],
+        [
+          279.49640287769785,
+          -38.72777806531758
+        ],
+        [
+          292.8057553956835,
+          -40.86846436519852
+        ],
+        [
+          306.11510791366914,
+          -43.03610579162569
+        ],
+        [
+          319.42446043165467,
+          -45.230702344599194
+        ],
+        [
+          332.7338129496402,
+          -47.452254024118815
+        ],
+        [
+          346.04316546762584,
+          -49.70076083018478
+        ],
+        [
+          359.3525179856115,
+          -51.976222762796965
+        ],
+        [
+          372.66187050359713,
+          -54.27863982195538
+        ],
+        [
+          385.9712230215828,
+          -56.60801200766002
+        ],
+        [
+          399.2805755395683,
+          -58.964339319911005
+        ],
+        [
+          412.58992805755395,
+          -61.347621758708215
+        ],
+        [
+          425.8992805755396,
+          -63.75785932405154
+        ],
+        [
+          439.2086330935251,
+          -66.1950520159412
+        ],
+        [
+          452.51798561151077,
+          -68.65919983437709
+        ],
+        [
+          465.8273381294964,
+          -71.15030277935932
+        ],
+        [
+          479.13669064748206,
+          -73.66836085088767
+        ],
+        [
+          492.4460431654677,
+          -76.21337404896224
+        ],
+        [
+          505.75539568345334,
+          -78.78534237358315
+        ],
+        [
+          519.0647482014388,
+          -81.38426582475029
+        ],
+        [
+          532.3741007194244,
+          -84.01014440246365
+        ],
+        [
+          545.68345323741,
+          -86.66297810672324
+        ],
+        [
+          558.9928057553957,
+          -89.34276693752906
+        ],
+        [
+          572.3021582733813,
+          -92.04951089488122
+        ],
+        [
+          585.6115107913669,
+          -94.78320997877961
+        ],
+        [
+          598.9208633093525,
+          -97.54386418922422
+        ],
+        [
+          612.2302158273382,
+          -100.33147352621506
+        ],
+        [
+          625.5395683453238,
+          -103.14603798975213
+        ],
+        [
+          638.8489208633093,
+          -105.98755757983542
+        ],
+        [
+          652.1582733812949,
+          -108.85603229646506
+        ],
+        [
+          665.4676258992805,
+          -111.75146213964081
+        ],
+        [
+          678.7769784172662,
+          -114.6738471093629
+        ],
+        [
+          692.0863309352518,
+          -117.62318720563121
+        ],
+        [
+          705.3956834532374,
+          -120.59948242844575
+        ],
+        [
+          718.7050359712231,
+          -123.60273277780652
+        ],
+        [
+          732.0143884892086,
+          -126.63293825371363
+        ],
+        [
+          745.3237410071943,
+          -129.69009885616686
+        ],
+        [
+          758.6330935251799,
+          -132.77421458516642
+        ],
+        [
+          771.9424460431655,
+          -135.8852854407122
+        ],
+        [
+          785.2517985611511,
+          -139.02331142280423
+        ],
+        [
+          798.5611510791366,
+          -142.18829253144247
+        ],
+        [
+          811.8705035971223,
+          -145.38022876662694
+        ],
+        [
+          825.1798561151079,
+          -148.59912012835775
+        ],
+        [
+          838.4892086330935,
+          -151.8449666166348
+        ],
+        [
+          851.7985611510792,
+          -155.11776823145794
+        ],
+        [
+          865.1079136690646,
+          -158.41752497282744
+        ],
+        [
+          878.4172661870502,
+          -161.74423684074327
+        ],
+        [
+          891.7266187050359,
+          -165.09790383520522
+        ],
+        [
+          905.0359712230215,
+          -168.4785259562135
+        ],
+        [
+          918.3453237410072,
+          -171.8861032037679
+        ],
+        [
+          931.6546762589928,
+          -175.32063557786864
+        ],
+        [
+          944.9640287769785,
+          -178.7821230785156
+        ],
+        [
+          958.2733812949641,
+          -182.2705657057088
+        ],
+        [
+          971.5827338129495,
+          -185.78596345944823
+        ],
+        [
+          984.8920863309354,
+          -189.328316339734
+        ],
+        [
+          998.2014388489208,
+          -192.89762434656598
+        ],
+        [
+          1011.5107913669067,
+          -196.4938874799442
+        ],
+        [
+          1024.820143884892,
+          -200.11710573986863
+        ],
+        [
+          1038.1294964028775,
+          -203.7672791263392
+        ],
+        [
+          1051.4388489208634,
+          -207.4444076393562
+        ],
+        [
+          1064.7482014388488,
+          -211.14849127891932
+        ],
+        [
+          1078.0575539568347,
+          -214.87953004502867
+        ],
+        [
+          1091.36690647482,
+          -218.63752393768436
+        ],
+        [
+          1104.6762589928057,
+          -222.42247295688628
+        ],
+        [
+          1117.9856115107914,
+          -226.23437710263443
+        ],
+        [
+          1131.294964028777,
+          -230.0732363749288
+        ],
+        [
+          1144.6043165467627,
+          -233.9390507737695
+        ],
+        [
+          1157.913669064748,
+          -237.83182029915633
+        ],
+        [
+          1171.2230215827337,
+          -241.7515449510894
+        ],
+        [
+          1184.5323741007194,
+          -245.6982247295689
+        ],
+        [
+          1197.841726618705,
+          -249.6718596345945
+        ],
+        [
+          1211.1510791366907,
+          -253.67244966616636
+        ],
+        [
+          1224.4604316546763,
+          -257.69999482428443
+        ],
+        [
+          1237.7697841726617,
+          -261.75449510894884
+        ],
+        [
+          1251.0791366906476,
+          -265.8359505201594
+        ],
+        [
+          1264.388489208633,
+          -269.94436105791624
+        ],
+        [
+          1277.6978417266187,
+          -274.07972672221933
+        ],
+        [
+          1291.0071942446043,
+          -278.24204751306854
+        ],
+        [
+          1304.3165467625897,
+          -282.4313234304642
+        ],
+        [
+          1317.6258992805756,
+          -286.6475544744061
+        ],
+        [
+          1330.935251798561,
+          -290.8907406448942
+        ],
+        [
+          1344.2446043165469,
+          -295.16088194192855
+        ],
+        [
+          1357.5539568345323,
+          -299.4579783655091
+        ],
+        [
+          1370.863309352518,
+          -303.7820299156359
+        ],
+        [
+          1384.1726618705036,
+          -308.13303659230894
+        ],
+        [
+          1397.4820143884892,
+          -312.5109983955282
+        ],
+        [
+          1410.7913669064749,
+          -316.91591532529367
+        ],
+        [
+          1424.1007194244605,
+          -321.3477873816055
+        ],
+        [
+          1437.4100719424462,
+          -325.80661456446353
+        ],
+        [
+          1450.7194244604316,
+          -330.2923968738678
+        ],
+        [
+          1464.0287769784172,
+          -334.8051343098183
+        ],
+        [
+          1477.3381294964029,
+          -339.34482687231514
+        ],
+        [
+          1490.6474820143885,
+          -343.9114745613581
+        ],
+        [
+          1503.9568345323742,
+          -348.5050773769474
+        ],
+        [
+          1517.2661870503598,
+          -353.1256353190829
+        ],
+        [
+          1530.5755395683452,
+          -357.77314838776454
+        ],
+        [
+          1543.884892086331,
+          -362.4476165829925
+        ],
+        [
+          1557.1942446043165,
+          -367.1490399047668
+        ],
+        [
+          1570.5035971223022,
+          -371.87741835308736
+        ],
+        [
+          1583.8129496402878,
+          -376.632751927954
+        ],
+        [
+          1597.1223021582732,
+          -381.415040629367
+        ],
+        [
+          1610.431654676259,
+          -386.22428445732623
+        ],
+        [
+          1623.7410071942445,
+          -391.0604834118317
+        ],
+        [
+          1637.0503597122304,
+          -395.92363749288336
+        ],
+        [
+          1650.3597122302158,
+          -400.8137467004814
+        ],
+        [
+          1663.6690647482014,
+          -405.7308110346255
+        ],
+        [
+          1676.978417266187,
+          -410.674830495316
+        ],
+        [
+          1690.2877697841727,
+          -415.64580508255267
+        ],
+        [
+          1703.5971223021584,
+          -420.6437347963356
+        ],
+        [
+          1716.9064748201438,
+          -425.66861963666486
+        ],
+        [
+          1730.2158273381294,
+          -430.7204596035401
+        ],
+        [
+          1743.525179856115,
+          -435.79925469696184
+        ],
+        [
+          1756.8345323741007,
+          -440.9050049169298
+        ],
+        [
+          1770.1438848920864,
+          -446.03771026344396
+        ],
+        [
+          1783.453237410072,
+          -451.19737073650435
+        ],
+        [
+          1796.7625899280574,
+          -456.383986336111
+        ],
+        [
+          1810.0719424460433,
+          -461.59755706226395
+        ],
+        [
+          1823.3812949640287,
+          -466.838082914963
+        ],
+        [
+          1836.6906474820144,
+          -472.10556389420833
+        ],
+        [
+          1850,
+          -477.4
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-006",
+      "type": "ellipse",
+      "x": 923,
+      "y": 825.53824,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 142260972,
+      "version": 1,
+      "versionNonce": 142260972,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "03-thermal-tuning-007",
+      "type": "line",
+      "x": 933,
+      "y": 857.53824,
+      "width": 0,
+      "height": 192.46176000000003,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 214333420,
+      "version": 1,
+      "versionNonce": 214333420,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          192.46176000000003
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-008",
+      "type": "text",
+      "x": 760.2000579833984,
+      "y": 1180,
+      "width": 345.5998840332031,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 219209850,
+      "version": 1,
+      "versionNonce": 219209850,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "reference resonance",
+      "originalText": "reference resonance",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 933,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "03-thermal-tuning-009",
+      "type": "ellipse",
+      "x": 1737,
+      "y": 592.5670399999999,
+      "width": 20,
+      "height": 20,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "#1e1e1e",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 0,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 136046636,
+      "version": 1,
+      "versionNonce": 136046636,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "03-thermal-tuning-010",
+      "type": "line",
+      "x": 1747,
+      "y": 624.5670399999999,
+      "width": 0,
+      "height": 425.4329600000001,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 159286040,
+      "version": 1,
+      "versionNonce": 159286040,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          425.4329600000001
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-011",
+      "type": "text",
+      "x": 1649.440040588379,
+      "y": 1180,
+      "width": 195.1199188232422,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 223614283,
+      "version": 1,
+      "versionNonce": 223614283,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "warmer ring",
+      "originalText": "warmer ring",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1747,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "03-thermal-tuning-012",
+      "type": "arrow",
+      "x": 1600,
+      "y": 490,
+      "width": 240,
+      "height": 100,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 12117166,
+      "version": 1,
+      "versionNonce": 12117166,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          240,
+          -100
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-013",
+      "type": "text",
+      "x": 1160,
+      "y": 260,
+      "width": 718.8837280273438,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 60916510,
+      "version": 1,
+      "versionNonce": 60916510,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "sensitivity can increase with temperature",
+      "originalText": "sensitivity can increase with temperature",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1160,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "03-thermal-tuning-014",
+      "type": "ellipse",
+      "x": 366,
+      "y": 924.57344,
+      "width": 24,
+      "height": 24,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 226692623,
+      "version": 1,
+      "versionNonce": 226692623,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "03-thermal-tuning-015",
+      "type": "line",
+      "x": 378,
+      "y": 956.57344,
+      "width": 0,
+      "height": 93.42656,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 38599899,
+      "version": 1,
+      "versionNonce": 38599899,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          93.42656
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "03-thermal-tuning-016",
+      "type": "text",
+      "x": 269.51404571533203,
+      "y": 1290,
+      "width": 216.97190856933594,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 216766016,
+      "version": 1,
+      "versionNonce": 216766016,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "slope anchor",
+      "originalText": "slope anchor",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 378,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "03-thermal-tuning-017",
+      "type": "text",
+      "x": 1050,
+      "y": 1390,
+      "width": 742.211669921875,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 162140326,
+      "version": 1,
+      "versionNonce": 162140326,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "the two reference temperatures can differ",
+      "originalText": "the two reference temperatures can differ",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1050,
+        "labelCentered": false
+      }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

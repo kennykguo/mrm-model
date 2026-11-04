@@ -1,0 +1,2058 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mrm-model phase.py visual companion",
+  "elements": [
+    {
+      "id": "02-bus-segments-000",
+      "type": "text",
+      "x": 90,
+      "y": 65,
+      "width": 663.4437255859375,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 10352619,
+      "version": 1,
+      "versionNonce": 10352619,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "how much light reaches the next ring?",
+      "originalText": "how much light reaches the next ring?",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 90,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "02-bus-segments-001",
+      "type": "text",
+      "x": 160,
+      "y": 290,
+      "width": 250.95590209960938,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 22553477,
+      "version": 1,
+      "versionNonce": 22553477,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "chip input loss",
+      "originalText": "chip input loss",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 160,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "02-bus-segments-002",
+      "type": "line",
+      "x": 180,
+      "y": 540,
+      "width": 2080,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 10750178,
+      "version": 1,
+      "versionNonce": 10750178,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          2080,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-003",
+      "type": "ellipse",
+      "x": 450,
+      "y": 610,
+      "width": 300,
+      "height": 300,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 106730913,
+      "version": 1,
+      "versionNonce": 106730913,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-004",
+      "type": "ellipse",
+      "x": 433,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 149064600,
+      "version": 1,
+      "versionNonce": 149064600,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-005",
+      "type": "ellipse",
+      "x": 733,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 26323451,
+      "version": 1,
+      "versionNonce": 26323451,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-006",
+      "type": "line",
+      "x": 600,
+      "y": 540,
+      "width": 0,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 228804361,
+      "version": 1,
+      "versionNonce": 228804361,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-007",
+      "type": "text",
+      "x": 446.748046875,
+      "y": 1040,
+      "width": 306.50390625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 225599524,
+      "version": 1,
+      "versionNonce": 225599524,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "first encountered",
+      "originalText": "first encountered",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 600,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-008",
+      "type": "ellipse",
+      "x": 1080,
+      "y": 610,
+      "width": 300,
+      "height": 300,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 75053943,
+      "version": 1,
+      "versionNonce": 75053943,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-009",
+      "type": "ellipse",
+      "x": 1063,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 4479928,
+      "version": 1,
+      "versionNonce": 4479928,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-010",
+      "type": "ellipse",
+      "x": 1363,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 190337962,
+      "version": 1,
+      "versionNonce": 190337962,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-011",
+      "type": "line",
+      "x": 1230,
+      "y": 540,
+      "width": 0,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 251565024,
+      "version": 1,
+      "versionNonce": 251565024,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-012",
+      "type": "text",
+      "x": 1151.4480361938477,
+      "y": 1040,
+      "width": 157.1039276123047,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 138470152,
+      "version": 1,
+      "versionNonce": 138470152,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "next ring",
+      "originalText": "next ring",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1230,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-013",
+      "type": "ellipse",
+      "x": 1710,
+      "y": 610,
+      "width": 300,
+      "height": 300,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 148256309,
+      "version": 1,
+      "versionNonce": 148256309,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-014",
+      "type": "ellipse",
+      "x": 1693,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 39527287,
+      "version": 1,
+      "versionNonce": 39527287,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-015",
+      "type": "ellipse",
+      "x": 1993,
+      "y": 743,
+      "width": 34,
+      "height": 34,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 251677249,
+      "version": 1,
+      "versionNonce": 251677249,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "02-bus-segments-016",
+      "type": "line",
+      "x": 1860,
+      "y": 540,
+      "width": 0,
+      "height": 50,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 60983577,
+      "version": 1,
+      "versionNonce": 60983577,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          50
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-017",
+      "type": "text",
+      "x": 1781.4480361938477,
+      "y": 1040,
+      "width": 157.1039276123047,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 220177055,
+      "version": 1,
+      "versionNonce": 220177055,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "next ring",
+      "originalText": "next ring",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1860,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-018",
+      "type": "arrow",
+      "x": 300,
+      "y": 540,
+      "width": 95,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 267685927,
+      "version": 1,
+      "versionNonce": 267685927,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          95,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-019",
+      "type": "arrow",
+      "x": 870,
+      "y": 540,
+      "width": 95,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 93582108,
+      "version": 1,
+      "versionNonce": 93582108,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          95,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-020",
+      "type": "arrow",
+      "x": 1500,
+      "y": 540,
+      "width": 95,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 68923410,
+      "version": 1,
+      "versionNonce": 68923410,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          95,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-021",
+      "type": "arrow",
+      "x": 2130,
+      "y": 540,
+      "width": 95,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 90356474,
+      "version": 1,
+      "versionNonce": 90356474,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          95,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-022",
+      "type": "line",
+      "x": 670,
+      "y": 376,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 169357250,
+      "version": 1,
+      "versionNonce": 169357250,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-023",
+      "type": "line",
+      "x": 1160,
+      "y": 376,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 265968527,
+      "version": 1,
+      "versionNonce": 265968527,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-024",
+      "type": "line",
+      "x": 670,
+      "y": 390,
+      "width": 490,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 198368155,
+      "version": 1,
+      "versionNonce": 198368155,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          490,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-025",
+      "type": "text",
+      "x": 803.3280334472656,
+      "y": 325,
+      "width": 223.34393310546875,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 71751465,
+      "version": 1,
+      "versionNonce": 71751465,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "same spacing",
+      "originalText": "same spacing",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 915,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-026",
+      "type": "line",
+      "x": 1300,
+      "y": 376,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 117147030,
+      "version": 1,
+      "versionNonce": 117147030,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-027",
+      "type": "line",
+      "x": 1790,
+      "y": 376,
+      "width": 0,
+      "height": 28,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 69243534,
+      "version": 1,
+      "versionNonce": 69243534,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          28
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-028",
+      "type": "line",
+      "x": 1300,
+      "y": 390,
+      "width": 490,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 252660250,
+      "version": 1,
+      "versionNonce": 252660250,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          490,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-029",
+      "type": "text",
+      "x": 1433.3280334472656,
+      "y": 325,
+      "width": 223.34393310546875,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 266696802,
+      "version": 1,
+      "versionNonce": 266696802,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "same spacing",
+      "originalText": "same spacing",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1545,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-030",
+      "type": "text",
+      "x": 223.06808471679688,
+      "y": 1180,
+      "width": 333.86383056640625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 125320144,
+      "version": 1,
+      "versionNonce": 125320144,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "no extra input loss",
+      "originalText": "no extra input loss",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 390,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-031",
+      "type": "text",
+      "x": 937.9500427246094,
+      "y": 1180,
+      "width": 224.09991455078125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 51831855,
+      "version": 1,
+      "versionNonce": 51831855,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "segment loss",
+      "originalText": "segment loss",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1050,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-032",
+      "type": "text",
+      "x": 1547.9500427246094,
+      "y": 1180,
+      "width": 224.09991455078125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 248716563,
+      "version": 1,
+      "versionNonce": 248716563,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "segment loss",
+      "originalText": "segment loss",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1660,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-033",
+      "type": "text",
+      "x": 1940,
+      "y": 290,
+      "width": 285.0838928222656,
+      "height": 90,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 170090104,
+      "version": 1,
+      "versionNonce": 170090104,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "no final-segment\nloss modeled",
+      "originalText": "no final-segment\nloss modeled",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1940,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "02-bus-segments-034",
+      "type": "arrow",
+      "x": 230,
+      "y": 1460,
+      "width": 1750,
+      "height": 0,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 117958950,
+      "version": 1,
+      "versionNonce": 117958950,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          1750,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-035",
+      "type": "arrow",
+      "x": 230,
+      "y": 1460,
+      "width": 0,
+      "height": 150,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 173141764,
+      "version": 1,
+      "versionNonce": 173141764,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          -150
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": false
+    },
+    {
+      "id": "02-bus-segments-036",
+      "type": "text",
+      "x": 230,
+      "y": 1225,
+      "width": 267.91192626953125,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 187000595,
+      "version": 1,
+      "versionNonce": 187000595,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "power remaining",
+      "originalText": "power remaining",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "left",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 230,
+        "labelCentered": false
+      }
+    },
+    {
+      "id": "02-bus-segments-037",
+      "type": "text",
+      "x": 864.7540893554688,
+      "y": 1525,
+      "width": 480.4918212890625,
+      "height": 45,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 130667883,
+      "version": 1,
+      "versionNonce": 130667883,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "text": "distance along one segment",
+      "originalText": "distance along one segment",
+      "fontSize": 36,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "top",
+      "containerId": null,
+      "autoResize": true,
+      "lineHeight": 1.25,
+      "customData": {
+        "labelAnchorX": 1105,
+        "labelCentered": true
+      }
+    },
+    {
+      "id": "02-bus-segments-038",
+      "type": "line",
+      "x": 230,
+      "y": 1331.75,
+      "width": 1750,
+      "height": 89.62184232226014,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 4,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "roundness": null,
+      "seed": 125984010,
+      "version": 1,
+      "versionNonce": 125984010,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1793188800000,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          12.589928057553948,
+          1.1024287124939747
+        ],
+        [
+          25.179856115107924,
+          2.1953810190143486
+        ],
+        [
+          37.76978417266184,
+          3.278938378134171
+        ],
+        [
+          50.35971223021585,
+          4.353181548214479
+        ],
+        [
+          62.949640287769796,
+          5.418190593422423
+        ],
+        [
+          75.53956834532374,
+          6.474044889698462
+        ],
+        [
+          88.12949640287769,
+          7.520823130672852
+        ],
+        [
+          100.71942446043164,
+          8.558603333530755
+        ],
+        [
+          113.30935251798564,
+          9.587462844826177
+        ],
+        [
+          125.89928057553959,
+          10.607478346247262
+        ],
+        [
+          138.48920863309354,
+          11.618725860331324
+        ],
+        [
+          151.0791366906475,
+          12.621280756131227
+        ],
+        [
+          163.66906474820144,
+          13.615217754831747
+        ],
+        [
+          176.25899280575538,
+          14.600610935319764
+        ],
+        [
+          188.84892086330933,
+          15.577533739704222
+        ],
+        [
+          201.43884892086328,
+          16.546058978790825
+        ],
+        [
+          214.02877697841728,
+          17.506258837508312
+        ],
+        [
+          226.61870503597123,
+          18.45820488028835
+        ],
+        [
+          239.20863309352524,
+          19.401968056399255
+        ],
+        [
+          251.79856115107913,
+          20.337618705234263
+        ],
+        [
+          264.3884892086331,
+          21.265226561553618
+        ],
+        [
+          276.978417266187,
+          22.184860760681886
+        ],
+        [
+          289.568345323741,
+          23.09658984366115
+        ],
+        [
+          302.158273381295,
+          24.000481762359186
+        ],
+        [
+          314.7482014388489,
+          24.896603884533306
+        ],
+        [
+          327.33812949640287,
+          25.78502299885281
+        ],
+        [
+          339.92805755395693,
+          26.665805319875062
+        ],
+        [
+          352.51798561151077,
+          27.539016492981773
+        ],
+        [
+          365.1079136690648,
+          28.404721599271397
+        ],
+        [
+          377.69784172661866,
+          29.262985160409244
+        ],
+        [
+          390.2877697841727,
+          30.113871143436427
+        ],
+        [
+          402.87769784172656,
+          30.957442965537666
+        ],
+        [
+          415.4676258992806,
+          31.793763498767703
+        ],
+        [
+          428.05755395683457,
+          32.622895074737016
+        ],
+        [
+          440.6474820143885,
+          33.44489948925798
+        ],
+        [
+          453.23741007194246,
+          34.259838006949394
+        ],
+        [
+          465.8273381294964,
+          35.06777136580399
+        ],
+        [
+          478.4172661870505,
+          35.86875978171429
+        ],
+        [
+          491.0071942446043,
+          36.662862952961405
+        ],
+        [
+          503.59712230215825,
+          37.4501400646634
+        ],
+        [
+          516.1870503597122,
+          38.23064979318701
+        ],
+        [
+          528.7769784172662,
+          39.004450310520724
+        ],
+        [
+          541.3669064748202,
+          39.77159928861033
+        ],
+        [
+          553.956834532374,
+          40.532153903657445
+        ],
+        [
+          566.546762589928,
+          41.286170840380464
+        ],
+        [
+          579.136690647482,
+          42.0337062962401
+        ],
+        [
+          591.726618705036,
+          42.7748159856269
+        ],
+        [
+          604.31654676259,
+          43.50955514401403
+        ],
+        [
+          616.9064748201438,
+          44.23797853207452
+        ],
+        [
+          629.4964028776978,
+          44.960140439761744
+        ],
+        [
+          642.0863309352518,
+          45.67609469035665
+        ],
+        [
+          654.6762589928057,
+          46.38589464447841
+        ],
+        [
+          667.2661870503597,
+          47.089593204061885
+        ],
+        [
+          679.8561151079138,
+          47.787242816299795
+        ],
+        [
+          692.4460431654676,
+          48.47889547755335
+        ],
+        [
+          705.0359712230215,
+          49.164602737225096
+        ],
+        [
+          717.6258992805756,
+          49.84441570160311
+        ],
+        [
+          730.2158273381295,
+          50.51838503766862
+        ],
+        [
+          742.8057553956835,
+          51.18656097687335
+        ],
+        [
+          755.3956834532373,
+          51.848993318882094
+        ],
+        [
+          767.9856115107914,
+          52.5057314352855
+        ],
+        [
+          780.5755395683453,
+          53.15682427327829
+        ],
+        [
+          793.1654676258993,
+          53.80232035930953
+        ],
+        [
+          805.7553956834531,
+          54.44226780269719
+        ],
+        [
+          818.3453237410072,
+          55.0767142992147
+        ],
+        [
+          830.9352517985612,
+          55.70570713464599
+        ],
+        [
+          843.5251798561151,
+          56.32929318830952
+        ],
+        [
+          856.1151079136691,
+          56.94751893655166
+        ],
+        [
+          868.705035971223,
+          57.56043045621186
+        ],
+        [
+          881.294964028777,
+          58.16807342805532
+        ],
+        [
+          893.8848920863311,
+          58.77049314017859
+        ],
+        [
+          906.4748201438849,
+          59.36773449138468
+        ],
+        [
+          919.0647482014388,
+          59.9598419945296
+        ],
+        [
+          931.6546762589928,
+          60.54685977983945
+        ],
+        [
+          944.2446043165469,
+          61.12883159819967
+        ],
+        [
+          956.834532374101,
+          61.70580082441643
+        ],
+        [
+          969.4244604316546,
+          62.277810460448336
+        ],
+        [
+          982.0143884892086,
+          62.844903138611926
+        ],
+        [
+          994.6043165467627,
+          63.40712112475967
+        ],
+        [
+          1007.1942446043165,
+          63.9645063214291
+        ],
+        [
+          1019.7841726618706,
+          64.51710027096601
+        ],
+        [
+          1032.3741007194244,
+          65.0649441586213
+        ],
+        [
+          1044.9640287769782,
+          65.60807881561982
+        ],
+        [
+          1057.5539568345323,
+          66.14654472220423
+        ],
+        [
+          1070.1438848920864,
+          66.68038201065133
+        ],
+        [
+          1082.7338129496404,
+          67.20963046826319
+        ],
+        [
+          1095.3237410071943,
+          67.73432954033365
+        ],
+        [
+          1107.913669064748,
+          68.25451833308671
+        ],
+        [
+          1120.5035971223022,
+          68.77023561659166
+        ],
+        [
+          1133.093525179856,
+          69.28151982765326
+        ],
+        [
+          1145.68345323741,
+          69.78840907267568
+        ],
+        [
+          1158.273381294964,
+          70.29094113050292
+        ],
+        [
+          1170.863309352518,
+          70.78915345523501
+        ],
+        [
+          1183.453237410072,
+          71.28308317901792
+        ],
+        [
+          1196.0431654676258,
+          71.77276711481272
+        ],
+        [
+          1208.63309352518,
+          72.25824175913908
+        ],
+        [
+          1221.2230215827337,
+          72.73954329479398
+        ],
+        [
+          1233.8129496402876,
+          73.21670759355015
+        ],
+        [
+          1246.4028776978419,
+          73.68977021882847
+        ],
+        [
+          1258.9928057553957,
+          74.15876642834928
+        ],
+        [
+          1271.5827338129498,
+          74.62373117675952
+        ],
+        [
+          1284.1726618705036,
+          75.0846991182384
+        ],
+        [
+          1296.7625899280574,
+          75.54170460907994
+        ],
+        [
+          1309.3525179856115,
+          75.99478171025385
+        ],
+        [
+          1321.9424460431653,
+          76.44396418994415
+        ],
+        [
+          1334.5323741007194,
+          76.8892855260649
+        ],
+        [
+          1347.1223021582734,
+          77.33077890875711
+        ],
+        [
+          1359.7122302158275,
+          77.76847724286085
+        ],
+        [
+          1372.3021582733813,
+          78.20241315036878
+        ],
+        [
+          1384.8920863309352,
+          78.63261897285679
+        ],
+        [
+          1397.4820143884892,
+          79.05912677389438
+        ],
+        [
+          1410.071942446043,
+          79.48196834143528
+        ],
+        [
+          1422.6618705035971,
+          79.90117519018554
+        ],
+        [
+          1435.2517985611512,
+          80.316778563953
+        ],
+        [
+          1447.841726618705,
+          80.72880943797577
+        ],
+        [
+          1460.431654676259,
+          81.13729852123106
+        ],
+        [
+          1473.021582733813,
+          81.54227625872295
+        ],
+        [
+          1485.611510791367,
+          81.9437728337532
+        ],
+        [
+          1498.2014388489208,
+          82.34181817016906
+        ],
+        [
+          1510.7913669064747,
+          82.73644193459495
+        ],
+        [
+          1523.381294964029,
+          83.12767353864228
+        ],
+        [
+          1535.9712230215828,
+          83.51554214110251
+        ],
+        [
+          1548.5611510791368,
+          83.9000766501199
+        ],
+        [
+          1561.1510791366907,
+          84.28130572534656
+        ],
+        [
+          1573.7410071942445,
+          84.65925778007772
+        ],
+        [
+          1586.3309352517986,
+          85.0339609833693
+        ],
+        [
+          1598.9208633093524,
+          85.40544326213899
+        ],
+        [
+          1611.5107913669065,
+          85.77373230324542
+        ],
+        [
+          1624.1007194244605,
+          86.13885555555316
+        ],
+        [
+          1636.6906474820144,
+          86.50084023197837
+        ],
+        [
+          1649.2805755395684,
+          86.85971331151654
+        ],
+        [
+          1661.8705035971223,
+          87.21550154125339
+        ],
+        [
+          1674.4604316546763,
+          87.56823143835845
+        ],
+        [
+          1687.0503597122301,
+          87.91792929206122
+        ],
+        [
+          1699.6402877697842,
+          88.26462116561106
+        ],
+        [
+          1712.2302158273383,
+          88.60833289821903
+        ],
+        [
+          1724.820143884892,
+          88.94909010698439
+        ],
+        [
+          1737.4100719424462,
+          89.2869181888027
+        ],
+        [
+          1750,
+          89.62184232226014
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "elbowed": false
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

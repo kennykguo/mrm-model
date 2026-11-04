@@ -1,0 +1,20 @@
+\section*{reference dispersion}
+\[
+\begin{array}{ll}x,\lambda_0,d=x-\lambda_0\ [\mathrm m]&\text{coordinate, reference, offset}\\[0.6em]n_0,n_{g0}\ [1]&\text{reference effective, group index}\\[0.6em]D\ [\mathrm{m^{-1}}]&\text{reference group-index slope}\\[0.6em]n_{\rm cold}(x),\widetilde n_g(x)\ [1]&\text{quadratic index, linear group index}\end{array}
+\]
+\subsection*{reference derivatives}
+\[
+\displaystyle D=\left.\frac{dn_g}{d\lambda}\right|_{\lambda_0},\qquad n'_0=\frac{n_0-n_{g0}}{\lambda_0},\qquad n''_0=-\frac{D}{\lambda_0}
+\]
+\subsection*{index model}
+\[
+\displaystyle n_{\rm cold}(x)=n_0+\frac{n_0-n_{g0}}{\lambda_0}d-\frac{D}{2\lambda_0}d^2
+\]
+\subsection*{group-index model}
+\[
+\displaystyle \widetilde n_g(x)=n_{g0}+Dd
+\]
+\subsection*{polynomial consistency}
+\[
+\displaystyle n_{\rm cold}(x)-x n'_{\rm cold}(x)=\widetilde n_g(x)+\frac{D}{2\lambda_0}d^2
+\]

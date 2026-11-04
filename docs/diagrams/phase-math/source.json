@@ -1,0 +1,775 @@
+[
+  {
+    "slug": "01-reference-state",
+    "title": "reference state",
+    "symbols": [
+      [
+        "T_{\\rm ref}\\ [\\mathrm K]",
+        "reference temperature"
+      ],
+      [
+        "V_{\\rm ref}\\ [\\mathrm V]",
+        "reference reverse bias"
+      ],
+      [
+        "\\lambda_0,L,\\Delta\\lambda_r\\ [\\mathrm m]",
+        "reference resonance, length, shift"
+      ],
+      [
+        "n_0,n_{g0}\\ [1]",
+        "reference effective, group index"
+      ],
+      [
+        "m\\in\\mathbb Z",
+        "longitudinal order"
+      ],
+      [
+        "f,q(V),n_J(V)\\ [1]",
+        "coverage, table index, ring index"
+      ],
+      [
+        "\\alpha_J,\\alpha_{\\rm ref}\\ [\\mathrm{m^{-1}}]",
+        "junction, total intrinsic loss"
+      ]
+    ],
+    "groups": [
+      [
+        "resonance",
+        "\\displaystyle n_0L=m\\lambda_0,\\qquad\\phi_{\\rm ref}(\\lambda_0)=2\\pi m"
+      ],
+      [
+        "junction baseline",
+        "\\displaystyle \\begin{aligned}n_{J,\\rm ref}&=f q(V_{\\rm ref})\\\\\\alpha_{J,\\rm ref}&=\\alpha_J(V_{\\rm ref})\\end{aligned}"
+      ],
+      [
+        "reference shift",
+        "\\displaystyle \\Delta\\lambda_r(T_{\\rm ref},V_{\\rm ref})=0"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T_{\\rm ref}\\ [\\mathrm K]&\\text{reference temperature}\\\\[0.6em]V_{\\rm ref}\\ [\\mathrm V]&\\text{reference reverse bias}\\\\[0.6em]\\lambda_0,L,\\Delta\\lambda_r\\ [\\mathrm m]&\\text{reference resonance, length, shift}\\\\[0.6em]n_0,n_{g0}\\ [1]&\\text{reference effective, group index}\\\\[0.6em]m\\in\\mathbb Z&\\text{longitudinal order}\\\\[0.6em]f,q(V),n_J(V)\\ [1]&\\text{coverage, table index, ring index}\\\\[0.6em]\\alpha_J,\\alpha_{\\rm ref}\\ [\\mathrm{m^{-1}}]&\\text{junction, total intrinsic loss}\\end{array}"
+  },
+  {
+    "slug": "02-bus-segments",
+    "title": "bus attenuation",
+    "symbols": [
+      [
+        "P(z),P_{{\\rm in},k}\\ [\\mathrm W]",
+        "waveguide, ring input power"
+      ],
+      [
+        "z,d_k\\ [\\mathrm m]",
+        "distance, segment length"
+      ],
+      [
+        "\\alpha_{\\rm bus}\\ [\\mathrm{m^{-1}}]",
+        "power attenuation"
+      ],
+      [
+        "B_k\\ [1]",
+        "segment power transmission"
+      ],
+      [
+        "k\\in\\{0,\\ldots,N-1\\}",
+        "bus position"
+      ],
+      [
+        "\\bar q_k\\ [1]",
+        "mean ring through fraction"
+      ]
+    ],
+    "groups": [
+      [
+        "propagation",
+        "\\displaystyle \\frac{dP}{dz}=-\\alpha_{\\rm bus}P,\\qquad P(z+d)=P(z)e^{-\\alpha_{\\rm bus}d}"
+      ],
+      [
+        "segments",
+        "\\displaystyle B_0=1,\\qquad B_k=e^{-\\alpha_{\\rm bus}d_k}\\ (k\\ge1),\\qquad B_{\\rm out}=1"
+      ],
+      [
+        "power handoff",
+        "\\displaystyle P_{{\\rm in},k+1}=B_{k+1}\\bar q_kP_{{\\rm in},k}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}P(z),P_{{\\rm in},k}\\ [\\mathrm W]&\\text{waveguide, ring input power}\\\\[0.6em]z,d_k\\ [\\mathrm m]&\\text{distance, segment length}\\\\[0.6em]\\alpha_{\\rm bus}\\ [\\mathrm{m^{-1}}]&\\text{power attenuation}\\\\[0.6em]B_k\\ [1]&\\text{segment power transmission}\\\\[0.6em]k\\in\\{0,\\ldots,N-1\\}&\\text{bus position}\\\\[0.6em]\\bar q_k\\ [1]&\\text{mean ring through fraction}\\end{array}"
+  },
+  {
+    "slug": "03-thermal-tuning",
+    "title": "thermal tuning",
+    "symbols": [
+      [
+        "T,T_{\\rm ref},T_0\\ [\\mathrm K]",
+        "ring, resonance anchor, slope anchor"
+      ],
+      [
+        "\\lambda_r,\\Delta\\lambda_T\\ [\\mathrm m]",
+        "resonance, thermal shift"
+      ],
+      [
+        "s(T),s_0\\ [\\mathrm{m/K}]",
+        "local, anchor tuning sensitivity"
+      ],
+      [
+        "\\beta\\ [\\mathrm{K^{-1}}]",
+        "relative tuning curvature"
+      ],
+      [
+        "u\\ [\\mathrm K]",
+        "integration temperature"
+      ]
+    ],
+    "groups": [
+      [
+        "sensitivity",
+        "\\displaystyle s(T)=\\frac{d\\lambda_r}{dT}=s_0[1+\\beta(T-T_0)]"
+      ],
+      [
+        "shift",
+        "\\displaystyle \\Delta\\lambda_T(T)=\\int_{T_{\\rm ref}}^T s(u)\\,du"
+      ],
+      [
+        "integrated law",
+        "\\displaystyle \\begin{aligned}\\Delta\\lambda_T(T)=s_0\\biggl[&(T-T_{\\rm ref})\\\\&+\\frac{\\beta}{2}\\bigl((T-T_0)^2-(T_{\\rm ref}-T_0)^2\\bigr)\\biggr]\\end{aligned}"
+      ],
+      [
+        "reference",
+        "\\displaystyle \\Delta\\lambda_T(T_{\\rm ref})=0,\\qquad s(T_0)=s_0"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T,T_{\\rm ref},T_0\\ [\\mathrm K]&\\text{ring, resonance anchor, slope anchor}\\\\[0.6em]\\lambda_r,\\Delta\\lambda_T\\ [\\mathrm m]&\\text{resonance, thermal shift}\\\\[0.6em]s(T),s_0\\ [\\mathrm{m/K}]&\\text{local, anchor tuning sensitivity}\\\\[0.6em]\\beta\\ [\\mathrm{K^{-1}}]&\\text{relative tuning curvature}\\\\[0.6em]u\\ [\\mathrm K]&\\text{integration temperature}\\end{array}"
+  },
+  {
+    "slug": "04-rebase-thermal-law",
+    "title": "thermal rebasing",
+    "symbols": [
+      [
+        "T_{\\rm prev},T_0,\\delta T\\ [\\mathrm K]",
+        "previous, anchor, increment"
+      ],
+      [
+        "s_0,s_{\\rm loc}\\ [\\mathrm{m/K}]",
+        "anchor, local sensitivity"
+      ],
+      [
+        "\\beta,\\beta_{\\rm loc}\\ [\\mathrm{K^{-1}}]",
+        "anchor, local relative curvature"
+      ],
+      [
+        "r_s\\ [1]",
+        "sensitivity ratio"
+      ],
+      [
+        "\\lambda_r\\ [\\mathrm m]",
+        "resonance wavelength"
+      ]
+    ],
+    "groups": [
+      [
+        "coefficients",
+        "\\displaystyle \\begin{aligned}r_s&=1+\\beta(T_{\\rm prev}-T_0)\\ne0\\\\s_{\\rm loc}&=s_0r_s,\\qquad\\beta_{\\rm loc}=\\frac{\\beta}{r_s}\\end{aligned}"
+      ],
+      [
+        "local shift",
+        "\\displaystyle \\begin{aligned}\\delta T&=T-T_{\\rm prev}\\\\\\lambda_r(T)-\\lambda_r(T_{\\rm prev})&=s_{\\rm loc}\\left(\\delta T+\\frac{\\beta_{\\rm loc}}2\\delta T^2\\right)\\end{aligned}"
+      ],
+      [
+        "curvature",
+        "\\displaystyle s_{\\rm loc}\\beta_{\\rm loc}=s_0\\beta=\\frac{d^2\\lambda_r}{dT^2}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T_{\\rm prev},T_0,\\delta T\\ [\\mathrm K]&\\text{previous, anchor, increment}\\\\[0.6em]s_0,s_{\\rm loc}\\ [\\mathrm{m/K}]&\\text{anchor, local sensitivity}\\\\[0.6em]\\beta,\\beta_{\\rm loc}\\ [\\mathrm{K^{-1}}]&\\text{anchor, local relative curvature}\\\\[0.6em]r_s\\ [1]&\\text{sensitivity ratio}\\\\[0.6em]\\lambda_r\\ [\\mathrm m]&\\text{resonance wavelength}\\end{array}"
+  },
+  {
+    "slug": "05-junction-device",
+    "title": "junction coverage",
+    "symbols": [
+      [
+        "V\\ [\\mathrm V],\\quad f\\in[0,1]",
+        "reverse bias, junction coverage"
+      ],
+      [
+        "L,L_J\\ [\\mathrm m]",
+        "ring, junction length"
+      ],
+      [
+        "q(V),n_J(V)\\ [1]",
+        "table, ring index contribution"
+      ],
+      [
+        "\\alpha_{\\rm FCA},\\alpha_J\\ [\\mathrm{m^{-1}}]",
+        "table, ring junction loss"
+      ],
+      [
+        "c'(V)\\ [\\mathrm{F/m}]",
+        "table capacitance density"
+      ],
+      [
+        "r'(V)\\ [\\Omega\\,\\mathrm m]",
+        "table resistance-length product"
+      ],
+      [
+        "C_J\\ [\\mathrm F],\\quad R_s\\ [\\Omega]",
+        "junction capacitance, resistance"
+      ]
+    ],
+    "groups": [
+      [
+        "coverage",
+        "\\displaystyle L_J=fL"
+      ],
+      [
+        "optical properties",
+        "\\displaystyle n_J(V)=fq(V),\\qquad\\alpha_J(V)=f\\alpha_{\\rm FCA}(V)"
+      ],
+      [
+        "electrical properties",
+        "\\displaystyle C_J(V)=L_Jc'(V),\\qquad R_s(V)=\\begin{cases}r'(V)/L_J&L_J>0\\\\+\\infty&L_J=0\\end{cases}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}V\\ [\\mathrm V],\\quad f\\in[0,1]&\\text{reverse bias, junction coverage}\\\\[0.6em]L,L_J\\ [\\mathrm m]&\\text{ring, junction length}\\\\[0.6em]q(V),n_J(V)\\ [1]&\\text{table, ring index contribution}\\\\[0.6em]\\alpha_{\\rm FCA},\\alpha_J\\ [\\mathrm{m^{-1}}]&\\text{table, ring junction loss}\\\\[0.6em]c'(V)\\ [\\mathrm{F/m}]&\\text{table capacitance density}\\\\[0.6em]r'(V)\\ [\\Omega\\,\\mathrm m]&\\text{table resistance-length product}\\\\[0.6em]C_J\\ [\\mathrm F],\\quad R_s\\ [\\Omega]&\\text{junction capacitance, resistance}\\end{array}"
+  },
+  {
+    "slug": "06-voltage-tables",
+    "title": "junction table interpolation",
+    "symbols": [
+      [
+        "V,V_i,V_{\\rm ref}\\ [\\mathrm V]",
+        "query, grid, reference bias"
+      ],
+      [
+        "i\\in\\{0,\\ldots,G-2\\}",
+        "grid interval"
+      ],
+      [
+        "y_i,\\mathcal I_y(V)",
+        "table, interpolated property"
+      ],
+      [
+        "w_i\\ [1]",
+        "interpolation weight"
+      ],
+      [
+        "\\chi_{\\rm clip}\\in\\{0,1\\}",
+        "clipping flag"
+      ],
+      [
+        "n_J\\ [1],\\quad\\alpha_J\\ [\\mathrm{m^{-1}}]",
+        "ring index, junction loss"
+      ]
+    ],
+    "groups": [
+      [
+        "interior",
+        "\\displaystyle w_i=\\frac{V-V_i}{V_{i+1}-V_i},\\qquad\\mathcal I_y(V)=y_i+w_i(y_{i+1}-y_i)"
+      ],
+      [
+        "endpoints",
+        "\\displaystyle \\mathcal I_y(V)=\\begin{cases}y_0&V\\le V_0\\\\y_{G-1}&V\\ge V_{G-1}\\end{cases}"
+      ],
+      [
+        "clipping",
+        "\\displaystyle \\chi_{\\rm clip}=\\begin{cases}1&V<V_0\\ \\lor\\ V>V_{G-1}\\\\0&V_0\\le V\\le V_{G-1}\\end{cases}"
+      ],
+      [
+        "reference differences",
+        "\\displaystyle \\begin{aligned}\\Delta n_J&=n_J(V)-n_J(V_{\\rm ref})\\\\\\Delta\\alpha_J&=\\alpha_J(V)-\\alpha_J(V_{\\rm ref})\\end{aligned}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}V,V_i,V_{\\rm ref}\\ [\\mathrm V]&\\text{query, grid, reference bias}\\\\[0.6em]i\\in\\{0,\\ldots,G-2\\}&\\text{grid interval}\\\\[0.6em]y_i,\\mathcal I_y(V)&\\text{table, interpolated property}\\\\[0.6em]w_i\\ [1]&\\text{interpolation weight}\\\\[0.6em]\\chi_{\\rm clip}\\in\\{0,1\\}&\\text{clipping flag}\\\\[0.6em]n_J\\ [1],\\quad\\alpha_J\\ [\\mathrm{m^{-1}}]&\\text{ring index, junction loss}\\end{array}"
+  },
+  {
+    "slug": "07-combined-shifts",
+    "title": "thermal and voltage shifts",
+    "symbols": [
+      [
+        "T\\ [\\mathrm K],\\quad V,V_{\\rm ref}\\ [\\mathrm V]",
+        "temperature, current and reference bias"
+      ],
+      [
+        "\\lambda_0,\\lambda_r\\ [\\mathrm m]",
+        "reference, shifted resonance"
+      ],
+      [
+        "\\Delta\\lambda_T,\\Delta\\lambda_V\\ [\\mathrm m]",
+        "thermal, voltage shift"
+      ],
+      [
+        "\\Delta n_J,n_{g0}\\ [1]",
+        "junction index difference, group index"
+      ],
+      [
+        "n_{\\rm eff}\\ [1]",
+        "effective index"
+      ]
+    ],
+    "groups": [
+      [
+        "dispersion",
+        "\\displaystyle n_g=n_{\\rm eff}-\\lambda\\frac{dn_{\\rm eff}}{d\\lambda}"
+      ],
+      [
+        "voltage conversion",
+        "\\displaystyle \\Delta\\lambda_V\\simeq\\frac{\\lambda_0}{n_{g0}}\\Delta n_J"
+      ],
+      [
+        "combined model",
+        "\\displaystyle \\begin{aligned}\\Delta\\lambda_r(T,V)&=\\Delta\\lambda_T(T)+\\frac{\\lambda_0}{n_{g0}}[n_J(V)-n_J(V_{\\rm ref})]\\\\\\lambda_r(T,V)&=\\lambda_0+\\Delta\\lambda_r(T,V)\\end{aligned}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T\\ [\\mathrm K],\\quad V,V_{\\rm ref}\\ [\\mathrm V]&\\text{temperature, current and reference bias}\\\\[0.6em]\\lambda_0,\\lambda_r\\ [\\mathrm m]&\\text{reference, shifted resonance}\\\\[0.6em]\\Delta\\lambda_T,\\Delta\\lambda_V\\ [\\mathrm m]&\\text{thermal, voltage shift}\\\\[0.6em]\\Delta n_J,n_{g0}\\ [1]&\\text{junction index difference, group index}\\\\[0.6em]n_{\\rm eff}\\ [1]&\\text{effective index}\\end{array}"
+  },
+  {
+    "slug": "08-loss-and-heat",
+    "title": "intrinsic loss and heat",
+    "symbols": [
+      [
+        "T_r,T_h,T_{\\rm ref}\\ [\\mathrm K]",
+        "ring, heater, reference temperature"
+      ],
+      [
+        "c_r,c_h\\ [\\mathrm{K^{-1}}]",
+        "fractional temperature sensitivities"
+      ],
+      [
+        "\\alpha_{\\rm ref},\\Delta\\alpha_J\\ [\\mathrm{m^{-1}}]",
+        "reference loss, junction loss change"
+      ],
+      [
+        "\\alpha,\\alpha_{\\rm nh},\\alpha_{\\rm heat}\\ [\\mathrm{m^{-1}}]",
+        "total, nonabsorptive, absorptive loss"
+      ],
+      [
+        "s_\\alpha,a,\\eta\\ [1]",
+        "loss factor, field retention, heat share"
+      ],
+      [
+        "L\\ [\\mathrm m]",
+        "round-trip length"
+      ]
+    ],
+    "groups": [
+      [
+        "temperature factor",
+        "\\displaystyle s_\\alpha=\\exp\\!\\left[c_r(T_r-T_{\\rm ref})+c_h(T_h-T_{\\rm ref})\\right]"
+      ],
+      [
+        "loss budget",
+        "\\displaystyle \\begin{aligned}\\alpha&=\\max\\!\\left(0,(\\alpha_{\\rm ref}+\\Delta\\alpha_J)s_\\alpha\\right)\\\\\\alpha_{\\rm nh}&=\\alpha_{\\rm nh,ref}\\\\\\alpha_{\\rm heat}&=\\max(0,\\alpha-\\alpha_{\\rm nh})\\end{aligned}"
+      ],
+      [
+        "optical inputs",
+        "\\displaystyle a=e^{-\\alpha L/2},\\qquad\\eta=\\begin{cases}\\min(1,\\alpha_{\\rm heat}/\\alpha)&\\alpha>0\\\\0&\\alpha=0\\end{cases}"
+      ],
+      [
+        "base G26",
+        "\\displaystyle c_r=c_h=0\\quad\\Longrightarrow\\quad s_\\alpha=1"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T_r,T_h,T_{\\rm ref}\\ [\\mathrm K]&\\text{ring, heater, reference temperature}\\\\[0.6em]c_r,c_h\\ [\\mathrm{K^{-1}}]&\\text{fractional temperature sensitivities}\\\\[0.6em]\\alpha_{\\rm ref},\\Delta\\alpha_J\\ [\\mathrm{m^{-1}}]&\\text{reference loss, junction loss change}\\\\[0.6em]\\alpha,\\alpha_{\\rm nh},\\alpha_{\\rm heat}\\ [\\mathrm{m^{-1}}]&\\text{total, nonabsorptive, absorptive loss}\\\\[0.6em]s_\\alpha,a,\\eta\\ [1]&\\text{loss factor, field retention, heat share}\\\\[0.6em]L\\ [\\mathrm m]&\\text{round-trip length}\\end{array}"
+  },
+  {
+    "slug": "09-shifted-phase-curve",
+    "title": "shifted reference phase",
+    "symbols": [
+      [
+        "\\lambda_L,\\lambda_0\\ [\\mathrm m]",
+        "laser, reference resonance"
+      ],
+      [
+        "\\Delta\\lambda_r\\ [\\mathrm m]",
+        "total resonance shift"
+      ],
+      [
+        "x,d\\ [\\mathrm m]",
+        "reference coordinate, offset"
+      ],
+      [
+        "n_{\\rm cold}(x)\\ [1]",
+        "reference effective index"
+      ],
+      [
+        "L\\ [\\mathrm m],\\quad m\\in\\mathbb Z",
+        "ring length, resonance order"
+      ],
+      [
+        "\\phi,\\psi_{\\rm add}\\ [\\mathrm{rad}]",
+        "round-trip phase, added coupler phase"
+      ]
+    ],
+    "groups": [
+      [
+        "coordinates",
+        "\\displaystyle x=\\lambda_L-\\Delta\\lambda_r,\\qquad d=x-\\lambda_0"
+      ],
+      [
+        "translated curve",
+        "\\displaystyle \\phi(\\lambda_L;\\Delta\\lambda_r)=\\phi_{\\rm ref}(x)=\\frac{2\\pi L n_{\\rm cold}(x)}{x}"
+      ],
+      [
+        "resonance",
+        "\\displaystyle \\lambda_L=\\lambda_0+\\Delta\\lambda_r\\quad\\Longrightarrow\\quad x=\\lambda_0,\\quad\\phi=2\\pi m"
+      ],
+      [
+        "coupler phase",
+        "\\displaystyle \\psi_{\\rm add}=0"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}\\lambda_L,\\lambda_0\\ [\\mathrm m]&\\text{laser, reference resonance}\\\\[0.6em]\\Delta\\lambda_r\\ [\\mathrm m]&\\text{total resonance shift}\\\\[0.6em]x,d\\ [\\mathrm m]&\\text{reference coordinate, offset}\\\\[0.6em]n_{\\rm cold}(x)\\ [1]&\\text{reference effective index}\\\\[0.6em]L\\ [\\mathrm m],\\quad m\\in\\mathbb Z&\\text{ring length, resonance order}\\\\[0.6em]\\phi,\\psi_{\\rm add}\\ [\\mathrm{rad}]&\\text{round-trip phase, added coupler phase}\\end{array}"
+  },
+  {
+    "slug": "10-wavelength-dispersion",
+    "title": "reference dispersion",
+    "symbols": [
+      [
+        "x,\\lambda_0,d=x-\\lambda_0\\ [\\mathrm m]",
+        "coordinate, reference, offset"
+      ],
+      [
+        "n_0,n_{g0}\\ [1]",
+        "reference effective, group index"
+      ],
+      [
+        "D\\ [\\mathrm{m^{-1}}]",
+        "reference group-index slope"
+      ],
+      [
+        "n_{\\rm cold}(x),\\widetilde n_g(x)\\ [1]",
+        "quadratic index, linear group index"
+      ]
+    ],
+    "groups": [
+      [
+        "reference derivatives",
+        "\\displaystyle D=\\left.\\frac{dn_g}{d\\lambda}\\right|_{\\lambda_0},\\qquad n'_0=\\frac{n_0-n_{g0}}{\\lambda_0},\\qquad n''_0=-\\frac{D}{\\lambda_0}"
+      ],
+      [
+        "index model",
+        "\\displaystyle n_{\\rm cold}(x)=n_0+\\frac{n_0-n_{g0}}{\\lambda_0}d-\\frac{D}{2\\lambda_0}d^2"
+      ],
+      [
+        "group-index model",
+        "\\displaystyle \\widetilde n_g(x)=n_{g0}+Dd"
+      ],
+      [
+        "polynomial consistency",
+        "\\displaystyle n_{\\rm cold}(x)-x n'_{\\rm cold}(x)=\\widetilde n_g(x)+\\frac{D}{2\\lambda_0}d^2"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}x,\\lambda_0,d=x-\\lambda_0\\ [\\mathrm m]&\\text{coordinate, reference, offset}\\\\[0.6em]n_0,n_{g0}\\ [1]&\\text{reference effective, group index}\\\\[0.6em]D\\ [\\mathrm{m^{-1}}]&\\text{reference group-index slope}\\\\[0.6em]n_{\\rm cold}(x),\\widetilde n_g(x)\\ [1]&\\text{quadratic index, linear group index}\\end{array}"
+  },
+  {
+    "slug": "11-shared-delay",
+    "title": "shared level-zero delay",
+    "symbols": [
+      [
+        "b\\in\\{0,1\\}",
+        "data level"
+      ],
+      [
+        "\\lambda_L,\\lambda_0,\\Delta\\lambda_b,x_b\\ [\\mathrm m]",
+        "laser, reference, shift, coordinate"
+      ],
+      [
+        "n_{g0}\\ [1],\\quad D\\ [\\mathrm{m^{-1}}]",
+        "reference group index, slope"
+      ],
+      [
+        "L\\ [\\mathrm m],\\quad c\\ [\\mathrm{m/s}]",
+        "ring length, vacuum light speed"
+      ],
+      [
+        "\\widetilde\\tau_b,\\tau_{{\\rm used},b}\\ [\\mathrm s]",
+        "estimated, retained delay"
+      ]
+    ],
+    "groups": [
+      [
+        "per-level estimate",
+        "\\displaystyle x_b=\\lambda_L-\\Delta\\lambda_b,\\qquad\\widetilde\\tau_b=\\frac{L}{c}[n_{g0}+D(x_b-\\lambda_0)]"
+      ],
+      [
+        "difference",
+        "\\displaystyle \\widetilde\\tau_1-\\widetilde\\tau_0=-\\frac{DL}{c}(\\Delta\\lambda_1-\\Delta\\lambda_0)"
+      ],
+      [
+        "implementation",
+        "\\displaystyle \\tau_{{\\rm used},0}=\\tau_{{\\rm used},1}=\\widetilde\\tau_0"
+      ],
+      [
+        "equal-delay limit",
+        "\\displaystyle D(\\Delta\\lambda_1-\\Delta\\lambda_0)=0\\quad\\Longrightarrow\\quad\\widetilde\\tau_1=\\widetilde\\tau_0"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}b\\in\\{0,1\\}&\\text{data level}\\\\[0.6em]\\lambda_L,\\lambda_0,\\Delta\\lambda_b,x_b\\ [\\mathrm m]&\\text{laser, reference, shift, coordinate}\\\\[0.6em]n_{g0}\\ [1],\\quad D\\ [\\mathrm{m^{-1}}]&\\text{reference group index, slope}\\\\[0.6em]L\\ [\\mathrm m],\\quad c\\ [\\mathrm{m/s}]&\\text{ring length, vacuum light speed}\\\\[0.6em]\\widetilde\\tau_b,\\tau_{{\\rm used},b}\\ [\\mathrm s]&\\text{estimated, retained delay}\\end{array}"
+  },
+  {
+    "slug": "12-two-data-levels",
+    "title": "two data levels",
+    "symbols": [
+      [
+        "b\\in\\{0,1\\},\\quad\\ell\\in\\{0,\\ldots,M-1\\}",
+        "data level, laser line"
+      ],
+      [
+        "V_b\\ [\\mathrm V],\\quad T_r,T_h\\ [\\mathrm K]",
+        "bias, shared temperatures"
+      ],
+      [
+        "\\phi_{b\\ell}\\ [\\mathrm{rad}]",
+        "round-trip phase"
+      ],
+      [
+        "a_{b\\ell},\\eta_{b\\ell}\\ [1]",
+        "retention, absorbed share"
+      ],
+      [
+        "\\Delta\\lambda_b\\ [\\mathrm m],\\quad C_{Jb}\\ [\\mathrm F]",
+        "shift, capacitance"
+      ],
+      [
+        "R_{sb}\\ [\\Omega],\\quad p_b\\ [1]",
+        "resistance, bit probability"
+      ],
+      [
+        "P_b,\\overline P\\ [\\mathrm W]",
+        "level, mean optical power"
+      ]
+    ],
+    "groups": [
+      [
+        "shared state",
+        "\\displaystyle T_{r,0}=T_{r,1}=T_r,\\qquad T_{h,0}=T_{h,1}=T_h"
+      ],
+      [
+        "per-level inputs",
+        "\\displaystyle \\mathcal F(T_r,T_h,V_b,\\lambda_\\ell)\\mapsto\\left(\\phi_{b\\ell},a_{b\\ell},\\eta_{b\\ell},\\Delta\\lambda_b,C_{Jb},R_{sb}\\right)"
+      ],
+      [
+        "optics.py",
+        "\\displaystyle p_0=1-p_1,\\qquad\\overline P=p_0P_0+p_1P_1"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}b\\in\\{0,1\\},\\quad\\ell\\in\\{0,\\ldots,M-1\\}&\\text{data level, laser line}\\\\[0.6em]V_b\\ [\\mathrm V],\\quad T_r,T_h\\ [\\mathrm K]&\\text{bias, shared temperatures}\\\\[0.6em]\\phi_{b\\ell}\\ [\\mathrm{rad}]&\\text{round-trip phase}\\\\[0.6em]a_{b\\ell},\\eta_{b\\ell}\\ [1]&\\text{retention, absorbed share}\\\\[0.6em]\\Delta\\lambda_b\\ [\\mathrm m],\\quad C_{Jb}\\ [\\mathrm F]&\\text{shift, capacitance}\\\\[0.6em]R_{sb}\\ [\\Omega],\\quad p_b\\ [1]&\\text{resistance, bit probability}\\\\[0.6em]P_b,\\overline P\\ [\\mathrm W]&\\text{level, mean optical power}\\end{array}"
+  },
+  {
+    "slug": "13-evanescent-overlap",
+    "title": "evanescent overlap",
+    "symbols": [
+      [
+        "y,g,\\lambda,\\ell\\ [\\mathrm m]",
+        "distance, gap, wavelength, length"
+      ],
+      [
+        "E(y),E_0\\ [\\mathrm{V/m}]",
+        "field, wall field"
+      ],
+      [
+        "n_{\\rm eff},n_{\\rm clad}\\ [1]",
+        "effective, cladding index"
+      ],
+      [
+        "\\sigma,\\kappa_c,F\\ [\\mathrm{m^{-1}}]",
+        "decay, coupling, prefactor"
+      ],
+      [
+        "C\\ [1]",
+        "cross-coupled power fraction"
+      ]
+    ],
+    "groups": [
+      [
+        "field tail",
+        "\\displaystyle E(y)=E_0e^{-\\sigma y},\\qquad\\sigma(\\lambda)=\\frac{2\\pi}{\\lambda}\\sqrt{n_{\\rm eff}^2-n_{\\rm clad}^2}"
+      ],
+      [
+        "overlap approximation",
+        "\\displaystyle \\kappa_c(\\lambda,g)\\simeq F(\\lambda)e^{-\\sigma(\\lambda)g}"
+      ],
+      [
+        "weak transfer",
+        "\\displaystyle |\\kappa_c\\ell|\\ll1\\quad\\Longrightarrow\\quad C\\simeq(\\kappa_c\\ell)^2\\simeq[F(\\lambda)\\ell]^2e^{-2\\sigma(\\lambda)g}"
+      ],
+      [
+        "fixed indices",
+        "\\displaystyle \\frac{dn_{\\rm eff}}{d\\lambda}=\\frac{dn_{\\rm clad}}{d\\lambda}=0\\quad\\Longrightarrow\\quad\\frac{d\\sigma}{d\\lambda}=-\\frac{\\sigma}{\\lambda}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}y,g,\\lambda,\\ell\\ [\\mathrm m]&\\text{distance, gap, wavelength, length}\\\\[0.6em]E(y),E_0\\ [\\mathrm{V/m}]&\\text{field, wall field}\\\\[0.6em]n_{\\rm eff},n_{\\rm clad}\\ [1]&\\text{effective, cladding index}\\\\[0.6em]\\sigma,\\kappa_c,F\\ [\\mathrm{m^{-1}}]&\\text{decay, coupling, prefactor}\\\\[0.6em]C\\ [1]&\\text{cross-coupled power fraction}\\end{array}"
+  },
+  {
+    "slug": "14-coherent-power-exchange",
+    "title": "coherent power exchange",
+    "symbols": [
+      [
+        "z,\\ell\\ [\\mathrm m]",
+        "propagation distance, interaction length"
+      ],
+      [
+        "A(z),B(z)\\ [1]",
+        "normalized guide amplitudes"
+      ],
+      [
+        "\\kappa_c\\ [\\mathrm{m^{-1}}]",
+        "spatial amplitude coupling"
+      ],
+      [
+        "\\Delta\\beta\\ [\\mathrm{m^{-1}}]",
+        "propagation mismatch"
+      ],
+      [
+        "C\\ [1],\\quad i^2=-1",
+        "transferred power fraction"
+      ]
+    ],
+    "groups": [
+      [
+        "phase-matched, lossless",
+        "\\displaystyle \\Delta\\beta=0,\\qquad\\frac{dA}{dz}=-i\\kappa_c B,\\qquad\\frac{dB}{dz}=-i\\kappa_c A"
+      ],
+      [
+        "unit launch",
+        "\\displaystyle A(0)=1,\\quad B(0)=0,\\qquad A''+\\kappa_c^2A=0"
+      ],
+      [
+        "fields",
+        "\\displaystyle A(z)=\\cos(\\kappa_c z),\\qquad B(z)=-i\\sin(\\kappa_c z)"
+      ],
+      [
+        "power",
+        "\\displaystyle C=|B(\\ell)|^2=\\sin^2(\\kappa_c\\ell),\\qquad|A|^2+|B|^2=1"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}z,\\ell\\ [\\mathrm m]&\\text{propagation distance, interaction length}\\\\[0.6em]A(z),B(z)\\ [1]&\\text{normalized guide amplitudes}\\\\[0.6em]\\kappa_c\\ [\\mathrm{m^{-1}}]&\\text{spatial amplitude coupling}\\\\[0.6em]\\Delta\\beta\\ [\\mathrm{m^{-1}}]&\\text{propagation mismatch}\\\\[0.6em]C\\ [1],\\quad i^2=-1&\\text{transferred power fraction}\\end{array}"
+  },
+  {
+    "slug": "15-local-coupling-model",
+    "title": "local coupling model",
+    "symbols": [
+      [
+        "C(\\lambda)=K^2(\\lambda),\\ C_0\\ [1]",
+        "coupled fraction, reference value"
+      ],
+      [
+        "\\lambda,\\lambda_0,h\\ [\\mathrm m]",
+        "laser, reference, extraction offset"
+      ],
+      [
+        "\\gamma_0\\ [\\mathrm{m^{-1}}]",
+        "fractional wavelength slope"
+      ],
+      [
+        "C_{\\rm raw},C_{\\rm used}\\ [1]",
+        "exponential, retained coupling"
+      ]
+    ],
+    "groups": [
+      [
+        "local coefficients",
+        "\\displaystyle C_0=C(\\lambda_0),\\qquad\\gamma_0=\\left.\\frac{d\\ln C}{d\\lambda}\\right|_{\\lambda_0}=\\frac{C'(\\lambda_0)}{C_0}"
+      ],
+      [
+        "logarithmic tangent",
+        "\\displaystyle \\begin{aligned}\\ln C(\\lambda)&\\simeq\\ln C_0+\\gamma_0(\\lambda-\\lambda_0)\\\\C_{\\rm raw}(\\lambda)&=C_0e^{\\gamma_0(\\lambda-\\lambda_0)}\\end{aligned}"
+      ],
+      [
+        "extracted slope",
+        "\\displaystyle \\gamma_0\\simeq\\frac{\\ln C(\\lambda_0+h)-\\ln C(\\lambda_0-h)}{2h}"
+      ],
+      [
+        "runtime bound",
+        "\\displaystyle C_{\\rm used}=\\begin{cases}C_{\\rm raw}&C_{\\rm raw}<1\\\\1-10^{-15}&C_{\\rm raw}\\ge1\\end{cases}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}C(\\lambda)=K^2(\\lambda),\\ C_0\\ [1]&\\text{coupled fraction, reference value}\\\\[0.6em]\\lambda,\\lambda_0,h\\ [\\mathrm m]&\\text{laser, reference, extraction offset}\\\\[0.6em]\\gamma_0\\ [\\mathrm{m^{-1}}]&\\text{fractional wavelength slope}\\\\[0.6em]C_{\\rm raw},C_{\\rm used}\\ [1]&\\text{exponential, retained coupling}\\end{array}"
+  },
+  {
+    "slug": "16-rigid-resonance-comb",
+    "title": "rigid resonance comb",
+    "symbols": [
+      [
+        "m,m_*\\in\\mathbb Z",
+        "resonance order, anchored order"
+      ],
+      [
+        "\\lambda_m^0,\\lambda_m^{\\rm rigid},\\lambda_m^{\\rm full}\\ [\\mathrm m]",
+        "reference, translated, fuller resonance"
+      ],
+      [
+        "\\Delta\\lambda_r,\\epsilon_m\\ [\\mathrm m]",
+        "common shift, comparison error"
+      ],
+      [
+        "L(T)\\ [\\mathrm m],\\quad n_{\\rm eff}\\ [1]",
+        "temperature-dependent length, index"
+      ]
+    ],
+    "groups": [
+      [
+        "runtime translation",
+        "\\displaystyle \\lambda_m^{\\rm rigid}=\\lambda_m^0+\\Delta\\lambda_r"
+      ],
+      [
+        "wavelength spacing",
+        "\\displaystyle \\lambda_{m+1}^{\\rm rigid}-\\lambda_m^{\\rm rigid}=\\lambda_{m+1}^0-\\lambda_m^0"
+      ],
+      [
+        "fuller resonance condition",
+        "\\displaystyle n_{\\rm eff}(\\lambda_m^{\\rm full},T,V)L(T)=m\\lambda_m^{\\rm full}"
+      ],
+      [
+        "anchored comparison",
+        "\\displaystyle \\begin{aligned}\\epsilon_m&=\\lambda_m^{\\rm full}-\\lambda_m^{\\rm rigid}\\\\\\lambda_{m_*}^{\\rm full}=\\lambda_{m_*}^{\\rm rigid}&\\quad\\Longrightarrow\\quad\\epsilon_{m_*}=0\\\\\\epsilon_{m_*}=0&\\quad\\not\\Longrightarrow\\quad\\epsilon_m=0\\quad(m\\ne m_*)\\end{aligned}"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}m,m_*\\in\\mathbb Z&\\text{resonance order, anchored order}\\\\[0.6em]\\lambda_m^0,\\lambda_m^{\\rm rigid},\\lambda_m^{\\rm full}\\ [\\mathrm m]&\\text{reference, translated, fuller resonance}\\\\[0.6em]\\Delta\\lambda_r,\\epsilon_m\\ [\\mathrm m]&\\text{common shift, comparison error}\\\\[0.6em]L(T)\\ [\\mathrm m],\\quad n_{\\rm eff}\\ [1]&\\text{temperature-dependent length, index}\\end{array}"
+  },
+  {
+    "slug": "17-optical-input-handoff",
+    "title": "optical-input handoff",
+    "symbols": [
+      [
+        "T_r,T_h,T_{n+1},T_{\\rm other}\\ [\\mathrm K]",
+        "ring, heater, endpoint, remainder"
+      ],
+      [
+        "V_0,V_1\\ [\\mathrm V],\\quad\\lambda_\\ell\\ [\\mathrm m]",
+        "binary biases, laser wavelength"
+      ],
+      [
+        "\\phi_{b\\ell}\\ [\\mathrm{rad}]",
+        "round-trip phase"
+      ],
+      [
+        "a_{b\\ell},\\eta_{b\\ell}\\ [1]",
+        "retention, absorbed share"
+      ],
+      [
+        "K_{t\\ell}^2,K_{d\\ell}^2\\ [1],\\quad\\tau_\\ell\\ [\\mathrm s]",
+        "coupler fractions, common delay"
+      ],
+      [
+        "P_{\\rm in},P_{\\rm mon},P_{\\rm abs}\\ [\\mathrm W]",
+        "input, monitor, absorbed power"
+      ],
+      [
+        "g\\ [\\mathrm{K/W}]",
+        "substep optical-heat gain"
+      ]
+    ],
+    "groups": [
+      [
+        "phase.py",
+        "\\displaystyle \\begin{aligned}\\mathbf p_{b\\ell}&=(\\phi_{b\\ell},a_{b\\ell},\\eta_{b\\ell},K_{t\\ell}^2,K_{d\\ell}^2,\\tau_\\ell)\\\\\\mathbf p&=\\mathcal F_{\\rm phase}(T_r,T_h,V_0,V_1,\\{\\lambda_\\ell\\})\\end{aligned}"
+      ],
+      [
+        "optics.py",
+        "\\displaystyle (\\mathbf P_{\\rm mon},\\mathbf P_{\\rm abs})=\\mathcal F_{\\rm optics}(\\mathbf p,\\mathbf P_{\\rm in})"
+      ],
+      [
+        "thermal closure",
+        "\\displaystyle T_{n+1}=T_{\\rm other}+gP_{\\rm abs}(T_{n+1})"
+      ]
+    ],
+    "definitions": "\\begin{array}{ll}T_r,T_h,T_{n+1},T_{\\rm other}\\ [\\mathrm K]&\\text{ring, heater, endpoint, remainder}\\\\[0.6em]V_0,V_1\\ [\\mathrm V],\\quad\\lambda_\\ell\\ [\\mathrm m]&\\text{binary biases, laser wavelength}\\\\[0.6em]\\phi_{b\\ell}\\ [\\mathrm{rad}]&\\text{round-trip phase}\\\\[0.6em]a_{b\\ell},\\eta_{b\\ell}\\ [1]&\\text{retention, absorbed share}\\\\[0.6em]K_{t\\ell}^2,K_{d\\ell}^2\\ [1],\\quad\\tau_\\ell\\ [\\mathrm s]&\\text{coupler fractions, common delay}\\\\[0.6em]P_{\\rm in},P_{\\rm mon},P_{\\rm abs}\\ [\\mathrm W]&\\text{input, monitor, absorbed power}\\\\[0.6em]g\\ [\\mathrm{K/W}]&\\text{substep optical-heat gain}\\end{array}"
+  }
+]
