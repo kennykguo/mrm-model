@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,9 +35,56 @@ def test_only_filter():
 def test_corners_section_expands_each_preset():
     matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
     runs = tlc_matrix.expand_corners(matrix)
-    sec = matrix["corners"]
-    assert len(runs) == len(sec["presets"]) * len(sec["experiments"]) * len(sec["controllers"])
-    assert {r[3] for r in runs} == set(sec["presets"])
+    variants = tlc_matrix.corner_variants(matrix)
+    assert len(runs) == sum(len(v["presets"]) * len(v["experiments"]) * len(v["controllers"]) for v in variants)
+    assert {r[3] for r in runs} == {p for v in variants for p in v["presets"]}
+
+
+# the corner runs of the first pass (docs/tlc/SUMMARY.md, section 5) must stay as they were
+CORNER_PRESETS = ["g26_fast_thermal", "g26_slow_thermal", "g26_textbook_thermal", "g26_tec_package"]
+CORNER_EXPERIMENTS = ["experiments/tlc/steady_tlc_faithful.yaml", "experiments/tlc/a1_tlc.yaml"]
+
+
+def test_shipped_corner_priors_runs_are_unchanged():
+    matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
+    runs = [r for r in tlc_matrix.expand_corners(matrix) if r[4] == "corner"]
+    want = [(e, c, p) for p in CORNER_PRESETS for e in CORNER_EXPERIMENTS for c in ("tlc", "pi_lock_c")]
+    assert [(r[0], r[1]["name"], r[3]) for r in runs] == want
+
+
+def test_shipped_mismatch_runs_cover_the_corner_table_with_the_model_based_comparators():
+    matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
+    runs = [r for r in tlc_matrix.expand_corners(matrix) if r[4] == "nominal"]
+    names = ("tlc", "pi_lock_c", "kalman_lqg_c", "mpc_c")
+    want = {(e, c, p) for p in CORNER_PRESETS for e in CORNER_EXPERIMENTS for c in names}
+    assert {(r[0], r[1]["name"], r[3]) for r in runs} == want
+    assert len(runs) == len(want)
+
+
+def test_corner_mapping_without_knowledge_defaults_to_corner_priors():
+    matrix = {"controllers": [{"name": "tlc", "params": {"core": "faithful"}}, {"name": "pi_lock_c"}],
+              "corners": {"presets": ["g26_fast_thermal"], "experiments": ["a.yaml"], "controllers": ["tlc"]}}
+    runs = tlc_matrix.expand_corners(matrix)
+    assert [(r[0], r[1]["name"], r[3], r[4]) for r in runs] == [("a.yaml", "tlc", "g26_fast_thermal", "corner")]
+
+
+def test_corner_variants_list_and_knowledge_filter():
+    matrix = {"controllers": [{"name": "tlc"}, {"name": "mpc_c"}],
+              "corners": [{"presets": ["c1"], "experiments": ["a.yaml"], "controllers": ["tlc"]},
+                          {"knowledge": "nominal", "presets": ["c1", "c2"], "experiments": ["a.yaml"],
+                           "controllers": ["tlc", "mpc_c"]}]}
+    assert len(tlc_matrix.expand_corners(matrix)) == 5
+    nominal = tlc_matrix.expand_corners(matrix, knowledge="nominal")
+    assert [(r[1]["name"], r[3], r[4]) for r in nominal] == [("tlc", "c1", "nominal"), ("mpc_c", "c1", "nominal"),
+                                                             ("tlc", "c2", "nominal"), ("mpc_c", "c2", "nominal")]
+    assert [r[1]["name"] for r in tlc_matrix.expand_corners(matrix, only={"mpc_c"})] == ["mpc_c", "mpc_c"]
+
+
+def test_unknown_corner_knowledge_is_refused():
+    matrix = {"controllers": [{"name": "tlc"}],
+              "corners": {"knowledge": "truth", "presets": ["c1"], "experiments": ["a.yaml"], "controllers": ["tlc"]}}
+    with pytest.raises(ValueError, match="knowledge"):
+        tlc_matrix.expand_corners(matrix)
 
 
 def test_corner_alts_come_from_the_preset():
