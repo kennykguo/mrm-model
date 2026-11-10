@@ -87,7 +87,7 @@ Plant and every controller's nominal knowledge follow the corner (as mrm treats 
 - Warm start seeds the estimator with the core's setpoint (the source passed the true detuning).
 - Timing alignment: blocks start at the first ADC sample's time; the heater DAC latency is added to the dither delay.
 - **R13 ER floor dropped to 0 dB on G26** (2.8-3.0 dB reachable vs 3.5 dB required, so the source B6 had no
-  setpoint). Pending owner confirmation.
+  setpoint). Confirmed by the owner (2026-11-09).
 
 ## 8. Limits of this pass
 - One nominal world per scenario except the 8-trial campaign; the planned 300-trial campaign is open.

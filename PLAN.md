@@ -16,19 +16,26 @@
 Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 
 ## Open items
-1. **R13 ER floor (owner decision).** G26 gives 2.8-3.0 dB ER at the inflection point vs the source's 3.5 dB, so
-   the source B6 finds no setpoint. The G26 priors drop the floor to 0 dB; confirm or overrule.
+1. **Source update: 3-step sign dither (B1).** The faithful baseline follows the source, so the new dither replaces
+   the cosine dither once it is published. Then re-vendor, rerun the matrix and run the TLC arm of item 3. Blocked:
+   the change is not on `msilve160/ECE496_project` yet (newest commit is still `f98ce84`).
 2. **Upstream main is broken from `84de49b`** (the simulator still references ~60 renamed optics names). This
    branch merges main only up to `ca3f8fe`; report upstream and re-merge once fixed. Some
    `tests/verification/test_ctrl_c_*` tests already fail at `ca3f8fe`, with or without this branch.
-3. **O5 (B10 learning)** is not mapped: scoring needs each world's true heater efficiency.
-4. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
+3. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
    experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300` (~2 h for the TLC arm), same for `_wdm`.
-5. **Model-mismatch corners.** Corner runs give the TLC the corner's own priors; a variant with g26 priors on a
-   corner plant is still to do.
-6. **Restart-one-ring (R8 variant)** has no mrm equivalent (`line_enable` restarts the laser, not the controller).
-7. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 4 and 5 land (the R13 decision and the 300-trial campaign change its numbers).
-8. **Optional second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model
-   gains), only after the faithful results are reviewed.
+   The `_wdm` arm is running; the TLC arm waits for item 1.
+4. **Model-mismatch corners.** Corner runs give the TLC the corner's own priors; a variant with g26 priors on a
+   corner plant is in progress.
+5. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 3 and 4 land.
+6. **Second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model gains). In
+   scope, after the item 5 refresh is committed.
+
+## Decided
+- **R13 ER floor: 0 dB on G26** (owner, 2026-11-09). G26 gives 2.8-3.0 dB ER at the inflection point vs the
+  source's 3.5 dB, so the source B6 finds no setpoint; the deviation stays disclosed.
+- **O5 (B10 learning) and restart-one-ring (R8 variant): not mapped** (owner, 2026-11-09). Reported as limits of
+  the pass. O5 scoring needs each world's true heater efficiency; `line_enable` restarts the laser, not the
+  controller.
 
 > ⚠️ The rev 1 status ("Phase 1 & 2 COMPLETE, 140/140") is withdrawn. See spec §1.
