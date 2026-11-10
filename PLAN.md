@@ -28,7 +28,9 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
    `tlc/merge-main-probe` (`cc423c0`) merges cleanly but inherits the engine failure. Report to Kenny Guo.
 3. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
    experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300` (~2 h for the TLC arm), same for `_wdm`.
-   The `_wdm` arm is running; the TLC arm waits for item 1.
+   `_wdm` arm done (2026-11-10, `runs/campaign300/20261110T025137Z_ecf03629`, 24 min): wrong line 12 / 2400 ring
+   trials [0.0026, 0.0087], 12 / 300 worlds; unlocked at 0.8 s 27 / 2400 [0.0074, 0.016], 24 / 300 worlds. The TLC
+   arm waits for item 1.
 4. **Model-mismatch corners: mechanism done, numbers provisional.** `matrix.yaml` `corners` has two variants:
    `knowledge: corner` (corner priors, as before) and `knowledge: nominal` (g26 priors on the corner plant, for
    `tlc`, `pi_lock_c`, `kalman_lqg_c`, `mpc_c`). Run only these: `tools/tlc_matrix.py --corners-only --knowledge
