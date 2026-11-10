@@ -19,9 +19,13 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 1. **Source update: 3-step sign dither (B1).** The faithful baseline follows the source, so the new dither replaces
    the cosine dither once it is published. Then re-vendor, rerun the matrix and run the TLC arm of item 3. Blocked:
    the change is not on `msilve160/ECE496_project` yet (newest commit is still `f98ce84`).
-2. **Upstream main is broken from `84de49b`** (the simulator still references ~60 renamed optics names). This
-   branch merges main only up to `ca3f8fe`; report upstream and re-merge once fixed. Some
-   `tests/verification/test_ctrl_c_*` tests already fail at `ca3f8fe`, with or without this branch.
+2. **Upstream main is still broken** (checked at `e77b124`, 2026-11-09). Building the engine fails with
+   `pack_self_heating_optical_state() got an unexpected keyword argument 'far_hold'` (`mrm/plant/plant.py:241`);
+   ~66 old optics names remain in `mrm/sim/kernel.py`, `kernel_ref.py`, `mrm/plant/plant.py`; five test files fail at
+   import. Main was force-pushed with rewritten history (old `ca3f8fe` = new `71004ea`, old `84de49b` = new
+   `b6a047e`), so a plain `git merge origin/main` refuses (unrelated histories). Once fixed, merge with base
+   `ca3f8fe` (`git merge-tree --merge-base=ca3f8fe`, then a commit with both parents); probe branch
+   `tlc/merge-main-probe` (`cc423c0`) merges cleanly but inherits the engine failure. Report to Kenny Guo.
 3. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
    experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300` (~2 h for the TLC arm), same for `_wdm`.
    The `_wdm` arm is running; the TLC arm waits for item 1.
