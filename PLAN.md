@@ -24,8 +24,10 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 3. **O5 (B10 learning)** is not mapped: scoring needs each world's true heater efficiency.
 4. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
    experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300` (~2 h for the TLC arm), same for `_wdm`.
-5. **Model-mismatch corners.** Corner runs give the TLC the corner's own priors; a variant with g26 priors on a
-   corner plant is still to do.
+5. **Model-mismatch corners: mechanism done, numbers provisional.** `matrix.yaml` `corners` has two variants:
+   `knowledge: corner` (corner priors, as before) and `knowledge: nominal` (g26 priors on the corner plant, for
+   `tlc`, `pi_lock_c`, `kalman_lqg_c`, `mpc_c`). Run only these: `tools/tlc_matrix.py --corners-only --knowledge
+   nominal`. Fold the numbers into `docs/tlc/SUMMARY.md` once the dither block is settled.
 6. **Restart-one-ring (R8 variant)** has no mrm equivalent (`line_enable` restarts the laser, not the controller).
 7. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 4 and 5 land (the R13 decision and the 300-trial campaign change its numbers).
 8. **Optional second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model
