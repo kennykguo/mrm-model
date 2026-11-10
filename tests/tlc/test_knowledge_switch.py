@@ -48,6 +48,14 @@ def designs():
     return {"nominal": exp.cfg, "corner": exp.config((), SLOW_CORNER)}
 
 
+def test_matrix_and_runner_use_the_same_knowledge_names():
+    _m = importlib.util.spec_from_file_location("tlc_matrix", ROOT / "tools" / "tlc_matrix.py")
+    tlc_matrix = importlib.util.module_from_spec(_m)
+    _m.loader.exec_module(tlc_matrix)
+    assert tlc_matrix.KNOWLEDGE_CHOICES == tlc_run.KNOWLEDGE_CHOICES
+    assert tlc_matrix.KNOWLEDGE_CORNER == tlc_run.KNOWLEDGE_CORNER
+
+
 def test_corner_and_nominal_designs_differ(designs):
     assert not np.allclose(_thermal_taus_s(designs["nominal"]), _thermal_taus_s(designs["corner"]))
 

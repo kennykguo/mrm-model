@@ -89,6 +89,23 @@ def test_markdown_and_json_are_written(tmp_path):
     assert json.loads(out.with_suffix(".json").read_text())["runs"][0]["controller"] == "tlc"
 
 
+@pytest.mark.parametrize("run_info, name, knowledge", [
+    ({"corner": "g26_slow_thermal"}, "steady_tlc@g26_slow_thermal", "corner"),
+    ({"corner": "g26_slow_thermal", "knowledge": "nominal"}, "steady_tlc@g26_slow_thermal (nominal priors)",
+     "nominal"),
+])
+def test_corner_runs_are_named_by_their_priors(tmp_path, run_info, name, knowledge):
+    run = _make_run(tmp_path)
+    (run / "tlc_run.json").write_text(json.dumps(run_info))
+    s = tlc_report.summarize_run(run)
+    assert (s["experiment"], s["corner"], s["knowledge"]) == (name, "g26_slow_thermal", knowledge)
+
+
+def test_report_header_names_both_corner_variants(tmp_path):
+    text = tlc_report.to_markdown([tlc_report.summarize_run(_make_run(tmp_path))])
+    assert "corner priors" in text and "nominal priors on the corner plant" in text
+
+
 def test_ece496_reference_rows_convert_ghz_to_pm_at_1310nm(tmp_path):
     pub = {"steady": {"tlc": {"R1": {"p999": [0.5, 0.4], "peak": [1.0, 0.6], "rms": [0.2, 0.1]}}},
            "d2_common": {"tlc": {"R3": {"p999": [1.8, 2.2], "peak": [2.0, 2.5], "rms": [0.3, 0.3]}}}}
