@@ -35,7 +35,7 @@ corners:                                          # spec 6, Q7: model trust; eac
     experiments: &corner_experiments
       - experiments/tlc/steady_tlc_faithful.yaml
       - experiments/tlc/a1_tlc.yaml
-    controllers: [tlc, pi_lock_c]
+    controllers: [tlc, pi_lock_c, kalman_lqg_c, mpc_c]   # model-based comparators: baseline for the mismatch rows
   - knowledge: nominal                            # model mismatch: plant follows the corner, controllers keep the g26 design
     presets: *corner_presets
     experiments: *corner_experiments
