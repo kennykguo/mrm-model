@@ -1,7 +1,7 @@
 # TLC Port: Spec and Plan (rev 3)
 
 **Target:** `mrm-model` (G26 8-ring plant) · **Source:** `ECE496_project/thermal_control/` (sibling checkout `../ECE496_project`, commit `f98ce84`)
-**Branch:** `feature/tlc-port` · **Status:** SPEC REVIEW. No implementation starts until the questions in §6 are answered.
+**Branch:** `feature/tlc-port` · **Status:** Phases 0-4 done, Phase 5 first pass written ([`docs/tlc/SUMMARY.md`](tlc/SUMMARY.md)); open items in [`PLAN.md`](../PLAN.md).
 
 ---
 
@@ -162,9 +162,9 @@ performance on G26.
 
 ### Phase 0: groundwork
 - [x] Answer §6.
-- [ ] Archive the rev 1 `mrm/control/tlc/*` and `tests/tlc/*` (Q4).
-- [ ] Reproducible env: `uv venv .venv && uv pip install -e .` (Python ≥ 3.12; numba, h5py; gymnasium optional). Document it in `TEST_INFRA.md`.
-- [ ] Bring in the source per Q5.
+- [x] Archive the rev 1 `mrm/control/tlc/*` and `tests/tlc/*` (Q4).
+- [x] Reproducible env: `uv venv .venv && uv pip install -e .` (Python ≥ 3.12; numba, h5py; gymnasium optional). Documented in the README install section.
+- [x] Bring in the source per Q5.
 
 ### Phase 1: walking skeleton (end to end with a stub) — DONE 2026-10-31
 - [x] Adapter `mrm/control/tlc/controller.py` (registry `tlc`, lazy entry in `mrm/control/registry.py`) with a **stub core** (`stub_core.py`: hold the warm code + source-tone dither).
@@ -203,11 +203,12 @@ Findings of Phase 3 (each is measured, none is fixed):
 - [x] One YAML per mapped row of §3 under `experiments/tlc/`; `matrix.yaml` + `tools/tlc_matrix.py` run every row with its comparators.
 - [x] Extensions for the rows G26 lacks (Q9), labelled `ext_*`; no plant change.
 - [x] Report: overview table, dither-removed tracking error (`track_*`, Q8), Monte Carlo rates with Clopper-Pearson intervals (Q10), corner runs named `experiment@corner` (Q7).
-- [ ] Open rows: O5 (B10 learning: needs each world's true heater efficiency on the scoring side), the 300-trial cold-start campaign (`--set experiment.batch=300`, ≈ 2 h for the TLC arm here).
+- [x] O5 (B10 learning) not mapped (owner, 2026-11-09): scoring needs each world's true heater efficiency.
+- [ ] 300-trial cold-start campaign (`--set experiment.batch=300`): `wdm_supervisor` arm done; the TLC arm (≈ 2 h) waits for the B1 dither update (`PLAN.md`).
 - Runtime: full matrix ≈ 10 min on this machine (8-trial campaign included).
 
 Findings of Phase 4 (first pass, nominal world unless stated):
-- **A1:** the faithful TLC loses lock (rings leave by ~1 nm) where `pi_lock_c`, `kalman_lqg_c` and `mpc_c` hold rings 1-7 within ~15 pm. Under the TEC-held package corner it rides through (8.3 pm on rings 1-7): the A1 verdict depends on the package model. In corner runs the TLC's priors follow the corner (as every model-based baseline's nominal knowledge does in mrm), so this is "a different plant the TLC knows", not a model-mismatch test; a mismatch variant (g26 priors on a corner plant) is open.
+- **A1:** the faithful TLC loses lock (rings leave by ~1 nm) where `pi_lock_c`, `kalman_lqg_c` and `mpc_c` hold rings 1-7 within ~15 pm. Under the TEC-held package corner it rides through (8.3 pm on rings 1-7): the A1 verdict depends on the package model. In corner runs the TLC's priors follow the corner (as every model-based baseline's nominal knowledge does in mrm), so this is "a different plant the TLC knows", not a model-mismatch test. The mismatch variant (g26 priors on a corner plant, `knowledge: nominal`) leaves every TLC A1 verdict unchanged, including the TEC-package ride-through.
 - **Cold start:** the TLC's ACQUIRE locks on the first fringe it meets; 43 of 64 ring trials end on a wrong line [0.54, 0.78] and none on its own line, against 1/64 for `wdm_supervisor` (expected discrepancy 2, confirmed).
 - **Squelch:** the TLC leaves its points (33 pm peak; expected discrepancy 1).
 - **+3 dB power step:** every controller unlocks; the step is 3x mrm's 3-sigma re-mate change.
@@ -215,8 +216,9 @@ Findings of Phase 4 (first pass, nominal world unless stated):
 - Note: the source's "0 of 40" campaign bounds the wrong-line rate below 8.8 % (two-sided 95 % Clopper-Pearson), not 7.5 % (the one-sided rule of three).
 
 ### Phase 5: report
-- [ ] `docs/tlc/results.md`: R-table, the ECE496-vs-G26 side by side, the scorecard rows, and known failure explanations.
-- [ ] README status updated.
+- [x] `docs/tlc/results.md`: R-table, the ECE496-vs-G26 side by side, the scorecard rows, and known failure explanations.
+- [x] README status updated; write-up in `docs/tlc/SUMMARY.md`.
+- [ ] Refresh after the B1 dither update, the TLC campaign arm and the corner rows (`PLAN.md`).
 
 ---
 
