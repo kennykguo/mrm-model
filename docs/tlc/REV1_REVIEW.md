@@ -4,7 +4,7 @@ Scope: commits `5d1cac0` (code) and `1387fe6` (PLAN.md), plus rev 1 of `docs/TLC
 Source compared: `ECE496_project@f98ce84`.
 
 ## Ported blocks
-`tests/tlc` passes 140/140 in about 3.7 s on a system Python 3.13. There is no `.venv`, although `TEST_INFRA.md` references one. The suite emits 639 numpy warnings that nobody has examined.
+`tests/tlc` passes 140/140 in about 3.7 s on a system Python 3.13. There is no `.venv`, although `TEST_INFRA.md` (now `archive/tlc_rev1/docs/`) references one. The suite emits 639 numpy warnings that nobody has examined.
 
 | Block | Verdict | Why |
 |---|---|---|
