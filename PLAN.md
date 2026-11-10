@@ -29,8 +29,10 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 3. **300-trial cold-start campaign** (8 trials committed): `tools/tlc_run.py
    experiments/tlc/cold_campaign_tlc.yaml --set experiment.batch=300` (~2 h for the TLC arm), same for `_wdm`.
    The `_wdm` arm is running; the TLC arm waits for item 1.
-4. **Model-mismatch corners.** Corner runs give the TLC the corner's own priors; a variant with g26 priors on a
-   corner plant is in progress.
+4. **Model-mismatch corners: mechanism done, numbers provisional.** `matrix.yaml` `corners` has two variants:
+   `knowledge: corner` (corner priors, as before) and `knowledge: nominal` (g26 priors on the corner plant, for
+   `tlc`, `pi_lock_c`, `kalman_lqg_c`, `mpc_c`). Run only these: `tools/tlc_matrix.py --corners-only --knowledge
+   nominal`. Fold the numbers into `docs/tlc/SUMMARY.md` once the dither block is settled.
 5. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 3 and 4 land.
 6. **Second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model gains). In
    scope, after the item 5 refresh is committed.

@@ -134,8 +134,12 @@ def summarize_run(run_dir: str | Path) -> dict:
     m = metrics["cases"]["main"]
     run_info = json.loads((run / "tlc_run.json").read_text()) if (run / "tlc_run.json").is_file() else {}
     name = metrics.get("name") or run.name
+    knowledge = None
     if run_info.get("corner"):
         name = f"{name}@{run_info['corner']}"
+        knowledge = run_info.get("knowledge", "corner")      # tools/tlc_run.py writes it only for a mismatch run
+        if knowledge == "nominal":
+            name = f"{name} (nominal priors)"
     with h5py.File(run / "trace.h5", "r") as f:
         t, det_pm = _detuning_trace(f)
         lam_m = np.asarray(f["truth_final/main/lam_m"])[0]
@@ -154,7 +158,7 @@ def summarize_run(run_dir: str | Path) -> dict:
                        track_rms_err_pm=float(np.sqrt(np.mean(track[:, i] ** 2))))
         row.update({k: _cell(m[k], i) for k in MRM_COLUMNS if k in m})
         rings.append(row)
-    return {"run": run.name, "experiment": name, "corner": run_info.get("corner"),
+    return {"run": run.name, "experiment": name, "corner": run_info.get("corner"), "knowledge": knowledge,
             "controller": controller, "scenario": cfg.get("scenario", {}).get("name"),
             "score_from_s": score_from, "duration_s": exp.get("duration_s"), "rings": rings,
             "telemetry": _telemetry_summary(run / "tlc_telemetry.npz"), "campaign": campaign_rates(m)}
@@ -248,9 +252,11 @@ def to_markdown(summaries: list[dict], reference: list[dict] | None = None) -> s
            "world 0, scored from `score_from_s`. The p99.9 / peak / rms columns come from the recorded 10 us-mean "
            "detuning trace; `track_*` is the same error with the TLC's dither tones removed (least squares per 4 ms "
            "block; TLC runs only). The mrm columns (`max_abs_lock_error_pm` onwards) are mrm's own per-tick metrics. "
-           "Thresholds: mrm 5 pm budget, ECE496 2 GHz. Corner runs (`experiment@corner`): the plant and every "
-           "controller's nominal knowledge follow the corner, as mrm treats every model-based controller, so a corner "
-           "tests the TLC on a different plant it knows, not a model mismatch.", ""]
+           "Thresholds: mrm 5 pm budget, ECE496 2 GHz. Corner runs with corner priors (`experiment@corner`): the "
+           "plant and every controller's nominal knowledge follow the corner, as mrm treats every model-based "
+           "controller, so a corner tests the TLC on a different plant it knows, not a model mismatch. Corner runs "
+           "with nominal priors on the corner plant (`experiment@corner (nominal priors)`): the plant follows the "
+           "corner and every controller keeps the g26 design (the TLC its G26 priors), a model mismatch.", ""]
     out += _overview_markdown(overview_rows(summaries))
     out += _campaign_markdown(summaries)
     for s in summaries:

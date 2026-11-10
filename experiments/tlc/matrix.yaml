@@ -29,9 +29,14 @@ controllers:                                      # spec 6, Q2
   - {name: mpc_c, params: {}}
   - {name: wdm_supervisor, params: {}, restricted_only: true}   # cold start only
 
-corners:                                          # spec 6, Q7: model trust (plant and priors follow the corner)
-  presets: [g26_fast_thermal, g26_slow_thermal, g26_textbook_thermal, g26_tec_package]   # tec_package: crosstalk
-  experiments:
-    - experiments/tlc/steady_tlc_faithful.yaml
-    - experiments/tlc/a1_tlc.yaml
-  controllers: [tlc, pi_lock_c]
+corners:                                          # spec 6, Q7: model trust; each variant runs on every preset
+  - knowledge: corner                             # corner priors: plant and every controller's knowledge follow the corner
+    presets: &corner_presets [g26_fast_thermal, g26_slow_thermal, g26_textbook_thermal, g26_tec_package]   # tec_package: crosstalk
+    experiments: &corner_experiments
+      - experiments/tlc/steady_tlc_faithful.yaml
+      - experiments/tlc/a1_tlc.yaml
+    controllers: [tlc, pi_lock_c]
+  - knowledge: nominal                            # model mismatch: plant follows the corner, controllers keep the g26 design
+    presets: *corner_presets
+    experiments: *corner_experiments
+    controllers: [tlc, pi_lock_c, kalman_lqg_c, mpc_c]   # the TLC, and mrm's model-based comparators for fairness
