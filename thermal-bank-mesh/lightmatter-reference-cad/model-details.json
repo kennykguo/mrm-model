@@ -1,0 +1,153 @@
+{
+  "model": "Existing eight-ring FEM bank geometry",
+  "source_function": "mrm.extraction.thermal_fem.bank_geometry3d",
+  "configuration": {
+    "family": "inring_noundercut",
+    "film_nm": 160.0,
+    "t_k": 300.0,
+    "lam_m": 1.31e-06,
+    "radius_um": 7.5,
+    "width_nm": 400.0,
+    "slab_nm": 60.0,
+    "slab_out_um": 2.0,
+    "slab_in_um": 2.0,
+    "contact_offset_um": 1.0,
+    "box_um": 2.0,
+    "sub_um": 200.0,
+    "die_side_mm": 5.0,
+    "bottom_bc": "dirichlet",
+    "h_bottom_w_per_m2_k": 20000.0,
+    "clad_um": 1.5,
+    "beol_lo_um": 2.5,
+    "beol_hi_um": 5.0,
+    "pass_um": 1.0,
+    "fill_lo": 0.15,
+    "fill_hi": 0.3,
+    "via_ratio": 0.1,
+    "keepout_um": 5.0,
+    "heater_gap_um": 2.0,
+    "heater_width_um": 1.0,
+    "heater_doping_factor": 0.8,
+    "sil_gap_um": 1.5,
+    "sil_width_um": 1.0,
+    "undercut_margin_um": 4.0,
+    "undercut_depth_um": 15.0,
+    "air_k_w_per_m_k": 0.026,
+    "metal_gap_um": 0.8,
+    "metal_width_um": 1.0,
+    "metal_thick_um": 0.1,
+    "metal": "tin_film",
+    "tbr_shell_um": 0.02,
+    "driver_radius_um": 5.0,
+    "aggressor_radius_um": 10.0,
+    "cmos_film_nm": 88.0,
+    "pd_radius_um": 3.0,
+    "sensor_radius_um": 2.0,
+    "site_offsets_um": {
+      "monitor_pd": [
+        0.0,
+        25.0
+      ],
+      "temp_sensor": [
+        40.0,
+        0.0
+      ],
+      "driver": [
+        0.0,
+        -30.0
+      ],
+      "aggressor": [
+        60.0,
+        0.0
+      ]
+    },
+    "pitch_um": 50.0,
+    "mode_weight": "femwell",
+    "mode_bent": true
+  },
+  "cad_units": "mm",
+  "bounding_dimensions_mm": [
+    1.15,
+    0.8,
+    0.21200000000000002
+  ],
+  "components": 79,
+  "display_colors": {
+    "si_sub": [
+      0.2,
+      0.22,
+      0.25,
+      1
+    ],
+    "box": [
+      0.61,
+      0.58,
+      0.49,
+      1
+    ],
+    "si_slab": [
+      0.39,
+      0.37,
+      0.32,
+      1
+    ],
+    "si_film": [
+      0.66,
+      0.61,
+      0.46,
+      1
+    ],
+    "si_heater": [
+      0.8,
+      0.57,
+      0.23,
+      1
+    ],
+    "cu": [
+      0.74,
+      0.73,
+      0.68,
+      1
+    ],
+    "clad": [
+      0.77,
+      0.74,
+      0.65,
+      0.08
+    ],
+    "beol_lo": [
+      0.62,
+      0.6,
+      0.55,
+      0.08
+    ],
+    "beol_hi": [
+      0.67,
+      0.65,
+      0.59,
+      0.08
+    ],
+    "beol_lo_ko": [
+      0.75,
+      0.73,
+      0.66,
+      0.04
+    ],
+    "beol_hi_ko": [
+      0.75,
+      0.73,
+      0.66,
+      0.04
+    ],
+    "pass": [
+      0.83,
+      0.81,
+      0.75,
+      0.06
+    ]
+  },
+  "appearance_reference": "https://lightmatter.co/wp-content/uploads/2025/04/OFC-2025-submission.pdf",
+  "appearance_note": "Neutral silicon and warm metal palette inspired by the public chip photo. Display colors are illustrative.",
+  "geometry_note": "Uses our simulation assumptions. This is not a manufacturer-provided CAD model.",
+  "verification": "Every body valid, total region volume matches the full simulation box, STEP reimport and dimensions verified."
+}

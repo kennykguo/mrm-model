@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eight-ring thermal model</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #101114; color: #f2f3f5; font: 14px/1.6 "SF Mono", Menlo, monospace; }
+  main { max-width: 1480px; margin: auto; padding: clamp(18px, 4vw, 56px); }
+  h1 { font-size: clamp(23px, 4vw, 36px); line-height: 1.2; margin: 0 0 12px; letter-spacing: -.06em; }
+  h2 { font-size: 14px; margin: 0 0 12px; }
+  p { margin: 0 0 16px; color: #b6bbc6; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 286px; gap: 16px; align-items: start; }
+  .panel { background: #181a20; border: 1px solid #343741; border-radius: 12px; padding: 16px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { font: inherit; color: inherit; border: 1px solid #505662; border-radius: 7px; background: #20232b; padding: 7px 11px; cursor: pointer; }
+  button:hover, button[aria-pressed=true] { background: #e9ecf2; color: #181a20; }
+  :focus-visible { outline: 2px solid #62bdff; outline-offset: 2px; }
+  canvas { display: block; width: 100%; height: clamp(320px, 58vh, 650px); background: #101114; border-radius: 8px; margin: 14px 0 10px; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .caption { min-height: 44px; margin: 14px 0 0; color: #e4e7ee; }
+  .help { margin: 0; font-size: 12px; }
+  .group + .group { margin-top: 18px; border-top: 1px solid #343741; padding-top: 14px; }
+  .group label { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; }
+  @media (max-width: 790px) { .layout { grid-template-columns: 1fr; } }
+</style>
+<main>
+  <h1>Eight-ring thermal model</h1>
+  <p>Explore the geometry used in the heat simulation. Colors identify parts and layers.</p>
+  <div class="layout">
+    <section class="panel" aria-label="3D model">
+      <div class="buttons" aria-label="Views">
+        <button type="button" data-view="bank">Ring bank</button>
+        <button type="button" data-view="ring">One ring</button>
+        <button type="button" data-view="stack">Exploded stack</button>
+        <button type="button" data-view="assembled">Assembled model</button>
+      </div>
+      <canvas id="model" aria-label="Rotatable 3D model of the eight-ring thermal mesh"></canvas>
+      <p class="help">Drag to rotate · Scroll or use + / − to zoom</p>
+      <div class="buttons" style="margin-top: 10px">
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+        <button type="button" id="reset">Reset camera</button>
+      </div>
+      <p class="caption" id="caption" aria-live="polite"></p>
+    </section>
+    <aside class="panel" id="layers" aria-label="Visible layers"></aside>
+  </div>
+</main>
+<script src="geometry.js"></script>
+<script src="viewer.js"></script>
+</html>
