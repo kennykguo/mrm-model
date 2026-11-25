@@ -1,0 +1,40 @@
+# default paths are relative to the repository root and do not depend on the working directory.
+[scope]
+files = ["mrm/plant/thermal.py", "mrm/plant/optics.py"]
+
+[comments]
+max_statements_per_explanation = 6
+
+# each table key is the literal first word of a function name.
+# exclusive verbs identify work that belongs to this category even if a different prefix was used.
+[categories.physics]
+meaning = "calculate a physical quantity or advance a physical state"
+exclusive_verbs = ["advance", "bound", "evaluate", "propagate"]
+
+[categories.solver]
+meaning = "solve equations for unknown fields or state"
+exclusive_verbs = ["solve"]
+
+[categories.cache]
+meaning = "inspect, store, reuse or invalidate a previously calculated result"
+exclusive_verbs = ["cache"]
+
+[categories.packing]
+meaning = "encode physical data in flat storage or expose structured views of it"
+exclusive_verbs = ["pack", "unpack"]
+
+[categories.validation]
+meaning = "check inputs, geometry, physical limits or model integrity"
+exclusive_verbs = ["validate", "assert"]
+
+[categories.assembly]
+meaning = "construct a layout, model, workspace or heat path"
+exclusive_verbs = ["assemble", "make", "append"]
+
+[categories.io]
+meaning = "locate, read, write or verify a model artifact"
+exclusive_verbs = ["load", "save"]
+
+[categories.helper]
+meaning = "select, index, normalize or reshape data to support another operation"
+exclusive_verbs = ["normalize", "broadcast", "select"]

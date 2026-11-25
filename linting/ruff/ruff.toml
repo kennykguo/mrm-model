@@ -1,0 +1,7 @@
+target-version = "py312"
+include = ["*.py", "*.pyi"]
+extend-exclude = ["archive", "runs", "build", "dist", "node_modules", ".venv"]
+force-exclude = true
+
+[lint]
+select = ["F401", "F821"]
