@@ -102,6 +102,21 @@ Int8Vector: TypeAlias = Annotated[NDArray[np.int8], "one-dimensional"]
 RealValue: TypeAlias = float | np.floating | NDArray[np.floating]
 
 
+# broadcast x to (B, N) using NumPy's trailing-axis rules.
+# pass (B, 1) explicitly for per-world values.
+# a 1-D input aligns with the ring axis.
+# axes - B = simulated worlds, N = rings.
+def helper_broadcast_ring_parameter(
+    world_count: int,  # world_count = B (1) - number of simulated worlds - type int scalar
+    ring_count: int,  # ring_count = N (1) - number of physical rings - type int scalar
+    x: ArrayLike,  # x = values (input units) - values to broadcast across worlds and rings - type array-like with broadcast shape (B, N)
+) -> (
+    Float64Matrix  # return = values (input units) - values broadcast to every world and ring - type float64 ndarray, shape (B, N)
+):
+    # a single ring row can supply all worlds without copying the source data.
+    return np.broadcast_to(np.asarray(x, dtype=float), (world_count, ring_count))
+
+
 # hold packed ring parameters and junction-table columns for the optics-input kernels.
 # ring has shape (B, N, RING_PARAMETER_COLUMN_COUNT), with RP_* columns.
 # grid has G reverse-bias points in V.
@@ -120,27 +135,33 @@ class PhaseParams:
 
     # return the number of simulated worlds.
     @property
-    def batch(
+    def helper_world_count(
         self: PhaseParams,  # self = parameters (mixed units) - packed ring parameters and junction tables - type PhaseParams record
     ) -> (
         int  # return = B (1) - number of worlds - type int scalar
     ):
+        # each row of the leading axis holds a separately realized device.
         return int(self.ring.shape[0])
 
+    batch = helper_world_count
+
     # return world b's junction-table row, or zero for a shared table.
-    def table_row(
+    def helper_junction_table_row(
         self: PhaseParams,  # self = parameters (mixed units) - packed ring parameters and junction tables - type PhaseParams record
         world_index: int,  # world_index = b (1) - world index - type int scalar
     ) -> (
         int  # return = b_table (1) - junction-table row for this world - type int scalar
     ):
+        # one lookup-table row is shared across worlds when the junction has a single realization.
         return world_index if self.dneff.shape[0] > 1 else 0
+
+    table_row = helper_junction_table_row
 
     # pack realized optics, thermal, and junction parameters into the fixed RP_* layout.
     # use the supplied junction table or build one from pp.
     # cache its ring-level values at the reference bias so this reference state reproduces the specified resonance and intrinsic loss.
     @classmethod
-    def from_plant_params(
+    def packing_ring_phase_parameters(
         cls: type[PhaseParams],  # cls = parameter_type (1) - class used to construct the parameter record - type PhaseParams class
         pp: Any,  # pp = parameters (mixed units) - realized optics, thermal, junction, layout, and laser parameters - type PlantParams record
         table: JunctionTable | None = None,  # table = table (mixed units) - optional junction table with voltage and per-length electrical fields - type JunctionTable record or None
@@ -149,39 +170,37 @@ class PhaseParams:
     ):
         optics, thermal, junction = pp.optics, pp.thermal, pp.junction
         world_count, ring_count = int(pp.batch), int(pp.n_rings)
+        # reuse the supplied junction table so its reference bias matches the caller’s current table.
         junction_table = junction_table_from_plant_params(pp) if table is None else table
         ring = np.zeros((world_count, ring_count, RING_PARAMETER_COLUMN_COUNT))
 
-        # broadcast x to (B, N) using NumPy's trailing-axis rules.
-        # pass (B, 1) explicitly for per-world values.
-        # a 1-D input aligns with the ring axis.
-        def per_ring(
-            x: ArrayLike,  # x = values (input units) - values to broadcast across worlds and rings - type array-like with broadcast shape (B, N)
-        ) -> (
-            Float64Matrix  # return = values (input units) - values broadcast to every world and ring - type float64 ndarray, shape (B, N)
-        ):
-            return np.broadcast_to(np.asarray(x, dtype=float), (world_count, ring_count))
-        ring[:, :, RING_PARAMETER_COLUMN_COLD_RESONANCE_WAVELENGTH] = per_ring(optics.lambda_res_cold_m)
-        ring[:, :, RING_PARAMETER_COLUMN_EFFECTIVE_INDEX] = per_ring(optics.n_eff)
-        ring[:, :, RING_PARAMETER_COLUMN_GROUP_INDEX] = per_ring(optics.n_g)
-        ring[:, :, RING_PARAMETER_COLUMN_GROUP_INDEX_WAVELENGTH_DERIVATIVE] = per_ring(optics.dn_g_dlambda_per_m)
-        ring[:, :, RING_PARAMETER_COLUMN_ROUND_TRIP_LENGTH] = per_ring(optics.length_m)
-        ring[:, :, RING_PARAMETER_COLUMN_REFERENCE_TEMPERATURE] = per_ring(optics.t_ref_k)
-        ring[:, :, RING_PARAMETER_COLUMN_THERMAL_TUNING_SLOPE] = per_ring(thermal.dlambda_dt_s0_m_per_k)
-        ring[:, :, RING_PARAMETER_COLUMN_RELATIVE_THERMAL_TUNING_CURVATURE] = per_ring(thermal.dlambda_dt_beta_per_k)
-        ring[:, :, RING_PARAMETER_COLUMN_TUNING_EXPANSION_TEMPERATURE] = per_ring(thermal.dlambda_dt_t0_k)
-        ring[:, :, RING_PARAMETER_COLUMN_THROUGH_POWER_COUPLING] = per_ring(optics.kappa2_through)
-        ring[:, :, RING_PARAMETER_COLUMN_DROP_POWER_COUPLING] = per_ring(optics.kappa2_drop)
-        ring[:, :, RING_PARAMETER_COLUMN_LOG_THROUGH_COUPLING_WAVELENGTH_DERIVATIVE] = per_ring(optics.dln_kappa2_through_dlambda_per_m)
-        ring[:, :, RING_PARAMETER_COLUMN_LOG_DROP_COUPLING_WAVELENGTH_DERIVATIVE] = per_ring(optics.dln_kappa2_drop_dlambda_per_m)
-        ring[:, :, RING_PARAMETER_COLUMN_INTRINSIC_POWER_LOSS_PER_LENGTH] = per_ring(optics.alpha_i_per_m)
-        ring[:, :, RING_PARAMETER_COLUMN_NONABSORPTIVE_POWER_LOSS_PER_LENGTH] = per_ring(optics.alpha_i_per_m) - per_ring(optics.alpha_heat_per_m)
-        ring[:, :, RING_PARAMETER_COLUMN_LOG_LOSS_RING_TEMPERATURE_DERIVATIVE] = per_ring(optics.dln_alpha_dt_ring_per_k)
-        ring[:, :, RING_PARAMETER_COLUMN_LOG_LOSS_HEATER_TEMPERATURE_DERIVATIVE] = per_ring(optics.dln_alpha_dt_heater_per_k)
-        ring[:, :, RING_PARAMETER_COLUMN_JUNCTION_FILL_FRACTION] = per_ring(junction.fill_fraction)
-        ring[:, :, RING_PARAMETER_COLUMN_REFERENCE_REVERSE_BIAS] = per_ring(optics.bias_ref_v)
+        # geometry sets the cold resonance and the phase accumulated per round trip.
+        ring[:, :, RING_PARAMETER_COLUMN_COLD_RESONANCE_WAVELENGTH] = helper_broadcast_ring_parameter(world_count, ring_count, optics.lambda_res_cold_m)
+        ring[:, :, RING_PARAMETER_COLUMN_EFFECTIVE_INDEX] = helper_broadcast_ring_parameter(world_count, ring_count, optics.n_eff)
+        ring[:, :, RING_PARAMETER_COLUMN_GROUP_INDEX] = helper_broadcast_ring_parameter(world_count, ring_count, optics.n_g)
+        ring[:, :, RING_PARAMETER_COLUMN_GROUP_INDEX_WAVELENGTH_DERIVATIVE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.dn_g_dlambda_per_m)
+        ring[:, :, RING_PARAMETER_COLUMN_ROUND_TRIP_LENGTH] = helper_broadcast_ring_parameter(world_count, ring_count, optics.length_m)
+        # the tuning law needs both the cold reference temperature and the expansion temperature.
+        ring[:, :, RING_PARAMETER_COLUMN_REFERENCE_TEMPERATURE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.t_ref_k)
+        ring[:, :, RING_PARAMETER_COLUMN_THERMAL_TUNING_SLOPE] = helper_broadcast_ring_parameter(world_count, ring_count, thermal.dlambda_dt_s0_m_per_k)
+        ring[:, :, RING_PARAMETER_COLUMN_RELATIVE_THERMAL_TUNING_CURVATURE] = helper_broadcast_ring_parameter(world_count, ring_count, thermal.dlambda_dt_beta_per_k)
+        ring[:, :, RING_PARAMETER_COLUMN_TUNING_EXPANSION_TEMPERATURE] = helper_broadcast_ring_parameter(world_count, ring_count, thermal.dlambda_dt_t0_k)
+        ring[:, :, RING_PARAMETER_COLUMN_THROUGH_POWER_COUPLING] = helper_broadcast_ring_parameter(world_count, ring_count, optics.kappa2_through)
+        # the two couplers have separate power fractions and wavelength slopes.
+        ring[:, :, RING_PARAMETER_COLUMN_DROP_POWER_COUPLING] = helper_broadcast_ring_parameter(world_count, ring_count, optics.kappa2_drop)
+        ring[:, :, RING_PARAMETER_COLUMN_LOG_THROUGH_COUPLING_WAVELENGTH_DERIVATIVE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.dln_kappa2_through_dlambda_per_m)
+        ring[:, :, RING_PARAMETER_COLUMN_LOG_DROP_COUPLING_WAVELENGTH_DERIVATIVE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.dln_kappa2_drop_dlambda_per_m)
+        ring[:, :, RING_PARAMETER_COLUMN_INTRINSIC_POWER_LOSS_PER_LENGTH] = helper_broadcast_ring_parameter(world_count, ring_count, optics.alpha_i_per_m)
+        # subtract the heat-producing loss to isolate scattering and radiation.
+        ring[:, :, RING_PARAMETER_COLUMN_NONABSORPTIVE_POWER_LOSS_PER_LENGTH] = helper_broadcast_ring_parameter(world_count, ring_count, optics.alpha_i_per_m) - helper_broadcast_ring_parameter(world_count, ring_count, optics.alpha_heat_per_m)
+        ring[:, :, RING_PARAMETER_COLUMN_LOG_LOSS_RING_TEMPERATURE_DERIVATIVE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.dln_alpha_dt_ring_per_k)
+        ring[:, :, RING_PARAMETER_COLUMN_LOG_LOSS_HEATER_TEMPERATURE_DERIVATIVE] = helper_broadcast_ring_parameter(world_count, ring_count, optics.dln_alpha_dt_heater_per_k)
+        # the fill fraction converts a junction material response into a whole-ring response.
+        ring[:, :, RING_PARAMETER_COLUMN_JUNCTION_FILL_FRACTION] = helper_broadcast_ring_parameter(world_count, ring_count, junction.fill_fraction)
+        ring[:, :, RING_PARAMETER_COLUMN_REFERENCE_REVERSE_BIAS] = helper_broadcast_ring_parameter(world_count, ring_count, optics.bias_ref_v)
         # the table at the reference bias (ring level), so the reference state reproduces lambda_res and alpha_i
         v_grid = np.asarray(junction_table.v_reverse_v, float)
+        # each device uses its own reference-bias correction for both resonance and loss.
         for world_index in range(world_count):
             junction_table_index = world_index if junction_table.dneff.shape[0] > 1 else 0          # a shared LUT has one row
             reference_junction = np.zeros((4, ring_count))                             # f dneff, f alpha_fca, C_j, R_s at V_ref
@@ -194,13 +213,17 @@ class PhaseParams:
                                   reference_junction[3], flags)
             ring[world_index, :, RING_PARAMETER_COLUMN_REFERENCE_JUNCTION_INDEX_CHANGE] = reference_junction[0]
             ring[world_index, :, RING_PARAMETER_COLUMN_REFERENCE_JUNCTION_POWER_LOSS_PER_LENGTH] = reference_junction[1]
+        # a non-finite packed coefficient would contaminate every subsequent optical evaluation.
         if not np.all(np.isfinite(ring)):
             invalid_columns = sorted({i for i in range(RING_PARAMETER_COLUMN_COUNT) if not np.all(np.isfinite(ring[:, :, i]))})
+            # report the failing columns so the source parameter can be identified.
             raise ValueError(f"PhaseParams: non-finite columns {invalid_columns} (check optics/thermal/junction in PlantParams)")
         return cls(ring=np.ascontiguousarray(ring), grid=v_grid, dneff=np.ascontiguousarray(junction_table.dneff),
                    alpha_fca=np.ascontiguousarray(junction_table.alpha_fca_per_m),
                    capacitance=np.ascontiguousarray(junction_table.capacitance_f_per_m),
                    r_series=np.ascontiguousarray(junction_table.r_series_ohm_m))
+
+    from_plant_params = packing_ring_phase_parameters
 
 
 # bus-segment transmission
@@ -212,7 +235,8 @@ class PhaseParams:
 # the segment after the last ring is unmodeled and uses one.
 # this is the bus_t2 input to the optics bus walk and self-heating adapter.
 # x
-def calculate_bus_segment_power_transmission(
+# axes - B = simulated worlds, N = physical rings.
+def physics_bus_segment_power_transmission(
     pp: Any,  # pp = parameters (mixed units) - realized optics, thermal, junction, layout, and laser parameters - type PlantParams record
 ) -> (
     Float64Matrix  # return = B_segment (1) - bus power transmission before each physical ring - type float64 ndarray, shape (B, N)
@@ -222,15 +246,21 @@ def calculate_bus_segment_power_transmission(
     ring_spacing_m = float(getattr(pp.layout, "ring_spacing_on_bus_m", 0.0) or 0.0)
     bus_loss_per_m = np.broadcast_to(np.asarray(pp.laser.bus_loss_per_m, dtype=float).reshape(-1), (world_count,))
     power_transmission = np.ones((world_count, ring_count))
+    # only gaps between distinct rings attenuate the bus power.
     if ring_count > 1 and ring_spacing_m > 0.0:
+        # power decays exponentially with propagation distance at the specified loss per metre.
         segment_power_transmission = np.exp(-bus_loss_per_m * ring_spacing_m)
+        # a passive segment must transmit a finite fraction no larger than one.
         if not np.all(np.isfinite(segment_power_transmission)) or np.any(segment_power_transmission > 1.0):
             raise ValueError(
                 f"bus segment transmission must lie in [0, 1]: {segment_power_transmission} (bus_loss_per_m {bus_loss_per_m}, spacing "
                 f"{ring_spacing_m} m)"
             )
         power_transmission[:, order[1:]] = segment_power_transmission[:, None]
+    # the input segment keeps unit transmission because the first ring defines the bus entrance.
     return power_transmission
+
+calculate_bus_segment_power_transmission = physics_bus_segment_power_transmission
 
 
 # resonance shift and optical-input kernels
@@ -240,7 +270,7 @@ def calculate_bus_segment_power_transmission(
 # Delta_lambda_r = s_0*((T-T_ref) + beta*((T-T_0)^2-(T_ref-T_0)^2)/2).
 # x
 @njit(cache=True, _nrt=False)
-def calculate_thermal_resonance_shift_m(
+def physics_thermal_resonance_shift_m(
     t_k: RealValue,  # t_k = T (K) - current ring temperature - type real scalar or ndarray, broadcast input shape
     t_ref_k: RealValue,  # t_ref_k = T_ref (K) - reference temperature for the shift - type real scalar or ndarray, broadcast input shape
     s0: RealValue,  # s0 = s_0 (m/K) - thermal tuning slope at T_0 - type real scalar or ndarray, broadcast input shape
@@ -249,7 +279,10 @@ def calculate_thermal_resonance_shift_m(
 ) -> (
     RealValue  # return = Delta_lambda_r (m) - shift from the reference resonance - type real scalar or ndarray, broadcast input shape
 ):
+    # integrate the local wavelength slope between the reference and operating temperatures.
     return s0 * ((t_k - t_ref_k) + 0.5 * beta * ((t_k - t0) ** 2 - (t_ref_k - t0) ** 2))
+
+calculate_thermal_resonance_shift_m = physics_thermal_resonance_shift_m
 
 
 # express the same thermal tuning law about the previous temperature.
@@ -259,7 +292,7 @@ def calculate_thermal_resonance_shift_m(
 # use t_ref_k=t_prev_k in the optical self-heating adapter.
 # x
 @njit(cache=True, _nrt=False)
-def rebase_thermal_tuning_coefficients(
+def physics_rebase_thermal_tuning_coefficients(
     t_prev_k: RealValue,  # t_prev_k = T_prev (K) - new expansion temperature - type real scalar or ndarray, broadcast input shape
     s0: RealValue,  # s0 = s_0 (m/K) - thermal tuning slope at T_0 - type real scalar or ndarray, broadcast input shape
     beta: RealValue,  # beta = beta (1/K) - relative curvature of the tuning slope - type real scalar or ndarray, broadcast input shape
@@ -268,11 +301,14 @@ def rebase_thermal_tuning_coefficients(
     RealValue,  # return[0] = s_local (m/K) - tuning slope at T_prev - type real scalar or ndarray, broadcast input shape
     RealValue,  # return[1] = beta_local (1/K) - relative curvature at T_prev - type real scalar or ndarray, broadcast input shape
 ]:
+    # evaluate the slope at the new origin and rescale the curvature to retain the same quadratic law.
     tuning_slope_ratio = 1.0 + beta * (t_prev_k - t0)
     return (
         s0 * tuning_slope_ratio,
         beta / tuning_slope_ratio,
     )
+
+rebase_thermal_tuning_coefficients = physics_rebase_thermal_tuning_coefficients
 
 
 # write each ring's resonance shift and junction properties at the supplied temperature and bias.
@@ -288,8 +324,9 @@ def rebase_thermal_tuning_coefficients(
 # this wrapper allocates scratch space.
 # evaluate_ring_resonance_shifts_with_workspace accepts reusable scratch instead.
 # x
+# axes - G = junction voltage grid points, N = physical rings.
 @njit(cache=True)
-def evaluate_ring_resonance_shifts(
+def physics_evaluate_ring_resonance_shifts(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     t_ring_k: Float64Vector,  # t_ring_k = T_ring (K) - ring temperatures - type float64 ndarray, shape (N,)
     reverse_bias_v: Float64Vector,  # reverse_bias_v = V (V) - reverse bias of each ring - type float64 ndarray, shape (N,)
@@ -306,15 +343,18 @@ def evaluate_ring_resonance_shifts(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    evaluate_ring_resonance_shifts_with_workspace(ring_parameters, t_ring_k, reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_resonance_shift_m, out_junction_loss_per_m, out_junction_capacitance_f, out_series_resistance_ohm,
+    physics_evaluate_ring_resonance_shifts_with_workspace(ring_parameters, t_ring_k, reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_resonance_shift_m, out_junction_loss_per_m, out_junction_capacitance_f, out_series_resistance_ohm,
                        out_junction_flags, np.empty(ring_parameters.shape[0]))
+
+evaluate_ring_resonance_shifts = physics_evaluate_ring_resonance_shifts
 
 
 # compute evaluate_ring_resonance_shifts with caller-owned scratch fdn, avoiding a per-call allocation.
 # fdn has N entries and receives ring-level effective-index change, including the junction fill fraction.
 # x
+# axes - G = junction voltage grid points, N = physical rings.
 @njit(cache=True, _nrt=False)
-def evaluate_ring_resonance_shifts_with_workspace(
+def physics_evaluate_ring_resonance_shifts_with_workspace(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     t_ring_k: Float64Vector,  # t_ring_k = T_ring (K) - ring temperatures - type float64 ndarray, shape (N,)
     reverse_bias_v: Float64Vector,  # reverse_bias_v = V (V) - reverse bias of each ring - type float64 ndarray, shape (N,)
@@ -335,9 +375,13 @@ def evaluate_ring_resonance_shifts_with_workspace(
     n_rings = ring_parameters.shape[0]
     junction_eval_row(reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, ring_parameters[:, RING_PARAMETER_COLUMN_JUNCTION_FILL_FRACTION], ring_parameters[:, RING_PARAMETER_COLUMN_ROUND_TRIP_LENGTH], junction_index_change, out_junction_loss_per_m, out_junction_capacitance_f,
                       out_series_resistance_ohm, out_junction_flags)
+    # combine each ring’s thermal shift with its bias-induced change in effective index.
     for ring_index in range(n_rings):
-        thermal_shift = calculate_thermal_resonance_shift_m(t_ring_k[ring_index], ring_parameters[ring_index, RING_PARAMETER_COLUMN_REFERENCE_TEMPERATURE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_THERMAL_TUNING_SLOPE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_RELATIVE_THERMAL_TUNING_CURVATURE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_TUNING_EXPANSION_TEMPERATURE])
+        thermal_shift = physics_thermal_resonance_shift_m(t_ring_k[ring_index], ring_parameters[ring_index, RING_PARAMETER_COLUMN_REFERENCE_TEMPERATURE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_THERMAL_TUNING_SLOPE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_RELATIVE_THERMAL_TUNING_CURVATURE], ring_parameters[ring_index, RING_PARAMETER_COLUMN_TUNING_EXPANSION_TEMPERATURE])
+        # the group index converts the change from reference index into a resonance-wavelength shift.
         out_resonance_shift_m[ring_index] = thermal_shift + ring_parameters[ring_index, RING_PARAMETER_COLUMN_COLD_RESONANCE_WAVELENGTH] * (junction_index_change[ring_index] - ring_parameters[ring_index, RING_PARAMETER_COLUMN_REFERENCE_JUNCTION_INDEX_CHANGE]) / ring_parameters[ring_index, RING_PARAMETER_COLUMN_GROUP_INDEX]
+
+evaluate_ring_resonance_shifts_with_workspace = physics_evaluate_ring_resonance_shifts_with_workspace
 
 
 # return the common temperature multiplier for both data levels' intrinsic loss.
@@ -345,8 +389,9 @@ def evaluate_ring_resonance_shifts_with_workspace(
 # temperatures use K, and coefficients 1/K.
 # the heater temperature is the thermal model's heater-resistor observer.
 # x
+# axes - N = physical rings.
 @njit(cache=True, inline="always")
-def calculate_intrinsic_loss_temperature_factor(
+def physics_intrinsic_loss_temperature_factor(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     ring_index: int,  # ring_index = k (1) - physical ring index - type int scalar
     ring_temperature_k: float,  # ring_temperature_k = T_ring (K) - current ring temperature - type float scalar
@@ -355,7 +400,10 @@ def calculate_intrinsic_loss_temperature_factor(
     float  # return = s_alpha (1) - temperature multiplier for intrinsic loss - type float scalar
 ):
     reference_temperature_k = ring_parameters[ring_index, RING_PARAMETER_COLUMN_REFERENCE_TEMPERATURE]
+    # integrate the two log-loss slopes from their shared reference temperature before exponentiating.
     return math.exp(ring_parameters[ring_index, RING_PARAMETER_COLUMN_LOG_LOSS_RING_TEMPERATURE_DERIVATIVE] * (ring_temperature_k - reference_temperature_k) + ring_parameters[ring_index, RING_PARAMETER_COLUMN_LOG_LOSS_HEATER_TEMPERATURE_DERIVATIVE] * (heater_temperature_k - reference_temperature_k))
+
+calculate_intrinsic_loss_temperature_factor = physics_intrinsic_loss_temperature_factor
 
 
 # write phase, field transmission, absorbed loss fraction, and optional delay for one ring/data level.
@@ -392,8 +440,9 @@ def calculate_intrinsic_loss_temperature_factor(
 # test_rigid_comb_against_the_solver_table in tests/verification/test_phase.py checks this limitation.
 # the full n_eff(lambda, T, V)*L(T) law needs a thermal-dispersion config key and coordinated changes to the engine, oracle, replicas, and calibration.
 # x
+# axes - L = laser lines, N = physical rings.
 @njit(cache=True, _nrt=False)
-def write_ring_optical_inputs_for_data_level(
+def physics_write_ring_optical_inputs_for_data_level(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     ring_index: int,  # ring_index = k (1) - physical ring index - type int scalar
     laser_wavelengths_m: Float64Vector,  # laser_wavelengths_m = lambda_L (m) - vacuum laser wavelengths - type float64 ndarray, shape (L,)
@@ -417,17 +466,23 @@ def write_ring_optical_inputs_for_data_level(
         ring_parameters[ring_index, RING_PARAMETER_COLUMN_INTRINSIC_POWER_LOSS_PER_LENGTH] + junction_power_loss_per_m - ring_parameters[ring_index, RING_PARAMETER_COLUMN_REFERENCE_JUNCTION_POWER_LOSS_PER_LENGTH]
     )  # intrinsic loss before temperature scaling, 1/m
     intrinsic_power_loss_per_m *= loss_temperature_factor  # intrinsic loss after temperature scaling, 1/m
+    # the passive ring cannot gain power when the bias correction exceeds the measured baseline loss.
     if intrinsic_power_loss_per_m < 0.0:
         intrinsic_power_loss_per_m = 0.0
+    # the field exponent is half the power exponent because optical power is squared field magnitude.
     round_trip_field_transmission = math.exp(-0.5 * intrinsic_power_loss_per_m * ring_length_m)
     absorptive_power_loss_per_m = intrinsic_power_loss_per_m - ring_parameters[ring_index, RING_PARAMETER_COLUMN_NONABSORPTIVE_POWER_LOSS_PER_LENGTH]  # alpha_heat [1/m]
+    # only positive absorption can supply heat to the ring.
     if absorptive_power_loss_per_m < 0.0:
         absorptive_power_loss_per_m = 0.0
+    # zero total loss leaves no dissipated power to partition.
     absorbed_share_of_intrinsic_loss = (
         absorptive_power_loss_per_m / intrinsic_power_loss_per_m if intrinsic_power_loss_per_m > 0.0 else 0.0
     )
+    # the heat-producing share cannot exceed the total power dissipated.
     if absorbed_share_of_intrinsic_loss > 1.0:
         absorbed_share_of_intrinsic_loss = 1.0
+    # each laser samples the same shifted resonance at its own vacuum wavelength.
     for line_index in range(laser_wavelengths_m.shape[0]):
         cold_wavelength_m = laser_wavelengths_m[line_index] - resonance_shift_m  # laser wavelength on the cold phase curve
         wavelength_offset_m = cold_wavelength_m - cold_resonance_m
@@ -453,11 +508,14 @@ def write_ring_optical_inputs_for_data_level(
                 / C0
             )
 
+write_ring_optical_inputs_for_data_level = physics_write_ring_optical_inputs_for_data_level
+
 
 # the part of `evaluate_ring_optical_inputs` that depends on the ring state - phases, loss, heat fraction, group delay, level shifts and junction values.
 # arguments follow evaluate_ring_optical_inputs.
+# axes - G = junction voltage grid points, L = laser lines, N = physical rings.
 @njit(cache=True)
-def evaluate_binary_ring_optical_inputs(
+def physics_evaluate_binary_ring_optical_inputs(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     laser_wavelengths_m: Float64Vector,  # laser_wavelengths_m = lambda_L (m) - vacuum laser wavelengths - type float64 ndarray, shape (L,)
     t_ring_k: Float64Vector,  # t_ring_k = T_ring (K) - ring temperatures - type float64 ndarray, shape (N,)
@@ -483,9 +541,11 @@ def evaluate_binary_ring_optical_inputs(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    evaluate_binary_ring_optical_inputs_with_workspace(ring_parameters, laser_wavelengths_m, t_ring_k, t_heater_k, level_zero_reverse_bias_v, level_one_reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_level_zero_phase_rad,
+    physics_evaluate_binary_ring_optical_inputs_with_workspace(ring_parameters, laser_wavelengths_m, t_ring_k, t_heater_k, level_zero_reverse_bias_v, level_one_reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_level_zero_phase_rad,
                           out_level_one_phase_rad, out_level_zero_field_transmission, out_level_one_field_transmission, out_level_zero_absorbed_loss_fraction, out_level_one_absorbed_loss_fraction, out_round_trip_delay_s, out_resonance_shift_m, out_junction_capacitance_f, out_series_resistance_ohm, out_junction_flags,
                           np.empty((6, ring_parameters.shape[0])))
+
+evaluate_binary_ring_optical_inputs = physics_evaluate_binary_ring_optical_inputs
 
 
 # `evaluate_binary_ring_optical_inputs` with the scratch ws (6, N) passed in, so the per-tick call of the kernel allocates nothing.
@@ -495,8 +555,9 @@ def evaluate_binary_ring_optical_inputs(
 # row 3 stores series resistance in ohm.
 # row 4 stores the dimensionless junction index change.
 # row 5 stores the dimensionless intrinsic-loss temperature multiplier.
+# axes - G = junction voltage grid points, L = laser lines, N = physical rings.
 @njit(cache=True, _nrt=False, inline="always")
-def evaluate_binary_ring_optical_inputs_with_workspace(
+def physics_evaluate_binary_ring_optical_inputs_with_workspace(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     laser_wavelengths_m: Float64Vector,  # laser_wavelengths_m = lambda_L (m) - vacuum laser wavelengths - type float64 ndarray, shape (L,)
     t_ring_k: Float64Vector,  # t_ring_k = T_ring (K) - ring temperatures - type float64 ndarray, shape (N,)
@@ -529,21 +590,28 @@ def evaluate_binary_ring_optical_inputs_with_workspace(
     junction_capacitance_f = workspace[2]
     series_resistance_ohm = workspace[3]
     loss_temperature_factor = workspace[5]
+    # the optical modulator switches between two voltages with distinct resonance and loss.
     for data_level in range(2):
+        # select the electrical bias driven by this binary level.
         reverse_bias_v = level_zero_reverse_bias_v if data_level == 0 else level_one_reverse_bias_v
-        evaluate_ring_resonance_shifts_with_workspace(ring_parameters, t_ring_k, reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, resonance_shift_m, junction_power_loss_per_m, junction_capacitance_f, series_resistance_ohm, out_junction_flags,
+        physics_evaluate_ring_resonance_shifts_with_workspace(ring_parameters, t_ring_k, reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, resonance_shift_m, junction_power_loss_per_m, junction_capacitance_f, series_resistance_ohm, out_junction_flags,
                            workspace[4])
+        # the junction correction and optical path length belong to each individual ring.
         for ring_index in range(ring_count):
             out_resonance_shift_m[ring_index, data_level] = resonance_shift_m[ring_index]
             out_junction_capacitance_f[ring_index, data_level] = junction_capacitance_f[ring_index]
             out_series_resistance_ohm[ring_index, data_level] = series_resistance_ohm[ring_index]
+            # store level zero separately because it also supplies the shared delay reference.
             if data_level == 0:
-                loss_temperature_factor[ring_index] = calculate_intrinsic_loss_temperature_factor(ring_parameters, ring_index, t_ring_k[ring_index], t_heater_k[ring_index])   # one exp for both levels
-                write_ring_optical_inputs_for_data_level(ring_parameters, ring_index, laser_wavelengths_m, resonance_shift_m[ring_index], junction_power_loss_per_m[ring_index], loss_temperature_factor[ring_index], out_level_zero_phase_rad, out_level_zero_field_transmission, out_level_zero_absorbed_loss_fraction, out_round_trip_delay_s,
+                loss_temperature_factor[ring_index] = physics_intrinsic_loss_temperature_factor(ring_parameters, ring_index, t_ring_k[ring_index], t_heater_k[ring_index])   # one exp for both levels
+                physics_write_ring_optical_inputs_for_data_level(ring_parameters, ring_index, laser_wavelengths_m, resonance_shift_m[ring_index], junction_power_loss_per_m[ring_index], loss_temperature_factor[ring_index], out_level_zero_phase_rad, out_level_zero_field_transmission, out_level_zero_absorbed_loss_fraction, out_round_trip_delay_s,
                             True)
             else:
-                write_ring_optical_inputs_for_data_level(ring_parameters, ring_index, laser_wavelengths_m, resonance_shift_m[ring_index], junction_power_loss_per_m[ring_index], loss_temperature_factor[ring_index], out_level_one_phase_rad, out_level_one_field_transmission, out_level_one_absorbed_loss_fraction, out_round_trip_delay_s,
+                # level one has a separate phase and loss while retaining the level-zero delay.
+                physics_write_ring_optical_inputs_for_data_level(ring_parameters, ring_index, laser_wavelengths_m, resonance_shift_m[ring_index], junction_power_loss_per_m[ring_index], loss_temperature_factor[ring_index], out_level_one_phase_rad, out_level_one_field_transmission, out_level_one_absorbed_loss_fraction, out_round_trip_delay_s,
                             False)
+
+evaluate_binary_ring_optical_inputs_with_workspace = physics_evaluate_binary_ring_optical_inputs_with_workspace
 
 
 # write per-pass through/drop power coupling at each actual laser wavelength.
@@ -555,8 +623,9 @@ def evaluate_binary_ring_optical_inputs_with_workspace(
 # reuse them while lam_l is unchanged.
 # clamp just below one so field self-coupling stays positive.
 # x
+# axes - L = laser lines, N = physical rings.
 @njit(cache=True, _nrt=False)
-def evaluate_coupler_power_fractions(
+def physics_evaluate_coupler_power_fractions(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     laser_wavelengths_m: Float64Vector,  # laser_wavelengths_m = lambda_L (m) - vacuum laser wavelengths - type float64 ndarray, shape (L,)
     out_through_power_coupling: Float64Matrix,  # out_through_power_coupling = K_th^2 (1) - per-pass coupler power fractions written in place - type float64 ndarray, shape (N, L)
@@ -565,14 +634,21 @@ def evaluate_coupler_power_fractions(
     None  # return = None - results are written into the output buffers - type None
 ):
     n_rings = ring_parameters.shape[0]
+    # each ring supplies its own cold wavelength and reference coupling.
     for ring_index in range(n_rings):
         cold_resonance_m = ring_parameters[ring_index, RING_PARAMETER_COLUMN_COLD_RESONANCE_WAVELENGTH]
+        # evaluate dispersion at each laser wavelength to obtain both coupling fractions.
         for line_index in range(laser_wavelengths_m.shape[0]):
+            # the logarithmic coupling slope is measured from the cold resonance.
             wavelength_offset_m = laser_wavelengths_m[line_index] - cold_resonance_m
             through_power_coupling = ring_parameters[ring_index, RING_PARAMETER_COLUMN_THROUGH_POWER_COUPLING] * math.exp(ring_parameters[ring_index, RING_PARAMETER_COLUMN_LOG_THROUGH_COUPLING_WAVELENGTH_DERIVATIVE] * wavelength_offset_m)
             drop_power_coupling = ring_parameters[ring_index, RING_PARAMETER_COLUMN_DROP_POWER_COUPLING] * math.exp(ring_parameters[ring_index, RING_PARAMETER_COLUMN_LOG_DROP_COUPLING_WAVELENGTH_DERIVATIVE] * wavelength_offset_m)
+            # keep through coupling below unity so its self-coupling amplitude remains positive.
             out_through_power_coupling[ring_index, line_index] = through_power_coupling if through_power_coupling < 1.0 else 1.0 - 1e-15
+            # the drop coupler needs the same passive bound independently.
             out_drop_power_coupling[ring_index, line_index] = drop_power_coupling if drop_power_coupling < 1.0 else 1.0 - 1e-15
+
+evaluate_coupler_power_fractions = physics_evaluate_coupler_power_fractions
 
 
 # compute all optics inputs for one world at both data levels.
@@ -588,8 +664,9 @@ def evaluate_coupler_power_fractions(
 # out_flags has N int8 junction-clipping flags.
 # this is evaluate_binary_ring_optical_inputs followed by evaluate_coupler_power_fractions.
 # x
+# axes - G = junction voltage grid points, L = laser lines, N = physical rings.
 @njit(cache=True)
-def evaluate_ring_optical_inputs(
+def physics_evaluate_ring_optical_inputs(
     ring_parameters: Float64Matrix,  # ring_parameters = R_ring (mixed units) - packed RP_* parameters, one row per ring - type float64 ndarray, shape (N, RING_PARAMETER_COLUMN_COUNT)
     laser_wavelengths_m: Float64Vector,  # laser_wavelengths_m = lambda_L (m) - vacuum laser wavelengths - type float64 ndarray, shape (L,)
     t_ring_k: Float64Vector,  # t_ring_k = T_ring (K) - ring temperatures - type float64 ndarray, shape (N,)
@@ -617,10 +694,12 @@ def evaluate_ring_optical_inputs(
 ) -> (
     None  # return = None - results are written into the output buffers - type None
 ):
-    evaluate_binary_ring_optical_inputs(ring_parameters, laser_wavelengths_m, t_ring_k, t_heater_k, level_zero_reverse_bias_v, level_one_reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_level_zero_phase_rad,
+    physics_evaluate_binary_ring_optical_inputs(ring_parameters, laser_wavelengths_m, t_ring_k, t_heater_k, level_zero_reverse_bias_v, level_one_reverse_bias_v, bias_grid_v, junction_index_change_table, junction_loss_table_per_m, junction_capacitance_table_f_per_m, junction_resistance_table_ohm_m, out_level_zero_phase_rad,
                            out_level_one_phase_rad, out_level_zero_field_transmission, out_level_one_field_transmission, out_level_zero_absorbed_loss_fraction, out_level_one_absorbed_loss_fraction, out_round_trip_delay_s, out_resonance_shift_m, out_junction_capacitance_f, out_series_resistance_ohm,
                            out_junction_flags)
-    evaluate_coupler_power_fractions(ring_parameters, laser_wavelengths_m, out_through_power_coupling, out_drop_power_coupling)
+    physics_evaluate_coupler_power_fractions(ring_parameters, laser_wavelengths_m, out_through_power_coupling, out_drop_power_coupling)
+
+evaluate_ring_optical_inputs = physics_evaluate_ring_optical_inputs
 
 
 # previous names remain aliases for callers that use the established API.
@@ -639,3 +718,17 @@ ring_optics_row = evaluate_ring_optical_inputs
 __all__ += ['bus_t2_from_plant_params', 'thermal_shift_m', 'local_thermo_optic', 'resonance_shift_row', 'resonance_shift_ws', '_loss_temperature_factor', '_fill_level', 'ring_optics_levels_row', 'ring_optics_levels_ws', 'coupling_row', 'ring_optics_row']
 
 __all__ += ['RP_LAM_RES', 'RP_N_EFF', 'RP_N_G', 'RP_DNG', 'RP_LEN', 'RP_T_REF', 'RP_S0', 'RP_BETA', 'RP_T0', 'RP_K2T', 'RP_K2D', 'RP_DLNK2T', 'RP_DLNK2D', 'RP_ALPHA_I', 'RP_ALPHA_NONHEAT', 'RP_CT_RING', 'RP_CT_HEATER', 'RP_FILL', 'RP_V_REF', 'RP_FDN_REF', 'RP_FAL_REF', 'N_RP']
+
+__all__ += [
+    "physics_bus_segment_power_transmission",
+    "physics_thermal_resonance_shift_m",
+    "physics_rebase_thermal_tuning_coefficients",
+    "physics_evaluate_ring_resonance_shifts",
+    "physics_evaluate_ring_resonance_shifts_with_workspace",
+    "physics_intrinsic_loss_temperature_factor",
+    "physics_write_ring_optical_inputs_for_data_level",
+    "physics_evaluate_binary_ring_optical_inputs",
+    "physics_evaluate_binary_ring_optical_inputs_with_workspace",
+    "physics_evaluate_coupler_power_fractions",
+    "physics_evaluate_ring_optical_inputs",
+]
