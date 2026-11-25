@@ -5,8 +5,8 @@ import sys
 
 import pytest
 
-from linting.stage_2_structure import check
-from linting.stage_2_structure.check import CATEGORIES, TARGETS, check_source
+from linting.structure import check
+from linting.structure.check import CATEGORIES, TARGETS, check_source
 
 SCRIPT = Path(check.__file__)
 

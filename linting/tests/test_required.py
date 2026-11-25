@@ -16,4 +16,4 @@ def test_both_required_checks_run_and_either_can_fail(monkeypatch, codes, expect
     assert required.main() == expected
     assert len(calls) == 2
     assert "ruff" in calls[0]
-    assert Path(calls[1][-1]) == required.HERE / "stage_2_structure" / "check.py"
+    assert Path(calls[1][-1]) == required.HERE / "structure" / "check.py"

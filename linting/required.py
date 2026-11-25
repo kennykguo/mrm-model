@@ -10,7 +10,7 @@ def main():
     failed = False
     for name, command in (
         ("ruff", [sys.executable, "-m", "ruff", "check", "."]),
-        ("function documentation", [sys.executable, str(HERE / "stage_2_structure" / "check.py")]),
+        ("function documentation", [sys.executable, str(HERE / "structure" / "check.py")]),
     ):
         print(f"checking {name}", flush=True)
         result = subprocess.run(command, cwd=HERE.parent)

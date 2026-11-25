@@ -1,7 +1,7 @@
 # exercise review sequencing and scoring without sending source to a model during pytest.
 import pytest
 
-from linting.stage_3_semantics import model_review as review
+from linting.semantics import model_review as review
 
 
 def step(line, evidence, judgment):

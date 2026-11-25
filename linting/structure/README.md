@@ -57,8 +57,8 @@ use short single-line `#` comments in lowercase plain English. keep the case req
 from the repository root, run the default scope or pass the path to one Python file.
 
 ```sh
-.venv/bin/python -m linting.stage_2_structure.check
-.venv/bin/python -m linting.stage_2_structure.check mrm/plant/thermal.py
+.venv/bin/python -m linting.structure.check
+.venv/bin/python -m linting.structure.check mrm/plant/thermal.py
 ```
 
 a finding gives the file, line, rule and reason. the exit code is 0 for a clean run, 1 for findings and 2 for invalid input.

@@ -5,8 +5,8 @@ import sys
 
 import pytest
 
-from linting.stage_2_structure.check import check_source
-from linting.stage_3_semantics import excerpt
+from linting.structure.check import check_source
+from linting.semantics import excerpt
 
 SCRIPT = Path(excerpt.__file__)
 

@@ -26,13 +26,13 @@ the three calibration cases present the entire solver. only the comment before t
 from the repository root, print a function to review it yourself. supply a qualified name such as `Class.method` for a method. use `--case A`, `--case B` or `--case C` in place of the file and function to inspect a calibration variant.
 
 ```sh
-.venv/bin/python -m linting.stage_3_semantics.excerpt mrm/plant/selfheat.py solve_ring_temperature
+.venv/bin/python -m linting.semantics.excerpt mrm/plant/selfheat.py solve_ring_temperature
 ```
 
 to request a model review, use an authenticated Codex CLI. the first pass receives only the complete function and its local header. if it flags a gap, a fresh pass checks the candidate against up to two same-file callers or callees. supply `--verify-with FILE FUNCTION` to choose more relevant evidence.
 
 ```sh
-.venv/bin/python -m linting.stage_3_semantics.model_review mrm/plant/selfheat.py solve_ring_temperature \
+.venv/bin/python -m linting.semantics.model_review mrm/plant/selfheat.py solve_ring_temperature \
   --verify-with mrm/plant/thermal.py physics_separate_known_heat_and_source_gain_for_observer
 ```
 
@@ -41,7 +41,7 @@ each pass runs in an empty directory with tools disabled. the runner attaches th
 ## how is the reviewer calibrated?
 
 ```sh
-.venv/bin/python -m linting.stage_3_semantics.model_review --calibrate
+.venv/bin/python -m linting.semantics.model_review --calibrate
 ```
 
 the isolated pass receives the full solver and the guard line. the runner withholds the expected judgment, case label and other variants. it scores exact classifications, missed issues and needless rewrites. an unverified issue counts as missed. classifying an incorrect explanation as vague loses the exact classification even if the reviewer proposed a correction. use `--model NAME` to select another available model.
