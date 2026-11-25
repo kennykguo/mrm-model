@@ -1,26 +1,42 @@
 # model how heat sources change ring, heater, photodiode, and sensor temperatures.
-# each source-to-observer heat path is a sum of first-order lags, called a Foster model.
-# tau_m*dx_m/dt = -x_m + r_m*u_source(t)
-# T_observer = T_base + sum(x_m for that observer)
-# x_m is a temperature contribution in K, not a separate ring.
-# r_m uses K/W, tau_m uses s, and u uses W.
-# several states represent heat stored and released on different time scales.
-# absorbed optical power depends on ring temperature.
-# mrm.plant.selfheat closes that nonlinear loop using these same states.
-# foh_scalar gives one lag's exact update for a held or linearly changing input.
-# InterimRom describes the default heat paths and records the source of each number.
-# load_rom reads an extracted FEM reduced-order model and checks its sidecar metadata.
-# assemble expands either model over all named sources and observers to create a ThermalSystem.
-# ThermalScales applies uncertainty per world, with separate fast and slow time scales per die.
-# thermal_advance updates temperatures when source power is known.
-# use selfheat.implicit_step when optical power must be solved together with temperature.
+#
+# the whole model is one equation used many times.
+# a lag is one temperature contribution x (K) from one heat source to one temperature readout.
+# given source power P (W), it follows tau*dx/dt = r*P - x.
+# gain r (K/W) sets the settled rise and tau (s) sets the warmup time.
+# a source (S) is a place where power enters. an observer (O) is a place where a temperature is read.
+# an observer temperature is T_base plus the sum of the lags that end at it.
+# over one step of duration h, x_next = a*x + c_start*P_start + c_end*P_end, with a = exp(-h/tau).
+#
+# follow one heat source to one temperature readout:
+# - assemble assigns the path gains and time constants from InterimRom or a saved ThermalRom.
+# - system.coefficients prepares the update weights for the chosen step duration.
+# - advance_thermal_state_for_world keeps the warmth that survives and adds new heating.
+# - write_observer_temperatures_for_world adds the contributions at each readout to its base.
+#
+# the file has ten sections, in this order.
+# each section starts with a one-line section comment.
+# 1. one lag over one step - the weights a, c_start, and c_end. core math.
+# 2. advance and read the lags - the update equation in each form the engines call. core math and batch wrappers.
+# 3. saved thermal model - ThermalRom, its files, and its quality checks. storage.
+# 4. layout and model records - LayoutSites, ThermalScales, and InterimRom. inputs.
+# 5. distance laws - warmup time and settled gain against separation. modeling choices.
+# 6. assembled system - ThermalSystem, the packed list of lags that the engines read. storage.
+# 7. assembly - choose r and tau for every lag, apply chip uncertainty, then pack. modeling choices.
+# 8. known power histories - simulate advances the lags for a supplied power history.
+# 9. response queries and checks - step, ramp, frequency, settled gain, reciprocity, and the cross-ring bound.
+# 10. previous names - aliases only.
+# in section 7, assemble is the entry point. read it first, then the stage functions above it.
+#
+# simulate takes a known power history. in a coupled tick, the reference engine
+# uses selfheat.implicit_step and the compiled engine uses kernel._implicit_step_eng
+# to solve absorbed power and ring temperature together.
+#
 # B is worlds, M is lag states, S is sources, and O is observers.
 # residues and time constants have shape (B, M).
-# source/observer index maps are shared across worlds. *_b kernels process one world's one-dimensional rows.
-# batched kernels loop over worlds and accept shared rows where documented.
-# coefficients can be cached for each step length.
-# their exact update assumes the specified input hold within the step.
-# it does not make a nonlinear optical feedback step exact.
+# lag_src and lag_obs map each lag to its input and readout across all worlds.
+# obs_ptr gives the start and end of each readout's contiguous range of lags.
+# the analytic update is exact for the assumed power history within the step.
 # source notes are in docs/research/04_thermal_and_control.md. [CO22-TCPMT] means Coenen et al., IEEE TCPMT 2022.
 # its measured and inferred numbers form the interim model's main reference.
 # detailed implementation assumptions are in docs/THERMAL_IMPLEMENTATION_NOTES.md.
@@ -127,6 +143,19 @@ class RomIntegrityError(ValueError):
     pass
 
 
+# section 1 - one lag over one step
+
+# in the full picture - the simulator moves time forward in steps of duration h (s).
+# this function answers one question for one lag - after one step, how much old warmth is left, and how much new warmth arrived?
+# a lag is one temperature contribution x (K) that one heat source adds at one place where temperature is read.
+# with a constant source power P (W), x settles at r*P. r (K/W) is the gain of the lag and tau (s) is how long the settling takes.
+# this function does not use r. it returns three pure numbers that depend only on y = h/tau.
+# a (1) is the fraction of the old x that is still there after the step.
+# b_start (1) and b_end (1) say how much of the settled rise r*P develops during the step.
+# the power can change during the step, so b_start weights the power at the start and b_end weights the power at the end.
+# example - tau = h = 10 us gives a = 0.368, b_start = 0.264, and b_end = 0.368.
+# b_end is larger because heat that arrives late in the step has had less time to leak away.
+# a caller multiplies b_start and b_end by r to get the temperature rise per watt in K/W.
 # integrate one thermal lag with linearly varying source power.
 # for tau*dx/dt=-x+r*P, the update is x_next=a*x+r*(b_start*P_start+b_end*P_end).
 # at time t within the step, P(t) = (1-t/h)*P_start + (t/h)*P_end.
@@ -192,6 +221,14 @@ def calculate_linear_hold_lag_weights(
     )
 
 
+# in the full picture - this function runs once when the step duration h (s) is chosen, not on every step.
+# it gives every lag the three numbers that each later step reuses.
+# a lag is one temperature contribution x (K) from one heat source. tau (s) is its warmup time and r (K/W) is its settled rise per watt.
+# a (1) is the fraction of x that survives one step.
+# c_start (K/W) and c_end (K/W) are the rise that one watt adds during one step, for the power at the start and at the end of the step.
+# one step is then x_next = a*x + c_start*P_start + c_end*P_end, with x in K and P in W.
+# this is the array form of calculate_linear_hold_lag_weights, with r multiplied in.
+# ThermalSystem.coefficients calls it with the tau and r of every lag.
 # calculate exact thermal update coefficients for linearly varying source power.
 # x_next=a*x+c_start*P_start+c_end*P_end.
 # multiply each scalar hold weight by its thermal residue in K/W.
@@ -259,6 +296,9 @@ def calculate_linear_hold_coefficients(
     )
 
 
+# in the full picture - this is the same preparation as calculate_linear_hold_coefficients for a power that stays constant across the step.
+# a (1) is the fraction of a lag's temperature contribution x (K) that survives one step of duration h (s).
+# c (K/W) is the rise that one watt, held for the whole step, adds by the end of the step.
 # calculate exact thermal update coefficients for constant source power.
 # x_next=a*x+c*P, with c=r*(1-a).
 # x_next is x at h
@@ -282,9 +322,31 @@ def calculate_constant_hold_coefficients(
     )
 
 
-# advance one world's thermal lag states in place.
-# each lag receives the start and end powers of its mapped source.
-# source_residue_scale multiplies the source-to-temperature gain.
+# section 2 - advance and read the lags
+# every function in this section applies one of two equations.
+# update - x_next = a*x + s_source*(c_start*P_start + c_end*P_end).
+# readout - T_observer = T_base + sum of x over that observer's lags.
+# the *_for_world functions hold the equations for one world.
+# the plural functions check shapes and loop the same equations over B worlds.
+# function                                             | equations          | weights
+# advance_thermal_state_for_world                      | update             | prepared a, c_start, c_end
+# advance_thermal_state_for_world_with_step_size       | update             | computed from tau and h per lag
+# write_observer_temperatures_for_world                | readout            | none
+# advance_thermal_state_and_temperatures_for_world     | update and readout | prepared a, c_start, c_end
+# separate_known_heat_and_source_gain_for_observer     | update and readout | prepared, with one source power left unknown
+
+# in the full picture - this is the thermal update of one simulated chip (one world) for one time step.
+# the thermal state is a list of M lags. lag m is one temperature contribution x[m] (K) from one heat source.
+# in one step, every lag keeps part of its old value and gains new warmth from the power of its own source.
+# x_next[m] = a[m]*x[m] + s*(c_start[m]*P_start + c_end[m]*P_end).
+# P_start and P_end (W) are the power of the source that drives lag m, at the start and at the end of the step.
+# a (1), c_start (K/W), and c_end (K/W) come from calculate_linear_hold_coefficients for this step duration.
+# lag_source_indices[m] names the source that drives lag m. several lags can share one source.
+# s (1) multiplies the new warmth from one source. it is 1 unless a caller rescales that source's gain.
+# example - a = 0.9, x = 2 K, c_start = c_end = 50 K/W, and 1 mW at both ends give 0.9*2 + 100*0.001 = 1.9 K.
+# this function does not produce temperatures. write_observer_temperatures_for_world sums the lags into temperatures.
+# advance one world's lag states with weights prepared for this step duration.
+# the variants below reuse this update to handle other execution paths.
 # x
 @njit(cache=True)
 def advance_thermal_state_for_world(
@@ -300,15 +362,24 @@ def advance_thermal_state_for_world(
     None  # return = None - results are written into the supplied state or record - type None
 ):
     for lag_index in range(state_rise_k.shape[0]):
+        # find the heat source that drives this lag.
         source_index = lag_source_indices[lag_index]
-        # a*x is the stored heat that remains. the power terms add new warming in K.
-        # x_next = a*x + s_source*(c_start*P_start + c_end*P_end), in K.
-        state_rise_k[lag_index] = state_retention[lag_index] * state_rise_k[lag_index] + source_residue_scale[source_index] * (start_power_gain_k_per_w[lag_index] * start_source_power_w[source_index] + end_power_gain_k_per_w[lag_index] * end_source_power_w[source_index])
+        # old warmth that survives the step - a*x (K).
+        retained_rise_k = state_retention[lag_index] * state_rise_k[lag_index]
+        # new warmth from this step's power - K/W times W gives K.
+        added_rise_k = source_residue_scale[source_index] * (
+            start_power_gain_k_per_w[lag_index] * start_source_power_w[source_index]
+            + end_power_gain_k_per_w[lag_index] * end_source_power_w[source_index]
+        )
+        state_rise_k[lag_index] = retained_rise_k + added_rise_k
 
 
-# advance one world's lag states with a caller-selected step duration.
-# calculate the exact linear-hold weights separately for each time constant.
-# per lag
+# in the full picture - this is the same one-world, one-step update as advance_thermal_state_for_world.
+# use it when no weights were prepared for the step duration h (s). verification code calls it.
+# each lag is one temperature contribution x (K) with warmup time tau (s) and settled rise per watt r (K/W).
+# the weights a, b_start, and b_end (1) come from calculate_linear_hold_lag_weights inside the loop.
+# use the same lag update when the caller supplies a step duration.
+# calculate the weights inside the loop, once for each lag's time constant.
 # x
 @njit(cache=True)
 def advance_thermal_state_for_world_with_step_size(
@@ -325,13 +396,29 @@ def advance_thermal_state_for_world_with_step_size(
 ):
     for lag_index in range(state_rise_k.shape[0]):
         source_index = lag_source_indices[lag_index]
-        state_retention, start_power_weight, end_power_weight = calculate_linear_hold_lag_weights(time_constants_s[lag_index], step_duration_s)
-        # x_next = a*x + s_source*r*(b_start*P_start + b_end*P_end), in K.
-        state_rise_k[lag_index] = state_retention * state_rise_k[lag_index] + source_residue_scale[source_index] * thermal_residues_k_per_w[lag_index] * (
-            start_power_weight * start_source_power_w[source_index] + end_power_weight * end_source_power_w[source_index]
+        state_retention, start_power_weight, end_power_weight = calculate_linear_hold_lag_weights(
+            time_constants_s[lag_index], step_duration_s
         )
+        # old warmth that survives the step - a*x (K).
+        retained_rise_k = state_retention * state_rise_k[lag_index]
+        # settled rise per watt of this lag, with the caller's source multiplier - s*r (K/W).
+        scaled_gain_k_per_w = source_residue_scale[source_index] * thermal_residues_k_per_w[lag_index]
+        # new warmth - K/W times the weighted power in W gives K.
+        added_rise_k = scaled_gain_k_per_w * (
+            start_power_weight * start_source_power_w[source_index]
+            + end_power_weight * end_source_power_w[source_index]
+        )
+        state_rise_k[lag_index] = retained_rise_k + added_rise_k
 
 
+# in the full picture - this turns the lag states into the temperatures that the rest of the simulator uses.
+# an observer is a place where temperature is read - a ring waveguide, a heater, a photodiode, or a sensor.
+# a lag is one temperature contribution x (K) that one heat source adds at one observer.
+# T_observer (K) = T_base (K) + the sum of every lag x[m] (K) that ends at that observer.
+# T_base is the temperature of the chip with every heat source off.
+# the lags are stored sorted by observer, so each observer owns one unbroken run of the lag array.
+# observer o owns lags boundaries[o] up to boundaries[o+1]-1.
+# example - boundaries = [0, 2, 3] means that observer 0 sums lags 0 and 1, and observer 1 reads lag 2.
 # sum one world's thermal states into absolute observer temperatures.
 # each observer reads the contiguous lag range in observer_lag_boundaries.
 # x
@@ -388,13 +475,35 @@ def validate_thermal_step_array_shapes(
 ):
     world_count = state_rise_k.shape[0]
     lag_count = state_rise_k.shape[1]
+
+    # the three weight arrays share one row count - 1 for shared weights, or B.
     coefficient_row_count = state_retention.shape[0]
-    if start_power_gain_k_per_w.shape[0] != coefficient_row_count or end_power_gain_k_per_w.shape[0] != coefficient_row_count or (coefficient_row_count != 1 and coefficient_row_count != world_count):
+    weight_rows_differ = (
+        start_power_gain_k_per_w.shape[0] != coefficient_row_count
+        or end_power_gain_k_per_w.shape[0] != coefficient_row_count
+    )
+    weight_rows_fit_no_batch = coefficient_row_count != 1 and coefficient_row_count != world_count
+    if weight_rows_differ or weight_rows_fit_no_batch:
         raise ValueError("thermal kernel: a, c0, c1 must all have 1 or B rows")
-    if state_retention.shape[1] != lag_count or start_power_gain_k_per_w.shape[1] != lag_count or end_power_gain_k_per_w.shape[1] != lag_count or lag_source_indices.shape[0] != lag_count:
+
+    # every per-lag array has one column per lag.
+    lag_columns_differ = (
+        state_retention.shape[1] != lag_count
+        or start_power_gain_k_per_w.shape[1] != lag_count
+        or end_power_gain_k_per_w.shape[1] != lag_count
+        or lag_source_indices.shape[0] != lag_count
+    )
+    if lag_columns_differ:
         raise ValueError("thermal kernel: a, c0, c1, lag_src must have M (= x.shape[1]) lags")
-    for n in (start_source_power_w.shape[0], end_source_power_w.shape[0], source_residue_scale.shape[0]):
-        if n != 1 and n != world_count:
+
+    # each per-source array has 1 shared row, or B rows.
+    source_row_counts = (
+        start_source_power_w.shape[0],
+        end_source_power_w.shape[0],
+        source_residue_scale.shape[0],
+    )
+    for row_count in source_row_counts:
+        if row_count != 1 and row_count != world_count:
             raise ValueError("thermal kernel: u0, u1, src_scale must have 1 or B rows")
 
 
@@ -415,12 +524,32 @@ def advance_thermal_states(
 ) -> (
     None  # return = None - results are written into the supplied state or record - type None
 ):
-    validate_thermal_step_array_shapes(state_rise_k, state_retention, start_power_gain_k_per_w, end_power_gain_k_per_w, lag_source_indices, start_source_power_w, end_source_power_w, source_residue_scale)
+    validate_thermal_step_array_shapes(
+        state_rise_k,
+        state_retention,
+        start_power_gain_k_per_w,
+        end_power_gain_k_per_w,
+        lag_source_indices,
+        start_source_power_w,
+        end_source_power_w,
+        source_residue_scale,
+    )
     for world_index in range(state_rise_k.shape[0]):
+        # pick this world's row from each input. an input with one row is shared by every world.
         coefficient_row = shared_or_world_row_index(world_index, state_retention.shape[0])
-        power_row = shared_or_world_row_index(world_index, start_source_power_w.shape[0])
-        advance_thermal_state_for_world(state_rise_k[world_index], state_retention[coefficient_row], start_power_gain_k_per_w[coefficient_row], end_power_gain_k_per_w[coefficient_row], lag_source_indices, start_source_power_w[power_row], end_source_power_w[shared_or_world_row_index(world_index, end_source_power_w.shape[0])],
-                       source_residue_scale[shared_or_world_row_index(world_index, source_residue_scale.shape[0])])
+        start_power_row = shared_or_world_row_index(world_index, start_source_power_w.shape[0])
+        end_power_row = shared_or_world_row_index(world_index, end_source_power_w.shape[0])
+        source_scale_row = shared_or_world_row_index(world_index, source_residue_scale.shape[0])
+        advance_thermal_state_for_world(
+            state_rise_k[world_index],
+            state_retention[coefficient_row],
+            start_power_gain_k_per_w[coefficient_row],
+            end_power_gain_k_per_w[coefficient_row],
+            lag_source_indices,
+            start_source_power_w[start_power_row],
+            end_source_power_w[end_power_row],
+            source_residue_scale[source_scale_row],
+        )
 
 
 # write all absolute observer temperatures from the current lag states and base temperatures.
@@ -435,16 +564,32 @@ def write_observer_temperatures(
 ) -> (
     None  # return = None - results are written into the supplied state or record - type None
 ):
-    if out_observer_temperature_k.shape[0] != state_rise_k.shape[0] or (base_temperature_k.shape[0] != 1 and base_temperature_k.shape[0] != state_rise_k.shape[0]):
+    world_count = state_rise_k.shape[0]
+    base_temperature_count = base_temperature_k.shape[0]
+    output_rows_differ = out_observer_temperature_k.shape[0] != world_count
+    base_fits_no_batch = base_temperature_count != 1 and base_temperature_count != world_count
+    if output_rows_differ or base_fits_no_batch:
         raise ValueError("thermal_outputs: out must have B rows and t_base 1 or B entries")
     if out_observer_temperature_k.shape[1] + 1 != observer_lag_boundaries.shape[0]:
         raise ValueError("thermal_outputs: out must have O = len(obs_ptr) - 1 columns")
-    for world_index in range(state_rise_k.shape[0]):
-        write_observer_temperatures_for_world(state_rise_k[world_index], observer_lag_boundaries, base_temperature_k[shared_or_world_row_index(world_index, base_temperature_k.shape[0])], out_observer_temperature_k[world_index])
+    for world_index in range(world_count):
+        base_row = shared_or_world_row_index(world_index, base_temperature_count)
+        write_observer_temperatures_for_world(
+            state_rise_k[world_index],
+            observer_lag_boundaries,
+            base_temperature_k[base_row],
+            out_observer_temperature_k[world_index],
+        )
 
 
-# advance one world's states and write its observer temperatures in one pass.
-# use the same linear-hold update as the state-only kernel.
+# in the full picture - the compiled engine calls this once per step for each simulated chip when self-heating is off.
+# it does two jobs in one loop and gives the same numbers as doing them one after the other.
+# job 1 - advance each lag. a lag is one temperature contribution x (K) from one heat source.
+# x_next = a*x + s*(c_start*P_start + c_end*P_end), with a (1), c (K/W), P (W), and source multiplier s (1).
+# job 2 - read each observer. T_observer (K) = T_base (K) + the sum of the lags that end at that observer.
+# observer o owns lags boundaries[o] up to boundaries[o+1]-1.
+# update each lag and add it to its observer in one pass.
+# the state-only update above uses the same equation.
 # x
 @njit(cache=True, _nrt=False)
 def advance_thermal_state_and_temperatures_for_world(
@@ -467,11 +612,14 @@ def advance_thermal_state_and_temperatures_for_world(
         temperature_k = base_temperature_k
         for lag_index in range(observer_lag_boundaries[observer_index], observer_lag_boundaries[observer_index + 1]):
             source_index = lag_source_indices[lag_index]
-            # x_next = a*x + s_source*(c_start*P_start+c_end*P_end).
-            next_lag_k = state_retention[lag_index] * state_rise_k[lag_index] + source_residue_scale[source_index] * (start_power_gain_k_per_w[lag_index] * start_source_power_w[source_index] + end_power_gain_k_per_w[lag_index] * end_source_power_w[source_index])
-            state_rise_k[lag_index] = next_lag_k
-            # sum the new lag rises above T_base to get the end-of-step temperature.
-            temperature_k += next_lag_k
+            retained_rise_k = state_retention[lag_index] * state_rise_k[lag_index]
+            added_rise_k = source_residue_scale[source_index] * (
+                start_power_gain_k_per_w[lag_index] * start_source_power_w[source_index]
+                + end_power_gain_k_per_w[lag_index] * end_source_power_w[source_index]
+            )
+            next_rise_k = retained_rise_k + added_rise_k
+            state_rise_k[lag_index] = next_rise_k
+            temperature_k += next_rise_k
         out_observer_temperature_k[observer_index] = temperature_k
 
 
@@ -495,18 +643,56 @@ def advance_thermal_states_and_temperatures(
 ) -> (
     None  # return = None - results are written into the supplied state or record - type None
 ):
-    validate_thermal_step_array_shapes(state_rise_k, state_retention, start_power_gain_k_per_w, end_power_gain_k_per_w, lag_source_indices, start_source_power_w, end_source_power_w, source_residue_scale)
-    if out_observer_temperature_k.shape[0] != state_rise_k.shape[0] or (base_temperature_k.shape[0] != 1 and base_temperature_k.shape[0] != state_rise_k.shape[0]):
+    validate_thermal_step_array_shapes(
+        state_rise_k,
+        state_retention,
+        start_power_gain_k_per_w,
+        end_power_gain_k_per_w,
+        lag_source_indices,
+        start_source_power_w,
+        end_source_power_w,
+        source_residue_scale,
+    )
+    world_count = state_rise_k.shape[0]
+    base_temperature_count = base_temperature_k.shape[0]
+    output_rows_differ = out_observer_temperature_k.shape[0] != world_count
+    base_fits_no_batch = base_temperature_count != 1 and base_temperature_count != world_count
+    if output_rows_differ or base_fits_no_batch:
         raise ValueError("thermal_advance: out must have B rows and t_base 1 or B entries")
     if out_observer_temperature_k.shape[1] + 1 != observer_lag_boundaries.shape[0]:
         raise ValueError("thermal_advance: out must have O = len(obs_ptr) - 1 columns")
-    for world_index in range(state_rise_k.shape[0]):
+    for world_index in range(world_count):
+        # pick this world's row from each input. an input with one row is shared by every world.
         coefficient_row = shared_or_world_row_index(world_index, state_retention.shape[0])
-        advance_thermal_state_and_temperatures_for_world(state_rise_k[world_index], state_retention[coefficient_row], start_power_gain_k_per_w[coefficient_row], end_power_gain_k_per_w[coefficient_row], lag_source_indices, observer_lag_boundaries, start_source_power_w[shared_or_world_row_index(world_index, start_source_power_w.shape[0])],
-                          end_source_power_w[shared_or_world_row_index(world_index, end_source_power_w.shape[0])], source_residue_scale[shared_or_world_row_index(world_index, source_residue_scale.shape[0])],
-                          base_temperature_k[shared_or_world_row_index(world_index, base_temperature_k.shape[0])], out_observer_temperature_k[world_index])
+        start_power_row = shared_or_world_row_index(world_index, start_source_power_w.shape[0])
+        end_power_row = shared_or_world_row_index(world_index, end_source_power_w.shape[0])
+        source_scale_row = shared_or_world_row_index(world_index, source_residue_scale.shape[0])
+        base_row = shared_or_world_row_index(world_index, base_temperature_count)
+        advance_thermal_state_and_temperatures_for_world(
+            state_rise_k[world_index],
+            state_retention[coefficient_row],
+            start_power_gain_k_per_w[coefficient_row],
+            end_power_gain_k_per_w[coefficient_row],
+            lag_source_indices,
+            observer_lag_boundaries,
+            start_source_power_w[start_power_row],
+            end_source_power_w[end_power_row],
+            source_residue_scale[source_scale_row],
+            base_temperature_k[base_row],
+            out_observer_temperature_k[world_index],
+        )
 
 
+# in the full picture - one source's power for this step is not known yet, because it depends on the temperature it produces.
+# example - heater power is V^2/R, and the heater resistance R depends on the heater temperature at the end of the step.
+# this function prepares that solve for one observer. it splits the observer's end-of-step rise into two parts.
+# T_end - T_base = T_known + g_self*P_self.
+# T_known (K) is everything that does not depend on the unknown power.
+# it is the old warmth that survives the step, plus the new warmth from every other source.
+# g_self (K/W) is how much one watt of the unknown source, held for the whole step, warms this observer by the end of the step.
+# P_self (W) is the unknown power. the caller solves its own equation for it and then runs the normal update.
+# a lag is one temperature contribution x (K). a (1), c_start (K/W), and c_end (K/W) are its prepared one-step weights.
+# observer o owns lags boundaries[o] up to boundaries[o+1]-1.
 # T_end-T_base=T_known+g_self*P_self, with P_self constant over the step.
 # include stored heat and every other source in T_known.
 # use the same other-source powers in the subsequent state update.
@@ -534,21 +720,33 @@ def separate_known_heat_and_source_gain_for_observer(
     self_gain_k_per_w = 0.0
     for lag_index in range(observer_lag_boundaries[observer_index], observer_lag_boundaries[observer_index + 1]):
         source_index = lag_source_indices[lag_index]
-        # a*x is known for every lag, including those driven by the unknown source.
-        known_rise_k += state_retention[lag_index] * state_rise_k[lag_index]
-        # for held unknown power, P_start = P_end = P_unknown, so its gain is s_source*(c_start+c_end).
+        # old warmth that survives the step is known whatever this step's power turns out to be.
+        retained_rise_k = state_retention[lag_index] * state_rise_k[lag_index]
+        known_rise_k += retained_rise_k
+
+        start_gain = start_power_gain_k_per_w[lag_index]
+        end_gain = end_power_gain_k_per_w[lag_index]
+        source_scale = source_residue_scale[source_index]
         if source_index == unknown_source_index:
-            self_gain_k_per_w += source_residue_scale[source_index] * (start_power_gain_k_per_w[lag_index] + end_power_gain_k_per_w[lag_index])
+            # held power uses the same unknown at both ends of the step.
+            self_gain_k_per_w += source_scale * (start_gain + end_gain)
         else:
-            # add the known input's s_source*(c_start*P_start+c_end*P_end) directly in K.
-            known_rise_k += source_residue_scale[source_index] * (start_power_gain_k_per_w[lag_index] * start_source_power_w[source_index] + end_power_gain_k_per_w[lag_index] * end_source_power_w[source_index])
+            # every other source has a known power, so its new warmth (K) is known too.
+            added_rise_k = source_scale * (
+                start_gain * start_source_power_w[source_index] + end_gain * end_source_power_w[source_index]
+            )
+            known_rise_k += added_rise_k
     return (
         known_rise_k,
         self_gain_k_per_w,
     )
 
 
-# artefact I/O (format thermal_rom/1 - docs/ARCHITECTURE.md, 5.3 "Thermal ROM")
+# section 3 - saved thermal model
+# a ThermalRom holds lag gains and time constants fitted to a finite-element heat solve.
+# the file format is thermal_rom/1 - see docs/ARCHITECTURE.md, 5.3 "Thermal ROM".
+# apart from the ThermalRom record, this section reads, writes, and checks files. it holds no heat equation.
+
 # hex sha256 of a file's bytes.
 # x
 # helper function
@@ -804,7 +1002,11 @@ def warn_about_rom_quality(
                       RuntimeWarning, stacklevel=3)
 
 
-# layout, scales and the interim model specification
+# section 4 - layout and model records
+# LayoutSites says where each source and observer is.
+# ThermalScales says how one simulated chip differs from the nominal model.
+# InterimRom gives the heat-path gains and times used when no ThermalRom is fitted.
+
 # site coordinates as an (n, 2) array in um (a single (2,) point becomes one row).
 # x
 # helper function
@@ -855,26 +1057,38 @@ class LayoutSites:
     ) -> (
         None  # return = None - results are written into the supplied state or record - type None
     ):
-        n = validate_site_coordinates_um(self.ring_xy_um, name="ring_xy_um").shape[0]
+        # the record is frozen, so object.__setattr__ stores each validated field.
+        ring_count = validate_site_coordinates_um(self.ring_xy_um, name="ring_xy_um").shape[0]
         object.__setattr__(self, "ring_xy_um", validate_site_coordinates_um(self.ring_xy_um, name="ring_xy_um"))
-        for nm in ("pd_xy_um", "driver_xy_um"):
-            v = getattr(self, nm)
-            if v is not None:
-                object.__setattr__(self, nm, validate_site_coordinates_um(v, n, nm))
+
+        # monitors and drivers have one row per ring when present.
+        for field_name in ("pd_xy_um", "driver_xy_um"):
+            coordinates_um = getattr(self, field_name)
+            if coordinates_um is not None:
+                object.__setattr__(
+                    self, field_name, validate_site_coordinates_um(coordinates_um, ring_count, field_name)
+                )
+
+        # each sensor gets a ring attachment (-1 for a free site) and a name.
         if self.temp_sensor_xy_um is not None:
-            ts = validate_site_coordinates_um(self.temp_sensor_xy_um, name="temp_sensor_xy_um")
-            object.__setattr__(self, "temp_sensor_xy_um", ts)
-            ring = (np.full(ts.shape[0], -1, np.int64) if self.temp_sensor_ring is None
-                    else np.asarray(self.temp_sensor_ring, np.int64).reshape(-1))
-            if ring.shape[0] != ts.shape[0] or np.any(ring >= n) or np.any(ring < -1):
+            sensor_xy_um = validate_site_coordinates_um(self.temp_sensor_xy_um, name="temp_sensor_xy_um")
+            object.__setattr__(self, "temp_sensor_xy_um", sensor_xy_um)
+            sensor_count = sensor_xy_um.shape[0]
+            if self.temp_sensor_ring is None:
+                sensor_rings = np.full(sensor_count, -1, np.int64)
+            else:
+                sensor_rings = np.asarray(self.temp_sensor_ring, np.int64).reshape(-1)
+            if sensor_rings.shape[0] != sensor_count or np.any(sensor_rings >= ring_count) or np.any(sensor_rings < -1):
                 raise ValueError("temp_sensor_ring must have one entry per sensor, each -1 or a ring index")
-            object.__setattr__(self, "temp_sensor_ring", ring)
-            names = tuple(self.temp_sensor_names) or tuple(f"ts{i}" for i in range(ts.shape[0]))
+            object.__setattr__(self, "temp_sensor_ring", sensor_rings)
+            names = tuple(self.temp_sensor_names) or tuple(f"ts{i}" for i in range(sensor_count))
             object.__setattr__(self, "temp_sensor_names", names)
+
+        # each aggressor gets a name.
         if self.aggressor_xy_um is not None:
-            ag = validate_site_coordinates_um(self.aggressor_xy_um, name="aggressor_xy_um")
-            object.__setattr__(self, "aggressor_xy_um", ag)
-            names = tuple(self.aggressor_names) or tuple(f"aggressor{i}" for i in range(ag.shape[0]))
+            aggressor_xy_um = validate_site_coordinates_um(self.aggressor_xy_um, name="aggressor_xy_um")
+            object.__setattr__(self, "aggressor_xy_um", aggressor_xy_um)
+            names = tuple(self.aggressor_names) or tuple(f"aggressor{i}" for i in range(aggressor_xy_um.shape[0]))
             object.__setattr__(self, "aggressor_names", names)
 
     # number of rings N.
@@ -905,10 +1119,18 @@ class LayoutSites:
     ) -> (
         LayoutSites  # return = sites (um) - straight ring bank and supplied site coordinates - type LayoutSites record
     ):
-        xy = np.zeros((int(n_rings), 2))
-        xy[:, axis] = np.arange(int(n_rings)) * float(pitch_um)
-        return LayoutSites(xy, pd_xy_um, driver_xy_um, temp_sensor_xy_um, temp_sensor_ring, tuple(temp_sensor_names),
-                           aggressor_xy_um, tuple(aggressor_names))
+        ring_xy_um = np.zeros((int(n_rings), 2))
+        ring_xy_um[:, axis] = np.arange(int(n_rings)) * float(pitch_um)
+        return LayoutSites(
+            ring_xy_um=ring_xy_um,
+            pd_xy_um=pd_xy_um,
+            driver_xy_um=driver_xy_um,
+            temp_sensor_xy_um=temp_sensor_xy_um,
+            temp_sensor_ring=temp_sensor_ring,
+            temp_sensor_names=tuple(temp_sensor_names),
+            aggressor_xy_um=aggressor_xy_um,
+            aggressor_names=tuple(aggressor_names),
+        )
 
     # construct ring and auxiliary-site coordinates from named layout records.
     # each site supplies coordinates in um, a kind, and an optional ring attachment.
@@ -929,12 +1151,15 @@ class LayoutSites:
         LayoutSites  # return = sites (um) - parsed ring, driver, sensor, photodiode, and aggressor positions - type LayoutSites record
     ):
         sites = dict(sites or {})
-        referenced = {str(spec["site"]) for spec in (temp_sensors or ()) if spec.get("site")}
-        ring_xy = np.full((n_rings, 2), np.nan)
-        pd = np.full((n_rings, 2), np.nan)
-        drv = np.full((n_rings, 2), np.nan)
-        shared_drv = None
-        ag_xy, ag_names, ts_xy, ts_ring, ts_names = [], [], [], [], []
+        # a sensor record can point at a named site. such a site is added once, in step 3.
+        referenced_site_names = {str(spec["site"]) for spec in (temp_sensors or ()) if spec.get("site")}
+        # a NaN row means that no site was given for that ring.
+        ring_xy_um = np.full((n_rings, 2), np.nan)
+        monitor_xy_um = np.full((n_rings, 2), np.nan)
+        driver_xy_um = np.full((n_rings, 2), np.nan)
+        shared_driver_xy_um = None
+        aggressor_xy_um, aggressor_names = [], []
+        sensor_xy_um, sensor_rings, sensor_names = [], [], []
 
         # read a ring index from the site field or trailing digits.
         # helper function
@@ -947,75 +1172,89 @@ class LayoutSites:
             if "ring" in spec and spec["ring"] is not None:
                 return int(spec["ring"])
             digits = ""
-            for ch in reversed(str(name)):
-                if ch.isdigit():
-                    digits = ch + digits
+            for character in reversed(str(name)):
+                if character.isdigit():
+                    digits = character + digits
                 else:
                     break
             return int(digits) if digits else None
 
+        # step 1 - route each named site to its list by kind.
         for name, spec in sites.items():
             kind = spec.get("kind", "other")
-            p = (float(spec["x_um"]), float(spec["y_um"]))
-            i = site_ring_index(name, spec)
+            position_um = (float(spec["x_um"]), float(spec["y_um"]))
+            ring_index = site_ring_index(name, spec)
             if kind == "ring":
-                if i is None or not 0 <= i < n_rings:
+                if ring_index is None or not 0 <= ring_index < n_rings:
                     raise ValueError(f"ring site {name!r} needs a ring index 0..{n_rings - 1}")
-                ring_xy[i] = p
+                ring_xy_um[ring_index] = position_um
             elif kind == "monitor_pd":
-                if i is None or not 0 <= i < n_rings:
+                if ring_index is None or not 0 <= ring_index < n_rings:
                     raise ValueError(f"monitor_pd site {name!r} needs a ring index")
-                pd[i] = p
+                monitor_xy_um[ring_index] = position_um
             elif kind == "driver":
-                if i is None:
-                    shared_drv = p
-                elif 0 <= i < n_rings:
-                    drv[i] = p
-            elif kind == "aggressor" or (kind == "heater" and (i is None or "ring" not in spec)):
-                ag_xy.append(p)
-                ag_names.append(str(name))
-            elif kind == "temp_sensor" and str(name) not in referenced:
-                ts_xy.append(p)
-                ts_ring.append(-1)
-                ts_names.append(str(name))
-        missing = np.isnan(ring_xy[:, 0])
-        if np.any(missing):
-            if ring_pitch_um is None and n_rings > 1:
-                raise ValueError(f"layout has no site for rings {np.flatnonzero(missing).tolist()} and no "
-                                 "layout.ring_pitch_um")
-            pitch = 0.0 if ring_pitch_um is None else float(ring_pitch_um)
-            ring_xy[missing, 0] = np.flatnonzero(missing) * pitch
-            ring_xy[missing, 1] = 0.0
-        if shared_drv is not None:
-            drv[np.isnan(drv[:, 0])] = shared_drv
-        centroid = ring_xy.mean(axis=0)
-        for k, spec in enumerate(temp_sensors or ()):
-            name = str(spec.get("name", f"ts{k}"))
-            if spec.get("site"):
-                s = sites[spec["site"]]
-                ts_xy.append((float(s["x_um"]), float(s["y_um"])))
-                ts_ring.append(-1)
-            else:
-                att = str(spec.get("attach", "die"))
-                if att.startswith("ring_"):
-                    i = int(att.split("_", 1)[1])
-                    ts_xy.append(tuple(ring_xy[i]))
-                    ts_ring.append(i)
-                elif att == "bank":
-                    ts_xy.append(tuple(centroid))
-                    ts_ring.append(-1)
-                else:   # die - assumed 1 mm from the bank centroid
-                    ts_xy.append((centroid[0], centroid[1] + 1000.0))
-                    ts_ring.append(-1)
-            ts_names.append(name)
-        return LayoutSites(          # NaN rows - PD at the model's default offset, no driver for that ring
-            ring_xy,
-            None if np.all(np.isnan(pd[:, 0])) else pd,
-            None if np.all(np.isnan(drv[:, 0])) else drv,
-            np.array(ts_xy, float).reshape(-1, 2) if ts_xy else None,
-            np.array(ts_ring, np.int64) if ts_xy else None, tuple(ts_names),
-            np.array(ag_xy, float).reshape(-1, 2) if ag_xy else None, tuple(ag_names))
+                # a driver without a ring index is shared by the rings.
+                if ring_index is None:
+                    shared_driver_xy_um = position_um
+                elif 0 <= ring_index < n_rings:
+                    driver_xy_um[ring_index] = position_um
+            elif kind == "aggressor" or (kind == "heater" and (ring_index is None or "ring" not in spec)):
+                aggressor_xy_um.append(position_um)
+                aggressor_names.append(str(name))
+            elif kind == "temp_sensor" and str(name) not in referenced_site_names:
+                sensor_xy_um.append(position_um)
+                sensor_rings.append(-1)
+                sensor_names.append(str(name))
 
+        # step 2 - fill the positions that no site gave.
+        # missing rings go on a line along x at their index times the pitch.
+        ring_is_missing = np.isnan(ring_xy_um[:, 0])
+        if np.any(ring_is_missing):
+            if ring_pitch_um is None and n_rings > 1:
+                raise ValueError(f"layout has no site for rings {np.flatnonzero(ring_is_missing).tolist()} and no "
+                                 "layout.ring_pitch_um")
+            pitch_um = 0.0 if ring_pitch_um is None else float(ring_pitch_um)
+            ring_xy_um[ring_is_missing, 0] = np.flatnonzero(ring_is_missing) * pitch_um
+            ring_xy_um[ring_is_missing, 1] = 0.0
+        if shared_driver_xy_um is not None:
+            driver_xy_um[np.isnan(driver_xy_um[:, 0])] = shared_driver_xy_um
+
+        # step 3 - place each requested temperature sensor.
+        bank_centroid_um = ring_xy_um.mean(axis=0)
+        for sensor_index, spec in enumerate(temp_sensors or ()):
+            name = str(spec.get("name", f"ts{sensor_index}"))
+            if spec.get("site"):
+                site = sites[spec["site"]]
+                sensor_xy_um.append((float(site["x_um"]), float(site["y_um"])))
+                sensor_rings.append(-1)
+            else:
+                attachment = str(spec.get("attach", "die"))
+                if attachment.startswith("ring_"):
+                    ring_index = int(attachment.split("_", 1)[1])
+                    sensor_xy_um.append(tuple(ring_xy_um[ring_index]))
+                    sensor_rings.append(ring_index)
+                elif attachment == "bank":
+                    sensor_xy_um.append(tuple(bank_centroid_um))
+                    sensor_rings.append(-1)
+                else:   # die - assumed 1 mm from the bank centroid
+                    sensor_xy_um.append((bank_centroid_um[0], bank_centroid_um[1] + 1000.0))
+                    sensor_rings.append(-1)
+            sensor_names.append(name)
+
+        # step 4 - build the record. an empty table becomes None.
+        # NaN rows - PD at the model's default offset, no driver for that ring
+        has_monitor_site = not np.all(np.isnan(monitor_xy_um[:, 0]))
+        has_driver_site = not np.all(np.isnan(driver_xy_um[:, 0]))
+        return LayoutSites(
+            ring_xy_um=ring_xy_um,
+            pd_xy_um=monitor_xy_um if has_monitor_site else None,
+            driver_xy_um=driver_xy_um if has_driver_site else None,
+            temp_sensor_xy_um=np.array(sensor_xy_um, float).reshape(-1, 2) if sensor_xy_um else None,
+            temp_sensor_ring=np.array(sensor_rings, np.int64) if sensor_xy_um else None,
+            temp_sensor_names=tuple(sensor_names),
+            aggressor_xy_um=np.array(aggressor_xy_um, float).reshape(-1, 2) if aggressor_xy_um else None,
+            aggressor_names=tuple(aggressor_names),
+        )
 
 # describe thermal uncertainty per world with scalar or (B,) factors.
 # dc_scale multiplies residues.
@@ -1176,6 +1415,18 @@ class InterimRom:
         return InterimRom(**base)
 
 
+# section 5 - distance laws
+# two separate rules estimate a heat path between separated sites.
+# the first gives its warmup time. the second gives its settled gain as a fraction of the heater-to-ring gain.
+
+# in the full picture - assembly needs a warmup time tau (s) for a heat path between two separated places.
+# an example is a heater on one ring that warms a neighbouring ring.
+# heat takes longer to arrive over a longer distance. this function estimates that time from the gap d (um).
+# it sets only how fast the far temperature rises. other rules set how far it rises.
+# near the source, diffusion time grows with distance squared - tau_near = tau_ref*(d/d_ref)^2.
+# by default that is 4.1 ms at 60 um, so 30 um gives about 1.0 ms.
+# farther away, measured warmup times grow much more slowly, so tau_far comes from a measured table or a supplied value.
+# tau_min keeps the estimate above zero when the gap is very small.
 # calculate a crosstalk time constant from source-to-victim distance.
 # the interim model subtracts the source and observer radii from centre spacing.
 # the near-field law is max(tau_min,tau_ref*(d/d_ref)^2).
@@ -1209,6 +1460,13 @@ def calculate_crosstalk_time_constant_s(
     return np.maximum(np.minimum(near, far), np.asarray(tau_min_s, float))
 
 
+# in the full picture - assembly needs the settled gain of a heat path that involves a monitor photodiode, driver, sensor, or aggressor.
+# settled gain means the final temperature rise per watt (K/W) after the warmup has finished.
+# this function gives that gain as a fraction c (1) of Z0, the gain from a heater to its own ring (K/W).
+# the caller multiplies - gain of the path = c*Z0.
+# c falls as 1/d with centre distance d (um). a floor and a cap bound it.
+# example with the defaults - at 180 um, 0.03*60/180 = 0.01, and the floor raises it to 0.015.
+# with Z0 = 6100 K/W and 1 mW of heat, that path settles at 0.015*6100*0.001 = 0.09 K.
 # estimate a site-path DC gain relative to the heater-to-ring gain.
 # c(d)=clip(nearest_frac*ref_um/d,floor_frac,max_frac).
 # use centre distance for this assumed law.
@@ -1230,7 +1488,8 @@ def calculate_site_coupling_fraction(
     return np.clip(c, np.asarray(floor_frac, float), float(max_frac))
 
 
-# the assembled system
+# section 6 - assembled system
+
 # the assembled MIMO thermal plant of one bank for B uncertainty worlds.
 # arrays (numba-ready) - taus_s, res_k_per_w (B, M) s and K/W.
 # lag_src, lag_obs, lag_kind, lag_pair, lag_layer, lag_tail (M,) int64, lags sorted by observer with obs_ptr (O+1,).
@@ -1435,7 +1694,16 @@ def find_thermal_element_index(
     return int(hit[0])
 
 
-# assembly
+# section 7 - assembly
+# assemble is the entry point and sits near the end of this section. read it first.
+# the functions before it appear in the order assemble uses them.
+# - small input helpers and the two builders _Lags and _Elements.
+# - place sources and observers - build_thermal_sources_and_observers.
+# - choose r and tau per heat path - append_interim_heat_path_lags or append_extracted_heat_path_lags.
+# - package share - replace_package_tail_preserving_dc_gain.
+# - chip uncertainty - calculate_pair_dc_scale and calculate_shared_pair_time_scales.
+# - the stage functions that assemble calls, then assemble.
+
 # a scalar, (B,) or (B, 1) parameter as a 1-D array of length 1 or B.
 # x
 # helper function
@@ -1516,8 +1784,16 @@ class _Lags:
         None  # return = None - results are written into the supplied state or record - type None
     ):
         self.world_count = B
-        self.observer_indices, self.source_indices, self.time_constants_s, self.residues_k_per_w = [], [], [], []
-        self.layer_codes, self.pair_codes, self.tail_replaceable, self.tail_flags, self.fixed_time_constants = [], [], [], [], []
+        # each list has one entry per lag. entry m of every list describes lag m.
+        self.observer_indices = []  # observer that reads the lag
+        self.source_indices = []  # source that drives the lag
+        self.time_constants_s = []  # tau (s) - one value per world - shape (B,)
+        self.residues_k_per_w = []  # r (K/W) - one value per world - shape (B,)
+        self.layer_codes = []  # LAYER_FAST or LAYER_SLOW - selects the time-scale factor
+        self.pair_codes = []  # PAIR_SELF, PAIR_CROSS, or PAIR_SITE
+        self.tail_replaceable = []  # the lag belongs to a path whose package share can be reassigned
+        self.tail_flags = []  # the lag is the package lag of its path
+        self.fixed_time_constants = []  # tau is absolute and takes no time-scale factor
 
     # append a lag with its source, observer, time constant, and thermal residue.
     # helper function
@@ -1699,6 +1975,12 @@ def build_thermal_sources_and_observers(
     )
 
 
+# in the full picture - the interim model does not calculate ring-to-ring heating from the exact distance.
+# it uses a few fixed coupling fractions - one for nearest neighbours, one for second neighbours, and one for all others.
+# this function decides which of those bands each pair of rings is in. the caller picks the fraction from the rank.
+# rank 1 is the nearest distinct distance from a ring. rank 2 is the next distinct distance. rank 99 is anything farther. rank 0 is a ring with itself.
+# example - rings at 0, 100, and 200 um. ring 0 sees ring 1 at rank 1 and ring 2 at rank 2.
+# the function also returns every centre-to-centre distance in um, which the caller uses for warmup times.
 # rank ring pairs by their first and second distinct neighbour distances.
 # (todo) helper func, move it out
 # x
@@ -1748,11 +2030,123 @@ def calculate_neighbor_ranks_and_distances(
     )
 
 
+# InterimRom fields as (B|1, N|1) arrays, with defaults resolved and bounds checked.
+# the returned dict uses short keys. the table in the body maps each key to its InterimRom field.
+# helper function
+def validate_and_broadcast_interim_parameters(
+    spec: InterimRom,  # spec = model (mixed units) - interim thermal resistance and time-constant parameters - type InterimRom record
+    n: int,  # n = N (1) - number of rings - type int scalar
+) -> (
+    dict[str, Float64Array]  # return = parameters (field units) - validated interim parameters with defaults resolved - type dict of float64 ndarrays, shape (1 or B, 1 or N)
+):
+    # broadcast one interim parameter over worlds and rings.
+    # helper function
+    def broadcast_interim_ring_parameter(
+        v: ArrayLike,  # v = parameter (field units) - interim parameter to broadcast - type array-like, scalar, (B,), or (B, N)
+        name: str,  # name = name (1) - element name or diagnostic parameter label - type str
+    ) -> (
+        Float64Array  # return = parameter (input units) - parameter broadcast over worlds and rings - type float64 ndarray, shape (1 or B, 1 or N)
+    ):
+        values = np.asarray(v, dtype=np.float64)
+        if values.ndim == 0:
+            return values.reshape(1, 1)
+        if values.ndim == 1:
+            return values[:, None]
+        if values.ndim == 2 and values.shape[1] in (1, n):
+            return values
+        raise ValueError(f"InterimRom.{name}: expected scalar, (B,) or (B, N), got shape {values.shape}")
+
+    # short key          | InterimRom field         | value used when the field is None
+    parameter_fields = (
+        ("z0",                "z_heater_ring_k_per_w",  None),
+        ("z_ratio",           "z_ratio_opt_heater",     None),
+        ("tau_fast",          "tau_fast_s",             None),
+        ("share_fast",        "share_fast_frac",        None),
+        ("tau_slow",          "tau_slow_s",             None),
+        ("tail_tau",          "tail_tau_s",             None),
+        ("tail_share",        "tail_share_frac",        None),
+        ("selfheat_tau",      "selfheat_tau_s",         None),
+        ("heater_self_ratio", "heater_self_ratio",      None),
+        ("heater_node_tau",   "heater_node_tau_s",      None),
+        ("xt_nearest",        "xt_nearest_frac",        None),
+        ("xt_floor",          "xt_floor_frac",          None),
+        ("xt_next",           "xt_next_frac",           0.0),
+        ("xt_tau_ref",        "xt_tau_ref_s",           None),
+        ("xt_tau_min",        "xt_tau_min_s",           None),
+        ("xt_tau_far",        "xt_tau_far_s",           0.0),
+        ("ring_radius",       "ring_radius_um",         None),
+    )
+    parameters = {}
+    for key, field_name, value_when_none in parameter_fields:
+        field_value = getattr(spec, field_name)
+        if field_value is None:
+            field_value = value_when_none
+        parameters[key] = broadcast_interim_ring_parameter(field_value, field_name)
+
+    # the site floor defaults to the ring-to-ring floor.
+    if spec.site_floor_frac is None:
+        parameters["site_floor"] = parameters["xt_floor"]
+    else:
+        parameters["site_floor"] = broadcast_interim_ring_parameter(spec.site_floor_frac, "site_floor_frac")
+
+    # by default z*(1-f_sh) = 1. the optical gain left on the heater lags then equals the heater gain.
+    optical_to_heater_gain_ratio = parameters["z_ratio"]
+    if spec.selfheat_share_frac is not None:
+        parameters["f_sh"] = broadcast_interim_ring_parameter(spec.selfheat_share_frac, "selfheat_share_frac")
+    else:
+        parameters["f_sh"] = (optical_to_heater_gain_ratio - 1.0) / optical_to_heater_gain_ratio
+
+    if np.any(parameters["z0"] <= 0):
+        raise ValueError("z_heater_ring_k_per_w must be > 0")
+    if np.any(optical_to_heater_gain_ratio < 1.0):
+        raise ValueError("z_ratio_opt_heater must be >= 1 (Z_opt/Z_heater >= 1 by reciprocity)")
+    if np.any(parameters["heater_self_ratio"] < 1.0):
+        raise ValueError("heater_self_ratio must be >= 1 (R_th,H >= Z_heater->ring)")
+    if np.any((parameters["f_sh"] < 0) | (parameters["f_sh"] > 1)):
+        raise ValueError("selfheat_share_frac must be in [0, 1]")
+    if np.any(parameters["ring_radius"] < 0):
+        raise ValueError("ring_radius_um must be >= 0")
+    if np.any(parameters["site_floor"] < 0):
+        raise ValueError("site_floor_frac must be >= 0")
+    fast_share = parameters["share_fast"]
+    tail_share = parameters["tail_share"]
+    if np.any(fast_share < 0) or np.any(tail_share < 0) or np.any(fast_share + tail_share > 1):
+        raise ValueError("share_fast_frac and tail_share_frac must be >= 0 with a sum <= 1")
+    positive_time_keys = (
+        "tau_fast", "tau_slow", "tail_tau", "selfheat_tau", "heater_node_tau", "xt_tau_ref", "xt_tau_min",
+    )
+    for key in positive_time_keys:
+        if np.any(parameters[key] <= 0):
+            raise ValueError(f"interim time constant {key} must be > 0")
+    if spec.crosstalk_dynamics not in ("imec", "self"):
+        raise ValueError("crosstalk_dynamics must be 'imec' or 'self'")
+    return parameters
+
+
+# in the full picture - assemble calls this once, before any simulation step, when no finite-element model is fitted.
+# it decides the whole interim thermal model - for every source and observer pair, how far the temperature rises and how fast.
+# a source is a place where power (W) enters. an observer is a place where temperature (K) is read.
+# the result goes into lag_builder, a list of lags. each lag_builder.add(observer, source, tau, r, layer, pair) appends one lag.
+# the layer and pair arguments are labels for the later uncertainty scaling. they do not change r or tau here.
+# parameter_arrays holds the InterimRom values under short keys. each array has shape (B, N).
+# "z0" = Z0 (K/W) - settled heater-to-ring gain. "z_ratio" = z (1) - optical-to-ring gain over Z0.
+# "heater_self_ratio" = h (1) - heater-to-heater gain over Z0. "f_sh" = f_sh (1) - share of the optical gain on the waveguide-core lag.
+# "share_fast" = f_F (1) and "tail_share" = f_T (1) - shares of a path's settled gain on the fast lag and on the package lag.
+# "tau_fast", "tau_slow", "tail_tau", "selfheat_tau", "heater_node_tau" (s) - time constants tau_F, tau_S, tau_T, tau_sh, tau_hn.
+# "xt_nearest", "xt_next", "xt_floor", "site_floor" (1) - coupling fractions. "ring_radius" (um) - ring radius.
 # how much does one source warm an observer on each time scale?
 # each path is a sum of lags. a power step P (W) gives each lag a rise P*r*(1-exp(-t/tau)) in K.
 # r (K/W) sets the eventual rise per watt. tau (s) sets how fast that rise develops.
 # choose the gains and times for a same-ring path, a cross-ring path, or a path involving a separate site.
 # each parameter array has one row per world and one column per ring.
+# Z0 is the heater-to-ring settled gain. the three heater lags are tau_F, tau_S, and tau_T with shares f_F, 1-f_F-f_T, and f_T.
+# pair of elements                          | settled gain    | lags
+# same ring, heater -> ring                 | Z0              | the three heater lags
+# same ring, light or junction -> heater    | Z0              | the three heater lags
+# same ring, heater -> heater               | h*Z0            | the three heater lags, plus (h-1)*Z0 at tau_hn
+# same ring, light or junction -> ring      | z*Z0            | f_sh*z*Z0 at tau_sh, the rest on the three heater lags
+# two rings                                 | c_rank*Z_ref    | one lag from the gap law, or the three heater lags when crosstalk_dynamics='self'
+# any pair with a monitor, driver, sensor, or aggressor | c_site(d)*Z_ref | one lag from the gap law
 def append_interim_heat_path_lags(
     spec: InterimRom,  # spec = model (mixed units) - interim thermal resistance and time-constant parameters - type InterimRom record
     elements: _Elements,  # elements = elements (mixed units) - source and observer instances with ring attachments and coordinates - type thermal element builder
@@ -1833,16 +2227,167 @@ def append_interim_heat_path_lags(
 
     ring_source_kinds = (SRC_HEATER, SRC_WG, SRC_JUNCTION)
     ring_observer_kinds = (OBS_RING, OBS_HEATER)
+
+    # case 1 - the source and the observer are ring elements on the same ring.
+    def append_same_ring_lags(
+        observer_index: int,  # o (1) - observer index
+        source_index: int,  # s (1) - source index
+        source_kind: int,  # source kind code - heater, waveguide absorption, or junction
+        observer_kind: int,  # observer kind code - ring or heater
+        ring_index: int,  # i (1) - the ring that carries both elements
+    ) -> (
+        None  # append the lags to lag_builder
+    ):
+        # Z_HR (K/W) is the settled heater-to-ring rise per watt on this ring.
+        heater_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, ring_index]
+
+        if source_kind in (SRC_WG, SRC_JUNCTION) and observer_kind == OBS_RING:
+            # waveguide-core heating gets an extra fast lag. the rest follows the heater response.
+            core_share = optical_core_share[:, ring_index]
+            gain_ratio = optical_to_heater_gain_ratio[:, ring_index]
+            # optical or junction power has total gain z*Z_HR. assign its fraction f_core to the core lag.
+            core_gain_k_per_w = gain_ratio * core_share * heater_gain_k_per_w
+            lag_builder.add(
+                observer_index,
+                source_index,
+                parameter_arrays["selfheat_tau"][:, ring_index],
+                core_gain_k_per_w,
+                LAYER_FAST,
+                PAIR_SELF,
+            )
+            # distribute the remaining gain z*Z_HR*(1-f_core) over the three heater time scales.
+            remaining_gain_k_per_w = gain_ratio * (1.0 - core_share) * heater_gain_k_per_w
+            append_heater_response_shape(
+                observer_index, source_index, remaining_gain_k_per_w, ring_index, PAIR_SELF
+            )
+            return
+
+        # use Z_HR for heater-to-ring and for the reciprocal ring-to-heater path.
+        append_heater_response_shape(
+            observer_index, source_index, heater_gain_k_per_w, ring_index, PAIR_SELF
+        )
+        if source_kind == SRC_HEATER and observer_kind == OBS_HEATER:
+            # add (h-1)*Z_HR to the heater's own path so the total is h*Z_HR.
+            extra_gain_k_per_w = (heater_self_gain_ratio[:, ring_index] - 1.0) * heater_gain_k_per_w
+            lag_builder.add(
+                observer_index,
+                source_index,
+                parameter_arrays["heater_node_tau"][:, ring_index],
+                extra_gain_k_per_w,
+                LAYER_FAST,
+                PAIR_SELF,
+            )
+
+    # case 2 - the source and the observer are ring elements on two different rings.
+    def append_cross_ring_lags(
+        observer_index: int,  # o (1) - observer index
+        source_index: int,  # s (1) - source index
+        source_kind: int,  # source kind code - heater, waveguide absorption, or junction
+        observer_kind: int,  # observer kind code - ring or heater
+        source_ring: int,  # j (1) - ring that carries the source
+        observer_ring: int,  # i (1) - ring that carries the observer
+    ) -> (
+        None  # append the lags to lag_builder
+    ):
+        # choose the coupling fraction from the first, second, or farther neighbour band.
+        neighbor_rank = neighbor_ranks[observer_ring, source_ring]
+        if neighbor_rank == 1:
+            coupling_fraction = parameter_arrays["xt_nearest"][:, 0]
+        elif neighbor_rank == 2 and spec.xt_next_frac is not None:
+            coupling_fraction = parameter_arrays["xt_next"][:, 0]
+        else:
+            coupling_fraction = parameter_arrays["xt_floor"][:, 0]
+
+        source_heater_gain = heater_ring_dc_gain_k_per_w[:, source_ring]
+        observer_heater_gain = heater_ring_dc_gain_k_per_w[:, observer_ring]
+        # heater-to-ring and its reciprocal use the heater's ring for the reference gain.
+        if source_kind == SRC_HEATER and observer_kind == OBS_RING:
+            reference_gain_k_per_w = source_heater_gain
+        elif source_kind in (SRC_WG, SRC_JUNCTION) and observer_kind == OBS_HEATER:
+            reference_gain_k_per_w = observer_heater_gain
+        else:
+            # use sqrt(Z_source*Z_observer) so reversing the rings gives the same reference.
+            reference_gain_k_per_w = np.sqrt(observer_heater_gain * source_heater_gain)
+
+        # Z_cross = c_neighbor*Z_ref. a coupling fraction of 0.03 gives 3 percent of the reference gain.
+        cross_gain_k_per_w = coupling_fraction * reference_gain_k_per_w
+        # split Z_cross over the source ring's heater lags or assign it to one gap-based lag.
+        if spec.crosstalk_dynamics == "self":
+            append_heater_response_shape(
+                observer_index, source_index, cross_gain_k_per_w, source_ring, PAIR_CROSS
+            )
+            return
+        cross_time_constant_s = calculate_path_time_constant_s(
+            ring_distances_um[observer_ring, source_ring],
+            ring_radii_um[:, source_ring],
+            ring_radii_um[:, observer_ring],
+        )
+        lag_builder.add(
+            observer_index, source_index, cross_time_constant_s, cross_gain_k_per_w,
+            LAYER_SLOW, PAIR_CROSS,
+        )
+
+    # case 3 - a monitor, driver, sensor, or aggressor is at one end of the path.
+    def append_site_lags(
+        observer_index: int,  # o (1) - observer index
+        source_index: int,  # s (1) - source index
+        source_ring: int,  # j (1) - ring that carries the source, or -1 for a free site
+        observer_ring: int,  # i (1) - ring that carries the observer, or -1 for a free site
+        source_is_ring_element: bool,  # the source is a heater, waveguide, or junction
+        observer_is_ring_element: bool,  # the observer is a ring or heater readout
+        pair_type: int,  # pair (1) - heat path type code
+    ) -> (
+        None  # append one lag to lag_builder
+    ):
+        # choose the source ring as the gain reference when present, then the observer ring, then the bank mean.
+        if source_ring >= 0:
+            reference_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, source_ring]
+        elif observer_ring >= 0:
+            reference_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, observer_ring]
+        else:
+            reference_gain_k_per_w = mean_heater_ring_dc_gain_k_per_w
+
+        # use centre distance for site gain and edge separation for the lag time constant.
+        source_xy_um = elements.src_xy[source_index]
+        observer_xy_um = elements.obs_xy[observer_index]
+        site_distance_um = float(np.linalg.norm(source_xy_um - observer_xy_um))
+        # a ring element has the ring's radius. a point site has zero radius.
+        source_radius_um = 0.0
+        if source_ring >= 0 and source_is_ring_element:
+            source_radius_um = ring_radii_um[:, source_ring]
+        observer_radius_um = 0.0
+        if observer_ring >= 0 and observer_is_ring_element:
+            observer_radius_um = ring_radii_um[:, observer_ring]
+        site_time_constant_s = calculate_path_time_constant_s(
+            site_distance_um, source_radius_um, observer_radius_um
+        )
+        # c_site falls as 1/d_centres between its bounds. the site lag gain is c_site*Z_ref.
+        site_coupling_fraction = calculate_site_coupling_fraction(
+            site_distance_um,
+            parameter_arrays["xt_nearest"][:, 0],
+            parameter_arrays["site_floor"][:, 0],
+            spec.site_ref_um,
+            spec.site_max_frac,
+        )
+        lag_builder.add(
+            observer_index,
+            source_index,
+            site_time_constant_s,
+            site_coupling_fraction * reference_gain_k_per_w,
+            LAYER_SLOW,
+            pair_type,
+        )
+
+    # visit every source and observer pair once and send it to its case.
     for source_index, source_kind in enumerate(elements.src_kind):
         source_ring = elements.src_ring[source_index]
-        source_xy_um = elements.src_xy[source_index]
         source_is_ring_element = source_kind in ring_source_kinds
 
         for observer_index, observer_kind in enumerate(elements.obs_kind):
             observer_ring = elements.obs_ring[observer_index]
-            observer_xy_um = elements.obs_xy[observer_index]
             observer_is_ring_element = observer_kind in ring_observer_kinds
 
+            # ring attachment -1 marks a free site.
             if source_ring < 0 or observer_ring < 0:
                 pair_type = PAIR_SITE
             elif source_ring == observer_ring:
@@ -1850,120 +2395,32 @@ def append_interim_heat_path_lags(
             else:
                 pair_type = PAIR_CROSS
 
-            if pair_type == PAIR_SELF and source_is_ring_element and observer_is_ring_element:
-                # Z_HR (K/W) is the settled heater-to-ring rise per watt on this ring.
-                heater_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, source_ring]
-                if source_kind in (SRC_WG, SRC_JUNCTION) and observer_kind == OBS_RING:
-                    # waveguide-core heating gets an extra fast lag. the rest follows the heater response.
-                    core_share = optical_core_share[:, source_ring]
-                    gain_ratio = optical_to_heater_gain_ratio[:, source_ring]
-                    # optical or junction power has total gain z*Z_HR. assign its fraction f_core to the core lag.
-                    core_gain_k_per_w = gain_ratio * core_share * heater_gain_k_per_w
-                    lag_builder.add(
-                        observer_index,
-                        source_index,
-                        parameter_arrays["selfheat_tau"][:, source_ring],
-                        core_gain_k_per_w,
-                        LAYER_FAST,
-                        pair_type,
-                    )
-                    # distribute the remaining gain z*Z_HR*(1-f_core) over the three heater time scales.
-                    remaining_gain_k_per_w = gain_ratio * (1.0 - core_share) * heater_gain_k_per_w
-                    append_heater_response_shape(
-                        observer_index, source_index, remaining_gain_k_per_w, source_ring, pair_type
-                    )
-                else:
-                    # use Z_HR for heater-to-ring and for the reciprocal ring-to-heater path.
-                    append_heater_response_shape(
-                        observer_index, source_index, heater_gain_k_per_w, source_ring, pair_type
-                    )
-                    if source_kind == SRC_HEATER and observer_kind == OBS_HEATER:
-                        # add (h-1)*Z_HR to the heater's own path so the total is h*Z_HR.
-                        extra_gain_k_per_w = (heater_self_gain_ratio[:, source_ring] - 1.0) * heater_gain_k_per_w
-                        lag_builder.add(
-                            observer_index,
-                            source_index,
-                            parameter_arrays["heater_node_tau"][:, source_ring],
-                            extra_gain_k_per_w,
-                            LAYER_FAST,
-                            pair_type,
-                        )
-                continue
-
-            if pair_type == PAIR_CROSS and source_is_ring_element and observer_is_ring_element:
-                # choose the coupling fraction from the first, second, or farther neighbour band.
-                neighbor_rank = neighbor_ranks[observer_ring, source_ring]
-                if neighbor_rank == 1:
-                    coupling_fraction = parameter_arrays["xt_nearest"][:, 0]
-                elif neighbor_rank == 2 and spec.xt_next_frac is not None:
-                    coupling_fraction = parameter_arrays["xt_next"][:, 0]
-                else:
-                    coupling_fraction = parameter_arrays["xt_floor"][:, 0]
-
-                source_heater_gain = heater_ring_dc_gain_k_per_w[:, source_ring]
-                observer_heater_gain = heater_ring_dc_gain_k_per_w[:, observer_ring]
-                # heater-to-ring and its reciprocal use the heater's ring for the reference gain.
-                if source_kind == SRC_HEATER and observer_kind == OBS_RING:
-                    reference_gain_k_per_w = source_heater_gain
-                elif source_kind in (SRC_WG, SRC_JUNCTION) and observer_kind == OBS_HEATER:
-                    reference_gain_k_per_w = observer_heater_gain
-                else:
-                    # use sqrt(Z_source*Z_observer) so reversing the rings gives the same reference.
-                    reference_gain_k_per_w = np.sqrt(observer_heater_gain * source_heater_gain)
-
-                # Z_cross = c_neighbor*Z_ref. a coupling fraction of 0.03 gives 3 percent of the reference gain.
-                cross_gain_k_per_w = coupling_fraction * reference_gain_k_per_w
-                # split Z_cross over the source ring's heater lags or assign it to one gap-based lag.
-                if spec.crosstalk_dynamics == "self":
-                    append_heater_response_shape(
-                        observer_index, source_index, cross_gain_k_per_w, source_ring, pair_type
-                    )
-                else:
-                    cross_time_constant_s = calculate_path_time_constant_s(
-                        ring_distances_um[observer_ring, source_ring],
-                        ring_radii_um[:, source_ring],
-                        ring_radii_um[:, observer_ring],
-                    )
-                    lag_builder.add(
-                        observer_index, source_index, cross_time_constant_s, cross_gain_k_per_w,
-                        LAYER_SLOW, pair_type,
-                    )
-                continue
-
-            # paths involving monitors, drivers, sensors, or aggressors use the site coupling law.
-            # choose the source ring as the gain reference when present, then the observer ring, then the bank mean.
-            if source_ring >= 0:
-                reference_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, source_ring]
-            elif observer_ring >= 0:
-                reference_gain_k_per_w = heater_ring_dc_gain_k_per_w[:, observer_ring]
+            both_are_ring_elements = source_is_ring_element and observer_is_ring_element
+            if pair_type == PAIR_SELF and both_are_ring_elements:
+                append_same_ring_lags(observer_index, source_index, source_kind, observer_kind, source_ring)
+            elif pair_type == PAIR_CROSS and both_are_ring_elements:
+                append_cross_ring_lags(
+                    observer_index, source_index, source_kind, observer_kind, source_ring, observer_ring
+                )
             else:
-                reference_gain_k_per_w = mean_heater_ring_dc_gain_k_per_w
-
-            # use centre distance for site gain and edge separation for the lag time constant.
-            site_distance_um = float(np.linalg.norm(source_xy_um - observer_xy_um))
-            source_radius_um = ring_radii_um[:, source_ring] if source_ring >= 0 and source_is_ring_element else 0.0
-            observer_radius_um = ring_radii_um[:, observer_ring] if observer_ring >= 0 and observer_is_ring_element else 0.0
-            site_time_constant_s = calculate_path_time_constant_s(
-                site_distance_um, source_radius_um, observer_radius_um
-            )
-            # c_site falls as 1/d_centres between its bounds. the site lag gain is c_site*Z_ref.
-            site_coupling_fraction = calculate_site_coupling_fraction(
-                site_distance_um,
-                parameter_arrays["xt_nearest"][:, 0],
-                parameter_arrays["site_floor"][:, 0],
-                spec.site_ref_um,
-                spec.site_max_frac,
-            )
-            lag_builder.add(
-                observer_index,
-                source_index,
-                site_time_constant_s,
-                site_coupling_fraction * reference_gain_k_per_w,
-                LAYER_SLOW,
-                pair_type,
-            )
+                append_site_lags(
+                    observer_index,
+                    source_index,
+                    source_ring,
+                    observer_ring,
+                    source_is_ring_element,
+                    observer_is_ring_element,
+                    pair_type,
+                )
 
 
+# in the full picture - assemble calls this once, before any simulation step, when a fitted ThermalRom is available.
+# it does the same job as append_interim_heat_path_lags, but it reads the gains from tables instead of from rules.
+# a ThermalRom is a compact fit to a finite-element heat solve. it has K shared time constants rom.taus_s (s).
+# for a source and observer on the same ring, rom.self_res[source kind, observer kind] gives K gains (K/W), one per time constant.
+# for any other pair, rom.cross_res[source kind, observer kind] gives the same K gains at each distance of rom.cross_r_um (um).
+# a gain can be negative. the temperature is the sum of all K terms, so only the sum must make physical sense.
+# the result goes into lag_builder, a list of lags. each nonzero gain becomes one lag with its time constant.
 # append extracted lags from the same-ring table or interpolate from the distance table.
 # the same-ring table applies when both sites match their extracted offsets.
 def append_extracted_heat_path_lags(
@@ -2098,7 +2555,7 @@ def append_extracted_heat_path_lags(
             f"{extracted_offsets_um} um: their same-ring pairs use the distance table cross_res "
             "at the actual site distance",
             RuntimeWarning,
-            stacklevel=3,
+            stacklevel=4,
         )
     if distances_outside_grid_um:
         example_distances_um = sorted({round(distance, 2) for distance in distances_outside_grid_um})[:6]
@@ -2106,36 +2563,42 @@ def append_extracted_heat_path_lags(
             f"thermal ROM cross_r_um grid {distance_grid_um[0]}..{distance_grid_um[-1]} um does not cover distances "
             f"{example_distances_um} um; clamped to the grid ends (radially symmetric table, valid for d > 2R)",
             RuntimeWarning,
-            stacklevel=3,
+            stacklevel=4,
         )
 
 
+# in the full picture - assemble calls this once when a simulated chip supplies its own package share.
+# the package lag is the slowest part of a warmup. it represents the whole die and package warming over milliseconds.
+# this function changes when the warmth arrives. it does not change how much arrives in the end.
+# lag_builder is the list of lags built so far. each lag has a gain r (K/W) and a time constant tau (s).
+# a path is every lag with the same source and the same observer. its settled gain Z (K/W) is the sum of its gains.
+# only lags marked tail_replaceable take part. the lag marked as the tail is the package lag.
 # how much of the settled temperature rise should develop on the package time scale?
 # a constant power P (W) gives one lag an eventual rise P*r (K), where r is its gain (K/W).
 # for each path, split the eligible gain Z between the package lag and the other eligible lags.
 def replace_package_tail_preserving_dc_gain(
-    lg: _Lags,  # lg = lags (mixed units) - lag indices, time constants, and thermal residues - type thermal lag builder
+    lag_builder: _Lags,  # lag_builder = lags (mixed units) - lag indices, time constants, and thermal residues - type thermal lag builder
     tail_tau: ArrayLike,  # tail_tau = tau_tail (s) - absolute package-tail time constants - type array-like, shape (B,)
     tail_share: ArrayLike,  # tail_share = f (1) - fraction of the eligible steady rise assigned to the package lag - shape (B,)
 ) -> (
-    None  # update the eligible lags in lg
+    None  # update the eligible lags in lag_builder
 ):
     eligible_lags_by_path: dict[tuple[int, int], list[int]] = {}
-    for lag_index, observer_index in enumerate(lg.observer_indices):
-        if lg.tail_replaceable[lag_index]:
-            heat_path = (observer_index, lg.source_indices[lag_index])
+    for lag_index, observer_index in enumerate(lag_builder.observer_indices):
+        if lag_builder.tail_replaceable[lag_index]:
+            heat_path = (observer_index, lag_builder.source_indices[lag_index])
             eligible_lags_by_path.setdefault(heat_path, []).append(lag_index)
 
     for (observer_index, source_index), eligible_lags in eligible_lags_by_path.items():
-        pair_type = lg.pair_codes[eligible_lags[0]]
-        other_lags = [index for index in eligible_lags if not lg.tail_flags[index]]
-        package_lags = [index for index in eligible_lags if lg.tail_flags[index]]
+        pair_type = lag_builder.pair_codes[eligible_lags[0]]
+        other_lags = [index for index in eligible_lags if not lag_builder.tail_flags[index]]
+        package_lags = [index for index in eligible_lags if lag_builder.tail_flags[index]]
 
         # save the original eligible gain Z before editing any lag.
-        total_gain_k_per_w = np.sum([lg.residues_k_per_w[index] for index in eligible_lags], axis=0)
+        total_gain_k_per_w = np.sum([lag_builder.residues_k_per_w[index] for index in eligible_lags], axis=0)
         old_other_gain_k_per_w = (
-            np.sum([lg.residues_k_per_w[index] for index in other_lags], axis=0)
-            if other_lags else np.zeros(lg.world_count)
+            np.sum([lag_builder.residues_k_per_w[index] for index in other_lags], axis=0)
+            if other_lags else np.zeros(lag_builder.world_count)
         )
 
         # assign f*Z to the package and leave (1-f)*Z for the other lags.
@@ -2151,37 +2614,41 @@ def replace_package_tail_preserving_dc_gain(
                 old_other_gain_k_per_w != 0.0, target_other_gain_k_per_w / old_other_gain_k_per_w, 0.0
             )
         for lag_index in other_lags:
-            lg.residues_k_per_w[lag_index] = lg.residues_k_per_w[lag_index] * other_gain_scale
+            lag_builder.residues_k_per_w[lag_index] = lag_builder.residues_k_per_w[lag_index] * other_gain_scale
 
         # store the requested package gain in one lag and keep its time constant fixed during later scaling.
         if package_lags:
             package_lag = package_lags[0]
-            lg.residues_k_per_w[package_lag] = package_gain_k_per_w
-            lg.time_constants_s[package_lag] = np.broadcast_to(tail_tau, (lg.world_count,)).copy()
-            lg.fixed_time_constants[package_lag] = True
+            lag_builder.residues_k_per_w[package_lag] = package_gain_k_per_w
+            lag_builder.time_constants_s[package_lag] = np.broadcast_to(tail_tau, (lag_builder.world_count,)).copy()
+            lag_builder.fixed_time_constants[package_lag] = True
             for lag_index in package_lags[1:]:
-                lg.residues_k_per_w[lag_index] = np.zeros(lg.world_count)
+                lag_builder.residues_k_per_w[lag_index] = np.zeros(lag_builder.world_count)
         else:
-            lg.add(
+            lag_builder.add(
                 observer_index, source_index, tail_tau, package_gain_k_per_w, LAYER_SLOW, pair_type,
                 tailable=True, tail=True, fixed_tau=True,
             )
 
 
+# in the full picture - each simulated chip (world) can have stronger or weaker heating than the nominal model.
+# s_DC (1) is the multiplier on the settled gain r (K/W) of a heat path. a value of 1.2 means 20 percent more temperature rise per watt.
+# the user gives one number for every path, or rules keyed by source kind and observer kind such as "heater->ring_mode_weighted".
+# this function returns the s_DC of one kind of path for every world. assemble multiplies each lag's gain by it.
 # multiply all DC-scale rules matching this source/observer kind pair.
 def calculate_pair_dc_scale(
     dc_scale: ArrayLike | Mapping[str, ArrayLike],  # dc_scale = s_DC (1) - DC residue scales or source-to-observer matching rules - type array-like or mapping to array-like values
-    sk_name: str,  # sk_name = source_kind (1) - source kind of the heat path - type str
-    ok_name: str,  # ok_name = observer_kind (1) - observer kind of the heat path - type str
-    B: int,  # B = B (1) - number of worlds - type int scalar
+    source_kind_name: str,  # source_kind_name = source_kind (1) - source kind of the heat path - type str
+    observer_kind_name: str,  # observer_kind_name = observer_kind (1) - observer kind of the heat path - type str
+    world_count: int,  # world_count = B (1) - number of worlds - type int scalar
 ) -> (
     Float64Array  # return = s_DC (1) - product of all matching DC-scale rules - type float64 ndarray, shape (B,)
 ):
     if not isinstance(dc_scale, Mapping):
-        return np.broadcast_to(normalize_world_parameter_vector(dc_scale, "dc_scale"), (B,))
+        return np.broadcast_to(normalize_world_parameter_vector(dc_scale, "dc_scale"), (world_count,))
     # start at 1 per world and multiply every applicable rule into that world's gain factor.
     # for example, a global factor of 1.2 and a matching path factor of 0.5 give 0.6.
-    factor = np.ones(B)
+    factor = np.ones(world_count)
     for key, value in dc_scale.items():
         if key == "*":
             factor = factor * normalize_world_parameter_vector(value, "dc_scale[*]")
@@ -2192,11 +2659,19 @@ def calculate_pair_dc_scale(
         for pattern, valid_kinds in ((source_pattern, SOURCE_KINDS), (observer_pattern, OBSERVER_KINDS)):
             if pattern != "*" and pattern not in valid_kinds:
                 raise ValueError(f"dc_scale key {key!r}: unknown kind {pattern!r}")
-        if source_pattern in ("*", sk_name) and observer_pattern in ("*", ok_name):
+        if source_pattern in ("*", source_kind_name) and observer_pattern in ("*", observer_kind_name):
             factor = factor * normalize_world_parameter_vector(value, f"dc_scale[{key}]")
-    return np.broadcast_to(factor, (B,))
+    return np.broadcast_to(factor, (world_count,))
 
 
+# in the full picture - each simulated chip (world) draws two time factors, s_fast (1) and s_slow (1).
+# they multiply the time constants tau (s) of the lags to model a chip that warms faster or slower than nominal.
+# normally a lag takes the factor of its own layer - s_fast for the ring and oxide, s_slow for the die and package.
+# that rule breaks for some fitted paths. a path is every lag with the same source and observer.
+# a fitted path can hold lags with positive and negative gains r (K/W) whose sum gives a smooth warmup curve.
+# if its fast and slow lags were stretched by different factors, they would stop cancelling and the curve would bend the wrong way.
+# this function finds those paths and gives all their lags one shared factor k (1), between s_fast and s_slow.
+# it returns a mask of the lags that need the shared factor and the factor itself. assemble applies it.
 # how does thermal uncertainty change the speed of a fitted warmup curve?
 # positive and negative lag contributions can cancel during warmup.
 # scaling all adjustable time constants by k changes each exp(-t/tau) to exp(-(t/k)/tau).
@@ -2291,11 +2766,325 @@ def calculate_shared_pair_time_scales(
     )
 
 
+# the stage functions from here to assemble each do one step of assembly.
+# assemble calls them in order.
+
+# turn the layout argument into a LayoutSites record with one centre per ring.
+# helper function
+def resolve_layout_sites(
+    layout: LayoutSites | Mapping[str, Mapping[str, Any]] | None,  # layout = layout (um) - site coordinates or layout records - type LayoutSites, mapping, or None
+    ring_count: int,  # ring_count = N (1) - number of rings - type int scalar
+    ring_pitch_um: float | None,  # ring_pitch_um = d_pitch (um) - optional spacing for missing ring sites - type float or None
+    temp_sensors: Sequence[Mapping[str, Any]] | None,  # temp_sensors = sensors (mixed units) - sensor site or attachment records - type sequence of mappings or None
+) -> (
+    LayoutSites  # return = sites (um) - ring, monitor, driver, sensor, and aggressor positions - type LayoutSites record
+):
+    if layout is None:
+        # one ring needs no positions. place it at the origin.
+        if ring_count != 1:
+            raise ValueError("layout is required for more than one ring")
+        layout = LayoutSites(np.zeros((1, 2)))
+    elif not isinstance(layout, LayoutSites):
+        layout = LayoutSites.from_sites(layout, ring_count, ring_pitch_um, temp_sensors)
+    if layout.n_rings != ring_count:
+        raise ValueError(f"layout has {layout.n_rings} rings, n_rings is {ring_count}")
+    return layout
+
+
+# turn each ThermalScales field into an array with 1 shared entry or B entries.
+# the dict also lets infer_world_count find B from the fields that have B entries.
+# helper function
+def normalize_thermal_scale_arrays(
+    scales: ThermalScales,  # scales = scales (mixed units) - thermal uncertainty factors and optional package-tail parameters - type ThermalScales record
+) -> (
+    dict[str, Float64Array]  # return = scale_arrays (field units) - uncertainty factors keyed by short name - type dict of float64 ndarrays, shape (1 or B,)
+):
+    scale_arrays = {
+        "time_scale_fast": normalize_world_parameter_vector(scales.time_scale_fast, "time_scale_fast"),
+        "time_scale_slow": normalize_world_parameter_vector(scales.time_scale_slow, "time_scale_slow"),
+        "crosstalk_scale": normalize_world_parameter_vector(scales.crosstalk_scale, "crosstalk_scale"),
+    }
+
+    if scales.package_tail_share_frac is not None:
+        scale_arrays["pkg_tail_share"] = normalize_world_parameter_vector(
+            scales.package_tail_share_frac, "package_tail_share_frac"
+        )
+        # default tau when only the share is drawn - assumed 4 ms, [CO22-TCPMT] circuit-level start-up (row T2)
+        package_tail_tau_s = 4.0e-3 if scales.package_tail_tau_s is None else scales.package_tail_tau_s
+        scale_arrays["pkg_tail_tau"] = normalize_world_parameter_vector(package_tail_tau_s, "package_tail_tau_s")
+
+    # dc_scale is one factor, or a set of rules keyed by source and observer kind.
+    if isinstance(scales.dc_scale, Mapping):
+        for rule_key, rule_value in scales.dc_scale.items():
+            scale_arrays[f"dc[{rule_key}]"] = normalize_world_parameter_vector(rule_value, f"dc_scale[{rule_key}]")
+    else:
+        scale_arrays["dc"] = normalize_world_parameter_vector(scales.dc_scale, "dc_scale")
+
+    scale_arrays["transport_delay_s"] = normalize_world_parameter_vector(scales.transport_delay_s, "transport_delay_s")
+    if np.any(~(scale_arrays["transport_delay_s"] >= 0.0)):
+        raise ValueError("transport_delay_s must be >= 0")
+
+    # the hypothesis entry is a placeholder. only its length matters, so that it counts toward B.
+    hypothesis = scales.scaling_hypothesis
+    hypothesis_count = 1 if isinstance(hypothesis, str) else np.asarray(hypothesis).reshape(-1).shape[0]
+    scale_arrays["scaling_hypothesis"] = np.zeros(hypothesis_count)
+    return scale_arrays
+
+
+# place the sources and observers, then choose r and tau for every heat path from the interim model.
+# helper function
+def build_interim_heat_paths(
+    spec: InterimRom,  # spec = model (mixed units) - interim thermal resistance and time-constant parameters - type InterimRom record
+    layout: LayoutSites,  # layout = sites (um) - source and observer site coordinates - type LayoutSites record
+    ring_count: int,  # ring_count = N (1) - number of rings - type int scalar
+    source_kind_names: Sequence[str],  # source_kind_names = source_kinds (1) - source kind names to include - type sequence of strings
+    observer_kind_names: Sequence[str],  # observer_kind_names = observer_kinds (1) - observer kind names to include - type sequence of strings
+    scale_arrays: dict[str, Float64Array],  # scale_arrays = scales (field units) - uncertainty factors, used here only to find B - type dict of float64 ndarrays, shape (1 or B,)
+    meta: dict[str, Any],  # meta = metadata (mixed units) - provenance record updated in place - type dict with string keys and metadata values
+) -> tuple[
+    int,  # return[0] = B (1) - number of worlds - type int scalar
+    _Elements,  # return[1] = elements (mixed units) - source and observer kinds, names, coordinates, and ring attachments - type thermal element builder
+    dict[str, Int64Array],  # return[2] = indices (1) - per-ring, temperature-sensor, and aggressor index maps - type dict of named int64 ndarrays
+    _Lags,  # return[3] = lags (mixed units) - one entry per heat-path lag before scaling - type thermal lag builder
+]:
+    interim_params = validate_and_broadcast_interim_parameters(spec, ring_count)
+    # a parameter with one column is the same for every ring. only its row count matters for B.
+    params_for_world_count = {
+        key: (values[:, 0] if values.shape[1] == 1 else values) for key, values in interim_params.items()
+    }
+    world_count = infer_world_count({**scale_arrays, **params_for_world_count})
+    interim_params = {
+        key: np.broadcast_to(values, (world_count, ring_count)) for key, values in interim_params.items()
+    }
+
+    elements, element_indices = build_thermal_sources_and_observers(
+        layout,
+        ring_count,
+        source_kind_names,
+        observer_kind_names,
+        spec.pd_offset_um,
+        spec.temp_sensor_offset_um,
+        spec.driver_offset_um,
+    )
+    lags = _Lags(world_count)
+    append_interim_heat_path_lags(spec, elements, layout, ring_count, world_count, interim_params, lags)
+    meta.update(
+        model="interim", name=spec.name, crosstalk_dynamics=spec.crosstalk_dynamics, xt_tau_law=spec.xt_tau_law
+    )
+
+    # z*(1-f_sh) is the optical gain on the shared heater time scales, relative to the heater gain.
+    shared_optical_gain_ratio = interim_params["z_ratio"] * (1.0 - interim_params["f_sh"])
+    if np.any(shared_optical_gain_ratio < 1.0 - 1e-12):
+        # stacklevel 3 reports the caller of assemble.
+        warnings.warn("interim thermal model: z_ratio*(1 - selfheat_share) < 1, so the heater/ring residue matrix "
+                      "of the heater poles is not positive semidefinite (not a passive RC network); "
+                      "selfheat_share_frac = (z - 1)/z restores it", RuntimeWarning, stacklevel=3)
+    return (
+        world_count,
+        elements,
+        element_indices,
+        lags,
+    )
+
+
+# place the sources and observers, then read r and tau for every heat path from a saved ThermalRom.
+# helper function
+def build_extracted_heat_paths(
+    rom: ThermalRom,  # rom = model (mixed units) - extracted poles, thermal residues, and site metadata - type ThermalRom record
+    layout: LayoutSites,  # layout = sites (um) - source and observer site coordinates - type LayoutSites record
+    ring_count: int,  # ring_count = N (1) - number of rings - type int scalar
+    source_kind_names: Sequence[str],  # source_kind_names = source_kinds (1) - source kind names to include - type sequence of strings
+    observer_kind_names: Sequence[str],  # observer_kind_names = observer_kinds (1) - observer kind names to include - type sequence of strings
+    driver_requested: bool,  # driver_requested = driver_requested (1) - the caller named the driver source kind explicitly - type bool scalar
+    scale_arrays: dict[str, Float64Array],  # scale_arrays = scales (field units) - uncertainty factors, used here only to find B - type dict of float64 ndarrays, shape (1 or B,)
+    tau_split_s: float,  # tau_split_s = tau_split (s) - boundary between fast and slow time scales - type float scalar
+    meta: dict[str, Any],  # meta = metadata (mixed units) - provenance record updated in place - type dict with string keys and metadata values
+) -> tuple[
+    int,  # return[0] = B (1) - number of worlds - type int scalar
+    _Elements,  # return[1] = elements (mixed units) - source and observer kinds, names, coordinates, and ring attachments - type thermal element builder
+    dict[str, Int64Array],  # return[2] = indices (1) - per-ring, temperature-sensor, and aggressor index maps - type dict of named int64 ndarrays
+    _Lags,  # return[3] = lags (mixed units) - one entry per heat-path lag before scaling - type thermal lag builder
+]:
+    world_count = infer_world_count(scale_arrays)
+    for site_kind in ("monitor_pd", "temp_sensor"):
+        if site_kind in observer_kind_names and site_kind in rom.observers and site_kind not in rom.site_offsets_um:
+            # stacklevel 3 reports the caller of assemble.
+            warnings.warn(f"thermal ROM has no site offset for {site_kind}; its sites are placed at the ring centre",
+                          RuntimeWarning, stacklevel=3)
+
+    # include drivers at explicit layout sites.
+    # an explicitly requested driver may use the ROM default offset.
+    # G26 places its drivers on a separate EIC beside the PIC.
+    driver_offset_um = None
+    if "driver" in rom.sources and driver_requested:
+        driver_offset_um = rom.site_offsets_um.get("driver")
+
+    elements, element_indices = build_thermal_sources_and_observers(
+        layout,
+        ring_count,
+        source_kind_names,
+        observer_kind_names,
+        rom.site_offsets_um.get("monitor_pd", (0.0, 0.0)),
+        rom.site_offsets_um.get("temp_sensor", (0.0, 0.0)),
+        driver_offset_um,
+    )
+    lags = _Lags(world_count)
+    append_extracted_heat_path_lags(rom, elements, layout, world_count, tau_split_s, lags, meta)
+    meta.update(
+        model="rom",
+        rom_path=rom.meta.get("path"),
+        rom_sha256=rom.meta.get("sha256"),
+        family=rom.meta.get("family"),
+        film_nm=rom.meta.get("film_nm"),
+    )
+    return (
+        world_count,
+        elements,
+        element_indices,
+        lags,
+    )
+
+
+# look up the settled-gain factor s_DC of every lag from its source kind and observer kind.
+# helper function
+def calculate_lag_dc_factors(
+    dc_scale: ArrayLike | Mapping[str, ArrayLike],  # dc_scale = s_DC (1) - DC residue scales or source-to-observer matching rules - type array-like or mapping to array-like values
+    lag_source_indices: Int64Array,  # lag_source_indices = s_m (1) - source index of each lag - type int64 ndarray, shape (M,)
+    lag_observer_indices: Int64Array,  # lag_observer_indices = o_m (1) - observer index of each lag - type int64 ndarray, shape (M,)
+    src_kind: Int64Array,  # src_kind = source_kind (1) - kind code of each source - type int64 ndarray, shape (S,)
+    obs_kind: Int64Array,  # obs_kind = observer_kind (1) - kind code of each observer - type int64 ndarray, shape (O,)
+    world_count: int,  # world_count = B (1) - number of worlds - type int scalar
+) -> (
+    Float64Array  # return = s_DC (1) - settled-gain factor of each lag - type float64 ndarray, shape (B, M)
+):
+    lag_count = lag_source_indices.shape[0]
+    dc_factors = np.ones((world_count, lag_count))
+    for lag_index in range(lag_count):
+        source_kind_name = SOURCE_KINDS[src_kind[lag_source_indices[lag_index]]]
+        observer_kind_name = OBSERVER_KINDS[obs_kind[lag_observer_indices[lag_index]]]
+        dc_factors[:, lag_index] = calculate_pair_dc_scale(
+            dc_scale, source_kind_name, observer_kind_name, world_count
+        )
+    return dc_factors
+
+
+# choose the time factor of every lag - s_fast or s_slow by layer, or one shared factor per path.
+# calculate_shared_pair_time_scales decides which paths need the shared factor.
+# helper function
+def calculate_lag_time_factors(
+    time_constants_s: Float64Array,  # time_constants_s = tau (s) - time constants before scaling - type float64 ndarray, shape (B, M)
+    thermal_residues_k_per_w: Float64Array,  # thermal_residues_k_per_w = r (K/W) - residues before scaling - type float64 ndarray, shape (B, M)
+    lag_observer_indices: Int64Array,  # lag_observer_indices = o_m (1) - observer index of each lag - type int64 ndarray, shape (M,)
+    lag_source_indices: Int64Array,  # lag_source_indices = s_m (1) - source index of each lag - type int64 ndarray, shape (M,)
+    lag_layers: Int64Array,  # lag_layers = layer (1) - fast or slow layer code of each lag - type int64 ndarray, shape (M,)
+    fixed_time_constants: BoolArray,  # fixed_time_constants = fixed_tau (1) - lags whose time constants must not be rescaled - type bool ndarray, shape (M,)
+    fast_time_scale: Float64Array,  # fast_time_scale = s_fast (1) - fast-layer time factor - type float64 ndarray, shape (B,)
+    slow_time_scale: Float64Array,  # slow_time_scale = s_slow (1) - slow-layer time factor - type float64 ndarray, shape (B,)
+    tau_split_s: float,  # tau_split_s = tau_split (s) - boundary between fast and slow time scales - type float scalar
+    source_count: int,  # source_count = S (1) - number of sources - type int scalar
+) -> tuple[
+    Float64Array,  # return[0] = s_time (1) - time factor of each lag - type float64 ndarray, shape (B, M)
+    int,  # return[1] = path_count (1) - number of paths that use one shared factor - type int scalar
+]:
+    # start from the layer rule - fast lags take s_fast and slow lags take s_slow.
+    time_factors = np.where(lag_layers[None, :] == LAYER_FAST, fast_time_scale[:, None], slow_time_scale[:, None])
+    # replace the layer factors where fitted lags need to keep their timing relative to each other.
+    whole_pair_mask, whole_pair_factors = calculate_shared_pair_time_scales(
+        time_constants_s,
+        thermal_residues_k_per_w,
+        lag_observer_indices,
+        lag_source_indices,
+        lag_layers,
+        fixed_time_constants,
+        fast_time_scale,
+        slow_time_scale,
+        tau_split_s,
+    )
+    # unselected lags keep their requested fast or slow factor here.
+    if whole_pair_factors is not None:
+        time_factors = np.where(whole_pair_mask[None, :], whole_pair_factors, time_factors)
+    # count the distinct source-to-observer paths among the selected lags.
+    shared_path_keys = lag_observer_indices[whole_pair_mask] * source_count + lag_source_indices[whole_pair_mask]
+    shared_path_count = int(np.unique(shared_path_keys).size)
+    return (
+        time_factors,
+        shared_path_count,
+    )
+
+
+# choose which lags to keep and the order that puts each observer's lags together.
+# helper function
+def order_kept_lags_by_observer(
+    time_constants_s: Float64Array,  # time_constants_s = tau (s) - scaled time constants - type float64 ndarray, shape (B, M)
+    thermal_residues_k_per_w: Float64Array,  # thermal_residues_k_per_w = r (K/W) - scaled residues - type float64 ndarray, shape (B, M)
+    lag_observer_indices: Int64Array,  # lag_observer_indices = o_m (1) - observer index of each lag - type int64 ndarray, shape (M,)
+    lag_source_indices: Int64Array,  # lag_source_indices = s_m (1) - source index of each lag - type int64 ndarray, shape (M,)
+    prune_abs_k_per_w: float,  # prune_abs_k_per_w = r_min (K/W) - prune lags whose residue magnitude never exceeds this threshold - type float scalar
+) -> (
+    Int64Array  # return = order (1) - indices of the kept lags in their final order - type int64 ndarray, shape (M_kept,)
+):
+    # keep a lag when its gain exceeds the threshold in at least one world.
+    keep = np.any(np.abs(thermal_residues_k_per_w) > float(prune_abs_k_per_w), axis=0)
+    if prune_abs_k_per_w == 0.0:
+        keep = np.any(thermal_residues_k_per_w != 0.0, axis=0)
+    # sort by observer, then source, then world 0's time constant. lexsort takes its last key first.
+    order = np.lexsort((time_constants_s[0], lag_source_indices, lag_observer_indices))
+    return order[keep[order]]
+
+
+# find where each observer's lags start and end in the sorted lag arrays.
+# observer o reads lags obs_ptr[o] up to obs_ptr[o+1]-1.
+# for example, lag observers [0, 0, 1, 2, 2, 2] give obs_ptr = [0, 2, 3, 6].
+# helper function
+def count_observer_lag_boundaries(
+    lag_observer_indices: Int64Array,  # lag_observer_indices = o_m (1) - observer index of each lag, sorted - type int64 ndarray, shape (M,)
+    observer_count: int,  # observer_count = O (1) - number of observers - type int scalar
+) -> (
+    Int64Array  # return = p_observer (1) - lag-array boundaries of each observer - type int64 ndarray, shape (O+1,)
+):
+    # count the lags of observer o into slot o+1, then accumulate the counts.
+    obs_ptr = np.zeros(observer_count + 1, np.int64)
+    np.add.at(obs_ptr, lag_observer_indices + 1, 1)
+    return np.cumsum(obs_ptr)
+
+
+# label each lag by how the self-heating solver must treat its source power.
+# only lags driven by waveguide absorption get an optical label. the rest stay LAG_EXOGENOUS.
+# helper function
+def classify_optical_lags(
+    lag_source_indices: Int64Array,  # lag_source_indices = s_m (1) - source index of each lag - type int64 ndarray, shape (M,)
+    lag_observer_indices: Int64Array,  # lag_observer_indices = o_m (1) - observer index of each lag - type int64 ndarray, shape (M,)
+    src_kind: Int64Array,  # src_kind = source_kind (1) - kind code of each source - type int64 ndarray, shape (S,)
+    src_ring: Int64Array,  # src_ring = k_source (1) - ring attachment of each source - type int64 ndarray, shape (S,)
+    obs_kind: Int64Array,  # obs_kind = observer_kind (1) - kind code of each observer - type int64 ndarray, shape (O,)
+    obs_ring: Int64Array,  # obs_ring = k_observer (1) - ring attachment of each observer - type int64 ndarray, shape (O,)
+) -> (
+    Int64Array  # return = kind_m (1) - LAG_* code of each lag - type int64 ndarray, shape (M,)
+):
+    lag_kinds = np.zeros(lag_observer_indices.shape[0], np.int64)
+    optical_source_mask = src_kind[lag_source_indices] == SRC_WG
+    ring_observer_mask = obs_kind[lag_observer_indices] == OBS_RING
+    same_ring_mask = src_ring[lag_source_indices] == obs_ring[lag_observer_indices]
+    # absorbed light warming its own ring - the solver finds this power and temperature together.
+    lag_kinds[optical_source_mask & ring_observer_mask & same_ring_mask] = LAG_OPT_SELF
+    # absorbed light warming another ring - the solver uses the absorbed power from the previous substep.
+    lag_kinds[optical_source_mask & ring_observer_mask & ~same_ring_mask] = LAG_OPT_CROSS_RING
+    # absorbed light warming a heater, monitor, or sensor - updated with the newly solved power.
+    lag_kinds[optical_source_mask & ~ring_observer_mask] = LAG_OPT_OTHER
+    return lag_kinds
+
+
+# in the full picture - this runs once before a simulation. it builds the thermal model that the engines then read on every step.
+# the model is a list of lags. a lag is one temperature contribution x (K) from one heat source to one place where temperature is read.
+# each lag has a gain r (K/W), the settled rise per watt, and a time constant tau (s), the warmup time.
+# the inputs say which model to use (rom), where things are (layout), and how this chip differs from nominal (scales).
+# the output is a ThermalSystem - r and tau as arrays (B, M) for B simulated chips and M lags, plus index arrays that say which source and observer each lag joins.
 # assemble the source-to-observer thermal system for the requested ring layout.
 # choose the heat response for the layout, then assign the requested share of warming to the package lag.
 # apply chip uncertainty last to set how much warming occurs and how quickly it develops.
 # prune negligible residues and sort lags by observer, source, and time constant.
 # classify optical heat paths for the implicit self-heating solver.
+# stages 2, 3, and 5 change the predicted temperatures. stages 1, 4, 6, and 7 only prepare or pack.
 # helper function
 # x
 def assemble(
@@ -2312,86 +3101,41 @@ def assemble(
 ) -> (
     ThermalSystem  # return = system (mixed units) - assembled and scaled source-to-observer heat paths - type ThermalSystem record
 ):
+    # stage 1 - turn the arguments into records and per-world arrays.
     ring_count = int(n_rings)
-    if layout is None:
-        if ring_count != 1:
-            raise ValueError("layout is required for more than one ring")
-        layout = LayoutSites(np.zeros((1, 2)))
-    elif not isinstance(layout, LayoutSites):
-        layout = LayoutSites.from_sites(layout, ring_count, ring_pitch_um, temp_sensors)
-    if layout.n_rings != ring_count:
-        raise ValueError(f"layout has {layout.n_rings} rings, n_rings is {ring_count}")
+    layout = resolve_layout_sites(layout, ring_count, ring_pitch_um, temp_sensors)
     if scales is None:
         scales = ThermalScales()
     elif isinstance(scales, Mapping):
         scales = ThermalScales(**scales)
-    src_kinds = tuple(SOURCE_KINDS if sources is None else sources)
-    obs_kinds = tuple(OBSERVER_KINDS if observers is None else observers)
-    for k in src_kinds:
-        if k not in SOURCE_KINDS:
-            raise ValueError(f"unknown source kind {k!r}")
-    for k in obs_kinds:
-        if k not in OBSERVER_KINDS:
-            raise ValueError(f"unknown observer kind {k!r}")
-
-    scale_arrays = {"time_scale_fast": normalize_world_parameter_vector(scales.time_scale_fast, "time_scale_fast"),
-          "time_scale_slow": normalize_world_parameter_vector(scales.time_scale_slow, "time_scale_slow"),
-          "crosstalk_scale": normalize_world_parameter_vector(scales.crosstalk_scale, "crosstalk_scale")}
-    if scales.package_tail_share_frac is not None:
-        scale_arrays["pkg_tail_share"] = normalize_world_parameter_vector(scales.package_tail_share_frac, "package_tail_share_frac")
-        # default tau when only the share is drawn - assumed 4 ms, [CO22-TCPMT] circuit-level start-up (row T2)
-        scale_arrays["pkg_tail_tau"] = normalize_world_parameter_vector(4.0e-3 if scales.package_tail_tau_s is None else scales.package_tail_tau_s,
-                               "package_tail_tau_s")
-    if isinstance(scales.dc_scale, Mapping):
-        for k, v in scales.dc_scale.items():
-            scale_arrays[f"dc[{k}]"] = normalize_world_parameter_vector(v, f"dc_scale[{k}]")
-    else:
-        scale_arrays["dc"] = normalize_world_parameter_vector(scales.dc_scale, "dc_scale")
-    scale_arrays["transport_delay_s"] = normalize_world_parameter_vector(scales.transport_delay_s, "transport_delay_s")
-    if np.any(~(scale_arrays["transport_delay_s"] >= 0.0)):
-        raise ValueError("transport_delay_s must be >= 0")
-    hyp_raw = scales.scaling_hypothesis
-    scale_arrays["scaling_hypothesis"] = np.zeros(1 if isinstance(hyp_raw,
-        str) else np.asarray(hyp_raw).reshape(-1).shape[0])
+    source_kind_names = tuple(SOURCE_KINDS if sources is None else sources)
+    observer_kind_names = tuple(OBSERVER_KINDS if observers is None else observers)
+    for kind_name in source_kind_names:
+        if kind_name not in SOURCE_KINDS:
+            raise ValueError(f"unknown source kind {kind_name!r}")
+    for kind_name in observer_kind_names:
+        if kind_name not in OBSERVER_KINDS:
+            raise ValueError(f"unknown observer kind {kind_name!r}")
+    scale_arrays = normalize_thermal_scale_arrays(scales)
+    tau_split_s = float(scales.tau_split_s)
     meta: dict = {"n_rings": ring_count}
 
+    # stage 2 - place the sources and observers, then choose r and tau for every heat path.
+    # lags is a list with one entry per lag. nothing is scaled yet.
     if isinstance(rom, InterimRom):
-        interim_params = validate_and_broadcast_interim_parameters(rom, ring_count)
-        world_count = infer_world_count({**scale_arrays, **{k: v[:, 0] if v.shape[1] == 1 else v for k, v in interim_params.items()}})
-        interim_params = {k: np.broadcast_to(v, (world_count, ring_count)) for k, v in interim_params.items()}
-        elements, element_indices = build_thermal_sources_and_observers(layout, ring_count, src_kinds, obs_kinds, rom.pd_offset_um,
-            rom.temp_sensor_offset_um,
-                                  rom.driver_offset_um)
-        lags = _Lags(world_count)
-        append_interim_heat_path_lags(rom, elements, layout, ring_count, world_count, interim_params, lags)
-        meta.update(model="interim", name=rom.name, crosstalk_dynamics=rom.crosstalk_dynamics,
-                    xt_tau_law=rom.xt_tau_law)
-        bad = (interim_params["z_ratio"] * (1.0 - interim_params["f_sh"]) < 1.0 - 1e-12)
-        if np.any(bad):
-            warnings.warn("interim thermal model: z_ratio*(1 - selfheat_share) < 1, so the heater/ring residue matrix "
-                          "of the heater poles is not positive semidefinite (not a passive RC network); "
-                          "selfheat_share_frac = (z - 1)/z restores it", RuntimeWarning, stacklevel=2)
+        world_count, elements, element_indices, lags = build_interim_heat_paths(
+            rom, layout, ring_count, source_kind_names, observer_kind_names, scale_arrays, meta
+        )
     elif isinstance(rom, ThermalRom):
-        world_count = infer_world_count(scale_arrays)
-        for nm in ("monitor_pd", "temp_sensor"):
-            if nm in obs_kinds and nm in rom.observers and nm not in rom.site_offsets_um:
-                warnings.warn(f"thermal ROM has no site offset for {nm}; its sites are placed at the ring centre",
-                              RuntimeWarning, stacklevel=2)
-        # include drivers at explicit layout sites.
-        # an explicitly requested driver may use the ROM default offset.
-        # G26 places its drivers on a separate EIC beside the PIC.
-        driver_offset = (rom.site_offsets_um.get("driver") if ("driver" in rom.sources and sources is not None
-                                                         and "driver" in sources) else None)
-        elements, element_indices = build_thermal_sources_and_observers(layout, ring_count, src_kinds, obs_kinds,
-                                  rom.site_offsets_um.get("monitor_pd", (0.0, 0.0)),
-                                  rom.site_offsets_um.get("temp_sensor", (0.0, 0.0)), driver_offset)
-        lags = _Lags(world_count)
-        append_extracted_heat_path_lags(rom, elements, layout, world_count, float(scales.tau_split_s), lags, meta)
-        meta.update(model="rom", rom_path=rom.meta.get("path"), rom_sha256=rom.meta.get("sha256"),
-                    family=rom.meta.get("family"), film_nm=rom.meta.get("film_nm"))
+        driver_requested = sources is not None and "driver" in sources
+        world_count, elements, element_indices, lags = build_extracted_heat_paths(
+            rom, layout, ring_count, source_kind_names, observer_kind_names, driver_requested,
+            scale_arrays, tau_split_s, meta,
+        )
     else:
         raise TypeError(f"rom must be a ThermalRom or an InterimRom, got {type(rom).__name__}")
 
+    # stage 3 - move the requested share of each path's settled rise onto the package time scale.
     if "pkg_tail_share" in scale_arrays:
         # split each eligible path's original gain before applying the chip uncertainty factors.
         package_tail_share = np.broadcast_to(scale_arrays["pkg_tail_share"], (world_count,))
@@ -2400,6 +3144,8 @@ def assemble(
         package_time_constants_s = np.broadcast_to(scale_arrays["pkg_tail_tau"], (world_count,))
         replace_package_tail_preserving_dc_gain(lags, package_time_constants_s, package_tail_share)
 
+    # stage 4 - turn the list of lags into arrays with one column per lag.
+    # tau and r have one row per world. the labels are the same in every world.
     lag_count = len(lags.observer_indices)
     if lag_count == 0:
         raise ValueError("the assembled thermal system has no lags (no sources or observers)")
@@ -2416,22 +3162,19 @@ def assemble(
     obs_kind = np.array(elements.obs_kind, np.int64)
     obs_ring = np.array(elements.obs_ring, np.int64)
 
+    # stage 5 - apply this chip's uncertainty factors.
     # gain factors change the eventual temperature rise. time factors change how quickly it develops.
     hypothesis_codes = encode_thermal_scaling_hypotheses(scales.scaling_hypothesis, world_count)
-    dc_factors = np.ones((world_count, lag_count))
-    for lag_index in range(lag_count):
-        source_index = lag_source_indices[lag_index]
-        observer_index = lag_observer_indices[lag_index]
-        source_name = SOURCE_KINDS[src_kind[source_index]]
-        observer_name = OBSERVER_KINDS[obs_kind[observer_index]]
-        dc_factors[:, lag_index] = calculate_pair_dc_scale(scales.dc_scale, source_name, observer_name, world_count)
+    dc_factors = calculate_lag_dc_factors(
+        scales.dc_scale, lag_source_indices, lag_observer_indices, src_kind, obs_kind, world_count
+    )
+    # s_cross applies to cross-ring lags only. it is one for every other lag.
     cross_factors = np.ones((world_count, lag_count))
-    cross_factors[:, lag_pair_types == PAIR_CROSS] = np.broadcast_to(scale_arrays["crosstalk_scale"], (world_count,))[:, None]
+    crosstalk_scale = np.broadcast_to(scale_arrays["crosstalk_scale"], (world_count,))
+    cross_factors[:, lag_pair_types == PAIR_CROSS] = crosstalk_scale[:, None]
     fast_time_scale = np.broadcast_to(scale_arrays["time_scale_fast"], (world_count,))
     slow_time_scale = np.broadcast_to(scale_arrays["time_scale_slow"], (world_count,))
-    time_factors = np.where(lag_layers[None, :] == LAYER_FAST, fast_time_scale[:, None], slow_time_scale[:, None])
-    # replace the layer factors where fitted lags need to keep their timing relative to each other.
-    whole_pair_mask, whole_pair_factors = calculate_shared_pair_time_scales(
+    time_factors, shared_path_count = calculate_lag_time_factors(
         time_constants_s,
         thermal_residues_k_per_w,
         lag_observer_indices,
@@ -2440,17 +3183,15 @@ def assemble(
         fixed_time_constants,
         fast_time_scale,
         slow_time_scale,
-        float(scales.tau_split_s),
+        tau_split_s,
+        len(elements.src_kind),
     )
-    # unselected lags keep their requested fast or slow factor here. fixed times are kept below.
-    if whole_pair_factors is not None:
-        time_factors = np.where(whole_pair_mask[None, :], whole_pair_factors, time_factors)
-    meta["time_scale_whole_pairs"] = int(np.unique(
-        lag_observer_indices[whole_pair_mask] * len(elements.src_kind) + lag_source_indices[whole_pair_mask]).size)
-    resistance = (hypothesis_codes == SCALING_HYPOTHESES.index("resistance"))[:, None]
+    meta["time_scale_whole_pairs"] = shared_path_count
     # under the resistance hypothesis, a gain multiplier of 1.5 also multiplies tau by 1.5 because tau = R*C.
     # the crosstalk gain factor affects only residues. an explicitly set package time stays fixed.
-    resistance_time_factor = np.where(resistance, dc_factors, 1.0)
+    uses_resistance_hypothesis = (hypothesis_codes == SCALING_HYPOTHESES.index("resistance"))[:, None]
+    resistance_time_factor = np.where(uses_resistance_hypothesis, dc_factors, 1.0)
+    # tau_new = tau*s_time*s_resistance, except where tau is fixed.
     time_constants_s = np.where(
         fixed_time_constants[None, :], time_constants_s, time_constants_s * time_factors * resistance_time_factor
     )
@@ -2459,103 +3200,60 @@ def assemble(
     if np.any(~(time_constants_s > 0)) or not np.all(np.isfinite(time_constants_s)):
         raise ValueError("assembled time constants must be finite and > 0 (check time scales and dc_scale)")
 
-    # prune, sort by observer, then source, then tau
-    keep = np.any(np.abs(thermal_residues_k_per_w) > float(prune_abs_k_per_w), axis=0)
-    if prune_abs_k_per_w == 0.0:
-        keep = np.any(thermal_residues_k_per_w != 0.0, axis=0)
-    order = np.lexsort((time_constants_s[0], lag_source_indices, lag_observer_indices))
-    order = order[keep[order]]
-    time_constants_s, thermal_residues_k_per_w, lag_observer_indices, lag_source_indices, lag_layers, lag_pair_types, lag_tail_flags = (time_constants_s[:, order], thermal_residues_k_per_w[:, order], lag_observer_indices[order], lag_source_indices[order], lag_layers[order],
-                                             lag_pair_types[order], lag_tail_flags[order])
-    observer_count = obs_kind.shape[0]
-    obs_ptr = np.zeros(observer_count + 1, np.int64)
-    np.add.at(obs_ptr, lag_observer_indices + 1, 1)
-    obs_ptr = np.cumsum(obs_ptr)
+    # stage 6 - drop lags with no gain, then sort so each observer's lags sit together.
+    order = order_kept_lags_by_observer(
+        time_constants_s, thermal_residues_k_per_w, lag_observer_indices, lag_source_indices, prune_abs_k_per_w
+    )
+    time_constants_s = time_constants_s[:, order]
+    thermal_residues_k_per_w = thermal_residues_k_per_w[:, order]
+    lag_observer_indices = lag_observer_indices[order]
+    lag_source_indices = lag_source_indices[order]
+    lag_layers = lag_layers[order]
+    lag_pair_types = lag_pair_types[order]
+    lag_tail_flags = lag_tail_flags[order]
+    obs_ptr = count_observer_lag_boundaries(lag_observer_indices, obs_kind.shape[0])
 
-    kind = np.zeros(lag_observer_indices.shape[0], np.int64)
-    optical_source_mask = src_kind[lag_source_indices] == SRC_WG
-    ring_observer_mask = obs_kind[lag_observer_indices] == OBS_RING
-    same_ring_mask = src_ring[lag_source_indices] == obs_ring[lag_observer_indices]
-    kind[optical_source_mask & ring_observer_mask & same_ring_mask] = LAG_OPT_SELF
-    kind[optical_source_mask & ring_observer_mask & ~same_ring_mask] = LAG_OPT_CROSS_RING
-    kind[optical_source_mask & ~ring_observer_mask] = LAG_OPT_OTHER
-
-    meta.update(scaling_hypothesis=[SCALING_HYPOTHESES[c] for c in np.unique(hypothesis_codes)],
-                tail_from_scales="pkg_tail_share" in scale_arrays, layout=layout)
+    # stage 7 - label the lags that the self-heating solver treats specially, then pack the record.
+    lag_kinds = classify_optical_lags(
+        lag_source_indices, lag_observer_indices, src_kind, src_ring, obs_kind, obs_ring
+    )
+    # opt_lags lists the lags that are updated with the newly solved absorbed power.
+    opt_lags = np.flatnonzero((lag_kinds == LAG_OPT_SELF) | (lag_kinds == LAG_OPT_OTHER)).astype(np.int64)
+    meta.update(
+        scaling_hypothesis=[SCALING_HYPOTHESES[code] for code in np.unique(hypothesis_codes)],
+        tail_from_scales="pkg_tail_share" in scale_arrays,
+        layout=layout,
+    )
     return ThermalSystem(
-        np.ascontiguousarray(time_constants_s), np.ascontiguousarray(thermal_residues_k_per_w), lag_source_indices, lag_observer_indices, kind, lag_pair_types, lag_layers, lag_tail_flags, obs_ptr,
-        src_kind, src_ring, tuple(elements.src_names), obs_kind, obs_ring, tuple(elements.obs_names),
-        element_indices["ring_obs"], element_indices["heater_obs"], element_indices["pd_obs"],
-        element_indices["temp_obs"], element_indices["heater_src"], element_indices["wg_src"],
-        element_indices["junction_src"], element_indices["driver_src"], element_indices["aggressor_src"],
-        np.flatnonzero((kind == LAG_OPT_SELF) | (kind == LAG_OPT_OTHER)).astype(np.int64), ring_count, meta,
-        np.broadcast_to(scale_arrays["transport_delay_s"], (world_count,)).copy())
-
-
-# InterimRom fields as (B|1, N|1) arrays, with defaults resolved and bounds checked.
-# helper function
-def validate_and_broadcast_interim_parameters(
-    spec: InterimRom,  # spec = model (mixed units) - interim thermal resistance and time-constant parameters - type InterimRom record
-    n: int,  # n = N (1) - number of rings - type int scalar
-) -> (
-    dict[str, Float64Array]  # return = parameters (field units) - validated interim parameters with defaults resolved - type dict of float64 ndarrays, shape (1 or B, 1 or N)
-):
-    # broadcast one interim parameter over worlds and rings.
-    # helper function
-    def broadcast_interim_ring_parameter(
-        v: ArrayLike,  # v = parameter (field units) - interim parameter to broadcast - type array-like, scalar, (B,), or (B, N)
-        name: str,  # name = name (1) - element name or diagnostic parameter label - type str
-    ) -> (
-        Float64Array  # return = parameter (input units) - parameter broadcast over worlds and rings - type float64 ndarray, shape (1 or B, 1 or N)
-    ):
-        a = np.asarray(v, dtype=np.float64)
-        if a.ndim == 0:
-            return a.reshape(1, 1)
-        if a.ndim == 1:
-            return a[:, None]
-        if a.ndim == 2 and a.shape[1] in (1, n):
-            return a
-        raise ValueError(f"InterimRom.{name}: expected scalar, (B,) or (B, N), got shape {a.shape}")
-
-    p = {"z0": broadcast_interim_ring_parameter(spec.z_heater_ring_k_per_w, "z_heater_ring_k_per_w"),
-         "z_ratio": broadcast_interim_ring_parameter(spec.z_ratio_opt_heater, "z_ratio_opt_heater"),
-         "tau_fast": broadcast_interim_ring_parameter(spec.tau_fast_s, "tau_fast_s"), "share_fast": broadcast_interim_ring_parameter(spec.share_fast_frac, "share_fast_frac"),
-         "tau_slow": broadcast_interim_ring_parameter(spec.tau_slow_s, "tau_slow_s"), "tail_tau": broadcast_interim_ring_parameter(spec.tail_tau_s, "tail_tau_s"),
-         "tail_share": broadcast_interim_ring_parameter(spec.tail_share_frac, "tail_share_frac"),
-         "selfheat_tau": broadcast_interim_ring_parameter(spec.selfheat_tau_s, "selfheat_tau_s"),
-         "heater_self_ratio": broadcast_interim_ring_parameter(spec.heater_self_ratio, "heater_self_ratio"),
-         "heater_node_tau": broadcast_interim_ring_parameter(spec.heater_node_tau_s, "heater_node_tau_s"),
-         "xt_nearest": broadcast_interim_ring_parameter(spec.xt_nearest_frac, "xt_nearest_frac"), "xt_floor": broadcast_interim_ring_parameter(spec.xt_floor_frac, "xt_floor_frac"),
-         "xt_next": broadcast_interim_ring_parameter(0.0 if spec.xt_next_frac is None else spec.xt_next_frac, "xt_next_frac"),
-         "xt_tau_ref": broadcast_interim_ring_parameter(spec.xt_tau_ref_s, "xt_tau_ref_s"), "xt_tau_min": broadcast_interim_ring_parameter(spec.xt_tau_min_s, "xt_tau_min_s"),
-         "xt_tau_far": broadcast_interim_ring_parameter(0.0 if spec.xt_tau_far_s is None else spec.xt_tau_far_s, "xt_tau_far_s"),
-         "ring_radius": broadcast_interim_ring_parameter(spec.ring_radius_um, "ring_radius_um")}
-    p["site_floor"] = (p["xt_floor"] if spec.site_floor_frac is None
-                       else broadcast_interim_ring_parameter(spec.site_floor_frac, "site_floor_frac"))
-    z = p["z_ratio"]
-    # by default z*(1-f_sh) = 1. the optical gain left on the heater lags then equals the heater gain.
-    p["f_sh"] = (broadcast_interim_ring_parameter(spec.selfheat_share_frac, "selfheat_share_frac") if spec.selfheat_share_frac is not None
-                 else (z - 1.0) / z)
-    if np.any(p["z0"] <= 0):
-        raise ValueError("z_heater_ring_k_per_w must be > 0")
-    if np.any(z < 1.0):
-        raise ValueError("z_ratio_opt_heater must be >= 1 (Z_opt/Z_heater >= 1 by reciprocity)")
-    if np.any(p["heater_self_ratio"] < 1.0):
-        raise ValueError("heater_self_ratio must be >= 1 (R_th,H >= Z_heater->ring)")
-    if np.any((p["f_sh"] < 0) | (p["f_sh"] > 1)):
-        raise ValueError("selfheat_share_frac must be in [0, 1]")
-    if np.any(p["ring_radius"] < 0):
-        raise ValueError("ring_radius_um must be >= 0")
-    if np.any(p["site_floor"] < 0):
-        raise ValueError("site_floor_frac must be >= 0")
-    if np.any(p["share_fast"] < 0) or np.any(p["tail_share"] < 0) or np.any(p["share_fast"] + p["tail_share"] > 1):
-        raise ValueError("share_fast_frac and tail_share_frac must be >= 0 with a sum <= 1")
-    for k in ("tau_fast", "tau_slow", "tail_tau", "selfheat_tau", "heater_node_tau", "xt_tau_ref", "xt_tau_min"):
-        if np.any(p[k] <= 0):
-            raise ValueError(f"interim time constant {k} must be > 0")
-    if spec.crosstalk_dynamics not in ("imec", "self"):
-        raise ValueError("crosstalk_dynamics must be 'imec' or 'self'")
-    return p
+        taus_s=np.ascontiguousarray(time_constants_s),
+        res_k_per_w=np.ascontiguousarray(thermal_residues_k_per_w),
+        lag_src=lag_source_indices,
+        lag_obs=lag_observer_indices,
+        lag_kind=lag_kinds,
+        lag_pair=lag_pair_types,
+        lag_layer=lag_layers,
+        lag_tail=lag_tail_flags,
+        obs_ptr=obs_ptr,
+        src_kind=src_kind,
+        src_ring=src_ring,
+        src_names=tuple(elements.src_names),
+        obs_kind=obs_kind,
+        obs_ring=obs_ring,
+        obs_names=tuple(elements.obs_names),
+        ring_obs=element_indices["ring_obs"],
+        heater_obs=element_indices["heater_obs"],
+        pd_obs=element_indices["pd_obs"],
+        temp_obs=element_indices["temp_obs"],
+        heater_src=element_indices["heater_src"],
+        wg_src=element_indices["wg_src"],
+        junction_src=element_indices["junction_src"],
+        driver_src=element_indices["driver_src"],
+        aggressor_src=element_indices["aggressor_src"],
+        opt_lags=opt_lags,
+        n_rings=ring_count,
+        meta=meta,
+        transport_delay_s=np.broadcast_to(scale_arrays["transport_delay_s"], (world_count,)).copy(),
+    )
 
 
 # assemble an interim thermal system from the named physical parameter overrides.
@@ -2577,6 +3275,8 @@ def assemble_interim_thermal_system(
     return assemble(InterimRom(**preset), layout, n_rings, scales, sources=sources, observers=observers,
                     temp_sensors=temp_sensors, ring_pitch_um=ring_pitch_um)
 
+
+# section 8 - known power histories
 
 # simulate observer temperatures for supplied source-power samples.
 # zoh holds the starting power constant within each interval.
@@ -2600,29 +3300,57 @@ def simulate(
 ) -> (
     Float64Array  # return = T_observer (K) - observer temperatures at every sample boundary - type float64 ndarray, shape (T, B, O)
 ):
-    u = np.asarray(u_samples_w, dtype=np.float64)
-    if u.ndim == 2:
-        u = u[:, None, :]
+    # source_power_w[k] holds every source's power at sample boundary k - shape (T, B or 1, S).
+    source_power_w = np.asarray(u_samples_w, dtype=np.float64)
+    if source_power_w.ndim == 2:
+        source_power_w = source_power_w[:, None, :]
     if hold not in ("zoh", "foh"):
         raise ValueError("hold must be 'zoh' or 'foh'")
-    if u.ndim != 3 or u.shape[2] != system.n_src:
-        raise ValueError(f"u_samples_w must be (n+1, B|1, S={system.n_src}), got {u.shape}")
-    B = max(system.batch, u.shape[1])
-    if system.batch not in (1, B) or u.shape[1] not in (1, B):
-        raise ValueError(f"batch mismatch: system has {system.batch} worlds, u has {u.shape[1]}")
-    a, c0, c1 = system.coefficients(h_s)
-    x = np.zeros((B, system.n_lags)) if x0 is None else np.array(x0, dtype=np.float64, copy=True)
-    base_temp_k = np.atleast_1d(np.asarray(t_base_k, np.float64))
-    source_scales = np.ones((1, system.n_src)) if src_scale is None else np.atleast_2d(np.asarray(src_scale,
-        np.float64))
-    out = np.zeros((u.shape[0], B, system.n_obs))
-    write_observer_temperatures(x, system.obs_ptr, base_temp_k, out[0])
-    for k in range(u.shape[0] - 1):
-        u1 = u[k] if hold == "zoh" else u[k + 1]
-        advance_thermal_states(x, a, c0, c1, system.lag_src, np.ascontiguousarray(u[k]), np.ascontiguousarray(u1), source_scales)
-        write_observer_temperatures(x, system.obs_ptr, base_temp_k, out[k + 1])
-    return out
+    if source_power_w.ndim != 3 or source_power_w.shape[2] != system.n_src:
+        raise ValueError(f"u_samples_w must be (n+1, B|1, S={system.n_src}), got {source_power_w.shape}")
+    sample_count = source_power_w.shape[0]
+    world_count = max(system.batch, source_power_w.shape[1])
+    if system.batch not in (1, world_count) or source_power_w.shape[1] not in (1, world_count):
+        raise ValueError(f"batch mismatch: system has {system.batch} worlds, u has {source_power_w.shape[1]}")
 
+    # the step duration is fixed, so the weights a, c_start, and c_end are computed once.
+    state_retention, start_power_gain_k_per_w, end_power_gain_k_per_w = system.coefficients(h_s)
+    if x0 is None:
+        state_rise_k = np.zeros((world_count, system.n_lags))
+    else:
+        state_rise_k = np.array(x0, dtype=np.float64, copy=True)
+    base_temperature_k = np.atleast_1d(np.asarray(t_base_k, np.float64))
+    if src_scale is None:
+        source_scales = np.ones((1, system.n_src))
+    else:
+        source_scales = np.atleast_2d(np.asarray(src_scale, np.float64))
+
+    observer_temperature_k = np.zeros((sample_count, world_count, system.n_obs))
+    write_observer_temperatures(state_rise_k, system.obs_ptr, base_temperature_k, observer_temperature_k[0])
+    for sample_index in range(sample_count - 1):
+        start_power_w = source_power_w[sample_index]
+        # zoh holds the starting power to the end of the step. foh ramps to the next sample.
+        end_power_w = start_power_w if hold == "zoh" else source_power_w[sample_index + 1]
+        advance_thermal_states(
+            state_rise_k,
+            state_retention,
+            start_power_gain_k_per_w,
+            end_power_gain_k_per_w,
+            system.lag_src,
+            np.ascontiguousarray(start_power_w),
+            np.ascontiguousarray(end_power_w),
+            source_scales,
+        )
+        write_observer_temperatures(
+            state_rise_k, system.obs_ptr, base_temperature_k, observer_temperature_k[sample_index + 1]
+        )
+    return observer_temperature_k
+
+
+# section 9 - response queries and checks
+# each query reads r and tau straight from the assembled lags. none advances a state.
+# select_thermal_response_lags and sum_selected_thermal_responses pick the lags and sum them per path.
+# the queries after them supply the formula for one lag.
 
 # return selected observer/source indices, their lag indices, and local pair indices.
 # helper function
@@ -2772,21 +3500,27 @@ def state_space(
     Float64Array,  # return[2] = C (1) - state-to-observer summation matrix - type float64 ndarray, shape (O_selected, M_selected)
     Float64Array,  # return[3] = D (K/W) - zero direct feedthrough matrix - type float64 ndarray, shape (O_selected, S_selected)
 ]:
-    o_sel, s_sel, m, lio, lis = select_thermal_response_lags(system, obs, src)
-    tau = system.taus_s[b, m]
-    r = system.res_k_per_w[b, m]
+    selected_observers, selected_sources, selected_lags, lag_observer_rows, lag_source_columns = (
+        select_thermal_response_lags(system, obs, src)
+    )
+    lag_count = selected_lags.size
+    lag_rows = np.arange(lag_count)
+    tau = system.taus_s[b, selected_lags]
+    r = system.res_k_per_w[b, selected_lags]
     # divide the lag ODE by tau to get the decay -1/tau and source drive r/tau.
-    A = np.diag(-1.0 / tau)
-    Bm = np.zeros((m.size, s_sel.size))
-    Bm[np.arange(m.size), lis] = r / tau
+    state_matrix = np.diag(-1.0 / tau)
+    # each lag has one source, so each row of B has one nonzero entry.
+    input_matrix = np.zeros((lag_count, selected_sources.size))
+    input_matrix[lag_rows, lag_source_columns] = r / tau
     # C[o,m] = 1 routes lag m to observer o. D = 0 because power must act through the lag states.
-    C = np.zeros((o_sel.size, m.size))
-    C[lio, np.arange(m.size)] = 1.0
+    output_matrix = np.zeros((selected_observers.size, lag_count))
+    output_matrix[lag_observer_rows, lag_rows] = 1.0
+    feedthrough_matrix = np.zeros((selected_observers.size, selected_sources.size))
     return (
-        A,
-        Bm,
-        C,
-        np.zeros((o_sel.size, s_sel.size)),
+        state_matrix,
+        input_matrix,
+        output_matrix,
+        feedthrough_matrix,
     )
 
 
@@ -2800,25 +3534,38 @@ def reciprocity_error(
 ) -> (
     float  # return = error (1) - largest relative thermal reciprocity error - type float scalar
 ):
-    H = frequency_response(system, f_hz)
+    impedance_k_per_w = frequency_response(system, f_hz)
     if b is not None:
-        H = H[b:b + 1]
-    n = system.n_rings
-    num, scale = 0.0, 0.0
-    combos = ((system.heater_src, system.heater_obs, system.heater_src, system.heater_obs),
-              (system.wg_src, system.ring_obs, system.wg_src, system.ring_obs),
-              (system.heater_src, system.ring_obs, system.wg_src, system.heater_obs))
-    for s1, o1, s2, o2 in combos:
-        for i in range(n):
-            for j in range(n):
-                if min(s1[j], o1[i], s2[i], o2[j]) < 0:
+        impedance_k_per_w = impedance_k_per_w[b:b + 1]
+    ring_count = system.n_rings
+    largest_mismatch = 0.0
+    largest_magnitude = 0.0
+    # each row pairs a path with its reciprocal - swap where heat enters and where temperature is read.
+    # forward source     | forward observer  | reverse source     | reverse observer
+    reciprocal_pairs = (
+        (system.heater_src, system.heater_obs, system.heater_src, system.heater_obs),
+        (system.wg_src,     system.ring_obs,   system.wg_src,     system.ring_obs),
+        (system.heater_src, system.ring_obs,   system.wg_src,     system.heater_obs),
+    )
+    for forward_src, forward_obs, reverse_src, reverse_obs in reciprocal_pairs:
+        # the forward path runs from ring j to ring i. the reverse path runs from ring i to ring j.
+        for i in range(ring_count):
+            for j in range(ring_count):
+                # index -1 marks a source or observer that is absent from the system.
+                if min(forward_src[j], forward_obs[i], reverse_src[i], reverse_obs[j]) < 0:
                     continue
-                z1 = H[:, o1[i], s1[j]]
-                z2 = H[:, o2[j], s2[i]]
-                num = max(num, float(np.max(np.abs(z1 - z2))))
-                scale = max(scale, float(np.max(np.abs(z1))), float(np.max(np.abs(z2))))
+                forward_impedance = impedance_k_per_w[:, forward_obs[i], forward_src[j]]
+                reverse_impedance = impedance_k_per_w[:, reverse_obs[j], reverse_src[i]]
+                largest_mismatch = max(
+                    largest_mismatch, float(np.max(np.abs(forward_impedance - reverse_impedance)))
+                )
+                largest_magnitude = max(
+                    largest_magnitude,
+                    float(np.max(np.abs(forward_impedance))),
+                    float(np.max(np.abs(reverse_impedance))),
+                )
     # divide the largest absolute mismatch by the largest magnitude among the compared responses.
-    return num / scale if scale > 0 else 0.0
+    return largest_mismatch / largest_magnitude if largest_magnitude > 0 else 0.0
 
 
 # DC optical self-heating resistance Z_opt->ring,i(0) of each ring, (B, N) K/W (sum of LAG_OPT_SELF residues).
@@ -2909,6 +3656,9 @@ def calculate_conductivity_residue_scale(
     return w[0] / film_conductivity_ratio + w[1] / oxide_conductivity_ratio + w[2] / substrate_conductivity_ratio
 
 
+# section 10 - previous names
+# (todo) why not have separate observer/source arrays per 22 fitted ROM lags? would make naming more easier
+
 # previous names remain aliases for callers that use the established API.
 foh_scalar = calculate_linear_hold_lag_weights
 foh_coefficients = calculate_linear_hold_coefficients
@@ -2948,4 +3698,43 @@ _select = select_thermal_response_lags
 _accumulate = sum_selected_thermal_responses
 k_temp_residue_scale = calculate_conductivity_residue_scale
 
-__all__ += ['calculate_linear_hold_lag_weights', 'calculate_linear_hold_coefficients', 'calculate_constant_hold_coefficients', 'advance_thermal_state_for_world', 'advance_thermal_state_for_world_with_step_size', 'write_observer_temperatures_for_world', 'shared_or_world_row_index', 'validate_thermal_step_array_shapes', 'advance_thermal_states', 'write_observer_temperatures', 'advance_thermal_state_and_temperatures_for_world', 'advance_thermal_states_and_temperatures', 'separate_known_heat_and_source_gain_for_observer', 'build_rom_sidecar_path', 'find_rom_sidecar_path', 'build_thermal_rom_path', 'read_rom_validation_metrics', 'warn_about_rom_quality', 'validate_site_coordinates_um', 'calculate_crosstalk_time_constant_s', 'calculate_site_coupling_fraction', 'find_thermal_element_index', 'normalize_world_parameter_vector', 'infer_world_count', 'encode_thermal_scaling_hypotheses', 'build_thermal_sources_and_observers', 'calculate_neighbor_ranks_and_distances', 'append_interim_heat_path_lags', 'append_extracted_heat_path_lags', 'replace_package_tail_preserving_dc_gain', 'calculate_pair_dc_scale', 'calculate_shared_pair_time_scales', 'validate_and_broadcast_interim_parameters', 'assemble_interim_thermal_system', 'select_thermal_response_lags', 'sum_selected_thermal_responses', 'calculate_conductivity_residue_scale']
+# the descriptive names are public as well.
+__all__ += [
+    "calculate_linear_hold_lag_weights",
+    "calculate_linear_hold_coefficients",
+    "calculate_constant_hold_coefficients",
+    "advance_thermal_state_for_world",
+    "advance_thermal_state_for_world_with_step_size",
+    "write_observer_temperatures_for_world",
+    "shared_or_world_row_index",
+    "validate_thermal_step_array_shapes",
+    "advance_thermal_states",
+    "write_observer_temperatures",
+    "advance_thermal_state_and_temperatures_for_world",
+    "advance_thermal_states_and_temperatures",
+    "separate_known_heat_and_source_gain_for_observer",
+    "build_rom_sidecar_path",
+    "find_rom_sidecar_path",
+    "build_thermal_rom_path",
+    "read_rom_validation_metrics",
+    "warn_about_rom_quality",
+    "validate_site_coordinates_um",
+    "calculate_crosstalk_time_constant_s",
+    "calculate_site_coupling_fraction",
+    "find_thermal_element_index",
+    "normalize_world_parameter_vector",
+    "infer_world_count",
+    "encode_thermal_scaling_hypotheses",
+    "build_thermal_sources_and_observers",
+    "calculate_neighbor_ranks_and_distances",
+    "append_interim_heat_path_lags",
+    "append_extracted_heat_path_lags",
+    "replace_package_tail_preserving_dc_gain",
+    "calculate_pair_dc_scale",
+    "calculate_shared_pair_time_scales",
+    "validate_and_broadcast_interim_parameters",
+    "assemble_interim_thermal_system",
+    "select_thermal_response_lags",
+    "sum_selected_thermal_responses",
+    "calculate_conductivity_residue_scale",
+]
