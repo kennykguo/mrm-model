@@ -19,13 +19,16 @@ T_S = 0.05
 SIGNALS = ("delta", "delta_hat", "u", "mode", "heater_w", "sigma", "amp", "rate_hat", "eff")
 
 
-def _run(sim, core_cls, **kw):
-    """sim.run with ``core_cls`` as the TLC; the vendored core also gets the vendored parameter classes (same
-    values as the source's, plus the injected fields of spec 2.3)."""
+def _run(sim, core_cls, shape="sine", **kw):
+    """sim.run with ``core_cls`` as the TLC and dither ``shape``; the vendored core also gets the vendored
+    parameter classes (same values as the source's, plus the injected fields of spec 2.3)."""
     orig = sim.TLC
     sim.TLC = core_cls
     if core_cls is vendored.TLC:
-        kw = dict(kw, pp=vparams.PlantParams(), cp=vparams.ControllerParams())
+        kw = dict(kw, pp=vparams.PlantParams(), cp=vparams.ControllerParams(dither_shape=shape))
+    else:
+        src = importlib.import_module("params")
+        kw = dict(kw, pp=src.PlantParams(), cp=src.ControllerParams(dither_shape=shape))
     try:
         return sim.run("tlc", **kw)
     finally:
@@ -41,12 +44,13 @@ def _scenarios(ece496):
     }
 
 
+@pytest.mark.parametrize("shape", ["sine", "triangle"])
 @pytest.mark.parametrize("name", ["steady", "d2_common", "cold"])
-def test_vendored_core_is_bit_identical_to_the_source(ece496, name):
+def test_vendored_core_is_bit_identical_to_the_source(ece496, name, shape):
     sim = importlib.import_module("sim")
     kw = _scenarios(ece496)[name]
-    ref = _run(sim, sim.TLC, **kw)
-    got = _run(sim, vendored.TLC, **kw)
+    ref = _run(sim, sim.TLC, shape, **kw)
+    got = _run(sim, vendored.TLC, shape, **kw)
     assert type(got["ctl"]).__module__.startswith("mrm.control.tlc.core")
     for k in SIGNALS:
         np.testing.assert_array_equal(got[k], ref[k], err_msg=k)

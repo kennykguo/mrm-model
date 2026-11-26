@@ -16,10 +16,12 @@
 Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`.
 
 ## Open items
-1. **Source update: 3-step sign dither (B1).** The faithful baseline follows the source, so the new dither replaces
-   the cosine dither once it is published; then re-vendor, rerun the matrix and run the TLC arm of item 3.
-   Blocked: the change is not on `msilve160/ECE496_project` yet (newest commit is still `f98ce84`).
-2. **Upstream main is broken** (checked at `e77b124`, 2026-11-09). Building the engine fails with
+1. **Source update: sampled dither (B1). DONE 2026-11-26.** Re-vendored at `ae9556b` (square / three-level /
+   triangle / qsine, monitor noise model, ablations); bit-identical to the source for sine and triangle, published
+   R1/R3/R4 reproduced on the f98ce84 noise settings (metrics.json was not regenerated upstream). 8 rings use the
+   source's four out_rate/N tones tiled every four rings (`tone_plan.sampled_plan`). First comparison:
+   [`docs/tlc/dither_compare.md`](docs/tlc/dither_compare.md): triangle is worse than sine on G26.
+2. **Upstream main is broken** (checked at `e77b124`, 2026-11-09; still at `d6983ca`, 2026-11-25: `plant.py:248` passes `far_hold`). Building the engine fails with
    `pack_self_heating_optical_state() got an unexpected keyword argument 'far_hold'` (`mrm/plant/plant.py:241`);
    ~66 old optics names remain in `mrm/sim/kernel.py`, `mrm/sim/kernel_ref.py` and `mrm/plant/plant.py`, and five
    test files fail at import. Main was also force-pushed with rewritten history (old `ca3f8fe` = new `71004ea`), so

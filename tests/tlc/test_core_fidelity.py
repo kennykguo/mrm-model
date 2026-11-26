@@ -8,6 +8,10 @@ published value is 0.25. So the tolerance is 1.5 units in the last published pla
 against the original core run here instead (test_core_equivalence.py). Compute-time fields (t_comp_*) are machine
 dependent and not compared.
 Slow: about 30 s (1.35 s of simulated time on the Python core).
+
+``metrics.json`` was last produced at f98ce84; ae9556b added a monitor noise model (Johnson, shot, per-ring DC
+offset) whose defaults change the plant, and did not regenerate it. The published numbers are therefore checked on
+the plant with the f98ce84 noise settings (``LEGACY_NOISE``: 4e-4 FS white noise only).
 """
 from __future__ import annotations
 
@@ -22,6 +26,7 @@ from mrm.control.tlc.core import params as vparams
 
 COMPARED = ("p999", "peak", "rms", "heater_mw", "max_slew_pct_per_ms", "cmd_range")
 TOL = 1.5e-3
+LEGACY_NOISE = dict(pd_noise_fs=4e-4, pd_shot=False, pd_johnson=False, pd_offset_fs=(0.0, 0.0, 0.0, 0.0))
 
 
 def _published(ece496):
@@ -32,7 +37,7 @@ def _run_vendored(sim, **kw):
     orig = sim.TLC
     sim.TLC = vendored.TLC
     try:
-        return sim.run("tlc", pp=vparams.PlantParams(), cp=vparams.ControllerParams(), **kw)
+        return sim.run("tlc", pp=vparams.PlantParams(**LEGACY_NOISE), cp=vparams.ControllerParams(), **kw)
     finally:
         sim.TLC = orig
 

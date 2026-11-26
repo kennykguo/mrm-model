@@ -9,17 +9,25 @@ computed once per ControllerSpec. Differences from the source's own driver (``th
 - timing: each block starts at its first monitor sample's time (the adapter), and the heater DAC latency is
   added to the dither delay the core assumes (``_add_dac_latency``);
 - the core's ``last`` telemetry only exists after its first step; before that the wrapper reports the start
-  state (modes, command) with zero estimates.
+  state (modes, command) with zero estimates;
+- dither shape: ``dither_shape`` selects the source's B1 waveform (sine, square, three, triangle, qsine). A sampled
+  shape needs tones at out_rate / N, so it uses ``tone_plan.sampled_plan`` instead of the 250 Hz-grid sine plan;
+  ``tone_plan="sampled"`` puts a sine on that plan too (separates the shape from the tone plan in a comparison).
 """
 from __future__ import annotations
+
+import dataclasses
 
 import numpy as np
 
 from mrm.control.api import ControllerSpec
 from mrm.control.tlc.core import TLC, BaselinePI
 from mrm.control.tlc.priors import TlcPriors, g26_priors
+from mrm.control.tlc.tone_plan import sampled_plan
 
 KINDS = {"tlc": TLC, "pi": BaselinePI}
+DITHER_SHAPES = ("sine", "square", "three", "triangle", "qsine")      # source B1 (ae9556b)
+TONE_PLANS = ("auto", "sampled")      # auto: the 250 Hz-grid plan for a sine, the sampled plan otherwise
 
 
 _PRIORS: dict[str, TlcPriors] = {}
@@ -37,8 +45,16 @@ def priors_for(spec: ControllerSpec) -> TlcPriors:
 
 
 class FaithfulCore:
-    def __init__(self, spec: ControllerSpec, *, ts: float, n_out: int, kind: str = "tlc"):
+    def __init__(self, spec: ControllerSpec, *, ts: float, n_out: int, kind: str = "tlc", dither_shape: str = "sine",
+                 tone_plan: str = "auto"):
+        if dither_shape not in DITHER_SHAPES:
+            raise ValueError(f"faithful core: dither_shape must be one of {DITHER_SHAPES}, got {dither_shape!r}")
+        if tone_plan not in TONE_PLANS:
+            raise ValueError(f"faithful core: tone_plan must be one of {TONE_PLANS}, got {tone_plan!r}")
         pr = priors_for(spec)
+        if dither_shape != "sine" or tone_plan == "sampled":
+            cp = dataclasses.replace(pr.cp, dither_shape=dither_shape, tone_freqs=sampled_plan(pr.cp.n_rings))
+            pr = dataclasses.replace(pr, cp=cp)
         if abs(ts - pr.cp.ts) > 1e-12:
             raise ValueError(f"faithful core: the adapter's core period {ts} s must be the source's {pr.cp.ts} s")
         if n_out != int(round(pr.cp.ts * pr.cp.out_rate)):

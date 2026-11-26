@@ -1,4 +1,4 @@
-# Vendored from msilve160/ECE496_project@f98ce84, thermal_control/tlc/b7_mpc.py (Apache-2.0, see LICENSE).
+# Vendored from msilve160/ECE496_project@ae9556b, thermal_control/tlc/b7_mpc.py (Apache-2.0, see LICENSE).
 # Changes from the source are listed in mrm/control/tlc/core/README.md.
 """B7 Linear MPC solved by the fast gradient method."""
 import numpy as np

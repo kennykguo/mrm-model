@@ -77,3 +77,55 @@ def _extend(plan, n, lo, top, min_sep, min_dc):
 
 def to_hz(bins: tuple[int, ...]) -> tuple[float, ...]:
     return tuple(b * BIN_HZ for b in bins)
+
+
+# --- sampled dither shapes (square, three-level, triangle, qsine; source ae9556b) ------------------------------
+#: the source's tones for sampled shapes (params.SQUARE_TONES): out_rate / N with N even, so every half period is a
+#: whole number of 10 us output samples. :func:`sampled_collisions` with every ring in reach finds exactly these.
+SAMPLED_N = (26, 22, 16, 14)
+OUT_RATE_HZ = 100e3
+SAMPLED_HARMONICS = (1, 3, 5, 7, 9)     # the harmonics B1/B4 model for a sampled shape
+SAMPLED_SEP_HZ = 500.0                  # source rule: >= 500 Hz between every demodulated line and every other line
+
+
+def sampled_collisions(periods: tuple[int, ...], *, reach: int, sep_hz: float = SAMPLED_SEP_HZ,
+                       harmonics: tuple[int, ...] = SAMPLED_HARMONICS) -> list[str]:
+    """Rule violations of a per-ring plan of sampled tones (``periods``: output samples per tone period).
+
+    The source's rule (params.SQUARE_TONES), applied per monitor: ring i demodulates f_i and 2 f_i, and both must be
+    ``sep_hz`` from every line that reaches ring i's detuning: harmonics 1..9 and 2nd harmonics of the tones of the
+    rings within ``reach`` (thermal crosstalk), their sums and differences, the own tone's higher harmonics and the
+    10 kHz ripple. With reach >= n - 1 this is the source's global rule. Rings further apart than ``reach`` may
+    share a tone: their crosstalk is outside the core's model (coupling has ``reach`` entries).
+    """
+    f = [OUT_RATE_HZ / p for p in periods]
+    bad = []
+    for i in range(len(f)):
+        near = [j for j in range(len(f)) if abs(i - j) <= reach]
+        lines = [(k * f[i], f"{k}f{i}") for k in harmonics if k > 2]
+        for j in (j for j in near if j != i):
+            lines += [(k * f[j], f"{k}f{j}") for k in harmonics] + [(2 * f[j], f"2f{j}")]
+        for a, b in combinations(near, 2):
+            lines += [(f[a] + f[b], f"f{a}+f{b}"), (abs(f[a] - f[b]), f"|f{a}-f{b}|")]
+        lines += [(m * RIPPLE_HZ, f"{m * 10} kHz ripple") for m in range(1, 13)]
+        for name, x in ((f"f{i}", f[i]), (f"2f{i}", 2 * f[i])):
+            bad += [f"ring {i}: {name} = {x:.0f} Hz is within {sep_hz:g} Hz of {lab} = {y:.0f} Hz"
+                    for y, lab in lines if abs(x - y) < sep_hz]
+    return bad
+
+
+def sampled_plan(n: int) -> tuple[float, ...]:
+    """Tones (Hz) for a sampled dither on n rings: the source's four tones, repeated every four rings.
+
+    Every even-N tone set for 8 distinct tones within reach 3 collides (no plan exists), but four tones tiled
+    passes with reach 3, the length of the G26 coupling prior: rings i and i + 4 share a tone. On G26 the
+    crosstalk four rings away is 1.5 % at DC and its ms-scale pole leaves about 1e-4 of the own response at these
+    tones. The plan also tops out at 7.1 kHz against 13.5 kHz for the sine plan (EIGHT_RING_BINS), which halves
+    the slew a given dither amplitude needs (R19).
+    """
+    periods = tuple(SAMPLED_N[i % len(SAMPLED_N)] for i in range(n))
+    reach = min(n - 1, len(SAMPLED_N) - 1)
+    bad = sampled_collisions(periods, reach=reach)
+    if bad:
+        raise ValueError(f"sampled tone plan for {n} rings collides: {bad[:3]}")
+    return tuple(OUT_RATE_HZ / p for p in periods)

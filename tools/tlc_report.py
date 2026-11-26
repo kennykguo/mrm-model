@@ -117,11 +117,17 @@ def remove_tones(t: np.ndarray, x: np.ndarray, tones_hz, block_s: float = DITHER
     return out
 
 
-def _tlc_tones(controller: str | None, n_rings: int):
-    """The TLC's tone plan for this run, or None for a controller whose tones the report does not know."""
+def _tlc_tones(controller: str | None, n_rings: int, dither_shape: str = "sine"):
+    """The lines the TLC's dither puts on the detuning (tones; remove_tones adds their 2nd harmonics), or None for
+    a controller whose tones the report does not know. A sampled shape (faithful_core) uses the sampled plan, and
+    its 3rd harmonic is removed too (triangle: 1/9 of the fundamental; the 5th and up are <= 4 % and, fitted per
+    4 ms block, would sit within a bin of other lines and make the fit ill-conditioned)."""
     if controller not in TLC_CONTROLLERS:
         return None
-    from mrm.control.tlc.tone_plan import EIGHT_RING_BINS, search, to_hz
+    from mrm.control.tlc.tone_plan import EIGHT_RING_BINS, SAMPLED_HARMONICS, sampled_plan, search, to_hz
+    if dither_shape != "sine":
+        base = sorted(set(sampled_plan(n_rings)))
+        return sorted({k * f for f in base for k in SAMPLED_HARMONICS[:2]})
     return to_hz(EIGHT_RING_BINS if n_rings == len(EIGHT_RING_BINS) else search(n_rings))
 
 
@@ -148,7 +154,9 @@ def summarize_run(run_dir: str | Path) -> dict:
     err = det_pm[scored, 0, :] - ref[None, :]
     ppg = lam_m ** 2 / C_M_PER_S * 1e21
     controller = cfg.get("controller", {}).get("name")
-    tones = _tlc_tones(controller, err.shape[1])
+    cparams = cfg.get("controller", {}).get("params") or {}
+    shape = cparams.get("dither_shape", "sine")
+    tones = _tlc_tones(controller, err.shape[1], "sampled" if cparams.get("tone_plan") == "sampled" else shape)
     track = remove_tones(t[scored], err, tones) if tones else None
     rings = []
     for i in range(err.shape[1]):
@@ -159,7 +167,7 @@ def summarize_run(run_dir: str | Path) -> dict:
         row.update({k: _cell(m[k], i) for k in MRM_COLUMNS if k in m})
         rings.append(row)
     return {"run": run.name, "experiment": name, "corner": run_info.get("corner"), "knowledge": knowledge,
-            "controller": controller, "scenario": cfg.get("scenario", {}).get("name"),
+            "controller": controller, "dither_shape": shape, "scenario": cfg.get("scenario", {}).get("name"),
             "score_from_s": score_from, "duration_s": exp.get("duration_s"), "rings": rings,
             "telemetry": _telemetry_summary(run / "tlc_telemetry.npz"), "campaign": campaign_rates(m)}
 

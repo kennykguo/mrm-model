@@ -14,7 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(os.environ.get("ECE496_PATH", ROOT.parent / "ECE496_project")) / "thermal_control"
-SOURCE_COMMIT = "f98ce84"
+SOURCE_COMMIT = "ae9556b"
 
 
 @pytest.fixture(scope="session")

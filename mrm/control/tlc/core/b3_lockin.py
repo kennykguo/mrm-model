@@ -1,4 +1,4 @@
-# Vendored from msilve160/ECE496_project@f98ce84, thermal_control/tlc/b3_lockin.py (Apache-2.0, see LICENSE).
+# Vendored from msilve160/ECE496_project@ae9556b, thermal_control/tlc/b3_lockin.py (Apache-2.0, see LICENSE).
 # Changes from the source are listed in mrm/control/tlc/core/README.md.
 """B3 Digital lock-in demodulator (fundamental and 2nd harmonic, all tones)."""
 from collections import deque
@@ -36,7 +36,7 @@ class B3LockIn:
         # Hann window: suppresses leakage of slow detuning trends into the tone bins
         n = x.shape[0]
         if getattr(self, "_win", None) is None or len(self._win) != n:
-            self._win = np.hanning(n + 2)[1:-1]
+            self._win = np.ones(n) if getattr(self, "rect", False) else np.hanning(n + 2)[1:-1]
             self._win /= self._win.sum()
         xw = x * self._win[:, None]
         y0 = xw.sum(0)

@@ -1,4 +1,4 @@
-# Vendored from msilve160/ECE496_project@f98ce84, thermal_control/tlc/b4_thermal_model.py (Apache-2.0, see LICENSE).
+# Vendored from msilve160/ECE496_project@ae9556b, thermal_control/tlc/b4_thermal_model.py (Apache-2.0, see LICENSE).
 # Changes from the source are listed in mrm/control/tlc/core/README.md.
 """Reduced-order thermal model (inside B4, also used by B7)."""
 import numpy as np

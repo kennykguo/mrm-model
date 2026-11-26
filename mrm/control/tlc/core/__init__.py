@@ -1,4 +1,4 @@
-# Vendored from msilve160/ECE496_project@f98ce84, thermal_control/tlc/__init__.py (Apache-2.0, see LICENSE).
+# Vendored from msilve160/ECE496_project@ae9556b, thermal_control/tlc/__init__.py (Apache-2.0, see LICENSE).
 # Changes from the source are listed in mrm/control/tlc/core/README.md.
 """Thermal locking controller (TLC): blocks B1-B10 from the proposal (Fig. 1, Table X).
 

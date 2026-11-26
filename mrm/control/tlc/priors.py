@@ -25,6 +25,8 @@ How each prior is obtained (all from ``mrm.control.models`` on the nominal desig
 - crosstalk: DC fractions of the nearest rings and a residue-weighted single time constant.
 - unheated offset: the detuning the static point would have with no heater and no absorbed power.
 
+Monitor noise: the G26 per-sample sigma, with the source's Johnson / shot terms (its own TIA assumptions) off.
+
 Controller parameters for G26: n_rings from the spec, the 8-ring tone plan (tone_plan.py), the 250 kS/s monitor
 (no decimation; FIR cutoff 60 kHz keeps every tone and 2nd harmonic within 0.1 % of unity gain, as the source's
 150 kHz at 1 MS/s does), and, only when B6 finds no setpoint, the R13 ER floor dropped (``_r13_er_floor``);
@@ -106,6 +108,10 @@ def g26_priors(spec: ControllerSpec) -> TlcPriors:
         pd_rate=float(spec.adc.rate_hz) or PD_RATE_HZ_FALLBACK, pd_bits=int(spec.adc.bits),
         pd_full_scale_mw=float(np.mean(pd_fs_ring)),
         pd_noise_fs=float(np.mean(sp.y_sigma_codes)) / full_scale,
+        # the source's monitor noise model (ae9556b) adds Johnson and shot terms from its own TIA assumptions; the
+        # G26 sigma above already is the whole monitor noise, so they are off and the squelch floor (B5,
+        # noise_floor_fs) stays pd_noise_fs. The per-ring DC offsets are plant-only.
+        pd_shot=False, pd_johnson=False, pd_offset_fs=(0.0,) * n, pd_offset_drift_fs_per_s=(0.0,) * n,
         unheated_offset=tuple(unheated), heater_eff_scale=(1.0,) * n,
     )
     cp = dataclasses.replace(ControllerParams(), n_rings=n, tone_freqs=_tones(n), decim=1,
