@@ -45,12 +45,12 @@ CORNER_PRESETS = ["g26_fast_thermal", "g26_slow_thermal", "g26_textbook_thermal"
 CORNER_EXPERIMENTS = ["experiments/tlc/steady_tlc_faithful.yaml", "experiments/tlc/a1_tlc.yaml"]
 
 
-def test_shipped_corner_priors_runs_keep_the_first_pass_and_add_the_model_based_comparators():
+def test_shipped_corner_priors_runs_cover_both_tlc_arms_and_the_model_based_comparators():
     matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
     runs = [(r[0], r[1]["name"], r[3]) for r in tlc_matrix.expand_corners(matrix) if r[4] == "corner"]
     first_pass = [(e, c, p) for p in CORNER_PRESETS for e in CORNER_EXPERIMENTS for c in ("tlc", "pi_lock_c")]
     assert [r for r in runs if r[1] in ("tlc", "pi_lock_c")] == first_pass
-    names = ("tlc", "pi_lock_c", "kalman_lqg_c", "mpc_c")
+    names = ("tlc", "tlc_arm2", "pi_lock_c", "kalman_lqg_c", "mpc_c")
     assert set(runs) == {(e, c, p) for p in CORNER_PRESETS for e in CORNER_EXPERIMENTS for c in names}
     assert len(runs) == len(set(runs))
 
@@ -58,7 +58,7 @@ def test_shipped_corner_priors_runs_keep_the_first_pass_and_add_the_model_based_
 def test_shipped_mismatch_runs_cover_the_corner_table_with_the_model_based_comparators():
     matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
     runs = [r for r in tlc_matrix.expand_corners(matrix) if r[4] == "nominal"]
-    names = ("tlc", "pi_lock_c", "kalman_lqg_c", "mpc_c")
+    names = ("tlc", "tlc_arm2", "pi_lock_c", "kalman_lqg_c", "mpc_c")
     want = {(e, c, p) for p in CORNER_PRESETS for e in CORNER_EXPERIMENTS for c in names}
     assert {(r[0], r[1]["name"], r[3]) for r in runs} == want
     assert len(runs) == len(want)
