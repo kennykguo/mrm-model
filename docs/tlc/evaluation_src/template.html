@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TLC on G26 Evaluation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --ground:#f4f6f5;--paper:#ffffff;--ink:#15191d;--ink2:#3b4449;--mute:#66727a;--line:#dbe1df;--soft:#eaeeec;
+  --accent:#1f5f8b;--ok:#2d7a4c;--warn:#9a6400;--bad:#b03a2e;
+  --c-tlc:#c8553d;--c-tlc_pi:#e3a08f;--c-pi_lock_c:#3f74b8;--c-dither_lockin_c:#8eaed8;--c-kalman_lqg_c:#2d7a4c;--c-mpc_c:#6d55a8;--c-wdm_supervisor:#138a8f;
+  --c-sine:#c8553d;--c-sine_sampled:#e3a08f;--c-triangle:#3f74b8;--c-three:#6d55a8;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-sine:#e27a5f;color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-sine:#e27a5f;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.55 var(--sans);padding-inline:16px}
+.wrap{max-width:1160px;margin:0 auto;padding-block:32px 72px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px}
+@media (max-width:620px){.findings{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:980px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}nav.toc{display:none}}
+nav.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;font-size:13px}
+nav.toc a{display:block;color:var(--mute);text-decoration:none;padding:3px 0 3px 10px;border-left:2px solid var(--line)}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--ink);border-left-color:var(--accent);outline:none}
+nav.toc b{display:block;font:600 11px/1 var(--cond);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+main{min-width:0;max-width:860px}
+header.top{padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font:600 11px/1 var(--cond);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+h1{font:600 34px/1.15 var(--cond);margin:8px 0 10px;text-wrap:balance;letter-spacing:-.01em}
+h2{font:600 22px/1.25 var(--cond);margin:0 0 10px;text-wrap:balance}
+h3{font:600 15px/1.3 var(--sans);margin:22px 0 6px}
+p{margin:0 0 12px;max-width:68ch}
+.lead{font-size:16.5px;color:var(--ink2);max-width:64ch}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 24px;margin-top:16px;font-size:12.5px}
+.meta div{min-width:0}.meta span{display:block;color:var(--mute);font:500 10.5px/1.6 var(--cond);letter-spacing:.08em;text-transform:uppercase}
+section{padding:28px 0 8px;border-top:1px solid var(--line);margin-top:20px;scroll-margin-top:16px}
+section:first-of-type{border-top:0}
+.num{color:var(--mute);font-weight:500;margin-right:8px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--soft);padding:1px 5px;border-radius:3px}
+a{color:var(--accent)}
+ul.tight{margin:0 0 12px;padding-left:20px;max-width:68ch}ul.tight li{margin:3px 0}
+.findings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 8px}
+.finding{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.finding .k{font:600 26px/1.1 var(--cond);display:block;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.finding p{font-size:13.5px;color:var(--ink2);margin:0}
+.pill{display:inline-block;font:600 10.5px/1 var(--cond);letter-spacing:.06em;text-transform:uppercase;padding:4px 7px;border-radius:3px;white-space:nowrap}
+.p-ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,transparent)}
+.p-warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent)}
+.p-bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
+.p-mute{color:var(--mute);background:var(--soft)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mute{color:var(--mute)}
+.tbl{overflow-x:auto;margin:10px 0 14px;background:var(--paper);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+th{font:600 11px/1.3 var(--cond);letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--soft)}
+td.n,th.n{text-align:right;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+figure{margin:16px 0 22px;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:14px 16px 12px}
+figcaption{font-size:12.5px;color:var(--mute);margin-top:8px;max-width:none}
+figcaption b{color:var(--ink);font-weight:600}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.ctl button{font:500 12px/1 var(--sans);padding:6px 10px;border:1px solid var(--line);background:var(--paper);color:var(--ink2);border-radius:4px;cursor:pointer}
+.ctl button:hover{border-color:var(--mute)}
+.ctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ctl button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.ctl .lab{font:600 10.5px/26px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-right:4px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--mute);font:10.5px var(--sans)}
+.ref{stroke-dasharray:4 3;stroke-width:1}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mute);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;line-height:1.4;padding:6px 8px;border-radius:4px;opacity:0;transition:opacity .1s;z-index:9;max-width:280px}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;font-size:12.5px;margin:4px 0}
+.flow .blk{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:8px 10px;flex:1 1 118px;min-width:0}
+.flow .blk b{display:block;font:600 12px/1.3 var(--cond);letter-spacing:.03em}
+.flow .blk small{color:var(--mute);display:block;margin-top:2px}
+.flow .arr{align-self:center;color:var(--mute);font-family:var(--mono)}
+.flow .blk.core{border-color:var(--c-tlc);background:color-mix(in srgb,var(--c-tlc) 8%,var(--paper))}
+.heat td{text-align:center;font-family:var(--mono);font-size:12px}
+.callout{border-left:3px solid var(--accent);background:var(--paper);padding:10px 14px;margin:12px 0 16px;font-size:14px;max-width:none}
+.callout p{margin:0}
+details{border-top:1px solid var(--line);padding:8px 0}details:last-of-type{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;font-size:14px}summary:focus-visible{outline:2px solid var(--accent)}
+details p{margin:6px 0 2px;color:var(--ink2);font-size:14px}
+ol.tl{list-style:none;margin:8px 0;padding:0}
+ol.tl li{display:grid;grid-template-columns:86px 1fr;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
+#themeBtn{font:500 12px/1 var(--sans);background:var(--paper);border:1px solid var(--line);color:var(--ink2);border-radius:4px;padding:6px 10px;cursor:pointer;float:right}
+@page{margin:12mm}
+@media print{body{background:#fff;font-size:11px;padding:0}.wrap{display:block;padding:0}nav.toc,#themeBtn,.ctl,.nop{display:none}
+  section{padding:10px 0 2px;margin-top:8px;break-inside:auto}figure,.tbl,.finding{break-inside:avoid;border-color:#ccc}h1{font-size:24px}h2{font-size:16px}
+  details{display:block}details>*{display:block}details p{font-size:10.5px}}
+</style>
+</head>
+<body>
+<div id="tip" role="tooltip"></div>
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <b>Contents</b>
+  <a href="#summary">Summary</a>
+  <a href="#scope">1 Objective and scope</a>
+  <a href="#system">2 System under test</a>
+  <a href="#method">3 Method</a>
+  <a href="#results">4 Results</a>
+  <a href="#analysis">5 Why the TLC struggles</a>
+  <a href="#problems">6 Problems encountered</a>
+  <a href="#decisions">7 Questions for review</a>
+  <a href="#next">8 Next steps</a>
+  <a href="#appendix">Appendices</a>
+</nav>
+<main>
+<header class="top">
+  <button id="themeBtn" type="button" class="nop">Switch theme</button>
+  <div class="eyebrow">ECE496 capstone · evaluation report · draft for review</div>
+  <h1>The ECE496 thermal locking controller on the G26 transmitter model</h1>
+  <p class="lead">We took the thermal locking controller (TLC) that our team designed on a simple 4-ring plant, moved it unchanged into <b>mrm-model</b>, an independent, higher-fidelity simulator of an 8-ring microring transmitter, and measured how well it keeps every ring locked. This page summarises the method, the results so far, and the decisions we need.</p>
+  <div class="meta">
+    <div><span>Status as of</span>26 Nov 2026</div>
+    <div><span>Code</span><code>mrm-model</code> · <code>feature/tlc-port</code></div>
+    <div><span>Controller source</span>ECE496 <code>ae9556b</code> (20 Nov)</div>
+    <div><span>Plant</span>G26 preset, 8 rings, 1310 nm</div>
+  </div>
+</header>
+
+<section id="summary">
+<h2>Summary</h2>
+<p>The port itself is sound: the controller code running in mrm-model is bit-for-bit identical to the team's source and reproduces its published results. On the G26 plant the controller keeps rings locked through slow disturbances, but with errors far larger than mrm's own model-based controllers, and it loses lock under several fast or large disturbances. The cause is mostly a mismatch between the controller's built-in plant model and G26, not the port and not the dither waveform.</p>
+<div class="findings">
+  <div class="finding"><span class="pill p-ok">Verified</span><span class="k">Bit-identical</span><p>The vendored controller matches the source exactly (sine and triangle dither) and reproduces the published R1/R3/R4 numbers.</p></div>
+  <div class="finding"><span class="pill p-warn">Partial pass</span><span class="k">≈ 2 pm rms</span><p>Steady-state tracking error on G26 (worst ring 9.7 pm peak). Inside ECE496's 11.4 pm bar, not always mrm's 5 pm. mrm's Kalman-LQG holds ≈ 0.01 pm.</p></div>
+  <div class="finding"><span class="pill p-bad">Fails</span><span class="k">43 / 64</span><p>Cold-start ring trials that lock onto a neighbouring laser line. The controller also loses lock under the local aggressor, squelch and the +10 K kick.</p></div>
+  <div class="finding"><span class="pill p-bad">Does not transfer</span><span class="k">Triangle dither</span><p>The team's best waveform on the 4-ring plant is 1–5 pm worse than sine on G26. Sine stays the default.</p></div>
+</div>
+<h3>Results at a glance</h3>
+<p>Worst peak error on rings 1–7 for each scenario. Ring 0 is left out because it runs out of heater range under the local aggressor for every controller (§5). "Best mrm" is the best of mrm's four built-in controllers.</p>
+<div class="tbl" id="glance"></div>
+</section>
+
+<section id="scope">
+<h2><span class="num">1</span>Objective and scope</h2>
+<p>The TLC was designed and validated only on the team's own purpose-built 4-ring plant. The question is whether it still works on a plant it was not designed against. mrm-model provides that plant: a physics model of an 8-ring O-band transmitter (G26 preset) with its own thermal network, optics, monitor ADC and heater DAC.</p>
+<ul class="tight">
+  <li><b>In scope:</b> run the controller as designed, on every disturbance both projects define, and report the numbers honestly, including failures.</li>
+  <li><b>Out of scope (for now):</b> re-tuning the controller for G26. Any tuning will be a separate, disclosed second arm so that the faithful result stays clean.</li>
+  <li><b>Deliverable:</b> one command (<code>tools/tlc_run_all.sh</code>, about 10 min) that runs the full scenario matrix and writes the report.</li>
+</ul>
+</section>
+
+<section id="system">
+<h2><span class="num">2</span>System under test</h2>
+<figure>
+<div class="flow" role="img" aria-label="Signal flow from monitor photodiode through the adapter and controller core to the heater DAC">
+  <div class="blk"><b>G26 plant</b><small>8 rings, thermal network, optics, 1 µs tick</small></div><span class="arr">→</span>
+  <div class="blk"><b>Monitor ADC</b><small>250 kS/s, 12-bit, 10 µs latency</small></div><span class="arr">→</span>
+  <div class="blk"><b>Adapter</b><small>buffers 25 samples, converts units, timing</small></div><span class="arr">→</span>
+  <div class="blk core"><b>TLC core (unchanged)</b><small>dither · lock-in · UKF · MPC · supervisor, every 100 µs</small></div><span class="arr">→</span>
+  <div class="blk"><b>Heater DAC</b><small>10 codes per 100 µs, P ∝ code², 1 µs latency</small></div>
+</div>
+<figcaption><b>Figure 1.</b> Closed loop. Only the adapter is our code; the core is copied from the ECE496 repository. The controller gets the same knowledge as mrm's model-based controllers: the laser grid, the ring-to-line assignment and the nominal design, never the true plant state.</figcaption>
+</figure>
+<h3>The controller in brief</h3>
+<p>Each heater carries a small tone (the <i>dither</i>). Demodulating the monitor photodiode at the tone gives the slope of the ring's resonance (z1) and at twice the tone its curvature (z2). Their ratio ζ = z2/z1 does not depend on optical power, so an unscented Kalman filter (UKF) uses it, together with the photodiode's DC level, to estimate each ring's detuning. A model-predictive controller (MPC) then sets the heaters, and a supervisor handles start-up (ACQUIRE), tracking (TRACK), squelch and fallback to a PI loop.</p>
+</section>
+
+<section id="method">
+<h2><span class="num">3</span>Method</h2>
+<h3>3.1 Faithful port and fidelity gate</h3>
+<p>The controller is copied, not rewritten. The only edits are packaging (relative imports) and making the ring count a parameter instead of a hard-coded 4. Two automated checks guard this: the copied core must produce <b>bit-identical</b> outputs to the source on the source's own plant, for both sine and triangle dither, and it must reproduce the source's published steady-state (R1), aggressor (R3) and recovery (R4) results. Both pass, so any poor number on G26 belongs to the design, not to the port.</p>
+<h3>3.2 Controller parameters from the nominal design</h3>
+<p>The controller needs plant constants (heater gains and time constants, crosstalk, linewidth, monitor noise). We derive every one from the G26 <i>nominal</i> design model, never from the simulated world, exactly as mrm does for its own model-based controllers. Examples: heater paths split into a fast and a slow pole; crosstalk 3 % to the neighbour and 1.5 % beyond; monitor noise 3.9 × 10⁻⁵ of full scale.</p>
+<h3>3.3 Scenario matrix and comparators</h3>
+<p>Each ECE496 requirement (R1–R22) is mapped to an mrm scenario: steady state, die-temperature ramp, laser drift, local and common aggressors, a +3 dB laser power step, squelch (modulation off), a +10 K kick, a photodiode dropout, a forced fallback and cold start. Disturbances G26 does not model natively are added as labelled extensions. Every scenario runs with the TLC, the TLC's own PI baseline and mrm's four controllers (PI, dither lock-in, Kalman-LQG, MPC); cold start compares against mrm's WDM supervisor.</p>
+<h3>3.4 Metrics and pass bars</h3>
+<p>Error is each ring's detuning minus mrm's lock reference, in picometres (1 GHz ≈ 5.7 pm at 1310 nm). We grade it against two bars: mrm's <b>5 pm</b> budget and the ECE496 <b>2 GHz ≈ 11.4 pm</b> threshold. We report rms and peak per ring, and a "tracking" error with the controller's own dither tones removed, so the dither is not counted as error.</p>
+<h3>3.5 Statistics and robustness</h3>
+<p>Rates such as wrong-line locking use exact 95 % Clopper–Pearson intervals. Robustness is tested on four alternative plants ("corners": fast, slow and textbook thermal, TEC-held package), once with controllers told the corner's model and once with the nominal model on the corner plant (a deliberate model mismatch).</p>
+</section>
+
+<section id="results">
+<h2><span class="num">4</span>Results</h2>
+<h3>4.1 Every scenario, every controller</h3>
+<figure>
+<div class="ctl" id="scSel"></div>
+<div class="ctl" id="scMetric"></div>
+<div id="scChart"></div>
+<div class="legend" id="scLegend"></div>
+<figcaption><b>Figure 2.</b> Per-ring error on a log scale. Dashed lines: 5 pm (mrm) and 11.4 pm (ECE496). ✕ marks a ring that finished locked to the wrong laser line. Hover any bar for its value.</figcaption>
+</figure>
+<p>In quiet or slowly changing conditions the TLC tracks at 2–3 pm rms, about 100 times the error of mrm's Kalman-LQG and MPC. Under the local aggressor, the power step and the PD-side aggressor it loses lock, but so do most mrm controllers in the last two: those are hard scenarios for everyone. The TLC's distinct failures are squelch, the +10 K kick and cold start.</p>
+
+<h3>4.2 What it looks like over time</h3>
+<figure>
+<div class="ctl" id="trSel"></div>
+<div class="ctl" id="trRings"></div>
+<div class="grid2"><div id="trA"></div><div id="trB"></div></div>
+<figcaption><b>Figure 3.</b> <span id="trNote"></span> Error against mrm's lock reference, from the recorded traces. The shaded band is warm-up and is not scored; dashed lines are ±5 pm.</figcaption>
+</figure>
+
+<h3>4.3 Cold start</h3>
+<figure>
+<div class="grid2"><div id="cpChart"></div><div id="ttlChart"></div></div>
+<div id="wrChart"></div>
+<figcaption><b>Figure 4.</b> Left: share of ring trials that end on a foreign laser line, with 95 % intervals. Right and bottom: mrm's WDM supervisor over 300 random worlds, for reference. The TLC's start-up locks onto the first fringe it sees, which on G26's dense 8-line grid is usually a neighbour's line. The WDM supervisor knows the grid and avoids this.</figcaption>
+</figure>
+
+<h3>4.4 Robustness to the plant model</h3>
+<figure>
+<div class="ctl" id="knSel"></div><div class="ctl" id="knExp"></div>
+<div id="heat" class="tbl"></div>
+<figcaption><b>Figure 5.</b> Worst peak on rings 1–7 per plant corner. "Lost" means a ring finished on the wrong line or above 100 pm. Steady-state rankings hold on every corner, and every verdict is the same whether the controllers know the corner or not.</figcaption>
+</figure>
+
+<h3>4.5 Dither waveform: sine vs triangle</h3>
+<p>The team's 20 Nov update adds waveforms that are cheap to generate on an FPGA (square, 3-level, triangle); on the 4-ring plant the triangle beat sine (0.55 vs 0.91 GHz steady). These waveforms need tone frequencies of exactly 100 kHz ÷ an even number. No set of 8 such tones avoids interfering with itself, so on G26 the source's 4 tones (3.8–7.1 kHz) repeat every 4 rings; crosstalk 4 rings apart is about 10⁻⁴ and does not matter. The "sine · sampled tones" arm uses the same tones with a sine wave, separating the tone change from the waveform change.</p>
+<figure>
+<div class="ctl" id="dtSel"></div><div class="ctl" id="dtMetric"></div>
+<div id="dtChart"></div>
+<div class="legend" id="dtLegend"></div>
+<div class="tbl" id="dtTable"></div>
+<figcaption><b>Figure 6.</b> Four dither arms on all 13 TLC scenarios (one world each; cold campaign 8 worlds). The table gives the worst peak on rings 1–7 and the change against sine. Moving the tones costs little; the triangle shape itself costs 1–5 pm wherever the TLC holds lock and loses the local aggressor much harder.</figcaption>
+</figure>
+</section>
+
+<section id="analysis">
+<h2><span class="num">5</span>Why the TLC struggles on G26</h2>
+<figure>
+<div class="grid2"><div id="z1Chart"></div><div id="zetaChart"></div></div>
+<figcaption><b>Figure 7.</b> Open-loop sweep of ring 0. The slope signal z1 matches the model (0.87×, signal-to-noise ≈ 50). The ratio ζ = z2/z1, which the estimator relies on, barely changes across the working range on G26's wider resonance: its total swing is only about twice its own noise.</figcaption>
+</figure>
+<ul class="tight">
+  <li><b>A weak detuning signal.</b> With ζ nearly flat, the UKF gets little information about where each ring sits, so the error wanders by several pm instead of settling (Figure 7).</li>
+  <li><b>A plant model that does not match G26.</b> The controller assumes two heater time constants and crosstalk to the three nearest rings only. G26 also has a millisecond-scale package path and a flat 1.5 % crosstalk to every ring. This mismatch explains the failures under cold start, the aggressor and the power step, which no dither change fixes.</li>
+  <li><b>Start-up has no knowledge of the laser grid.</b> ACQUIRE takes the first fringe it finds, which on an 8-line grid is often the wrong one (Figure 4).</li>
+  <li><b>Squelch is invisible.</b> The controller detects squelch from a drop in data-pattern noise, but the G26 monitor averages the modulation away, so it drifts 34 pm.</li>
+  <li><b>Ring 0 runs out of heater</b> under the local aggressor for every controller. This is a plant limit, which is why tables exclude it.</li>
+</ul>
+</section>
+
+<section id="problems">
+<h2><span class="num">6</span>Problems encountered</h2>
+<div class="tbl"><table>
+<tr><th>Problem</th><th>What we did</th><th>State</th></tr>
+<tr><td>The first port (Oct 25) passed its own tests but had 8 serious defects: colliding tones, a lock-in that dropped its sign, invented constants.</td><td>Withdrew it, rebuilt phase by phase with the fidelity gate first.</td><td><span class="pill p-ok">Resolved</span></td></tr>
+<tr><td>G26 has 8 rings; the source hard-codes 4 rings and 4 tones.</td><td>Made the ring count a parameter; searched for a collision-free 8-tone plan (4–13.5 kHz).</td><td><span class="pill p-ok">Resolved</span></td></tr>
+<tr><td>The source's extinction-ratio floor (3.5 dB) is unreachable on G26 (2.8–3.0 dB), so the controller found no setpoint.</td><td>Owner decision: 0 dB floor on G26, disclosed.</td><td><span class="pill p-ok">Decided</span></td></tr>
+<tr><td>The new sampled dithers need tones at 100 kHz ÷ even N; no 8 distinct tones work.</td><td>Reuse the source's 4 tones every 4 rings; verified by a collision check.</td><td><span class="pill p-ok">Resolved</span></td></tr>
+<tr><td>The source's new noise model adds its own amplifier assumptions, which would have doubled the squelch threshold on G26.</td><td>Use G26's own monitor noise for the threshold.</td><td><span class="pill p-ok">Resolved</span></td></tr>
+<tr><td>The source's published <code>metrics.json</code> predates its new noise model, so the source no longer reproduces it.</td><td>The fidelity gate uses the old noise settings; asked for a regeneration.</td><td><span class="pill p-warn">Open</span></td></tr>
+<tr><td>mrm-model's <code>main</code> branch was rewritten and its engine no longer builds (<code>plant.py:248</code>).</td><td>Our branch stays on the last working version; reported upstream.</td><td><span class="pill p-warn">Blocked</span></td></tr>
+</table></div>
+</section>
+
+<section id="decisions">
+<h2><span class="num">7</span>Questions for review</h2>
+<div class="tbl"><table>
+<tr><th>Question</th><th>Why it matters</th></tr>
+<tr><td><b>Re-fit the controller's model to G26, or report the mismatch as a limit?</b></td><td>It is the main cause of the remaining failures. Re-fitting would be a disclosed second arm, kept separate from the faithful result.</td></tr>
+<tr><td><b>Which pass bar is the headline: 5 pm or 11.4 pm?</b></td><td>The TLC passes one and often fails the other in the same scenario.</td></tr>
+<tr><td><b>Is cold start a requirement on an 8-line grid?</b></td><td>Without knowledge of the laser grid the current start-up cannot succeed reliably; adding it changes the design.</td></tr>
+<tr><td><b>Which G26 parameters can we validate?</b></td><td>Heater time constants, crosstalk, ADC width and rate are marked "assumed" in the G26 preset. Our numbers are only as good as these.</td></tr>
+<tr><td><b>How much statistical evidence is enough?</b></td><td>Most cells are one simulated world. A 300-world cold-start run takes about 2 h per arm.</td></tr>
+</table></div>
+</section>
+
+<section id="next">
+<h2><span class="num">8</span>Next steps</h2>
+<ul class="tight">
+  <li><b>Demo:</b> use the sine dither; present the triangle result as "does not transfer to 8 rings yet".</li>
+  <li><b>After review:</b> re-run the corner matrix with the updated controller and refresh the written summary.</li>
+  <li><b>If approved:</b> a disclosed second arm that re-fits the controller's model and dither amplitude to G26, then the 300-world cold-start campaign.</li>
+  <li><b>Upstream:</b> merge mrm-model's <code>main</code> once its engine is fixed; ask for the ECE496 results to be regenerated.</li>
+</ul>
+<h3>Future direction: FPGA emulation</h3>
+<p>mrm-model already has a binary, tick-locked interface for external controllers (<code>mrm/sim/bridge.py</code>), fixed-point helpers (<code>mrm/control/fxp.py</code>) and test-vector export for HDL testbenches. A hardware version of the controller can therefore be tested against the simulator in lockstep: the simulator sends each monitor sample block, the FPGA returns heater codes. This proves the logic and fixed-point behaviour, not real-time timing, because the simulator runs about 15× slower than real time. A sensible order is a fixed-point Python model, then Verilator/cocotb against recorded vectors, then the FPGA over the bridge. The dither, lock-in and PI loop map naturally to hardware; the UKF and MPC are better kept on a soft processor at first.</p>
+</section>
+
+<section id="appendix">
+<h2>Appendices</h2>
+<h3>A. Timeline</h3>
+<ol class="tl">
+  <li><time>25 Oct</time><span>First port; withdrawn after review found 8 defects.</span></li>
+  <li><time>31 Oct</time><span>Rebuild: specification, adapter, faithful core with fidelity gate, G26 parameters, scenario matrix.</span></li>
+  <li><time>2 Nov</time><span>First full results and summary.</span></li>
+  <li><time>9 Nov</time><span>Owner decisions (extinction-ratio floor, unmapped scenarios); model-mismatch corner runs.</span></li>
+  <li><time>10 Nov</time><span>300-world cold-start campaign for mrm's WDM supervisor.</span></li>
+  <li><time>20 Nov</time><span>ECE496 update: sampled dither waveforms, photodiode noise and offset model.</span></li>
+  <li><time>26 Nov</time><span>Controller re-imported at <code>ae9556b</code> (bit-identical); four-arm dither comparison.</span></li>
+</ol>
+<h3>B. Glossary</h3>
+<details><summary>Detuning and lock reference</summary><p>A ring modulates well only when its resonance sits at a fixed offset from its laser line. Heat shifts the resonance by tens of pm per kelvin; the heater pulls it back. The lock reference is the offset mrm considers ideal; our error is the distance from it.</p></details>
+<details><summary>Dither and lock-in detection</summary><p>A small heater tone makes the photodiode signal wobble. Multiplying by the tone and averaging (lock-in) extracts the wobble's size and sign, which tells which side of the resonance the ring is on. Each ring needs its own tone, chosen so that no tone, harmonic or mixing product lands near another ring's tone.</p></details>
+<details><summary>UKF and MPC</summary><p>The unscented Kalman filter fuses the lock-in ratio and the DC photodiode level with a thermal model to estimate each ring's detuning and drift. The model-predictive controller plans heater commands a few steps ahead using the same model.</p></details>
+<details><summary>Wrong-line lock</summary><p>All 8 rings see all 8 laser lines. A ring that locks to a neighbour's line looks locked to the controller but carries the wrong channel.</p></details>
+<details><summary>Corners and priors</summary><p>Corners are alternative plants. "Corner priors" tells the controller the alternative model; "nominal priors" keeps the design model on the alternative plant, which tests model mismatch.</p></details>
+<details><summary>Clopper–Pearson interval</summary><p>An exact confidence interval for a rate measured from a small number of trials. 1 failure in 64 trials gives 0.04 %–8.4 %, which is why larger campaigns matter.</p></details>
+<h3>C. Reproduce</h3>
+<p>From the mrm-model repository on <code>feature/tlc-port</code>: <code>tools/tlc_run_all.sh</code> for the full matrix (<code>docs/tlc/results.md</code>), <code>tools/tlc_dither_compare.py</code> for the dither comparison, and <code>docs/tlc/evaluation_src/</code> (<code>extract.py</code>, then <code>build.py</code>) to rebuild this page.</p>
+</section>
+</main>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D=JSON.parse(document.getElementById('data').textContent);
+const NS='http://www.w3.org/2000/svg',tip=document.getElementById('tip');
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const col=c=>css('--c-'+c)||css('--mute');
+const NAMES={tlc:'TLC (ECE496)',tlc_pi:'TLC PI baseline',pi_lock_c:'mrm PI',dither_lockin_c:'mrm dither lock-in',kalman_lqg_c:'mrm Kalman-LQG',mpc_c:'mrm MPC',wdm_supervisor:'mrm WDM supervisor'};
+const EXP={steady_tlc_faithful:'Steady state',tlc_xpu_step:'Die-temperature ramp',tlc_laser_drift:'Laser drift',tlc_ext_common_aggressor:'Common aggressor',tlc_a1:'Local aggressor (A1)',tlc_a1_pd_adjacent:'A1, PD side, 1.5×',tlc_power_step:'+3 dB power step',tlc_squelch:'Squelch',tlc_ext_kick:'+10 K kick',tlc_fallback:'Forced PI fallback',tlc_ext_pd_fault:'Photodiode dropout',tlc_cold:'Cold start',tlc_cold_wdm:'Cold start (WDM)',tlc_cold_campaign:'Cold start, 8 worlds'};
+const REQ={steady_tlc_faithful:'R1',tlc_xpu_step:'R2',tlc_laser_drift:'R5',tlc_ext_common_aggressor:'R3/R4',tlc_a1:'R3/R6',tlc_a1_pd_adjacent:'R11',tlc_power_step:'R7',tlc_squelch:'R12',tlc_ext_kick:'R10',tlc_fallback:'R22',tlc_ext_pd_fault:'R21',tlc_cold:'R8'};
+function el(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function txt(p,x,y,s,a={}){const e=el('text',{x,y,...a},p);e.textContent=s;return e}
+function hov(e,h){e.addEventListener('mousemove',ev=>{tip.innerHTML=h;tip.style.opacity=1;tip.style.left=Math.min(ev.clientX+12,innerWidth-290)+'px';tip.style.top=ev.clientY+12+'px'});e.addEventListener('mouseleave',()=>tip.style.opacity=0)}
+function buttons(host,items,cur,on,multi,label){host.innerHTML=label?`<span class="lab">${label}</span>`:'';items.forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;const isOn=multi?cur.has(k):cur===k;if(isOn)b.className='on';b.setAttribute('aria-pressed',isOn);b.onclick=()=>on(k);host.appendChild(b)})}
+const fmt=v=>v==null?'—':v>=100?Math.round(v).toLocaleString('en-US'):v>=1?v.toFixed(1):v>=0.01?v.toFixed(3):v.toExponential(1);
+function logScale(lo,hi,a,b){const l0=Math.log10(lo),l1=Math.log10(hi);return v=>a+(Math.log10(Math.max(v,lo))-l0)/(l1-l0)*(b-a)}
+function linScale(lo,hi,a,b){return v=>a+(v-lo)/(hi-lo)*(b-a)}
+function niceTicks(lo,hi,n=5){const s=(hi-lo)/n,m=Math.pow(10,Math.floor(Math.log10(s))),st=[1,2,5,10].map(k=>k*m).find(k=>k>=s);const out=[];for(let v=Math.ceil(lo/st)*st;v<=hi+1e-9;v+=st)out.push(+v.toPrecision(6));return out}
+function frame(host,W,H){host.innerHTML='';const s=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img'});host.appendChild(s);return s}
+const pk17=r=>Math.max(...r.peak.slice(1));
+
+/* Summary table */
+function drawGlance(){const order=['steady_tlc_faithful','tlc_xpu_step','tlc_laser_drift','tlc_ext_common_aggressor','tlc_a1','tlc_a1_pd_adjacent','tlc_power_step','tlc_squelch','tlc_ext_kick','tlc_ext_pd_fault','tlc_fallback','tlc_cold'];
+  const mrm=['pi_lock_c','dither_lockin_c','kalman_lqg_c','mpc_c'];
+  const verdict=r=>{const p=pk17(r),w=r.wrong.slice(1).some(Boolean);if(w||p>100)return'<span class="pill p-bad">Lost lock</span>';if(p<=5)return'<span class="pill p-ok">Within 5 pm</span>';if(p<=11.4)return'<span class="pill p-warn">Within 11.4 pm</span>';return'<span class="pill p-warn">Holds, &gt;11.4 pm</span>'};
+  let h='<table><tr><th>Scenario</th><th>Req.</th><th class="n">TLC peak (pm)</th><th class="n">TLC rms (pm)</th><th>TLC verdict</th><th class="n">Best mrm peak (pm)</th></tr>';
+  order.forEach(e=>{const t=D.matrix.find(r=>r.exp===e&&r.ctrl==='tlc'&&!r.corner);if(!t)return;
+    let cmp=e==='tlc_cold'?D.matrix.find(r=>r.exp==='tlc_cold_wdm'&&!r.corner):null;
+    if(!cmp){const c=D.matrix.filter(r=>r.exp===e&&mrm.includes(r.ctrl)&&!r.corner);cmp=c.length?c.reduce((a,b)=>pk17(a)<=pk17(b)?a:b):null}
+    const rms=t.rms.slice(1).reduce((a,b)=>a+b)/7;
+    h+=`<tr><td>${EXP[e]}</td><td class="mono mute">${REQ[e]||''}</td><td class="n">${fmt(pk17(t))}</td><td class="n">${fmt(rms)}</td><td>${verdict(t)}</td><td class="n">${cmp?fmt(pk17(cmp))+` <span class="mute" style="font-family:var(--sans)">${NAMES[cmp.ctrl].replace('mrm ','')}</span>`:'<span class="mute">n/a</span>'}</td></tr>`});
+  document.getElementById('glance').innerHTML=h+'</table>'}
+
+/* Fig 2 scorecard */
+const exps=[...new Set(D.matrix.filter(r=>!r.corner).map(r=>r.exp))];
+let sc={exp:'steady_tlc_faithful',metric:'rms'};
+function drawScore(){
+  buttons(document.getElementById('scSel'),exps.map(e=>[e,EXP[e]||e]),sc.exp,k=>{sc.exp=k;drawScore()},false,'Scenario');
+  buttons(document.getElementById('scMetric'),[['rms','rms'],['peak','peak']],sc.metric,k=>{sc.metric=k;drawScore()},false,'Metric');
+  const rows=D.matrix.filter(r=>r.exp===sc.exp&&!r.corner);const W=860,H=270,m={l:48,r:10,t:12,b:28};
+  const s=frame(document.getElementById('scChart'),W,H);const y=logScale(0.003,6000,H-m.b,m.t);
+  [0.01,0.1,1,10,100,1000].forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line')},s);txt(s,m.l-6,y(v)+3,v>=1?v.toLocaleString('en-US')+' pm':v+'',{'text-anchor':'end'})});
+  [[5,'--ok','5 pm',y(5)+12],[11.4,'--warn','11.4 pm',y(11.4)-4]].forEach(([v,c,l,ly])=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css(c),class:'ref'},s);txt(s,W-m.r,ly,l,{'text-anchor':'end',style:`fill:${css(c)}`})});
+  const n=8,gw=(W-m.l-m.r)/n,bw=Math.min(14,(gw-10)/rows.length);
+  for(let i=0;i<n;i++){txt(s,m.l+gw*i+gw/2,H-9,'ring '+i,{'text-anchor':'middle'});
+    rows.forEach((r,j)=>{const v=r[sc.metric][i],x=m.l+gw*i+(gw-bw*rows.length)/2+j*bw;
+      const b=el('rect',{x,y:y(v),width:bw-2,height:Math.max(1,y(0.003)-y(v)),fill:col(r.ctrl),rx:1},s);
+      hov(b,`<b>${NAMES[r.ctrl]}</b><br>ring ${i}: ${sc.metric} ${fmt(v)} pm${r.wrong[i]?'<br>finished on the WRONG line':''}`);
+      if(r.wrong[i])txt(s,x+bw/2-1,y(v)-3,'✕',{'text-anchor':'middle',style:`fill:${css('--bad')};font-size:11px`})})}
+  document.getElementById('scLegend').innerHTML=rows.map(r=>`<span><i style="background:${col(r.ctrl)}"></i>${NAMES[r.ctrl]}</span>`).join('')}
+
+/* Fig 3 traces */
+const pairs=[];for(let i=0;i<D.traces.length;i+=2)pairs.push(i);
+let tr={pair:0,rings:new Set([0,1,2,3,4,5,6,7]),zoom:false};
+const NOTES=['Steady state: the TLC wanders ±5–10 pm around its setpoint; Kalman-LQG settles to about 0.01 pm after warm-up.','Local aggressor: heat near rings 0–1 makes the TLC lose lock and two rings jump to a neighbouring line (≈1 nm); MPC rides through except on ring 0.','Squelch: with no modulation on the monitor the TLC drifts to 34 pm; mrm PI holds rings 1–7.','+10 K die-wide kick: the TLC does not relock (179 pm); Kalman-LQG recovers.','Cold start (800 ms): the TLC parks most rings one line-spacing away (wrong line); the WDM supervisor brings every ring home.'];
+function drawTraceOne(host,t){const W=430,H=240,m={l:46,r:8,t:20,b:24};const s=frame(host,W,H);
+  const vis=[...tr.rings];let mx=1;vis.forEach(i=>t.err[i].forEach(v=>mx=Math.max(mx,Math.abs(v))));if(tr.zoom)mx=20;
+  const x=linScale(0,t.t_ms[t.t_ms.length-1],m.l,W-m.r),y=linScale(-mx,mx,H-m.b,m.t);
+  el('rect',{x:m.l,y:m.t,width:Math.max(0,x(t.score_ms)-m.l),height:H-m.t-m.b,fill:css('--soft')},s);
+  niceTicks(-mx,mx,4).forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line')},s);txt(s,m.l-5,y(v)+3,v,{'text-anchor':'end'})});
+  niceTicks(0,t.t_ms[t.t_ms.length-1],4).forEach(v=>txt(s,x(v),H-8,v+' ms',{'text-anchor':'middle'}));
+  [5,-5].forEach(v=>{if(v<mx)el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--ok'),class:'ref'},s)});
+  const cg=el('g',{},s);el('clipPath',{id:'c'+host.id},s).appendChild(el('rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'#000'}));cg.setAttribute('clip-path',`url(#c${host.id})`);
+  const ramp=i=>`hsl(${200+i*20} ${40+i*4}% ${i%2?58:42}%)`;
+  vis.forEach(i=>{const d=t.err[i].map((v,k)=>(k?'L':'M')+x(t.t_ms[k]).toFixed(1)+' '+y(v).toFixed(1)).join('');
+    const p=el('path',{d,fill:'none',stroke:ramp(i),'stroke-width':1.3},cg);hov(p,`ring ${i}: rms ${fmt(t.rms[i])} pm, peak ${fmt(t.peak[i])} pm${t.wrong[i]?' · wrong line':''}`)});
+  txt(s,m.l,12,NAMES[t.ctrl],{style:`fill:${col(t.ctrl)};font-weight:600;font-size:12px`});txt(s,W-m.r,12,'error (pm)',{'text-anchor':'end'})}
+function drawTraces(){const i=pairs[tr.pair];
+  buttons(document.getElementById('trSel'),pairs.map((p,k)=>[k,EXP[D.traces[p].exp]||D.traces[p].exp]).concat([['z',tr.zoom?'Zoom ±20 pm: on':'Zoom ±20 pm: off']]),tr.pair,k=>{if(k==='z')tr.zoom=!tr.zoom;else tr.pair=k;drawTraces()},false,'Scenario');
+  buttons(document.getElementById('trRings'),[0,1,2,3,4,5,6,7].map(r=>[r,String(r)]),tr.rings,r=>{tr.rings.has(r)?tr.rings.delete(r):tr.rings.add(r);drawTraces()},true,'Rings');
+  drawTraceOne(document.getElementById('trA'),D.traces[i]);drawTraceOne(document.getElementById('trB'),D.traces[i+1]);
+  document.getElementById('trNote').textContent=NOTES[tr.pair]||''}
+
+/* Fig 4 cold start */
+function drawCold(){const camp=D.dither.find(r=>r.exp==='tlc_cold_campaign'&&r.arm==='triangle');
+  const rows=[['TLC, sine · 8 worlds',43,64,.5431,.7841,'tlc'],['TLC, triangle · 8 worlds',39,64,.4793,.7290,'triangle'],['WDM supervisor · 8 worlds',1,64,.0004,.084,'wdm_supervisor'],['WDM supervisor · 300 worlds',12,2400,.0026,.0087,'wdm_supervisor']];
+  const W=430,H=172,m={l:160,r:14,t:10,b:24},s=frame(document.getElementById('cpChart'),W,H),x=linScale(0,1,m.l,W-m.r);
+  [0,.25,.5,.75,1].forEach(v=>{el('line',{x1:x(v),x2:x(v),y1:m.t,y2:H-m.b,stroke:css('--line')},s);txt(s,x(v),H-8,(v*100)+'%',{'text-anchor':'middle'})});
+  rows.forEach(([l,k,n,lo,hi,c],i)=>{const yy=m.t+18+i*34;txt(s,m.l-10,yy+4,l,{'text-anchor':'end',style:'fill:'+css('--ink')});
+    el('line',{x1:x(lo),x2:x(hi),y1:yy,y2:yy,stroke:col(c),'stroke-width':3,'stroke-linecap':'round'},s);
+    const d=el('circle',{cx:x(k/n),cy:yy,r:5,fill:col(c)},s);hov(d,`${l}<br>${k}/${n} ring trials = ${(100*k/n).toFixed(1)} %<br>95 % CI ${(lo*100).toFixed(2)}–${(hi*100).toFixed(1)} %`)});
+  const c=D.campaign300,W2=430,H2=172,m2={l:36,r:8,t:22,b:24},s2=frame(document.getElementById('ttlChart'),W2,H2);
+  const bins=Array(20).fill(0),lo=0,hi=50;c.ttl_ms.forEach(v=>bins[Math.min(19,Math.floor((v-lo)/(hi-lo)*20))]++);const mx=Math.max(...bins);
+  const x2=linScale(lo,hi,m2.l,W2-m2.r),y2=linScale(0,mx,H2-m2.b,m2.t);
+  niceTicks(0,mx,3).forEach(v=>{el('line',{x1:m2.l,x2:W2-m2.r,y1:y2(v),y2:y2(v),stroke:css('--line')},s2);txt(s2,m2.l-5,y2(v)+3,v,{'text-anchor':'end'})});
+  bins.forEach((b,i)=>{const r=el('rect',{x:x2(i*2.5)+1,y:y2(b),width:x2(2.5)-x2(0)-2,height:y2(0)-y2(b),fill:col('wdm_supervisor')},s2);hov(r,`${(i*2.5)}–${i*2.5+2.5} ms: ${b} ring trials`)});
+  [0,10,20,30,40,50].forEach(v=>txt(s2,x2(v),H2-8,v+' ms',{'text-anchor':'middle'}));txt(s2,m2.l,12,`WDM supervisor time to lock (${c.ttl_ms.length.toLocaleString('en-US')} ring trials)`,{style:'fill:'+css('--ink')});
+  const W3=860,H3=120,m3={l:48,r:10,t:26,b:22},s3=frame(document.getElementById('wrChart'),W3,H3),mxw=Math.max(...c.wrong_per_ring,1),y3=linScale(0,mxw,H3-m3.b,m3.t),gw=(W3-m3.l-m3.r)/8;
+  txt(s3,m3.l,12,`WDM supervisor wrong-line finishes per ring, ${c.worlds} worlds: the misses cluster on rings 1–3`,{style:'fill:'+css('--ink')});
+  c.wrong_per_ring.forEach((v,i)=>{const r=el('rect',{x:m3.l+gw*i+gw*.3,y:y3(v),width:gw*.4,height:y3(0)-y3(v)+.5,fill:col('wdm_supervisor')},s3);hov(r,`ring ${i}: ${v} of ${c.worlds}`);txt(s3,m3.l+gw*i+gw/2,y3(v)-4,v,{'text-anchor':'middle'});txt(s3,m3.l+gw*i+gw/2,H3-6,'ring '+i,{'text-anchor':'middle'})})}
+
+/* Fig 5 corners */
+let hm={know:'corner',exp:'tlc_a1'};const CORN=['g26_fast_thermal','g26_slow_thermal','g26_textbook_thermal','g26_tec_package'],CL={g26_fast_thermal:'Fast thermal',g26_slow_thermal:'Slow thermal',g26_textbook_thermal:'Textbook thermal',g26_tec_package:'TEC-held package'};
+function drawHeat(){buttons(document.getElementById('knSel'),[['corner','Corner model'],['nominal','Nominal model (mismatch)']],hm.know,k=>{hm.know=k;drawHeat()},false,'Controllers know');
+  buttons(document.getElementById('knExp'),[['tlc_a1','Local aggressor'],['steady_tlc_faithful','Steady state']],hm.exp,k=>{hm.exp=k;drawHeat()},false,'Scenario');
+  const ctrls=['tlc','pi_lock_c','kalman_lqg_c','mpc_c'];const nom=D.matrix.filter(r=>r.exp===hm.exp);
+  const cell=r=>{if(!r)return'<td class="mute">—</td>';const p=pk17(r),bad=r.wrong.some(Boolean)||p>100,mid=p>5;
+    const bg=bad?css('--bad'):mid?css('--warn'):css('--ok');return`<td style="background:color-mix(in srgb,${bg} 16%,transparent)">${bad?'<b>lost</b>':fmt(p)}</td>`};
+  let h='<table class="heat"><tr><th style="text-align:left">Controller</th><th>Nominal plant</th>'+CORN.map(c=>`<th>${CL[c]}</th>`).join('')+'</tr>';
+  ctrls.forEach(c=>{h+=`<tr><td style="text-align:left;font-family:var(--sans);color:${col(c)};font-weight:600">${NAMES[c]}</td>`+cell(nom.find(r=>r.ctrl===c&&!r.corner))+CORN.map(k=>cell(D.corners.find(r=>r.exp===hm.exp&&r.ctrl===c&&r.corner===k&&r.know===hm.know))).join('')+'</tr>'});
+  document.getElementById('heat').innerHTML=h+'</table>'}
+
+/* Fig 7 lock-in */
+function drawLock(host,key,label){const L=D.lockin,W=430,H=210,m={l:62,r:8,t:22,b:26},s=frame(host,W,H);
+  let lo=Infinity,hi=-Infinity;L.forEach(r=>{[r[key+'_mean']-r[key+'_std'],r[key+'_mean']+r[key+'_std'],r[key+'_model']].forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v)})});
+  if(key==='zeta'){lo=-0.02;hi=0.04}const x=linScale(50,190,m.l,W-m.r),y=linScale(lo,hi,H-m.b,m.t);
+  niceTicks(lo,hi,4).forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line')},s);txt(s,m.l-5,y(v)+3,v,{'text-anchor':'end'})});
+  [60,90,120,150,180].forEach(v=>txt(s,x(v),H-8,v+' pm',{'text-anchor':'middle'}));
+  el('path',{d:L.map((r,k)=>(k?'L':'M')+x(r.detuning_pm)+' '+y(r[key+'_model'])).join(''),fill:'none',stroke:css('--mute'),'stroke-dasharray':'5 3'},s);
+  L.forEach(r=>{const mu=r[key+'_mean'],sd=r[key+'_std'],cx=x(r.detuning_pm);
+    el('line',{x1:cx,x2:cx,y1:y(Math.min(hi,mu+sd)),y2:y(Math.max(lo,mu-sd)),stroke:col('tlc')},s);const c=el('circle',{cx,cy:y(Math.max(lo,Math.min(hi,mu))),r:3.5,fill:col('tlc')},s);
+    hov(c,`detuning ${fmt(r.detuning_pm)} pm<br>measured ${mu.toExponential(2)} ± ${sd.toExponential(1)}<br>model ${r[key+'_model'].toExponential(2)}`)});
+  txt(s,m.l,12,label,{style:'fill:'+css('--ink')+';font-weight:600;font-size:12px'});txt(s,W-m.r,12,'● measured ±1σ   - - model',{'text-anchor':'end'})}
+
+/* Fig 6 dither */
+const ARMS=[['sine','Sine'],['sine_sampled','Sine · sampled tones'],['triangle','Triangle'],['three','3-level']];
+const dexps=[...new Set(D.dither.map(r=>r.exp))];let dt={exp:'steady_tlc_faithful',metric:'peak'};
+function drawDither(){buttons(document.getElementById('dtSel'),dexps.map(e=>[e,EXP[e]||e]),dt.exp,k=>{dt.exp=k;drawDither()},false,'Scenario');
+  buttons(document.getElementById('dtMetric'),[['rms','rms'],['peak','peak']],dt.metric,k=>{dt.metric=k;drawDither()},false,'Metric');
+  const rows=ARMS.map(([a])=>D.dither.find(r=>r.exp===dt.exp&&r.arm===a)).filter(Boolean);
+  const W=860,H=210,m={l:48,r:10,t:12,b:24},s=frame(document.getElementById('dtChart'),W,H),y=logScale(0.3,6000,H-m.b,m.t);
+  [1,10,100,1000].forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line')},s);txt(s,m.l-6,y(v)+3,v.toLocaleString('en-US')+' pm',{'text-anchor':'end'})});
+  el('line',{x1:m.l,x2:W-m.r,y1:y(5),y2:y(5),stroke:css('--ok'),class:'ref'},s);txt(s,W-m.r,y(5)-4,'5 pm',{'text-anchor':'end',style:`fill:${css('--ok')}`});
+  const gw=(W-m.l-m.r)/8,bw=Math.min(16,(gw-10)/rows.length);
+  for(let i=0;i<8;i++){txt(s,m.l+gw*i+gw/2,H-7,'ring '+i,{'text-anchor':'middle'});
+    rows.forEach((r,j)=>{const v=r[dt.metric][i],x=m.l+gw*i+(gw-bw*rows.length)/2+j*bw;
+      const b=el('rect',{x,y:y(v),width:bw-2,height:Math.max(1,y(0.3)-y(v)),fill:col(r.arm),rx:1},s);
+      hov(b,`<b>${ARMS.find(a=>a[0]===r.arm)[1]}</b><br>ring ${i}: ${dt.metric} ${fmt(v)} pm${r.wrong[i]?'<br>finished on the WRONG line':''}`);
+      if(r.wrong[i])txt(s,x+bw/2-1,y(v)-3,'✕',{'text-anchor':'middle',style:`fill:${css('--bad')};font-size:11px`})})}
+  document.getElementById('dtLegend').innerHTML=ARMS.map(([a,l])=>`<span><i style="background:${col(a)}"></i>${l}</span>`).join('');
+  const cell=(r,base)=>{if(!r)return'<td class="n mute">—</td>';const v=pk17(r),d=v/pk17(base);
+    const c=d>1.3?'bad':d<0.77?'ok':'mute',pc=Math.round((d-1)*100);return`<td class="n">${fmt(v)}${r===base?'':` <span class="${c}">${pc>0?'+':''}${pc}%</span>`}${r.camp?`<br><span class="mute">wrong ${r.camp[0]}/${r.camp[1]}</span>`:''}</td>`};
+  document.getElementById('dtTable').innerHTML='<table><tr><th>Scenario (peak, rings 1–7, pm)</th>'+ARMS.map(a=>`<th class="n">${a[1]}</th>`).join('')+'</tr>'+
+    dexps.map(e=>{const rs=ARMS.map(([a])=>D.dither.find(r=>r.exp===e&&r.arm===a)),base=rs[0];return`<tr style="${e===dt.exp?'background:color-mix(in srgb,var(--accent) 9%,transparent)':''}"><td>${EXP[e]||e}</td>${rs.map(r=>cell(r,base)).join('')}</tr>`}).join('')+'</table>'}
+
+function drawAll(){drawGlance();drawScore();drawTraces();drawCold();drawHeat();drawDither();drawLock(document.getElementById('z1Chart'),'z1','z1, slope signal');drawLock(document.getElementById('zetaChart'),'zeta','ζ = z2/z1 (clipped)')}
+document.getElementById('themeBtn').onclick=()=>{const r=document.documentElement,cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.dataset.theme=cur==='dark'?'light':'dark';try{localStorage.setItem('theme',r.dataset.theme)}catch(e){}drawAll()};
+try{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',drawAll);
+drawAll();
+</script>
+</body>
+</html>

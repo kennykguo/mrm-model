@@ -1,6 +1,6 @@
-"""Extract compact plot data from mrm-model TLC runs into one JSON for the catch-up report (docs/tlc/catchup.html).
+"""Extract compact plot data from mrm-model TLC runs into one JSON for the catch-up report (docs/tlc/tlc_g26_evaluation.html).
 
-    .venv/bin/python docs/tlc/catchup_src/extract.py && .venv/bin/python docs/tlc/catchup_src/build.py
+    .venv/bin/python docs/tlc/evaluation_src/extract.py && .venv/bin/python docs/tlc/evaluation_src/build.py
 
 Needs the run directories listed in docs/tlc/results.md.runs.txt, runs/mismatch, runs/corner_mb, runs/campaign300
 (local, not in git); data.json is written beside this file.

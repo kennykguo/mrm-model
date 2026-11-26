@@ -13,7 +13,7 @@
 | 4 | Scenario matrix (ECE496 D1–D6 / R-reqs → mrm scenarios) | **DONE**; corner variants with corner and nominal priors |
 | 5 | Results report + README status | **first pass DONE** ([`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md)); refresh after the open items |
 
-Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`. Visual catch-up (open in a browser): [`docs/tlc/catchup.html`](docs/tlc/catchup.html).
+Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`. Evaluation report (interactive, open in a browser): [`docs/tlc/tlc_g26_evaluation.html`](docs/tlc/tlc_g26_evaluation.html).
 
 ## Open items
 1. **Source update: sampled dither (B1). DONE 2026-11-26.** Re-vendored at `ae9556b` (square / three-level /
