@@ -8,7 +8,7 @@ meta: {name: tlc_cold_hybrid, kind: experiment, description: "cold start, 25 deg
 controller_interface:
   knowledge: [line_grid, ring_to_line, model_nominal, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
   bind: {tx.assignment: controller}     # the WDM supervisor chooses the assignment (cyclic), as in cold_wdm.yaml
-controller: {name: tlc_wdm, params: {tlc: {core: faithful}}}
+controller: {name: tlc_wdm}                 # tracks with tlc_arm2's settings
 scenario: {name: static}
 metrics: {lock_reference: line, allowed_assignments: cyclic, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
 experiment:

@@ -19,7 +19,7 @@ import numpy as np
 
 from mrm.control.api import BaseController, ControllerSpec, Observation
 from mrm.control.baselines.wdm_supervisor import PH_TRACK, WdmSupervisor
-from mrm.control.tlc.controller import CORES, TlcController
+from mrm.control.tlc.controller import ARM2_CP_OVERRIDES, ARM2_OPTIONS, CORES, TlcController
 
 
 class TlcWdmController(BaseController):
@@ -28,7 +28,8 @@ class TlcWdmController(BaseController):
 
     @dataclass
     class Params:
-        tlc: dict = field(default_factory=lambda: {"core": "faithful"})
+        tlc: dict = field(default_factory=lambda: {"core": "faithful", "cp_overrides": dict(ARM2_CP_OVERRIDES),
+                                                   "arm2": dict(ARM2_OPTIONS)})       # tlc_arm2's settings
         wdm: dict = field(default_factory=dict)
 
     def reset(self, spec: ControllerSpec) -> None:

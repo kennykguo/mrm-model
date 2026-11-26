@@ -27,7 +27,7 @@ ECE496_LAMBDA_M = 1310e-9    # the ECE496 plant's band (thermal_control/params.p
 ECE496_REFERENCE = {          # published scenario -> requirement block holding the error statistics
     "steady": "R1", "d2_common": "R3"}
 DEFAULT_ECE496_METRICS = Path(__file__).resolve().parents[2] / "ECE496_project/thermal_control/results/metrics.json"
-TLC_CONTROLLERS = ("tlc", "tlc_pi")
+TLC_CONTROLLERS = ("tlc", "tlc_pi", "tlc_arm2", "tlc_wdm")
 DITHER_BLOCK_S = 4e-3         # one lock-in window: every tone of the plan is a whole number of cycles in it
 MRM_COLUMNS = ("max_abs_lock_error_pm", "rms_lock_error_pm", "time_to_lock_s", "locked_final", "wrong_line_final",
                "excursion_count", "oma_penalty_db", "peak_slew_codes_per_s")

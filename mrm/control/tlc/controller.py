@@ -14,7 +14,7 @@ Units: the core speaks power fraction and GHz; :mod:`mrm.control.tlc.units` conv
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -223,3 +223,20 @@ class TlcPiController(TlcController):
     @dataclass
     class Params(TlcController.Params):
         core: str = "faithful_pi"
+
+
+#: the second arm's a-priori settings (docs/tlc/SUMMARY.md, "Tuned TLC"): dither capped at 0.15 GHz, the UKF's DC
+#: scale held stiff once a ring has settled, and red-side waiting re-lock for a ring lost at its heater floor
+ARM2_CP_OVERRIDES = {"dither_max": 0.15, "dither_nominal": 0.15, "dither_min": 0.05}
+ARM2_OPTIONS = {"stiff_scale_rel": 0.005, "stiff_settle_s": 0.03, "red_wait_s": 0.05}
+
+
+class TlcArm2Controller(TlcController):
+    """``tlc_arm2``: the TLC with the disclosed G26 adaptations (second arm) as defaults; ``tlc`` stays faithful."""
+    name = "tlc_arm2"
+
+    @dataclass
+    class Params(TlcController.Params):
+        core: str = "faithful"
+        cp_overrides: dict | None = field(default_factory=lambda: dict(ARM2_CP_OVERRIDES))
+        arm2: dict | None = field(default_factory=lambda: dict(ARM2_OPTIONS))

@@ -22,7 +22,8 @@ _REGISTRY: dict[str, Any] = {
     "composite": "mrm.control.api:CompositeController",
     "tlc": "mrm.control.tlc.controller:TlcController",       # ECE496 TLC port (docs/TLC_PORT_SPEC_AND_PLAN.md)
     "tlc_pi": "mrm.control.tlc.controller:TlcPiController",  # its BaselinePI comparator
-    "tlc_wdm": "mrm.control.tlc.hybrid:TlcWdmController",    # second arm: WDM supervisor acquires, the TLC tracks
+    "tlc_arm2": "mrm.control.tlc.controller:TlcArm2Controller",  # second arm: TLC with disclosed G26 adaptations
+    "tlc_wdm": "mrm.control.tlc.hybrid:TlcWdmController",    # second arm: WDM supervisor acquires, tlc_arm2 tracks
 }
 _RESOLVED: dict[str, Any] = {}
 _BUILTINS_LOADED = False

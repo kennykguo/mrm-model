@@ -16,9 +16,9 @@ _spec.loader.exec_module(tlc_matrix)
 def test_shipped_matrix_expands_restricted_entries_and_restricted_controllers():
     matrix = yaml.safe_load((ROOT / "experiments/tlc/matrix.yaml").read_text())
     pairs = tlc_matrix.expand(matrix)
-    names = {c["name"] for c in matrix["controllers"]}
+    names = {c["name"] for c in matrix["controllers"] if not c.get("restricted_only")}
     plain = [e for e in matrix["experiments"] if isinstance(e, str)]
-    assert all((e, c) in [(p[0], p[1]["name"]) for p in pairs] for e in plain for c in names - {"wdm_supervisor"})
+    assert all((e, c) in [(p[0], p[1]["name"]) for p in pairs] for e in plain for c in names)
     assert ("experiments/tlc/cold_wdm.yaml", "wdm_supervisor") in [(p[0], p[1]["name"]) for p in pairs]
     assert not any(p[1]["name"] == "wdm_supervisor" and p[0] in plain for p in pairs)
     assert all(p[2] == [] for p in pairs if p[0] == "experiments/tlc/cold_tlc.yaml")   # keeps its own params
