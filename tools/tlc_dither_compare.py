@@ -23,6 +23,8 @@ ARMS = {
     "triangle": {"dither_shape": "triangle"},
     "three": {"dither_shape": "three"},
     "square": {"dither_shape": "square"},
+    # second arm (disclosed re-parameterisation, spec 6 Q1): dither amplitude capped at 0.15 GHz (~0.9 pm)
+    "arm2_d015": {"cp_overrides": {"dither_max": 0.15, "dither_nominal": 0.15, "dither_min": 0.05}},
 }
 EXPERIMENTS = (
     "experiments/tlc/steady_tlc_faithful.yaml",

@@ -28,7 +28,7 @@ def _faithful(kind: str):
     def make(spec, *, ts, n_out, params):
         from mrm.control.tlc.faithful_core import FaithfulCore       # imports scipy and the nominal model
         return FaithfulCore(spec, ts=ts, n_out=n_out, kind=kind, dither_shape=params.dither_shape,
-                            tone_plan=params.tone_plan)
+                            tone_plan=params.tone_plan, cp_overrides=params.cp_overrides)
     return make
 
 
@@ -65,6 +65,7 @@ class TlcController(BaseController):
         dither_amp_u: float = 0.0           # stub only: dither amplitude in power fraction
         dither_shape: str = "sine"          # faithful cores: source B1 waveform (sine, square, three, triangle, qsine)
         tone_plan: str = "auto"             # faithful cores: auto (grid plan for sine, sampled otherwise) | sampled
+        cp_overrides: dict | None = None    # second arm only: ControllerParams fields replaced a priori (disclosed)
         buffer_capacity: int = 64           # monitor samples per ring per core block (G26: 25)
         force_fault_at_s: float | None = None   # R22: force the core's PI fallback at this time (faithful core)
         # R21 extension (spec 6, Q9): a PD fault injected at the controller boundary, as the source's PDFault:

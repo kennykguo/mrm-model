@@ -12,7 +12,9 @@ computed once per ControllerSpec. Differences from the source's own driver (``th
   state (modes, command) with zero estimates;
 - dither shape: ``dither_shape`` selects the source's B1 waveform (sine, square, three, triangle, qsine). A sampled
   shape needs tones at out_rate / N, so it uses ``tone_plan.sampled_plan`` instead of the 250 Hz-grid sine plan;
-  ``tone_plan="sampled"`` puts a sine on that plan too (separates the shape from the tone plan in a comparison).
+  ``tone_plan="sampled"`` puts a sine on that plan too (separates the shape from the tone plan in a comparison);
+- second arm (spec 6, Q1): ``cp_overrides`` replaces ControllerParams fields a priori (e.g. dither amplitude). Any
+  run that sets it is a disclosed re-parameterisation, not the faithful baseline.
 """
 from __future__ import annotations
 
@@ -46,7 +48,7 @@ def priors_for(spec: ControllerSpec) -> TlcPriors:
 
 class FaithfulCore:
     def __init__(self, spec: ControllerSpec, *, ts: float, n_out: int, kind: str = "tlc", dither_shape: str = "sine",
-                 tone_plan: str = "auto"):
+                 tone_plan: str = "auto", cp_overrides: dict | None = None):
         if dither_shape not in DITHER_SHAPES:
             raise ValueError(f"faithful core: dither_shape must be one of {DITHER_SHAPES}, got {dither_shape!r}")
         if tone_plan not in TONE_PLANS:
@@ -55,6 +57,8 @@ class FaithfulCore:
         if dither_shape != "sine" or tone_plan == "sampled":
             cp = dataclasses.replace(pr.cp, dither_shape=dither_shape, tone_freqs=sampled_plan(pr.cp.n_rings))
             pr = dataclasses.replace(pr, cp=cp)
+        if cp_overrides:
+            pr = dataclasses.replace(pr, cp=dataclasses.replace(pr.cp, **cp_overrides))
         if abs(ts - pr.cp.ts) > 1e-12:
             raise ValueError(f"faithful core: the adapter's core period {ts} s must be the source's {pr.cp.ts} s")
         if n_out != int(round(pr.cp.ts * pr.cp.out_rate)):
