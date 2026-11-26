@@ -10,7 +10,7 @@ harmonic 2 f_i, and both must be at least ``min_sep`` bins from
 
 and every tone must be at least ``min_dc`` bins above DC (the Hann window's leakage of slow drifts). The source's
 4-ring plan (2.0, 3.0, 3.5, 4.5 kHz) passes, and :func:`search` finds exactly it for 4 rings; the withdrawn rev 1
-grid did not pass (docs/tlc/REV1_REVIEW.md).
+grid did not pass.
 """
 from __future__ import annotations
 

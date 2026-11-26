@@ -10,12 +10,12 @@
 :root{
   --ground:#f4f6f5;--paper:#ffffff;--ink:#15191d;--ink2:#3b4449;--mute:#66727a;--line:#dbe1df;--soft:#eaeeec;
   --accent:#1f5f8b;--ok:#2d7a4c;--warn:#9a6400;--bad:#b03a2e;
-  --c-tlc:#c8553d;--c-tlc_pi:#e3a08f;--c-pi_lock_c:#3f74b8;--c-dither_lockin_c:#8eaed8;--c-kalman_lqg_c:#2d7a4c;--c-mpc_c:#6d55a8;--c-wdm_supervisor:#138a8f;
+  --c-tlc:#c8553d;--c-tlc_arm2:#d4960f;--c-tlc_wdm:#d4960f;--c-tlc_pi:#e3a08f;--c-pi_lock_c:#3f74b8;--c-dither_lockin_c:#8eaed8;--c-kalman_lqg_c:#2d7a4c;--c-mpc_c:#6d55a8;--c-wdm_supervisor:#138a8f;
   --c-sine:#c8553d;--c-sine_sampled:#e3a08f;--c-triangle:#3f74b8;--c-three:#6d55a8;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-sine:#e27a5f;color-scheme:dark}}
-:root[data-theme="dark"]{--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-sine:#e27a5f;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-tlc_arm2:#f0b43c;--c-tlc_wdm:#f0b43c;--c-sine:#e27a5f;color-scheme:dark}}
+:root[data-theme="dark"]{--ground:#121517;--paper:#191d20;--ink:#e8ecea;--ink2:#c3cbc8;--mute:#8e9a9f;--line:#2c3337;--soft:#22282b;--accent:#6fa8d6;--ok:#5cb07e;--warn:#d4a23c;--bad:#e0705f;--c-tlc:#e27a5f;--c-tlc_arm2:#f0b43c;--c-tlc_wdm:#f0b43c;--c-sine:#e27a5f;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.55 var(--sans);padding-inline:16px}
@@ -69,6 +69,7 @@ figcaption b{color:var(--ink);font-weight:600}
 .ctl button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .ctl .lab{font:600 10.5px/26px var(--cond);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-right:4px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 svg{display:block;width:100%;height:auto;overflow:visible}
 svg text{fill:var(--mute);font:10.5px var(--sans)}
 .ref{stroke-dasharray:4 3;stroke-width:1}
@@ -107,7 +108,7 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
   <a href="#system">2 System under test</a>
   <a href="#method">3 Method</a>
   <a href="#results">4 Results</a>
-  <a href="#analysis">5 Why the TLC struggles</a>
+  <a href="#analysis">5 Diagnosis and the tuned arm</a>
   <a href="#problems">6 Problems encountered</a>
   <a href="#decisions">7 Questions for review</a>
   <a href="#next">8 Next steps</a>
@@ -118,7 +119,7 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
   <button id="themeBtn" type="button" class="nop">Switch theme</button>
   <div class="eyebrow">ECE496 capstone · evaluation report · draft for review</div>
   <h1>The ECE496 thermal locking controller on the G26 transmitter model</h1>
-  <p class="lead">We took the thermal locking controller (TLC) that our team designed on a simple 4-ring plant, moved it unchanged into <b>mrm-model</b>, an independent, higher-fidelity simulator of an 8-ring microring transmitter, and measured how well it keeps every ring locked. This page summarises the method, the results so far, and the decisions we need.</p>
+  <p class="lead">We moved the thermal locking controller (TLC) that our team designed on a simple 4-ring plant into <b>mrm-model</b>, an independent, higher-fidelity simulator of an 8-ring microring transmitter, and measured how well it keeps every ring locked: first exactly as designed, then with four disclosed adaptations for this plant. This page gives the method, the results, the diagnosis behind them, and the decisions we need.</p>
   <div class="meta">
     <div><span>Status as of</span>26 Nov 2026</div>
     <div><span>Code</span><code>mrm-model</code> · <code>feature/tlc-port</code></div>
@@ -129,25 +130,25 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
 
 <section id="summary">
 <h2>Summary</h2>
-<p>The port itself is sound: the controller code running in mrm-model is bit-for-bit identical to the team's source and reproduces its published results. On the G26 plant the controller keeps rings locked through slow disturbances, but with errors far larger than mrm's own model-based controllers, and it loses lock under several fast or large disturbances. The cause is mostly a mismatch between the controller's built-in plant model and G26, not the port and not the dither waveform.</p>
+<p>The port is sound: the controller code in mrm-model is bit-for-bit identical to the team's source and reproduces its published results. Run exactly as designed, it tracks slow disturbances at about 2 pm rms but loses lock under fast or large ones and locks onto the wrong laser line at start-up. We traced those failures to six causes, four of them specific to this plant, and built a <b>tuned TLC</b> that changes four things, each disclosed and switchable. The tuned TLC holds every slow scenario within mrm's 5 pm budget and matches mrm's own controllers under the aggressor and squelch; it stays behind them in quiet steady state because a dithering controller always carries its own small dither.</p>
 <div class="findings">
   <div class="finding"><span class="pill p-ok">Verified</span><span class="k">Bit-identical</span><p>The vendored controller matches the source exactly (sine and triangle dither) and reproduces the published R1/R3/R4 numbers.</p></div>
-  <div class="finding"><span class="pill p-warn">Partial pass</span><span class="k">≈ 2 pm rms</span><p>Steady-state tracking error on G26 (worst ring 9.7 pm peak). Inside ECE496's 11.4 pm bar, not always mrm's 5 pm. mrm's Kalman-LQG holds ≈ 0.01 pm.</p></div>
-  <div class="finding"><span class="pill p-bad">Fails</span><span class="k">43 / 64</span><p>Cold-start ring trials that lock onto a neighbouring laser line. The controller also loses lock under the local aggressor, squelch and the +10 K kick.</p></div>
-  <div class="finding"><span class="pill p-bad">Does not transfer</span><span class="k">Triangle dither</span><p>The team's best waveform on the 4-ring plant is 1–5 pm worse than sine on G26. Sine stays the default.</p></div>
+  <div class="finding"><span class="pill p-ok">Tuned: passes</span><span class="k">0.86 pm peak</span><p>Steady state on rings 1–7 (as designed: 6.3 pm). Die ramp, laser drift and the common aggressor also stay under 5 pm on every ring.</p></div>
+  <div class="finding"><span class="pill p-ok">Tuned: recovered</span><span class="k">1 / 64</span><p>Cold-start ring trials on the wrong line (as designed: 43 / 64). The local aggressor and the +10 K kick no longer lose lock.</p></div>
+  <div class="finding"><span class="pill p-warn">Still open</span><span class="k">Power step</span><p>A −3 dB laser drop knocks every controller off lock on this plant, ours included. Squelch is level with mrm's controllers at about 20 pm.</p></div>
 </div>
 <h3>Results at a glance</h3>
-<p>Worst peak error on rings 1–7 for each scenario. Ring 0 is left out because it runs out of heater range under the local aggressor for every controller (§5). "Best mrm" is the best of mrm's four built-in controllers.</p>
+<p>Worst peak error on rings 1–7, in pm. Ring 0 is left out because it runs out of heater range under the local aggressor for every controller (§5). ✕ marks a run where a ring finished on the wrong laser line. "Best mrm" is the best of mrm's four built-in controllers.</p>
 <div class="tbl" id="glance"></div>
 </section>
 
 <section id="scope">
 <h2><span class="num">1</span>Objective and scope</h2>
-<p>The TLC was designed and validated only on the team's own purpose-built 4-ring plant. The question is whether it still works on a plant it was not designed against. mrm-model provides that plant: a physics model of an 8-ring O-band transmitter (G26 preset) with its own thermal network, optics, monitor ADC and heater DAC.</p>
+<p>The TLC was designed and validated only on the team's own purpose-built 4-ring plant. The question is whether it works on a plant it was not designed against. mrm-model provides one: a physics model of an 8-ring O-band transmitter (G26 preset) with its own thermal network, optics, monitor ADC and heater DAC.</p>
 <ul class="tight">
-  <li><b>In scope:</b> run the controller as designed, on every disturbance both projects define, and report the numbers honestly, including failures.</li>
-  <li><b>Out of scope (for now):</b> re-tuning the controller for G26. Any tuning will be a separate, disclosed second arm so that the faithful result stays clean.</li>
-  <li><b>Deliverable:</b> one command (<code>tools/tlc_run_all.sh</code>, about 10 min) that runs the full scenario matrix and writes the report.</li>
+  <li><b>Faithful arm:</b> the controller exactly as published, adapted only at its interfaces. This is the evaluation of the team's design.</li>
+  <li><b>Tuned arm:</b> four a-priori changes for this plant, each derived from a diagnosed cause rather than fitted to a score, and reported beside the faithful numbers, never instead of them.</li>
+  <li><b>Deliverable:</b> one command (<code>tools/tlc_run_all.sh</code>, about 45 min, 151 runs) that runs the full scenario matrix for both arms and every comparator and writes the report.</li>
 </ul>
 </section>
 
@@ -161,24 +162,26 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
   <div class="blk core"><b>TLC core (unchanged)</b><small>dither · lock-in · UKF · MPC · supervisor, every 100 µs</small></div><span class="arr">→</span>
   <div class="blk"><b>Heater DAC</b><small>10 codes per 100 µs, P ∝ code², 1 µs latency</small></div>
 </div>
-<figcaption><b>Figure 1.</b> Closed loop. Only the adapter is our code; the core is copied from the ECE496 repository. The controller gets the same knowledge as mrm's model-based controllers: the laser grid, the ring-to-line assignment and the nominal design, never the true plant state.</figcaption>
+<figcaption><b>Figure 1.</b> Closed loop. Only the adapter is our code; the core is copied from the ECE496 repository. The tuned arm's changes sit in a subclass beside the core, not inside it. The controller gets the same knowledge as mrm's model-based controllers: the laser grid, the ring-to-line assignment and the nominal design, never the true plant state.</figcaption>
 </figure>
 <h3>The controller in brief</h3>
-<p>Each heater carries a small tone (the <i>dither</i>). Demodulating the monitor photodiode at the tone gives the slope of the ring's resonance (z1) and at twice the tone its curvature (z2). Their ratio ζ = z2/z1 does not depend on optical power, so an unscented Kalman filter (UKF) uses it, together with the photodiode's DC level, to estimate each ring's detuning. A model-predictive controller (MPC) then sets the heaters, and a supervisor handles start-up (ACQUIRE), tracking (TRACK), squelch and fallback to a PI loop.</p>
+<p>Each heater carries a small tone (the <i>dither</i>). Demodulating the monitor photodiode at the tone gives the slope of the ring's resonance (z1) and at twice the tone its curvature (z2). Their ratio ζ = z2/z1 does not depend on optical power, so an unscented Kalman filter (UKF) uses it, together with the photodiode's DC level, to estimate each ring's detuning and an optical power scale. A model-predictive controller (MPC) then sets the heaters, and a supervisor handles start-up (ACQUIRE), tracking (TRACK), loss of lock, squelch and fallback to a PI loop.</p>
 </section>
 
 <section id="method">
 <h2><span class="num">3</span>Method</h2>
 <h3>3.1 Faithful port and fidelity gate</h3>
-<p>The controller is copied, not rewritten. The only edits are packaging (relative imports) and making the ring count a parameter instead of a hard-coded 4. Two automated checks guard this: the copied core must produce <b>bit-identical</b> outputs to the source on the source's own plant, for both sine and triangle dither, and it must reproduce the source's published steady-state (R1), aggressor (R3) and recovery (R4) results. Both pass, so any poor number on G26 belongs to the design, not to the port.</p>
+<p>The controller is copied, not rewritten. The only edits are packaging (relative imports) and making the ring count a parameter. Two automated checks guard this: the copied core must produce <b>bit-identical</b> outputs to the source on the source's own plant, for both sine and triangle dither, and it must reproduce the source's published steady-state (R1), aggressor (R3) and recovery (R4) results. Both pass, so any poor faithful number belongs to the design, not to the port.</p>
 <h3>3.2 Controller parameters from the nominal design</h3>
-<p>The controller needs plant constants (heater gains and time constants, crosstalk, linewidth, monitor noise). We derive every one from the G26 <i>nominal</i> design model, never from the simulated world, exactly as mrm does for its own model-based controllers. Examples: heater paths split into a fast and a slow pole; crosstalk 3 % to the neighbour and 1.5 % beyond; monitor noise 3.9 × 10⁻⁵ of full scale.</p>
+<p>The controller's plant constants (heater gains and time constants, crosstalk, linewidth, monitor noise) are derived from the G26 <i>nominal</i> design model, never from the simulated world, exactly as mrm does for its own model-based controllers. Examples: heater paths split into a fast and a slow pole; crosstalk 3 % to the neighbour and 1.5 % beyond; monitor noise 3.9 × 10⁻⁵ of full scale.</p>
 <h3>3.3 Scenario matrix and comparators</h3>
-<p>Each ECE496 requirement (R1–R22) is mapped to an mrm scenario: steady state, die-temperature ramp, laser drift, local and common aggressors, a +3 dB laser power step, squelch (modulation off), a +10 K kick, a photodiode dropout, a forced fallback and cold start. Disturbances G26 does not model natively are added as labelled extensions. Every scenario runs with the TLC, the TLC's own PI baseline and mrm's four controllers (PI, dither lock-in, Kalman-LQG, MPC); cold start compares against mrm's WDM supervisor.</p>
+<p>Each ECE496 requirement (R1–R22) is mapped to an mrm scenario: steady state, die-temperature ramp, laser drift, local and common aggressors, a +3 dB laser power step, squelch (modulation off), a +10 K kick, a photodiode dropout, a forced fallback and cold start. Disturbances G26 does not model natively are added as labelled extensions. Every scenario runs with both TLC arms, the TLC's own PI baseline and mrm's four controllers (PI, dither lock-in, Kalman-LQG, MPC); cold start compares against mrm's WDM supervisor.</p>
 <h3>3.4 Metrics and pass bars</h3>
-<p>Error is each ring's detuning minus mrm's lock reference, in picometres (1 GHz ≈ 5.7 pm at 1310 nm). We grade it against two bars: mrm's <b>5 pm</b> budget and the ECE496 <b>2 GHz ≈ 11.4 pm</b> threshold. We report rms and peak per ring, and a "tracking" error with the controller's own dither tones removed, so the dither is not counted as error.</p>
+<p>Error is each ring's detuning minus mrm's lock reference, in picometres (1 GHz ≈ 5.7 pm at 1310 nm), graded against mrm's <b>5 pm</b> budget and the ECE496 <b>2 GHz ≈ 11.4 pm</b> threshold. We report rms and peak per ring, and a "tracking" error with the controller's own dither tones removed.</p>
 <h3>3.5 Statistics and robustness</h3>
-<p>Rates such as wrong-line locking use exact 95 % Clopper–Pearson intervals. Robustness is tested on four alternative plants ("corners": fast, slow and textbook thermal, TEC-held package), once with controllers told the corner's model and once with the nominal model on the corner plant (a deliberate model mismatch).</p>
+<p>Rates such as wrong-line locking use exact 95 % Clopper–Pearson intervals. Robustness is tested on four alternative plants ("corners": fast, slow and textbook thermal, TEC-held package), once with controllers told the corner's model and once with the nominal model on the corner plant (a deliberate model mismatch). Most scenario cells are one simulated world; the cold-start campaigns use 8 random worlds.</p>
+<h3>3.6 How the tuned arm was built</h3>
+<p>We probed the faithful controller's internal state (estimates, power scale, mode, heater command) against the plant's true detuning in each failing scenario, named a cause for each failure, and changed only what that cause called for. Changes that did not help were dropped and are listed in §5.</p>
 </section>
 
 <section id="results">
@@ -191,67 +194,70 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
 <div class="legend" id="scLegend"></div>
 <figcaption><b>Figure 2.</b> Per-ring error on a log scale. Dashed lines: 5 pm (mrm) and 11.4 pm (ECE496). ✕ marks a ring that finished locked to the wrong laser line. Hover any bar for its value.</figcaption>
 </figure>
-<p>In quiet or slowly changing conditions the TLC tracks at 2–3 pm rms, about 100 times the error of mrm's Kalman-LQG and MPC. Under the local aggressor, the power step and the PD-side aggressor it loses lock, but so do most mrm controllers in the last two: those are hard scenarios for everyone. The TLC's distinct failures are squelch, the +10 K kick and cold start.</p>
+<p>As designed, the TLC tracks slow disturbances at 1.8–2.6 pm rms, about 100 times mrm's Kalman-LQG and MPC, and loses lock under the local aggressor and the kick. Tuned, it drops to about 0.55 pm rms and 0.9–3 pm peak, holds the aggressor (0.84 pm rms on rings 1–7 against mrm PI's 0.63) and recovers from the kick. The power step and the stronger PD-side aggressor are lost by almost every controller: those are limits of this plant, not of one design.</p>
 
 <h3>4.2 What it looks like over time</h3>
 <figure>
 <div class="ctl" id="trSel"></div>
 <div class="ctl" id="trRings"></div>
-<div class="grid2"><div id="trA"></div><div id="trB"></div></div>
-<figcaption><b>Figure 3.</b> <span id="trNote"></span> Error against mrm's lock reference, from the recorded traces. The shaded band is warm-up and is not scored; dashed lines are ±5 pm.</figcaption>
+<div class="grid3"><div id="trA"></div><div id="trB"></div><div id="trC"></div></div>
+<figcaption><b>Figure 3.</b> <span id="trNote"></span> Left to right: the TLC as designed, the tuned TLC, an mrm comparator. Error against mrm's lock reference from the recorded traces; the shaded band is warm-up and is not scored; dashed lines are ±5 pm.</figcaption>
 </figure>
 
 <h3>4.3 Cold start</h3>
 <figure>
 <div class="grid2"><div id="cpChart"></div><div id="ttlChart"></div></div>
 <div id="wrChart"></div>
-<figcaption><b>Figure 4.</b> Left: share of ring trials that end on a foreign laser line, with 95 % intervals. Right and bottom: mrm's WDM supervisor over 300 random worlds, for reference. The TLC's start-up locks onto the first fringe it sees, which on G26's dense 8-line grid is usually a neighbour's line. The WDM supervisor knows the grid and avoids this.</figcaption>
+<figcaption><b>Figure 4.</b> Left: share of ring trials that end on a foreign laser line, with 95 % intervals, over 8 random worlds (ambient 0–105 °C). As designed, the TLC's start-up locks onto the first fringe it sees, which on G26's dense 8-line grid is usually a neighbour's line. The tuned arm lets mrm's WDM supervisor, which knows the line grid, find each ring's line and then hands the world to the TLC. Right and bottom: the WDM supervisor over 300 worlds, for reference.</figcaption>
 </figure>
 
 <h3>4.4 Robustness to the plant model</h3>
 <figure>
 <div class="ctl" id="knSel"></div><div class="ctl" id="knExp"></div>
 <div id="heat" class="tbl"></div>
-<figcaption><b>Figure 5.</b> Worst peak on rings 1–7 per plant corner. "Lost" means a ring finished on the wrong line or above 100 pm. Steady-state rankings hold on every corner, and every verdict is the same whether the controllers know the corner or not.</figcaption>
+<figcaption><b>Figure 5.</b> Worst peak on rings 1–7 per plant corner. "Lost" means a ring finished on the wrong line or above 100 pm. The tuned TLC passes 5 pm in steady state on every corner, also with the nominal model on the corner plant, and its aggressor verdict matches mrm's PI on every corner.</figcaption>
 </figure>
 
 <h3>4.5 Dither waveform: sine vs triangle</h3>
-<p>The team's 20 Nov update adds waveforms that are cheap to generate on an FPGA (square, 3-level, triangle); on the 4-ring plant the triangle beat sine (0.55 vs 0.91 GHz steady). These waveforms need tone frequencies of exactly 100 kHz ÷ an even number. No set of 8 such tones avoids interfering with itself, so on G26 the source's 4 tones (3.8–7.1 kHz) repeat every 4 rings; crosstalk 4 rings apart is about 10⁻⁴ and does not matter. The "sine · sampled tones" arm uses the same tones with a sine wave, separating the tone change from the waveform change.</p>
+<p>The team's 20 Nov update adds waveforms that are cheap to generate on an FPGA (square, 3-level, triangle); on the 4-ring plant the triangle beat sine (0.55 vs 0.91 GHz steady). These waveforms need tone frequencies of exactly 100 kHz ÷ an even number. No set of 8 such tones avoids interfering with itself, so on G26 the source's 4 tones (3.8–7.1 kHz) repeat every 4 rings; crosstalk 4 rings apart is about 10⁻⁴ and does not matter. The "sine · sampled tones" arm uses the same tones with a sine wave, separating the tone change from the waveform change. This comparison uses the faithful arm.</p>
 <figure>
 <div class="ctl" id="dtSel"></div><div class="ctl" id="dtMetric"></div>
 <div id="dtChart"></div>
 <div class="legend" id="dtLegend"></div>
 <div class="tbl" id="dtTable"></div>
-<figcaption><b>Figure 6.</b> Four dither arms on all 13 TLC scenarios (one world each; cold campaign 8 worlds). The table gives the worst peak on rings 1–7 and the change against sine. Moving the tones costs little; the triangle shape itself costs 1–5 pm wherever the TLC holds lock and loses the local aggressor much harder.</figcaption>
+<figcaption><b>Figure 6.</b> Four dither arms on all 13 TLC scenarios (one world each; cold campaign 8 worlds). The table gives the worst peak on rings 1–7 and the change against sine. Moving the tones costs little; the triangle shape itself costs 1–5 pm wherever the TLC holds lock and loses the local aggressor much harder. Sine stays the default.</figcaption>
 </figure>
 </section>
 
 <section id="analysis">
-<h2><span class="num">5</span>Why the TLC struggles on G26</h2>
+<h2><span class="num">5</span>Diagnosis and the tuned arm</h2>
 <figure>
 <div class="grid2"><div id="z1Chart"></div><div id="zetaChart"></div></div>
-<figcaption><b>Figure 7.</b> Open-loop sweep of ring 0. The slope signal z1 matches the model (0.87×, signal-to-noise ≈ 50). The ratio ζ = z2/z1, which the estimator relies on, barely changes across the working range on G26's wider resonance: its total swing is only about twice its own noise.</figcaption>
+<figcaption><b>Figure 7.</b> Open-loop sweep of ring 0. The slope signal z1 matches the model (0.87×, signal-to-noise ≈ 50). The ratio ζ = z2/z1, which the estimator relies on to tell detuning from power, barely changes across the working range on G26's wider resonance: its total swing is only about twice its own noise.</figcaption>
 </figure>
-<ul class="tight">
-  <li><b>A weak detuning signal.</b> With ζ nearly flat, the UKF gets little information about where each ring sits, so the error wanders by several pm instead of settling (Figure 7).</li>
-  <li><b>A plant model that does not match G26.</b> The controller assumes two heater time constants and crosstalk to the three nearest rings only. G26 also has a millisecond-scale package path and a flat 1.5 % crosstalk to every ring. This mismatch explains the failures under cold start, the aggressor and the power step, which no dither change fixes.</li>
-  <li><b>Start-up has no knowledge of the laser grid.</b> ACQUIRE takes the first fringe it finds, which on an 8-line grid is often the wrong one (Figure 4).</li>
-  <li><b>Squelch is invisible.</b> The controller detects squelch from a drop in data-pattern noise, but the G26 monitor averages the modulation away, so it drifts 34 pm.</li>
-  <li><b>Ring 0 runs out of heater</b> under the local aggressor for every controller. This is a plant limit, which is why tables exclude it.</li>
-</ul>
+<div class="tbl"><table>
+<tr><th>Cause found</th><th>Evidence</th><th>Tuned arm</th></tr>
+<tr><td><b>The dither always runs at its maximum (0.5 GHz).</b> Its size follows the estimator's uncertainty, which never settles on G26. The dither alone is about 1.7 pm rms of scored error, and it also drove a slow estimate drift on rings 0–2.</td><td>Steady state: dither part 1.6–1.8 pm rms; true tracking error 0.05–0.4 pm on rings 4–7.</td><td>Dither capped at 0.15 GHz (≈0.9 pm).</td></tr>
+<tr><td><b>Detuning and optical power look alike to the estimator</b> at the G26 lock point (Figure 7). In a fast transient it reads a level change as power.</td><td>+10 K kick: power estimate +18 % in 0.5 ms, detuning estimate on target, ring actually 40 pm off, no loss of lock declared.</td><td>Power estimate held nearly fixed once a ring has tracked for 30 ms, so level changes count as detuning.</td></tr>
+<tr><td><b>Re-acquisition assumes a ring fell to the cold side.</b> Under the local aggressor, ring 0 is lost to the hot side with its heater already off; turning the heater up pushes it onto the next line, and its light then knocks ring 4 off.</td><td>Ring 0 at zero heater, +335 pm, then +1,018 pm within 1.5 ms.</td><td>A ring lost hot at zero heater waits, then re-locks when its level returns to the calibrated operating level.</td></tr>
+<tr><td><b>Start-up takes the first fringe.</b> Every cold G26 ring sits next to a foreign line.</td><td>43 / 64 ring trials on the wrong line.</td><td>mrm's WDM supervisor finds the lines; the TLC takes over each world once locked.</td></tr>
+<tr><td><b>Squelch detection is blind.</b> It expects data-pattern noise on the monitor, which G26 averages away.</td><td>As designed: 34 pm.</td><td>Not changed directly; the held power estimate alone brings it to 20 pm, level with mrm's controllers.</td></tr>
+<tr><td><b>A −3 dB power drop knocks rings off their hot branch.</b> It removes most of the self-heating that holds a G26 ring, and the resonance jumps about 0.9 nm within 0.1 ms.</td><td>Every model-based controller loses lock.</td><td>Open. A fall-off detector halves the wrong lines but no ring re-locks in time yet.</td></tr>
+</table></div>
+<p><b>Tried without gain:</b> giving the controller crosstalk to every ring instead of the nearest three, and rate-limiting the power estimate instead of holding it. After the changes above the plant-model mismatch is no longer the limit; the dither is. <b>Ring 0</b> runs out of heater under the local aggressor for every controller, which is a plant limit and why tables use rings 1–7.</p>
 </section>
 
 <section id="problems">
 <h2><span class="num">6</span>Problems encountered</h2>
 <div class="tbl"><table>
 <tr><th>Problem</th><th>What we did</th><th>State</th></tr>
-<tr><td>The first port (Oct 25) passed its own tests but had 8 serious defects: colliding tones, a lock-in that dropped its sign, invented constants.</td><td>Withdrew it, rebuilt phase by phase with the fidelity gate first.</td><td><span class="pill p-ok">Resolved</span></td></tr>
+<tr><td>The first port (25 Oct) passed its own tests but had 8 serious defects: colliding tones, a lock-in that dropped its sign, invented constants.</td><td>Withdrew it, rebuilt phase by phase with the fidelity gate first.</td><td><span class="pill p-ok">Resolved</span></td></tr>
 <tr><td>G26 has 8 rings; the source hard-codes 4 rings and 4 tones.</td><td>Made the ring count a parameter; searched for a collision-free 8-tone plan (4–13.5 kHz).</td><td><span class="pill p-ok">Resolved</span></td></tr>
 <tr><td>The source's extinction-ratio floor (3.5 dB) is unreachable on G26 (2.8–3.0 dB), so the controller found no setpoint.</td><td>Owner decision: 0 dB floor on G26, disclosed.</td><td><span class="pill p-ok">Decided</span></td></tr>
 <tr><td>The new sampled dithers need tones at 100 kHz ÷ even N; no 8 distinct tones work.</td><td>Reuse the source's 4 tones every 4 rings; verified by a collision check.</td><td><span class="pill p-ok">Resolved</span></td></tr>
 <tr><td>The source's new noise model adds its own amplifier assumptions, which would have doubled the squelch threshold on G26.</td><td>Use G26's own monitor noise for the threshold.</td><td><span class="pill p-ok">Resolved</span></td></tr>
 <tr><td>The source's published <code>metrics.json</code> predates its new noise model, so the source no longer reproduces it.</td><td>The fidelity gate uses the old noise settings; asked for a regeneration.</td><td><span class="pill p-warn">Open</span></td></tr>
-<tr><td>mrm-model's <code>main</code> branch was rewritten and its engine no longer builds (<code>plant.py:248</code>).</td><td>Our branch stays on the last working version; reported upstream.</td><td><span class="pill p-warn">Blocked</span></td></tr>
+<tr><td>mrm-model's <code>main</code> branch was rewritten and its simulation engine no longer builds: the optics code was refactored, the engine was not updated.</td><td>Checked a merge: it is a readability refactor with no physics change, so our branch stays on the last working version until the engine is fixed upstream.</td><td><span class="pill p-warn">Blocked</span></td></tr>
 </table></div>
 </section>
 
@@ -259,9 +265,9 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
 <h2><span class="num">7</span>Questions for review</h2>
 <div class="tbl"><table>
 <tr><th>Question</th><th>Why it matters</th></tr>
-<tr><td><b>Re-fit the controller's model to G26, or report the mismatch as a limit?</b></td><td>It is the main cause of the remaining failures. Re-fitting would be a disclosed second arm, kept separate from the faithful result.</td></tr>
-<tr><td><b>Which pass bar is the headline: 5 pm or 11.4 pm?</b></td><td>The TLC passes one and often fails the other in the same scenario.</td></tr>
-<tr><td><b>Is cold start a requirement on an 8-line grid?</b></td><td>Without knowledge of the laser grid the current start-up cannot succeed reliably; adding it changes the design.</td></tr>
+<tr><td><b>Is the tuned arm a fair second result?</b></td><td>Each change follows a diagnosed cause and none was fitted to a score, but they change the design. We report both arms side by side.</td></tr>
+<tr><td><b>Which pass bar is the headline: 5 pm or 11.4 pm?</b></td><td>As designed, the TLC passes 11.4 pm and fails 5 pm in the same slow scenarios; tuned, it passes both.</td></tr>
+<tr><td><b>Is borrowing mrm's line-finding acquisition acceptable for cold start?</b></td><td>It fixes wrong-line locking but means the TLC alone does not solve start-up on an 8-line grid.</td></tr>
 <tr><td><b>Which G26 parameters can we validate?</b></td><td>Heater time constants, crosstalk, ADC width and rate are marked "assumed" in the G26 preset. Our numbers are only as good as these.</td></tr>
 <tr><td><b>How much statistical evidence is enough?</b></td><td>Most cells are one simulated world. A 300-world cold-start run takes about 2 h per arm.</td></tr>
 </table></div>
@@ -270,9 +276,10 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
 <section id="next">
 <h2><span class="num">8</span>Next steps</h2>
 <ul class="tight">
-  <li><b>Demo:</b> use the sine dither; present the triangle result as "does not transfer to 8 rings yet".</li>
-  <li><b>After review:</b> re-run the corner matrix with the updated controller and refresh the written summary.</li>
-  <li><b>If approved:</b> a disclosed second arm that re-fits the controller's model and dither amplitude to G26, then the 300-world cold-start campaign.</li>
+  <li><b>Demo:</b> show both arms; sine dither.</li>
+  <li><b>Power step:</b> detect the fall-off and re-acquire fast enough to re-lock.</li>
+  <li><b>Squelch:</b> give the controller the squelch state, or freeze it when its dither response collapses.</li>
+  <li><b>Statistics:</b> 300-world cold-start campaign for the tuned arm; more worlds per scenario.</li>
   <li><b>Upstream:</b> merge mrm-model's <code>main</code> once its engine is fixed; ask for the ECE496 results to be regenerated.</li>
 </ul>
 <h3>Future direction: FPGA emulation</h3>
@@ -285,21 +292,22 @@ ol.tl li time{font:500 12px/1.6 var(--mono);color:var(--mute)}
 <ol class="tl">
   <li><time>25 Oct</time><span>First port; withdrawn after review found 8 defects.</span></li>
   <li><time>31 Oct</time><span>Rebuild: specification, adapter, faithful core with fidelity gate, G26 parameters, scenario matrix.</span></li>
-  <li><time>2 Nov</time><span>First full results and summary.</span></li>
+  <li><time>2 Nov</time><span>First full results.</span></li>
   <li><time>9 Nov</time><span>Owner decisions (extinction-ratio floor, unmapped scenarios); model-mismatch corner runs.</span></li>
   <li><time>10 Nov</time><span>300-world cold-start campaign for mrm's WDM supervisor.</span></li>
   <li><time>20 Nov</time><span>ECE496 update: sampled dither waveforms, photodiode noise and offset model.</span></li>
-  <li><time>26 Nov</time><span>Controller re-imported at <code>ae9556b</code> (bit-identical); four-arm dither comparison.</span></li>
+  <li><time>26 Nov</time><span>Controller re-imported at <code>ae9556b</code> (bit-identical); dither comparison; diagnosis and tuned arm; full matrix rerun with both arms.</span></li>
 </ol>
 <h3>B. Glossary</h3>
 <details><summary>Detuning and lock reference</summary><p>A ring modulates well only when its resonance sits at a fixed offset from its laser line. Heat shifts the resonance by tens of pm per kelvin; the heater pulls it back. The lock reference is the offset mrm considers ideal; our error is the distance from it.</p></details>
 <details><summary>Dither and lock-in detection</summary><p>A small heater tone makes the photodiode signal wobble. Multiplying by the tone and averaging (lock-in) extracts the wobble's size and sign, which tells which side of the resonance the ring is on. Each ring needs its own tone, chosen so that no tone, harmonic or mixing product lands near another ring's tone.</p></details>
-<details><summary>UKF and MPC</summary><p>The unscented Kalman filter fuses the lock-in ratio and the DC photodiode level with a thermal model to estimate each ring's detuning and drift. The model-predictive controller plans heater commands a few steps ahead using the same model.</p></details>
+<details><summary>UKF and MPC</summary><p>The unscented Kalman filter fuses the lock-in ratio and the DC photodiode level with a thermal model to estimate each ring's detuning, drift and optical power scale. The model-predictive controller plans heater commands a few steps ahead using the same model.</p></details>
+<details><summary>Self-heating and the hot branch</summary><p>Light absorbed in the ring heats it and pulls its resonance further toward the laser's red side. On G26 this is strong enough that a ring has two stable positions (the hot and the cold branch); losing power or overshooting makes it jump between them by close to a nanometre.</p></details>
 <details><summary>Wrong-line lock</summary><p>All 8 rings see all 8 laser lines. A ring that locks to a neighbour's line looks locked to the controller but carries the wrong channel.</p></details>
 <details><summary>Corners and priors</summary><p>Corners are alternative plants. "Corner priors" tells the controller the alternative model; "nominal priors" keeps the design model on the alternative plant, which tests model mismatch.</p></details>
 <details><summary>Clopper–Pearson interval</summary><p>An exact confidence interval for a rate measured from a small number of trials. 1 failure in 64 trials gives 0.04 %–8.4 %, which is why larger campaigns matter.</p></details>
 <h3>C. Reproduce</h3>
-<p>From the mrm-model repository on <code>feature/tlc-port</code>: <code>tools/tlc_run_all.sh</code> for the full matrix (<code>docs/tlc/results.md</code>), <code>tools/tlc_dither_compare.py</code> for the dither comparison, and <code>docs/tlc/evaluation_src/</code> (<code>extract.py</code>, then <code>build.py</code>) to rebuild this page.</p>
+<p>From the mrm-model repository on <code>feature/tlc-port</code>: <code>tools/tlc_run_all.sh</code> for the full matrix (<code>docs/tlc/results.md</code>, both arms), <code>tools/tlc_dither_compare.py</code> for the dither comparison, and <code>docs/tlc/evaluation_src/</code> (<code>extract.py</code>, then <code>build.py</code>) to rebuild this page. Written summary: <code>docs/tlc/SUMMARY.md</code>.</p>
 </section>
 </main>
 </div>
@@ -310,8 +318,8 @@ const D=JSON.parse(document.getElementById('data').textContent);
 const NS='http://www.w3.org/2000/svg',tip=document.getElementById('tip');
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const col=c=>css('--c-'+c)||css('--mute');
-const NAMES={tlc:'TLC (ECE496)',tlc_pi:'TLC PI baseline',pi_lock_c:'mrm PI',dither_lockin_c:'mrm dither lock-in',kalman_lqg_c:'mrm Kalman-LQG',mpc_c:'mrm MPC',wdm_supervisor:'mrm WDM supervisor'};
-const EXP={steady_tlc_faithful:'Steady state',tlc_xpu_step:'Die-temperature ramp',tlc_laser_drift:'Laser drift',tlc_ext_common_aggressor:'Common aggressor',tlc_a1:'Local aggressor (A1)',tlc_a1_pd_adjacent:'A1, PD side, 1.5×',tlc_power_step:'+3 dB power step',tlc_squelch:'Squelch',tlc_ext_kick:'+10 K kick',tlc_fallback:'Forced PI fallback',tlc_ext_pd_fault:'Photodiode dropout',tlc_cold:'Cold start',tlc_cold_wdm:'Cold start (WDM)',tlc_cold_campaign:'Cold start, 8 worlds'};
+const NAMES={tlc:'TLC faithful',tlc_arm2:'TLC tuned',tlc_wdm:'TLC tuned + WDM acquisition',tlc_pi:'TLC PI baseline',pi_lock_c:'mrm PI',dither_lockin_c:'mrm dither lock-in',kalman_lqg_c:'mrm Kalman-LQG',mpc_c:'mrm MPC',wdm_supervisor:'mrm WDM supervisor'};
+const EXP={steady_tlc_faithful:'Steady state',tlc_xpu_step:'Die-temperature ramp',tlc_laser_drift:'Laser drift',tlc_ext_common_aggressor:'Common aggressor',tlc_a1:'Local aggressor (A1)',tlc_a1_pd_adjacent:'A1, PD side, 1.5×',tlc_power_step:'+3 dB power step',tlc_squelch:'Squelch',tlc_ext_kick:'+10 K kick',tlc_fallback:'Forced PI fallback',tlc_ext_pd_fault:'Photodiode dropout',tlc_cold:'Cold start',tlc_cold_wdm:'Cold start (WDM)',tlc_cold_campaign:'Cold start, 8 worlds',tlc_cold_hybrid:'Cold start (WDM acquires)',tlc_cold_campaign_hybrid:'Cold start, 8 worlds (WDM acquires)',tlc_cold_campaign_wdm:'Cold start, 8 worlds (WDM)'};
 const REQ={steady_tlc_faithful:'R1',tlc_xpu_step:'R2',tlc_laser_drift:'R5',tlc_ext_common_aggressor:'R3/R4',tlc_a1:'R3/R6',tlc_a1_pd_adjacent:'R11',tlc_power_step:'R7',tlc_squelch:'R12',tlc_ext_kick:'R10',tlc_fallback:'R22',tlc_ext_pd_fault:'R21',tlc_cold:'R8'};
 function el(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
 function txt(p,x,y,s,a={}){const e=el('text',{x,y,...a},p);e.textContent=s;return e}
@@ -325,15 +333,16 @@ function frame(host,W,H){host.innerHTML='';const s=el('svg',{viewBox:`0 0 ${W} $
 const pk17=r=>Math.max(...r.peak.slice(1));
 
 /* Summary table */
-function drawGlance(){const order=['steady_tlc_faithful','tlc_xpu_step','tlc_laser_drift','tlc_ext_common_aggressor','tlc_a1','tlc_a1_pd_adjacent','tlc_power_step','tlc_squelch','tlc_ext_kick','tlc_ext_pd_fault','tlc_fallback','tlc_cold'];
+function verdict(r){const p=pk17(r),w=r.wrong.slice(1).some(Boolean),rms=r.rms.slice(1).reduce((a,b)=>a+b)/7;if(!w&&p>100&&rms<15)return'<span class="pill p-warn">Transient, relocks</span>';if(w||p>100)return'<span class="pill p-bad">Lost lock</span>';if(p<=5)return'<span class="pill p-ok">Within 5 pm</span>';if(p<=11.4)return'<span class="pill p-warn">Within 11.4 pm</span>';return'<span class="pill p-warn">Holds, &gt;11.4 pm</span>'}
+function drawGlance(){const order=['steady_tlc_faithful','tlc_xpu_step','tlc_laser_drift','tlc_ext_common_aggressor','tlc_a1','tlc_a1_pd_adjacent','tlc_power_step','tlc_squelch','tlc_ext_kick'];
   const mrm=['pi_lock_c','dither_lockin_c','kalman_lqg_c','mpc_c'];
-  const verdict=r=>{const p=pk17(r),w=r.wrong.slice(1).some(Boolean);if(w||p>100)return'<span class="pill p-bad">Lost lock</span>';if(p<=5)return'<span class="pill p-ok">Within 5 pm</span>';if(p<=11.4)return'<span class="pill p-warn">Within 11.4 pm</span>';return'<span class="pill p-warn">Holds, &gt;11.4 pm</span>'};
-  let h='<table><tr><th>Scenario</th><th>Req.</th><th class="n">TLC peak (pm)</th><th class="n">TLC rms (pm)</th><th>TLC verdict</th><th class="n">Best mrm peak (pm)</th></tr>';
-  order.forEach(e=>{const t=D.matrix.find(r=>r.exp===e&&r.ctrl==='tlc'&&!r.corner);if(!t)return;
-    let cmp=e==='tlc_cold'?D.matrix.find(r=>r.exp==='tlc_cold_wdm'&&!r.corner):null;
-    if(!cmp){const c=D.matrix.filter(r=>r.exp===e&&mrm.includes(r.ctrl)&&!r.corner);cmp=c.length?c.reduce((a,b)=>pk17(a)<=pk17(b)?a:b):null}
-    const rms=t.rms.slice(1).reduce((a,b)=>a+b)/7;
-    h+=`<tr><td>${EXP[e]}</td><td class="mono mute">${REQ[e]||''}</td><td class="n">${fmt(pk17(t))}</td><td class="n">${fmt(rms)}</td><td>${verdict(t)}</td><td class="n">${cmp?fmt(pk17(cmp))+` <span class="mute" style="font-family:var(--sans)">${NAMES[cmp.ctrl].replace('mrm ','')}</span>`:'<span class="mute">n/a</span>'}</td></tr>`});
+  let h='<table><tr><th>Scenario</th><th>Req.</th><th class="n">TLC faithful</th><th class="n">TLC tuned</th><th>Tuned verdict</th><th class="n">Best mrm</th></tr>';
+  order.forEach(e=>{const f=D.matrix.find(r=>r.exp===e&&r.ctrl==='tlc'&&!r.corner),a=D.matrix.find(r=>r.exp===e&&r.ctrl==='tlc_arm2'&&!r.corner);if(!f||!a)return;
+    const c=D.matrix.filter(r=>r.exp===e&&mrm.includes(r.ctrl)&&!r.corner),cmp=c.length?c.reduce((x,y)=>pk17(x)<=pk17(y)?x:y):null;
+    const cell=r=>fmt(pk17(r))+(r.wrong.slice(1).some(Boolean)?' <span class="bad">✕</span>':'');
+    h+=`<tr><td>${EXP[e]}</td><td class="mono mute">${REQ[e]||''}</td><td class="n">${cell(f)}</td><td class="n"><b>${cell(a)}</b></td><td>${verdict(a)}</td><td class="n">${cmp?cell(cmp)+` <span class="mute" style="font-family:var(--sans)">${NAMES[cmp.ctrl].replace('mrm ','')}</span>`:'<span class="mute">n/a</span>'}</td></tr>`});
+  const cg=(x,y)=>D.campaigns.find(r=>r.exp===x&&r.ctrl===y);const cf=cg('tlc_cold_campaign','tlc'),ch=cg('tlc_cold_campaign_hybrid','tlc_wdm'),cw=cg('tlc_cold_campaign_wdm','wdm_supervisor');
+  if(cf&&ch)h+=`<tr><td>Cold start, wrong-line ring trials (8 worlds)</td><td class="mono mute">R9</td><td class="n">${cf.wrong[0]} / ${cf.wrong[1]} <span class="bad">✕</span></td><td class="n"><b>${ch.wrong[0]} / ${ch.wrong[1]}</b></td><td>${ch.wrong[0]/ch.wrong[1]<=0.05?'<span class="pill p-ok">Matches WDM</span>':'<span class="pill p-warn">Partial</span>'}</td><td class="n">${cw?cw.wrong[0]+' / '+cw.wrong[1]:'—'} <span class="mute" style="font-family:var(--sans)">WDM supervisor</span></td></tr>`;
   document.getElementById('glance').innerHTML=h+'</table>'}
 
 /* Fig 2 scorecard */
@@ -355,30 +364,30 @@ function drawScore(){
   document.getElementById('scLegend').innerHTML=rows.map(r=>`<span><i style="background:${col(r.ctrl)}"></i>${NAMES[r.ctrl]}</span>`).join('')}
 
 /* Fig 3 traces */
-const pairs=[];for(let i=0;i<D.traces.length;i+=2)pairs.push(i);
+const pairs=[];for(let i=0;i<D.traces.length;i+=3)pairs.push(i);
 let tr={pair:0,rings:new Set([0,1,2,3,4,5,6,7]),zoom:false};
-const NOTES=['Steady state: the TLC wanders ±5–10 pm around its setpoint; Kalman-LQG settles to about 0.01 pm after warm-up.','Local aggressor: heat near rings 0–1 makes the TLC lose lock and two rings jump to a neighbouring line (≈1 nm); MPC rides through except on ring 0.','Squelch: with no modulation on the monitor the TLC drifts to 34 pm; mrm PI holds rings 1–7.','+10 K die-wide kick: the TLC does not relock (179 pm); Kalman-LQG recovers.','Cold start (800 ms): the TLC parks most rings one line-spacing away (wrong line); the WDM supervisor brings every ring home.'];
-function drawTraceOne(host,t){const W=430,H=240,m={l:46,r:8,t:20,b:24};const s=frame(host,W,H);
+const NOTES=['Steady state: as designed the TLC wanders ±5–10 pm; tuned it stays within ±1 pm; Kalman-LQG settles to about 0.01 pm.','Local aggressor: as designed two rings jump to a neighbouring line (≈1 nm); tuned and MPC both ride through except on ring 0, which runs out of heater.','Squelch: with no modulation on the monitor the TLC as designed drifts to 34 pm; tuned and mrm PI both see about 20 pm at the edges.','+10 K die-wide kick: as designed the TLC never relocks; tuned it relocks within milliseconds, like Kalman-LQG.','Cold start (800 ms): as designed most rings end one line-spacing away; with the WDM supervisor acquiring, every ring reaches its own line.'];
+function drawTraceOne(host,t){const W=300,H=230,m={l:40,r:6,t:20,b:24};const s=frame(host,W,H);
   const vis=[...tr.rings];let mx=1;vis.forEach(i=>t.err[i].forEach(v=>mx=Math.max(mx,Math.abs(v))));if(tr.zoom)mx=20;
   const x=linScale(0,t.t_ms[t.t_ms.length-1],m.l,W-m.r),y=linScale(-mx,mx,H-m.b,m.t);
   el('rect',{x:m.l,y:m.t,width:Math.max(0,x(t.score_ms)-m.l),height:H-m.t-m.b,fill:css('--soft')},s);
   niceTicks(-mx,mx,4).forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--line')},s);txt(s,m.l-5,y(v)+3,v,{'text-anchor':'end'})});
-  niceTicks(0,t.t_ms[t.t_ms.length-1],4).forEach(v=>txt(s,x(v),H-8,v+' ms',{'text-anchor':'middle'}));
+  niceTicks(0,t.t_ms[t.t_ms.length-1],3).forEach(v=>txt(s,x(v),H-8,v+' ms',{'text-anchor':'middle'}));
   [5,-5].forEach(v=>{if(v<mx)el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--ok'),class:'ref'},s)});
   const cg=el('g',{},s);el('clipPath',{id:'c'+host.id},s).appendChild(el('rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'#000'}));cg.setAttribute('clip-path',`url(#c${host.id})`);
   const ramp=i=>`hsl(${200+i*20} ${40+i*4}% ${i%2?58:42}%)`;
   vis.forEach(i=>{const d=t.err[i].map((v,k)=>(k?'L':'M')+x(t.t_ms[k]).toFixed(1)+' '+y(v).toFixed(1)).join('');
     const p=el('path',{d,fill:'none',stroke:ramp(i),'stroke-width':1.3},cg);hov(p,`ring ${i}: rms ${fmt(t.rms[i])} pm, peak ${fmt(t.peak[i])} pm${t.wrong[i]?' · wrong line':''}`)});
-  txt(s,m.l,12,NAMES[t.ctrl],{style:`fill:${col(t.ctrl)};font-weight:600;font-size:12px`});txt(s,W-m.r,12,'error (pm)',{'text-anchor':'end'})}
+  txt(s,m.l,12,NAMES[t.ctrl],{style:`fill:${col(t.ctrl)};font-weight:600;font-size:12px`});txt(s,W-m.r,12,'pm',{'text-anchor':'end'})}
 function drawTraces(){const i=pairs[tr.pair];
   buttons(document.getElementById('trSel'),pairs.map((p,k)=>[k,EXP[D.traces[p].exp]||D.traces[p].exp]).concat([['z',tr.zoom?'Zoom ±20 pm: on':'Zoom ±20 pm: off']]),tr.pair,k=>{if(k==='z')tr.zoom=!tr.zoom;else tr.pair=k;drawTraces()},false,'Scenario');
   buttons(document.getElementById('trRings'),[0,1,2,3,4,5,6,7].map(r=>[r,String(r)]),tr.rings,r=>{tr.rings.has(r)?tr.rings.delete(r):tr.rings.add(r);drawTraces()},true,'Rings');
-  drawTraceOne(document.getElementById('trA'),D.traces[i]);drawTraceOne(document.getElementById('trB'),D.traces[i+1]);
+  ['trA','trB','trC'].forEach((id,k)=>drawTraceOne(document.getElementById(id),D.traces[i+k]));
   document.getElementById('trNote').textContent=NOTES[tr.pair]||''}
 
 /* Fig 4 cold start */
-function drawCold(){const camp=D.dither.find(r=>r.exp==='tlc_cold_campaign'&&r.arm==='triangle');
-  const rows=[['TLC, sine · 8 worlds',43,64,.5431,.7841,'tlc'],['TLC, triangle · 8 worlds',39,64,.4793,.7290,'triangle'],['WDM supervisor · 8 worlds',1,64,.0004,.084,'wdm_supervisor'],['WDM supervisor · 300 worlds',12,2400,.0026,.0087,'wdm_supervisor']];
+function drawCold(){const cg=(x,y,l,c)=>{const r=D.campaigns.find(q=>q.exp===x&&q.ctrl===y);return r?[l,...r.wrong,c]:null};
+  const rows=[cg('tlc_cold_campaign','tlc','TLC faithful · 8 worlds','tlc'),cg('tlc_cold_campaign_hybrid','tlc_wdm','TLC tuned + WDM · 8 worlds','tlc_arm2'),cg('tlc_cold_campaign_wdm','wdm_supervisor','WDM supervisor · 8 worlds','wdm_supervisor'),['WDM supervisor · 300 worlds',12,2400,.0026,.0087,'wdm_supervisor']].filter(Boolean);
   const W=430,H=172,m={l:160,r:14,t:10,b:24},s=frame(document.getElementById('cpChart'),W,H),x=linScale(0,1,m.l,W-m.r);
   [0,.25,.5,.75,1].forEach(v=>{el('line',{x1:x(v),x2:x(v),y1:m.t,y2:H-m.b,stroke:css('--line')},s);txt(s,x(v),H-8,(v*100)+'%',{'text-anchor':'middle'})});
   rows.forEach(([l,k,n,lo,hi,c],i)=>{const yy=m.t+18+i*34;txt(s,m.l-10,yy+4,l,{'text-anchor':'end',style:'fill:'+css('--ink')});
@@ -398,7 +407,7 @@ function drawCold(){const camp=D.dither.find(r=>r.exp==='tlc_cold_campaign'&&r.a
 let hm={know:'corner',exp:'tlc_a1'};const CORN=['g26_fast_thermal','g26_slow_thermal','g26_textbook_thermal','g26_tec_package'],CL={g26_fast_thermal:'Fast thermal',g26_slow_thermal:'Slow thermal',g26_textbook_thermal:'Textbook thermal',g26_tec_package:'TEC-held package'};
 function drawHeat(){buttons(document.getElementById('knSel'),[['corner','Corner model'],['nominal','Nominal model (mismatch)']],hm.know,k=>{hm.know=k;drawHeat()},false,'Controllers know');
   buttons(document.getElementById('knExp'),[['tlc_a1','Local aggressor'],['steady_tlc_faithful','Steady state']],hm.exp,k=>{hm.exp=k;drawHeat()},false,'Scenario');
-  const ctrls=['tlc','pi_lock_c','kalman_lqg_c','mpc_c'];const nom=D.matrix.filter(r=>r.exp===hm.exp);
+  const ctrls=['tlc','tlc_arm2','pi_lock_c','kalman_lqg_c','mpc_c'];const nom=D.matrix.filter(r=>r.exp===hm.exp);
   const cell=r=>{if(!r)return'<td class="mute">—</td>';const p=pk17(r),bad=r.wrong.some(Boolean)||p>100,mid=p>5;
     const bg=bad?css('--bad'):mid?css('--warn'):css('--ok');return`<td style="background:color-mix(in srgb,${bg} 16%,transparent)">${bad?'<b>lost</b>':fmt(p)}</td>`};
   let h='<table class="heat"><tr><th style="text-align:left">Controller</th><th>Nominal plant</th>'+CORN.map(c=>`<th>${CL[c]}</th>`).join('')+'</tr>';

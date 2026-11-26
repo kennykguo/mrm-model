@@ -4,46 +4,47 @@ This branch ports the ECE496 thermal locking controller (TLC,
 [msilve160/ECE496_project](https://github.com/msilve160/ECE496_project)) into mrm-model and runs it closed loop on
 the 8-ring G26 transmitter, next to mrm's own controllers.
 
-**Status:** framework complete (spec Phases 0-4); first results pass written (Phase 5). Open items are tracked in
-[`PLAN.md`](PLAN.md).
+**Status:** framework complete; faithful and tuned (second-arm) results written. Open items: [`PLAN.md`](PLAN.md).
 
 | | |
 |---|---|
 | Results write-up | [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md) |
+| Interactive evaluation page | [`docs/tlc/tlc_g26_evaluation.html`](docs/tlc/tlc_g26_evaluation.html) (open in a browser) |
 | Full tables | [`docs/tlc/results.md`](docs/tlc/results.md) (`.json` alongside) |
 | How the pieces fit | [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md) |
-| Spec, decisions and plan | [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) |
-| Tracker | [`PLAN.md`](PLAN.md) |
+| Spec and decisions | [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) |
+| Status | [`PLAN.md`](PLAN.md) |
 
 ## Run
 ```bash
-tools/tlc_run_all.sh                       # full matrix, ~10 min -> docs/tlc/results.md
+tools/tlc_run_all.sh                       # full matrix, ~45 min -> docs/tlc/results.md
 .venv/bin/python tools/tlc_run.py experiments/tlc/steady_tlc_faithful.yaml   # one experiment
 .venv/bin/python -m pytest tests/tlc -q    # framework tests
 ```
-The fidelity tests need the source checkout at `../ECE496_project` or `$ECE496_PATH` (commit `f98ce84`); without it they are skipped.
+The fidelity tests need the source checkout at `../ECE496_project` or `$ECE496_PATH` (commit `ae9556b`); without it
+they are skipped.
 
 ## What is on this branch
 | Path | Contents |
 |---|---|
 | `mrm/control/tlc/core/` | The ECE496 TLC (blocks B1-B10), vendored with attribution; every deviation listed in its README |
-| `mrm/control/tlc/` | Adapter to mrm's controller API, G26 priors, telemetry log |
-| `experiments/tlc/` | One YAML per scenario, `matrix.yaml` (scenarios, comparators, model-trust corners) |
-| `tools/tlc_*.py`, `tools/tlc_run_all.sh` | Runner, matrix driver, report and lock-in diagnostic |
+| `mrm/control/tlc/` | Adapter to mrm's controller API, G26 priors, tone plans, telemetry log; second arm (`arm2.py`, `hybrid.py`) |
+| `experiments/tlc/` | One YAML per scenario, `matrix.yaml` (scenarios, controllers, model-trust corners) |
+| `tools/tlc_*.py`, `tools/tlc_run_all.sh` | Runner, matrix driver, report, dither comparison, lock-in diagnostic |
 | `tests/tlc/` | Contract, plumbing and fidelity tests (bit-identical to the source on the source plant) |
-| `archive/tlc_rev1/` | The withdrawn rev 1 port, kept for reference ([`docs/tlc/REV1_REVIEW.md`](docs/tlc/REV1_REVIEW.md)) |
 
-## Headline results (first pass)
-- The faithful TLC holds lock in every slow or moderate disturbance (steady state, die ramp, laser drift,
-  common-mode aggressor, PD dropout) at 2-3.5 pm rms: inside the ECE496 2 GHz threshold, not inside mrm's 5 pm
-  budget on every ring. mrm's PI, Kalman-LQG and MPC controllers hold the same cases at 0.01-0.2 pm.
-- It loses lock under the A1 on-die aggressor, squelch and the +10 K kick, and its cold-start acquisition ends on
-  a wrong line in most ring trials. Each failure was predicted from the plant differences before the runs.
-- Details, intervals, corners and every deviation from the source: [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md).
+## Headline results
+- **Faithful TLC** (as published): 1.8-2.6 pm rms in slow disturbances (6-8 pm peak: inside ECE496's 11.4 pm, not
+  mrm's 5 pm); loses lock under the A1 aggressor and the +10 K kick; cold start ends on a foreign line in 43 / 64 ring
+  trials.
+- **Tuned TLC** (four disclosed G26 adaptations): every slow scenario under 5 pm on every ring (0.86-3.0 pm peak),
+  A1 and the kick recovered, cold-start wrong lines 1 / 64. It beats mrm's dither lock-in everywhere, matches mrm's
+  PI / Kalman-LQG / MPC under A1 and squelch, and stays behind them in quiet steady state (its own ~0.9 pm dither).
+- Details: [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md).
 
 ## Known constraints
 - Upstream `main` is broken and was force-pushed with rewritten history; this branch merges main up to `ca3f8fe`
-  (see `PLAN.md`, item 2).
+  (see `PLAN.md`, open item 4).
 - `tests/verification` needs `gymnasium`; the first `mrm run` spends ~2 min on numba compilation (cached afterwards).
 
 ---
