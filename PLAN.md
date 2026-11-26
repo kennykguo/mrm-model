@@ -39,7 +39,9 @@ Run everything: `tools/tlc_run_all.sh` (~10 min) → `docs/tlc/results.md`. Eval
    First results: every A1 verdict is the same under both priors, for the TLC (TEC-package ride-through included)
    and for `kalman_lqg_c` / `mpc_c` (rings 1-7 peak 12.6 / 33 / lost / 3.6 pm on fast / slow / textbook / TEC).
 5. **Refresh `docs/tlc/SUMMARY.md`** once items 1, 3 and 4 land.
-6. **Second arm** (spec 6, Q1): a disclosed a-priori re-parameterisation (dither amplitude, ζ-model gains). In
+6. **Second arm: first version DONE 2026-11-26** ([`docs/tlc/ARM2.md`](docs/tlc/ARM2.md)): capped dither, stiff DC scale,
+   red-side waiting re-lock, WDM-supervisor acquisition (`tlc_wdm`). Open: power step (blue fall-off), squelch.
+   Original scope: a disclosed a-priori re-parameterisation (dither amplitude, ζ-model gains). In
    scope, after the item 5 refresh is committed.
 
 ## Decided

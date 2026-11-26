@@ -1,0 +1,22 @@
+# SECOND ARM (spec 6, Q1): cold start with tlc_wdm (mrm.control.tlc.hybrid): the WDM supervisor acquires, the TLC tracks.
+# faithful TLC starts in its own ACQUIRE (a heater ramp from the blue side, 2 GHz/ms). The G26 rings start ~1170 GHz
+# (~6.7 nm) blue of their lines, so the ramp crosses foreign lines first: expected discrepancy 2 (wrong-line locks).
+# A ring counts as locked when it ends within 300 pm of its own line (as acceptance B5). TLC only; the comparator
+# wdm_supervisor runs from experiments/tlc/cold_wdm.yaml.
+extends: g26
+meta: {name: tlc_cold_hybrid, kind: experiment, description: "cold start, 25 degC; WDM supervisor acquires, TLC tracks (second arm)"}
+controller_interface:
+  knowledge: [line_grid, ring_to_line, model_nominal, heater_nominal, optics_nominal, dlambda_dt_nominal, monitor_nominal]
+  bind: {tx.assignment: controller}     # the WDM supervisor chooses the assignment (cyclic), as in cold_wdm.yaml
+controller: {name: tlc_wdm, params: {tlc: {core: faithful}}}
+scenario: {name: static}
+metrics: {lock_reference: line, allowed_assignments: cyclic, lock_threshold_pm: 300.0, hysteresis_pm: 20.0}
+experiment:
+  kind: run
+  duration_s: 0.8
+  batch: 1
+  seeds: {device: 0, uncertainty: 0, noise: 0, scenario: 0}
+  uncertainty: nominal
+  variation: "off"
+  start: cold
+  score_from_s: 0.0

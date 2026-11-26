@@ -25,6 +25,12 @@ ARMS = {
     "square": {"dither_shape": "square"},
     # second arm (disclosed re-parameterisation, spec 6 Q1): dither amplitude capped at 0.15 GHz (~0.9 pm)
     "arm2_d015": {"cp_overrides": {"dither_max": 0.15, "dither_nominal": 0.15, "dither_min": 0.05}},
+    # + the UKF's DC-scale state held stiff (mrm.control.tlc.arm2: level changes go to detuning)
+    "arm2_stiff": {"cp_overrides": {"dither_max": 0.15, "dither_nominal": 0.15, "dither_min": 0.05},
+                   "arm2": {"stiff_scale_rel": 0.005}},
+    # + stiff scale only once settled, and red-side waiting re-lock for a ring lost at the heater floor
+    "arm2_full": {"cp_overrides": {"dither_max": 0.15, "dither_nominal": 0.15, "dither_min": 0.05},
+                  "arm2": {"stiff_scale_rel": 0.005, "stiff_settle_s": 0.03, "red_wait_s": 0.05}},
 }
 EXPERIMENTS = (
     "experiments/tlc/steady_tlc_faithful.yaml",

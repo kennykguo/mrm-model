@@ -13,8 +13,10 @@ computed once per ControllerSpec. Differences from the source's own driver (``th
 - dither shape: ``dither_shape`` selects the source's B1 waveform (sine, square, three, triangle, qsine). A sampled
   shape needs tones at out_rate / N, so it uses ``tone_plan.sampled_plan`` instead of the 250 Hz-grid sine plan;
   ``tone_plan="sampled"`` puts a sine on that plan too (separates the shape from the tone plan in a comparison);
-- second arm (spec 6, Q1): ``cp_overrides`` replaces ControllerParams fields a priori (e.g. dither amplitude). Any
-  run that sets it is a disclosed re-parameterisation, not the faithful baseline.
+- second arm (spec 6, Q1): ``cp_overrides`` replaces ControllerParams fields a priori (e.g. dither amplitude) and
+  ``arm2`` switches on G26 adaptations of the core (:mod:`mrm.control.tlc.arm2`); ``pp_overrides`` replaces plant
+  priors (e.g. crosstalk to every ring instead of the nearest three). Any run that sets either is the
+  disclosed second arm, not the faithful baseline.
 """
 from __future__ import annotations
 
@@ -48,7 +50,8 @@ def priors_for(spec: ControllerSpec) -> TlcPriors:
 
 class FaithfulCore:
     def __init__(self, spec: ControllerSpec, *, ts: float, n_out: int, kind: str = "tlc", dither_shape: str = "sine",
-                 tone_plan: str = "auto", cp_overrides: dict | None = None):
+                 tone_plan: str = "auto", cp_overrides: dict | None = None, arm2: dict | None = None,
+                 pp_overrides: dict | None = None):
         if dither_shape not in DITHER_SHAPES:
             raise ValueError(f"faithful core: dither_shape must be one of {DITHER_SHAPES}, got {dither_shape!r}")
         if tone_plan not in TONE_PLANS:
@@ -59,13 +62,22 @@ class FaithfulCore:
             pr = dataclasses.replace(pr, cp=cp)
         if cp_overrides:
             pr = dataclasses.replace(pr, cp=dataclasses.replace(pr.cp, **cp_overrides))
+        if pp_overrides:
+            pr = dataclasses.replace(pr, pp=dataclasses.replace(pr.pp, **{k: tuple(v) if isinstance(v, list) else v
+                                                                          for k, v in pp_overrides.items()}))
         if abs(ts - pr.cp.ts) > 1e-12:
             raise ValueError(f"faithful core: the adapter's core period {ts} s must be the source's {pr.cp.ts} s")
         if n_out != int(round(pr.cp.ts * pr.cp.out_rate)):
             raise ValueError(f"faithful core: {n_out} samples per core step, the source plans "
                              f"{int(round(pr.cp.ts * pr.cp.out_rate))}")
         self.priors = pr
-        self.ctl = KINDS[kind](pr.pp, pr.cp)
+        if arm2:
+            if kind != "tlc":
+                raise ValueError("faithful core: arm2 options apply to the TLC only")
+            from mrm.control.tlc.arm2 import Arm2Options, Arm2TLC
+            self.ctl = Arm2TLC(pr.pp, pr.cp, options=Arm2Options.from_dict(arm2))
+        else:
+            self.ctl = KINDS[kind](pr.pp, pr.cp)
         self._add_dac_latency(spec.heater_dac.latency_ticks * spec.tick_s)
         self.n = pr.cp.n_rings
         self.last = self._start_last(np.zeros(self.n))
