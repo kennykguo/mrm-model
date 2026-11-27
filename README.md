@@ -8,7 +8,8 @@ the 8-ring G26 transmitter, next to mrm's own controllers.
 
 | | |
 |---|---|
-| Results write-up | [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md) |
+| Client report | [`docs/tlc/CLIENT_REPORT.md`](docs/tlc/CLIENT_REPORT.md) |
+| Results write-up (team) | [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md) |
 | Interactive evaluation page | [`docs/tlc/tlc_g26_evaluation.html`](docs/tlc/tlc_g26_evaluation.html) (open in a browser) |
 | Full tables | [`docs/tlc/results.md`](docs/tlc/results.md) (`.json` alongside) |
 | How the pieces fit | [`docs/tlc/WALKTHROUGH.md`](docs/tlc/WALKTHROUGH.md) |

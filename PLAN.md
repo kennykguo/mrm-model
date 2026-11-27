@@ -1,7 +1,7 @@
 # TLC Port: Status
 
 **Branch:** `feature/tlc-port` · **Spec:** [`docs/TLC_PORT_SPEC_AND_PLAN.md`](docs/TLC_PORT_SPEC_AND_PLAN.md) ·
-**Results:** [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md) (tables: [`docs/tlc/results.md`](docs/tlc/results.md);
+**Results:** [`docs/tlc/SUMMARY.md`](docs/tlc/SUMMARY.md), client report [`docs/tlc/CLIENT_REPORT.md`](docs/tlc/CLIENT_REPORT.md) (tables: [`docs/tlc/results.md`](docs/tlc/results.md);
 page: [`docs/tlc/tlc_g26_evaluation.html`](docs/tlc/tlc_g26_evaluation.html))
 **Source:** `../ECE496_project/thermal_control/` @ `ae9556b` · **Updated:** 2026-11-26
 
